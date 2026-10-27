@@ -115,7 +115,7 @@
         <li><a href="#spectrogram">スペクトログラム／ラウドネス</a></li>
         <li><a href="#shortcuts">ショートカット</a>
           <ol>
-            <li><a href="#shortcuts-accesskeys">UI に下線が出ない Alt キー</a></li>
+            <li><a href="#shortcuts-accesskeys">UI に下線が出ない Alt+Shift キー</a></li>
             <li><a href="#shortcuts-file">ファイル／タブ</a></li>
             <li><a href="#shortcuts-play">再生</a></li>
             <li><a href="#shortcuts-view">表示／ズーム</a></li>
@@ -172,7 +172,7 @@
             <li>名前を付けて保存はフォルダを選び、各ファイルを Wave で書いて、タブがその新しいファイルを指すようになります。書き出しと違い、保存後のファイルが今のタブになります。</li>
             <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> は MP3 専用です。ファイルを出すだけで、今のタブはそのままです（書き出した MP3 は開きません）。</li>
             <li>MP3 はいったん 16 bit の音から作り直します。3 チャンネル以上、またはスピーカーの割り当てを変えているときは、今聴いている左右 2 本にまとめた音を書きます（くわしくは <a href="#mp3-downmix">MP3 のダウンミックス</a>。確認は出しません）。</li>
-            <li>設定で LAME の場所が正しければそれを使い、空欄や無効なら Windows で書き出します（既定 192 kbps）。マーカーなどは MP3 には書きません。</li>
+            <li>設定で LAME の場所が正しければそれを使い（オプション空欄時は <code>-V2 --noreplaygain</code>）、空欄や無効なら Windows で書き出します（既定 192 kbps）。マーカーなどは MP3 には書きません。</li>
           </ul>
         </li>
         <li>Wwise へ渡すときは、レベルメーター上の <span class="ui">WAAPI</span> をオンにし、作成先を選んで <span class="ui">EXPORT</span> します。</li>
@@ -216,7 +216,7 @@
         <ul>
           <li>設定・新規・保存確認などのダイアログでは <kbd>Tab</kbd> でボタンへも移動できます。</li>
           <li><kbd>Ctrl</kbd>+<kbd>Tab</kbd>／<kbd>Ctrl</kbd>+<kbd>PageDown</kbd> で次のタブ、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>／<kbd>Ctrl</kbd>+<kbd>PageUp</kbd> で前のタブ（端から反対側へ回る。長押しの連続送りは端で一旦止まる）。<kbd>Esc</kbd> で閉じます。</li>
-          <li>幅はオーディオタブの内容に合わせます。タブは一般／表示項目／オーディオ／プレイヤー／編集／書き出し・パス／Wwise です。</li>
+          <li>幅はオーディオタブの内容に合わせます。タブは一般／レイアウト／表示項目／カラー／オーディオ／プレイヤー／編集／書き出し・パス／Wwise です。</li>
         </ul>
 
         <h4>一般</h4>
@@ -224,7 +224,7 @@
           <li><strong>表示言語</strong> …… Auto／Japanese／English。Auto は、パソコンが日本語なら Japanese、それ以外は English です。</li>
           <li><strong>表示倍率</strong> …… 100〜200%。Windows の拡大に加えて、さらに大きくします。小さくはできません。効くのはメイン画面だけです。右クリックメニューや設定などの別ウィンドウ、編集履歴は 100% のままです。選んだ瞬間に変わり、キャンセルで戻します。</li>
           <li><strong>複数ファイル</strong> …… 2 つ以上開いたあとの並べ方。タブのまま／左右／上下／上下左右。最初はタブのままです。</li>
-          <li><strong>起動モード</strong> …… エディタ（通常）／エディタ（フルスクリーン：アナライザー有り）／エディタ（フルスクリーン：アナライザー無し）／プレイヤー（通常）／プレイヤー（コンパクト）。既定はエディタ（通常）。コンパクトはプレイリストと波形だけです。ファイルを渡さずに起動したときだけ入ります。引数や関連付けでファイルを開いたときは、今までどおり種類で決まります。次回起動から効きます。</li>
+          <li><strong>起動モード</strong> …… <span class="ui">F09：プレイヤーモード１</span>（プレイリスト＋波形のコンパクト）／<span class="ui">F10：プレイヤーモード２</span>／<span class="ui">F11：エディタモード１</span>／<span class="ui">F12：エディタモード２</span>。既定は F12。ファイルを渡さず、前回の編集も復元しないときだけ入ります。引数や関連付けでファイルを開いたとき、または前回タブを復元するときは使いません。次回起動から効きます。各モードの見た目はレイアウトタブのプリセットで変えられます。</li>
           <li><strong>同時処理数</strong> …… 書き出しと破壊編集の並列処理数（既定 Auto＝CPU コア数の 1/4。上限はコア数の 1/2）。</li>
           <li><strong>壁紙</strong> …… 動的背景の上に重ねる画像です。最初は無し。参照で画像（JPEG / PNG / BMP / GIF / TIFF）を選び、クリアまたは空欄で外します。読めないパスは出しません。パスを指定した瞬間、および不透明度を変えた瞬間に画面へ反映し、キャンセルで開く前へ戻します。不透明度は 0〜100%（最初は 10%）。欄の ↑↓ とマウスホイールで 1% ずつ変わります。比率は変えず、中央を基準に画面全体を覆います（はみ出しは切れ、タイルには並べません）。動画や PDF を背面に出しているときは、その手前に隠れます。</li>
           <li>
@@ -237,6 +237,12 @@
               <li>そのときのプレイヤーは前面 UI なしで起動します。<kbd>A</kbd>／<kbd>T</kbd> の表示は F8 と共通で覚えます（既定オン。変えた状態は本再生とミニで共通に覚え、以後ずっと使う）。</li>
             </ul>
           </li>
+        </ul>
+
+        <h4>レイアウト</h4>
+        <ul>
+          <li><strong>メニューバーを表示</strong> …… 既定オン。ウィンドウ上部のメニュー（波形の右クリックと同じ内容。「この位置」は無し。基準は再生ヘッド）。オフで隠します。選んだ瞬間に反映し、キャンセルで戻します。<kbd>F9</kbd> の最小 UI 中は設定に関わらず出しません。表示中の <kbd>Alt</kbd>+文字はルートメニューを開きます（トグル系は <kbd>Alt</kbd>+<kbd>Shift</kbd>+文字。くわしくは <a href="#shortcuts-accesskeys">ショートカット</a>）。</li>
+          <li><strong>F9〜F12 プリセット</strong> …… 各モードごとに、全画面（オフ／オン／トグル）／トグル時の初回全画面／波形（プレイヤー枠のみ。エディタは常にオン）／レベルメーター／ステータスバー／アナライザー（位置）を覚えます。ライブラリ列は設定では変えられず、スロット既定のままです（F9 オフ／F10 オン／F11・F12 オフ）。「既定に戻す」でそのモードだけ初期に戻します。既定の中身の目安: F9＝波形オン・他オフ・全画面オフ／F10＝プレイヤー一式オン・全画面オフ／F11＝アナライザーオフ（レベルメーター／ステータスバーはオン）・全画面トグル（初回オン）／F12＝アナライザーオン・全画面トグル（初回オフ）。起動モードや <kbd>F9</kbd>〜<kbd>F12</kbd> キーで入る見た目の土台です（キーのフルスクリーン挙動そのものは別説明）。</li>
         </ul>
 
         <h4>表示項目</h4>
@@ -268,6 +274,12 @@
           <li><strong>波形表示の幅</strong> …… Wave 用と MP3 用を、それぞれの列チェックの一番下で別々に選べます。S（短）／M（中）／L（長）。Wave / MP3 とも最初は L。M は S の 2 倍、L は 3 倍です。WAVE / AIFF だけのリストは Wave 側、MP3 / M4A だけは MP3 側、混ざっているときは広い方です。「既定に戻す」でもその側の幅を戻します。リストを出したあと、波形の棒は少し遅れて描きます。</li>
         </ul>
 
+        <h4>カラー</h4>
+        <ul>
+          <li><strong>色設定</strong> …… アプリの配色パネルを開きます（VIEW の重なり円ボタンや <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> と同じ。くわしくは <a href="#layout-color">色設定</a>）。</li>
+          <li><strong>ファイル名の色</strong> …… ファイル名に文字列が含まれると、先頭に縦の色マーカーを付けます。上から見て最初に一致した色を使います。大文字と小文字は区別しません。空の文字列と、範囲外の色は設定を確定したときに捨てます。同じ色は何度でも使えます。色は Wwise と同じ 28 色です。行の ▲／▼ で順番を変え、追加はリストのすぐ下に付きます。手動で付けた色があるファイルでは、このルールより手動が優先されます。出し方と記録の残り方は <a href="#layout-filename-color">ファイル名の色</a> です。</li>
+        </ul>
+
         <h4>オーディオ</h4>
         <ul>
           <li><strong>既定 Wave フォーマット</strong> …… 最初は 48kHz / 24bit / Stereo。新しいファイルに使います。チャンネルは、有効にしたスピーカーと、いつも選べるモノラルです。</li>
@@ -282,29 +294,33 @@
         </ul>
 
         <h4>プレイヤー</h4>
-        <p>先頭が<strong>ギャップレス再生</strong>（既定オン。何をするかは <a href="#layout-gapless">ギャップレス再生</a>）。続けて左ツリーのルートです。既定はマイミュージック。登録・削除・上から順の並び替えができます。見つからない登録は赤字で表示します。ルートは設定のほか、ツリーの右クリック／メニューキー「ツリーのルートに登録」、またはエクスプローラーからフォルダをツリーへドロップしても追加できます（既にルートなら「ツリーのルートから外す」）。並び替えは設定の上へ／下へ、ルート選択時の <kbd>Alt</kbd>+↑／↓、またはルートをツリー内でドラッグしてもできます。</p>
+        <ul>
+          <li><strong>ギャップレス再生</strong> …… 既定オン。何をするかは <a href="#layout-gapless">ギャップレス再生</a>。</li>
+          <li><strong>ライブラリ索引</strong> …… 現在の容量を表示。<span class="ui">Clear</span> で消去します（確認あり）。タイトルやアーティストなどのタグ検索は、次に <kbd>Ctrl</kbd>+<kbd>F5</kbd> で構築するまで当たりません。</li>
+          <li><strong>左ツリーのルート</strong> …… 既定はマイミュージック。登録・削除・上から順の並び替えができます。見つからない登録は赤字で表示します。ルートは設定のほか、ツリーの右クリック／メニューキー「ツリーのルートに登録」、またはエクスプローラーからフォルダをツリーへドロップしても追加できます（既にルートなら「ツリーのルートから外す」）。並び替えは設定の上へ／下へ、ルート選択時の <kbd>Alt</kbd>+↑／↓、ツリーの右クリック「ルートを上へ／下へ」、またはルートをツリー内でドラッグしてもできます。</li>
+        </ul>
 
         <h4>編集</h4>
         <ul>
-          <li><strong>ラウドネスターゲット</strong> …… LKFS。</li>
+          <li><strong>ラウドネスターゲット</strong> …… 既定 −24 LKFS（−70〜0）。メーター色分けとラウドネス揃えの既定値に使います。</li>
           <li><strong>無音しきい値</strong>（Silent Skip）…… 最初は -60 dB。-120 から 0。再生の飛ばしと、オン時の録音のゲートに使います。<a href="#silence-hit">無音・ヒット検出</a>（<kbd>Ctrl</kbd>+<kbd>D</kbd>）のしきい値とは共有しません。</li>
           <li>横に、割り当てた録音をモノラルにしたレベルメーターがあります。バーはピーク。赤線と数値は谷の平均で、ピークではありません。編集タブでも入力を監視します。</li>
           <li><strong>スキップ時の無音挿入時間</strong> …… 最初は 500 ms。それ以上の無音は縮めます。0 なら無音は全部捨てます。0 から 10000。再生には使いません。</li>
           <li><strong>プチノイズ防止フェード</strong> …… 最初は 20 ms。1 から 100。リージョン毎のノーマライズと Silent Skip 録音の継ぎ目に使います。無音・ヒット検出のカット時フェードとは独立です。</li>
-          <li><strong>フェードカーブ既定</strong>。</li>
+          <li><strong>フェードカーブ既定</strong> …… フェードイン／アウトとも既定は S-Curve（Sカーブ）。</li>
           <li>リージョンを付けるかどうかは、録音を始めるときに指定します。</li>
         </ul>
 
         <h4>書き出し・パス</h4>
         <ul>
-          <li><strong>オーディオ</strong> …… LAME パス／LAME オプション／Windows ビットレート（LAME を使わないとき）。</li>
+          <li><strong>オーディオ</strong> …… LAME パス／LAME オプション（空欄時は <code>-V2 --noreplaygain</code>）／Windows ビットレート（LAME を使わないとき。128〜320 kbps。最初は 192）。</li>
           <li>
             <p><strong>ムービー</strong> …… 再生用プロキシと ffmpeg の設定です。</p>
             <ul>
               <li>FFmpeg パス（利用推奨。プロキシ生成に使う）</li>
               <li>プロキシを自動生成しない（既定オフ。F8／関連付け・引数起動ではオフでも自動生成しません。自動生成は F9／F10 の本再生時だけ）</li>
               <li>プレイリスト／本再生／ミニでは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> で強制生成できます（設定や F8 抑止を無視）</li>
-              <li>未使用プロキシの保存日数（動画ごと。起動だけでは未使用はリセットされない。再生・波形・サムネ参照も「使用」）</li>
+              <li>未使用プロキシの保存日数（動画ごと。選択肢 1／7／14／30 日。既定 7。起動だけでは未使用はリセットされない。再生・波形・サムネ参照も「使用」）</li>
               <li>現在の容量／すべて削除（期限を無視して今すぐ全部消す。確認あり）</li>
             </ul>
           </li>
@@ -312,7 +328,6 @@
 
         <h4>Wwise</h4>
         <p>EXPORT のときの Music Track です。ストリーム再生はいつもオン。Prefetch Length と Look-ahead Time の最初はどちらも 500 ms（0 から 10000）。先頭の区間の Look-ahead は 50 ms 固定です。Prefetch は先頭、Look-ahead は 2 本目以降です。</p>
-        <p><strong>ファイル名の色</strong> …… ファイル名に文字列が含まれると、先頭に縦の色マーカーを付けます。上から見て最初に一致した色を使います。大文字と小文字は区別しません。空の文字列と、範囲外の色は設定を確定したときに捨てます。同じ色は何度でも使えます。色は Wwise と同じ 28 色です。行の ▲／▼ で順番を変え、追加はリストのすぐ下に付きます。手動で付けた色があるファイルでは、このルールより手動が優先されます。出し方と記録の残り方は <a href="#layout-filename-color">ファイル名の色</a> です。</p>
       </article>
 
       <article class="part" id="layout-overview">
@@ -342,7 +357,7 @@
 
       <article class="part" id="layout-player">
         <h3>プレイヤーモード</h3>
-        <p class="where">波形エリアで <kbd>F10</kbd>。全画面にはしません。もう一度 <kbd>F10</kbd> で戻します。エディタから入るとき、未保存のファイルがあるとダイアログが出て、その場ではプレイヤーへ移れません（下記）。</p>
+        <p class="where">波形エリアで <kbd>F10</kbd>。全画面にはしません。同じ <kbd>F10</kbd> をもう一度押してもエディタには戻りません（見た目の再適用のみ）。エディタへ戻すときは <kbd>F11</kbd>／<kbd>F12</kbd> です。エディタから入るとき、未保存のファイルがあるとダイアログが出て、その場ではプレイヤーへ移れません（下記）。</p>
 
         <h4>画面</h4>
         <ul>
@@ -364,9 +379,9 @@
           </li>
           <li><kbd>F9</kbd> でプレイリストと波形だけを出します（デスクトップの占有面積を節約したいとき。どのモードからでも）。
             <ul>
-              <li>ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出しません。Alt+S（Silent Skip）、Alt+L（Single Loop）、Alt+T（Always on Top）は効きます。</li>
-              <li>もう一度 <kbd>F9</kbd> で通常のエディタへ戻します（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除）。</li>
-              <li><kbd>F10</kbd> で通常のプレイヤー表示に戻し、再生は続けます。</li>
+              <li>メニューバー／ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出しません。Alt+Shift+S（Silent Skip）、Alt+Shift+L（Single Loop）、Alt+Shift+T（Always on Top）は効きます。</li>
+              <li>同じ <kbd>F9</kbd> をもう一度押してもエディタには戻りません（見た目の再適用のみ）。エディタへ戻すときは <kbd>F11</kbd>／<kbd>F12</kbd>（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除）。</li>
+              <li><kbd>F10</kbd> で通常のプレイヤー表示に切り替え、再生は続けます。</li>
             </ul>
           </li>
           <li>ウィンドウの位置とサイズは通常モードと別々に覚え、切り替えで戻します。</li>
@@ -382,14 +397,14 @@
               <li>再生中の <kbd>Space</kbd> は止めて開始位置へ戻す（音声など）。動画本再生中はプレイリストを出さずその場一時停止し、もう一度で再開。</li>
               <li><kbd>Enter</kbd> はその場停止（プレイリストへは戻さない）。停止中の動画／PDF では <kbd>Space</kbd> と同じく本再生／明るい表示へ。</li>
               <li>バックグラウンドへ戻すのは <kbd>Escape</kbd>／<kbd>Q</kbd>（PDF の明るい表示の抜けも同じ）。</li>
-              <li>曲末で次へ進むかは「次の曲を自動再生」（<kbd>Alt</kbd>+<kbd>N</kbd>。既定オフ）。ダブルクリックは再生開始で、自動再生オンなら次へ進みます。</li>
+              <li>曲末で次へ進むかは「次の曲を自動再生」（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>。既定オフ）。ダブルクリックは再生開始で、自動再生オンなら次へ進みます。</li>
             </ul>
           </li>
           <li>停止中の選択は波形だけ出し、再生はしません。PDF／動画を選ぶと背面に暗いプレビューも出します（動画は暗転＋格子＋無音 1/3 速ループ。PDF は暗転だけ。すりガラスは無し）。曲を追加したときは 1 秒でフェードインし、再生が始まったらすぐ出します。リストが空になったら 1 秒でフェードアウトします。</li>
-          <li><kbd>Alt</kbd>+<kbd>R</kbd> でランダム再生（プレイリスト上段の <span class="ui">Random</span>）。一巡まで同じ曲を繰り返しません。空でも切替可。既定オフ。エディタとプレイヤーを行き来しても、次回起動でも最後の状態を設定に覚えます。<kbd>R</kbd> は今の曲を先頭から再生し直しです。</li>
-          <li><kbd>Alt</kbd>+<kbd>P</kbd> で <span class="ui">Auto Play</span>。オンのとき、プレイリストをクリアして追加（Enter／ドロップ）すると先頭から再生します。オフのときは追加だけ（再生も停止もしない）。Shift 付きの追加では再生しません。既定オン。最後の状態を設定に覚えます。</li>
-          <li><kbd>Alt</kbd>+<kbd>N</kbd> で次の曲を自動再生（プレイリスト上段の <span class="ui">Auto Next</span>）。オンのとき曲末で次へ進み、ギャップレス先読みもします。オフのときはその曲で止まります。空でも切替可。既定オフ。エディタとプレイヤーを行き来しても、次回起動でも最後の状態を設定に覚えます。<kbd>N</kbd> は次の曲への手動送りのままです。</li>
-          <li><kbd>Alt</kbd>+<kbd>L</kbd> で <span class="ui">Single Loop</span>（ステータスバー。エディタでも同じ）。オンのとき、サンプルループがあれば頭（または再生位置）からイントロを通し、ループ終端で始点へ無限ループします。サンプルループが無ければ曲末で先頭へ戻します。選択やプレイヤーの A-B があるときはそちらが再生窓になり、この頭通しは使いません。空でも切替可。最後の状態を設定に覚えます。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生のままです。</li>
+          <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> でランダム再生（プレイリスト上段の <span class="ui">Random</span>）。一巡まで同じ曲を繰り返しません。空でも切替可。既定オフ。エディタとプレイヤーを行き来しても、次回起動でも最後の状態を設定に覚えます。<kbd>R</kbd> は今の曲を先頭から再生し直しです。</li>
+          <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> で <span class="ui">Auto Play</span>。オンのとき、プレイリストをクリアして追加（Enter／ドロップ）すると先頭から再生します。オフのときは追加だけ（再生も停止もしない）。Shift 付きの追加では再生しません。既定オン。最後の状態を設定に覚えます。</li>
+          <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> で次の曲を自動再生（プレイリスト上段の <span class="ui">Auto Next</span>）。オンのとき曲末で次へ進み、ギャップレス先読みもします。オフのときはその曲で止まります。空でも切替可。既定オフ。エディタとプレイヤーを行き来しても、次回起動でも最後の状態を設定に覚えます。<kbd>N</kbd> は次の曲への手動送りのままです。</li>
+          <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> で <span class="ui">Single Loop</span>（ステータスバー。エディタでも同じ）。オンのとき、サンプルループがあれば頭（または再生位置）からイントロを通し、ループ終端で始点へ無限ループします。サンプルループが無ければ曲末で先頭へ戻します。選択やプレイヤーの A-B があるときはそちらが再生窓になり、この頭通しは使いません。空でも切替可。最後の状態を設定に覚えます。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生のままです。</li>
           <li>再生は音が出せるようになった時点で始めます。波形が全部描き終わるのは待ちません。</li>
           <li>次の曲を自動再生がオンのとき、次の曲を先に用意し、終わったら隙間なくつなぎます。MP3／M4A の頭と尻のごく短い無音は <a href="#layout-gapless">ギャップレス再生</a>（設定のプレイヤー。最初はオン）で減らします。オンでもわずかな隙間は残ることがあります。</li>
           <li>
@@ -482,7 +497,7 @@
               <li><kbd>Shift</kbd> …… クリアせず、直下だけ追加する</li>
               <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd> …… クリアせず、配下を再帰的に追加する（右クリック「配下を含めて追加」）</li>
             </ul>
-            <p>クリア系は、大量読み込みの最中でも進行中の追加を中断して差し替えます。<span class="ui">Auto Play</span>（<kbd>Alt</kbd>+<kbd>P</kbd>。既定オン）がオンなら先頭から再生し、オフなら追加だけです。Shift 付きの追加は再生しません。検索中は見えているフォルダだけです（ファイル名ヒットはそのファイルだけ、フォルダ名ヒットはそのフォルダ内すべて）。</p>
+            <p>クリア系は、大量読み込みの最中でも進行中の追加を中断して差し替えます。<span class="ui">Auto Play</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>。既定オン）がオンなら先頭から再生し、オフなら追加だけです。Shift 付きの追加は再生しません。検索中は見えているフォルダだけです（ファイル名ヒットはそのファイルだけ、フォルダ名ヒットはそのフォルダ内すべて）。</p>
           </li>
         </ul>
 
@@ -490,7 +505,7 @@
         <p>ファイル名の先頭に、短い縦の色を出します。出す場所は、プレイリストのファイル名、編集タブ、タイルの見出し、動画の本再生と F8 で <kbd>T</kbd> が出しているファイル名です。色は Wwise と同じ 28 色です。並びは上段 14、下段 14 で、左から右です。設定の色選択と右クリックの色選択は、同じ並びの同じ盤面です。マスにポインタを置くと、その 1 色だけが明るくなります。</p>
         <ul>
           <li>
-            <p><strong>ルール</strong> …… 設定（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>）の Wwise タブ「ファイル名の色」です。1 行が、ファイル名に含まれる文字列と色です。確定は設定の OK です。</p>
+            <p><strong>ルール</strong> …… 設定（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>）のカラータブ「ファイル名の色」です。1 行が、ファイル名に含まれる文字列と色です。確定は設定の OK です。</p>
             <ul>
               <li>見るのはファイル名だけです。文字列が名前のどこかに含まれていれば一致します（例: <code>_bt_</code> は <code>gun_bt_fire.wav</code>）。大文字と小文字は区別しません。</li>
               <li>上の行から見て、最初に一致した色を使います。同じ色は何度でも使えます。件数の上限はありません。</li>
@@ -533,7 +548,7 @@
           </li>
         </ol>
         <div class="note">
-          <p>ツリーにフォーカスがあるとき、<kbd>N</kbd>／<kbd>P</kbd>／<kbd>R</kbd>／<kbd>J</kbd>／<kbd>K</kbd>／<kbd>M</kbd>／<kbd>I</kbd>／<kbd>O</kbd> は前後曲・再生・一時マーカー／A-B ではなく、このフォルダ名ジャンプに使います（テンキーの再生操作はそのまま）。ランダム再生は <kbd>Alt</kbd>+<kbd>R</kbd>、次の曲の自動再生は <kbd>Alt</kbd>+<kbd>N</kbd>、Auto Play は <kbd>Alt</kbd>+<kbd>P</kbd>、Single Loop は <kbd>Alt</kbd>+<kbd>L</kbd> です。</p>
+          <p>ツリーにフォーカスがあるとき、<kbd>N</kbd>／<kbd>P</kbd>／<kbd>R</kbd>／<kbd>J</kbd>／<kbd>K</kbd>／<kbd>M</kbd>／<kbd>I</kbd>／<kbd>O</kbd> は前後曲・再生・一時マーカー／A-B ではなく、このフォルダ名ジャンプに使います（テンキーの再生操作はそのまま）。ランダム再生は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>、次の曲の自動再生は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>、Auto Play は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>、Single Loop は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> です。</p>
         </div>
 
         <h4>波形</h4>
@@ -542,7 +557,7 @@
           <li>音声のプレイリスト波形と動画本再生／F8 では <kbd>I</kbd>／<kbd>O</kbd> の捨て A-B と <kbd>M</kbd>／<kbd>Ins</kbd> の一時マーカーを使えます（別ファイル再生で忘れる。音声はエディタへ戻すとき既存マーカーとマージし、揃った A-B はサンプルループにして未保存のまま持ち越す。動画／PDF は持ち込まないので捨てる）。</li>
           <li>動画／PDF の暗いプレビューでは使いません。範囲は反転して半透明です。拡大しません。</li>
           <li>画面用の波形だけ作り、短いファイルは粗くしません。スペクトラムやラウドネスの曲線表示には切り替えません。波形上の右クリックでは、シーク・選択・再生まわりが中心です（ドキュメントへの破壊編集はプレイリスト側のメニューから行います。下記）。</li>
-          <li>右クリック／メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd> でメニューを開けます。表示の中は、ズーム・解析・画面（<kbd>F8</kbd>〜<kbd>F12</kbd> と常に最前面）のあと、再生ヘッド、ソロ、映像（全画面 <kbd>F</kbd>、ミニ窓、オーバーレイ <kbd>A</kbd>、タイムコード <kbd>T</kbd>、PDF の固定 <kbd>W</kbd>、プレビューへ戻る <kbd>Q</kbd>、プロキシ <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>）です。タイムラインはマーカー／リージョン／ループです。再生は再生操作と、プレイリスト・端への移動に分かれ、Silent Skip もここにあります。ファイルの時間はタブ、設定と色設定はその他です。クリックした位置の再生・移動・マーカー・区間・時間のコピーは「この位置」です。再生に追加時の自動再生（<kbd>Alt</kbd>+<kbd>P</kbd>）・前の曲（<kbd>P</kbd>）・次の曲（<kbd>N</kbd>）・頭から再生（<kbd>R</kbd>）があります。元に戻すは捨てマーカーです。プレイリストの右クリックにも前後の曲・頭出し・Auto Play があります。</li>
+          <li>右クリック／メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd> でメニューを開けます。表示の中は、ズーム・解析・画面（<kbd>F8</kbd>〜<kbd>F12</kbd> と常に最前面）のあと、再生ヘッド、ソロ、映像（全画面 <kbd>F</kbd>、ミニ窓、オーバーレイ <kbd>A</kbd>、タイムコード <kbd>T</kbd>、PDF の固定 <kbd>W</kbd>、プレビューへ戻る <kbd>Q</kbd>、プロキシ <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>）です。タイムラインはマーカー／リージョン／ループです。再生は再生操作と、プレイリスト・端への移動に分かれ、Silent Skip もここにあります。ファイルの時間はタブ、設定と色設定はその他です。クリックした位置の再生・移動・マーカー・区間・時間のコピーは「この位置」です。再生に追加時の自動再生（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>）・前の曲（<kbd>P</kbd>）・次の曲（<kbd>N</kbd>）・頭から再生（<kbd>R</kbd>）があります。元に戻すは捨てマーカーです。プレイリストの右クリックにも前後の曲・頭出し・Auto Play があります。</li>
         </ul>
 
         <h4>プレイリストの破壊編集</h4>
@@ -687,7 +702,7 @@
 
       <article class="part" id="layout-silent">
         <h3>Silent Skip</h3>
-        <p class="where">ステータスバーの <span class="ui">SPEAKER</span> の左、<kbd>Alt</kbd>+<kbd>S</kbd>。既定オフ。</p>
+        <p class="where">ステータスバーの <span class="ui">SPEAKER</span> の左、<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>。既定オフ。</p>
         <ul>
           <li>再生中に無音区間を飛ばし、録音中はしきい値を超えたときだけ書き込みます。</li>
           <li>書き込んだ可聴の前後には、プチノイズだけを消す短いフェードをかけます（設定の編集タブ。既定 20 ms）。</li>
@@ -714,7 +729,7 @@
 
       <article class="part" id="layout-single-loop">
         <h3>Single Loop</h3>
-        <p class="where">ステータスバー。Silent Skip の右、Always on Top の左。<kbd>Alt</kbd>+<kbd>L</kbd>。エディタ／プレイヤー共通。</p>
+        <p class="where">ステータスバー。Silent Skip の右、Always on Top の左。<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>。エディタ／プレイヤー共通。</p>
         <ul>
           <li>オンのとき、サンプルループがあれば頭（または再生位置）からイントロを通し、ループ終端で始点へ無限ループします。</li>
           <li>サンプルループが無ければ曲末で先頭へ戻します。</li>
@@ -727,7 +742,7 @@
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
         <p class="where"><span class="ui">Single Loop</span> の右、<span class="ui">SPEAKER</span> の左</p>
-        <p>ウィンドウを最前面に固定します。<kbd>Alt</kbd>+<kbd>T</kbd> で切り替えます。</p>
+        <p>ウィンドウを最前面に固定します。<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> で切り替えます。</p>
       </article>
 
       <article class="part" id="layout-meters">
@@ -737,10 +752,10 @@
         <h4>モニター列（BPM／MONO／DIM／LC）</h4>
         <p class="where">ラウドネスとスペクトラムのあいだ。エディタ／プレイヤー共通。</p>
         <ul>
-          <li><span class="ui">BPM</span>（<kbd>Alt</kbd>+<kbd>B</kbd>）…… オフ／オンの 2 段階です（既定オフ。セッションのみ。ラベルは常に BPM）。オン時は解析・表示と拍クリックを同時に有効にします。ボタン上にテンポ数値が出ます。表示 BPM は EffeTune が返す半／倍テンポ値ではなく、検出拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算します。クリック音はマーカークリックと同じ本アプリの Low.wav（−20 dB）で、EffeTune の合成クリックは出力しません。拍のタイミングは EffeTune の検出拍に合わせます。再生停止中はクリックも止まります。</li>
-          <li><span class="ui">MONO</span>（<kbd>Alt</kbd>+<kbd>M</kbd>）…… L+R を合算してモニターします。既定オフ。セッションのみ。</li>
-          <li><span class="ui">DIM</span>（<kbd>Alt</kbd>+<kbd>D</kbd>）…… モニターを減衰します。量は設定のオーディオタブ（既定 −15 dB）。オン／オフはセッションのみ。</li>
-          <li><span class="ui">LC</span>（<kbd>Alt</kbd>+<kbd>C</kbd>）…… モニターにローシェルフをかけます。周波数は設定のオーディオタブ（既定 120 Hz、20〜500）。ゲイン −20 dB 固定。RBJ ローシェルフ（Q≈0.707）。低域は約 −20 dB で頭打ち。オン／オフはセッションのみ。詳細は設定のオーディオタブ説明を参照。</li>
+          <li><span class="ui">BPM</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>）…… オフ／オンの 2 段階です（既定オフ。セッションのみ。ラベルは常に BPM）。オン時は解析・表示と拍クリックを同時に有効にします。ボタン上にテンポ数値が出ます。表示 BPM は EffeTune が返す半／倍テンポ値ではなく、検出拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算します。クリック音はマーカークリックと同じ本アプリの Low.wav（−20 dB）で、EffeTune の合成クリックは出力しません。拍のタイミングは EffeTune の検出拍に合わせます。再生停止中はクリックも止まります。</li>
+          <li><span class="ui">MONO</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>）…… L+R を合算してモニターします。既定オフ。セッションのみ。</li>
+          <li><span class="ui">DIM</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>）…… モニターを減衰します。量は設定のオーディオタブ（既定 −15 dB）。オン／オフはセッションのみ。</li>
+          <li><span class="ui">LC</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>）…… モニターにローシェルフをかけます。周波数は設定のオーディオタブ（既定 120 Hz、20〜500）。ゲイン −20 dB 固定。RBJ ローシェルフ（Q≈0.707）。低域は約 −20 dB で頭打ち。オン／オフはセッションのみ。詳細は設定のオーディオタブ説明を参照。</li>
         </ul>
 
         <h4>ラウドネス</h4>
@@ -773,14 +788,14 @@
         <h4>幅と表示の切り替え</h4>
         <ul>
           <li>列の左端をドラッグすると幅を広げられます。既定が最小で、バーが最大の太さになるところで止まります。広げた幅は次の起動でも覚えます。</li>
-          <li>停止後、表示はゆっくり消えます。レベルメーター上の <span class="ui">WAAPI</span>（<kbd>Alt</kbd>+<kbd>W</kbd>）でバーの表示を切り替えます。</li>
+          <li>停止後、表示はゆっくり消えます。レベルメーター上の <span class="ui">WAAPI</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>）でバーの表示を切り替えます。</li>
         </ul>
       </article>
 
       <article class="part" id="layout-waapi">
         <h3>WAAPI バー</h3>
         <p>接続状態、作成先、<span class="ui">Play -E</span>、<span class="ui">Auto Active</span>、<span class="ui">EXPORT</span> があります。</p>
-        <p>プロジェクト名をクリック、または <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面に出します。WAAPI がオフでもバーを出してから起動します。覚えたプロジェクトが無ければバーの表示までとし、起動できない旨を出します。</p>
+        <p>エディタ時のみ。プロジェクト名をクリック、波形の右クリック → Wwise → プロジェクトを起動、または <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面に出します（プレイヤー最大化中は無効）。WAAPI がオフでもバーを出してから起動します。覚えたプロジェクトが無ければバーの表示までとし、起動できない旨を出します。</p>
       </article>
 
       <article class="part" id="layout-status">
@@ -788,9 +803,9 @@
         <ul>
           <li><strong>ファイル位置</strong> …… 2 ファイル以上開いているときは、冒頭に <code>1 / 10 Files</code> のように何番目／全数を表示します。</li>
           <li><strong>ファイル情報</strong> …… サンプリングレートなど（名前はタブ側）。レート／ビット深度／チャンネルを変換すると、該当項目が保存まで赤になります。MP3／M4A はビットレートも表示します。容量は MB（MiB / B）。変換や範囲削除で変わると推測サイズが赤になります。</li>
-          <li><strong>Silent Skip／Single Loop／Always on Top</strong> …… NOW POS の左からこの順。<span class="ui">SPEAKER</span> の手前。Silent Skip は <kbd>Alt</kbd>+<kbd>S</kbd>、<span class="ui">Single Loop</span> は <kbd>Alt</kbd>+<kbd>L</kbd>、Always on Top は <kbd>Alt</kbd>+<kbd>T</kbd>。Silent Skip は無音を飛ばして再生し、録音ではしきい値超だけ書きます（しきい値は設定）。Single Loop の動作は <a href="#layout-single-loop">Single Loop</a>。</li>
+          <li><strong>Silent Skip／Single Loop／Always on Top</strong> …… NOW POS の左からこの順。<span class="ui">SPEAKER</span> の手前。Silent Skip は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>、<span class="ui">Single Loop</span> は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>、Always on Top は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>。Silent Skip は無音を飛ばして再生し、録音ではしきい値超だけ書きます（しきい値は設定）。Single Loop の動作は <a href="#layout-single-loop">Single Loop</a>。</li>
           <li><strong><span class="ui">SPEAKER</span></strong> …… その右でスピーカー配置を切り替えます。一覧は表示項目タブと同じです。今使っている定義は外しても、切り替えるまで残ります。自動スピーカー選択がオンなら、ファイルの本数に合う定義へ切り替えます。既定オフ。</li>
-          <li><strong>時間</strong> …… 現在時間／選択開始／選択範囲／選択終了／トータル。トータル以外は入力・ホイール／↑↓で調整します。時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。右クリックで時間とサンプル数を切り替えます。</li>
+          <li><strong>時間</strong> …… 現在時間／選択開始／選択範囲／選択終了／トータル。トータル以外は入力・ホイール／↑↓で調整します。時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。右クリックで時間とサンプル数を切り替えます（次回起動でも残ります）。</li>
         </ul>
       </article>
 
@@ -807,13 +822,13 @@
         <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> …… 波形にフォーカスがあるときだけ 3 秒前から（プリロール）。プレイリストでは使わない。</li>
         <li><kbd>Shift</kbd>+<kbd>Space</kbd> …… プレイリストのチェックモードのオン／オフ（初期オフ。オン時だけ行頭にチェックボックス。ツリーには出さない。モード中の Space でチェック。右クリック等はチェック行が対象。オフ時は列を隠し、チェック済み行の選択は残す。再オンは空のチェックから）。ツリーにフォーカスがあるときは折りたたみのまま。</li>
         <li><kbd>Alt</kbd>+<kbd>Enter</kbd> …… 再生開始位置からやり直し（タイル検索ボックスにフォーカスがあるときはヒット以外を閉じる）。</li>
-        <li><kbd>Alt</kbd>+<kbd>S</kbd> …… Silent Skip。無音区間を飛ばして再生し、録音中はしきい値を超えたときだけ書く（既定オフ。しきい値は設定、既定 -60 dB）。再生中の ←／→ 早送り／巻き戻し中は飛ばしません。録音開始時は毎回、Silent Skip をオンにするか確認します（チェックの初期値はステータスバー。OK すると反映。確認文にしきい値と無音の尺。設定から変更可）。オンのときだけリージョン付加を指定します（既定オフ。前回の指定を初期値にする）。</li>
+        <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> …… Silent Skip。無音区間を飛ばして再生し、録音中はしきい値を超えたときだけ書く（既定オフ。しきい値は設定、既定 -60 dB）。再生中の ←／→ 早送り／巻き戻し中は飛ばしません。録音開始時は毎回、Silent Skip をオンにするか確認します（チェックの初期値はステータスバー。OK すると反映。確認文にしきい値と無音の尺。設定から変更可）。オンのときだけリージョン付加を指定します（既定オフ。前回の指定を初期値にする）。</li>
         <li>次の曲を自動再生がオンのとき、プレイヤーの連続再生は次の曲を先に用意します。MP3／M4A の頭と尻のごく短い無音は <a href="#layout-gapless">ギャップレス再生</a>（設定のプレイヤー。最初はオン）で減らします。オンでもわずかな隙間は残ることがあります。</li>
         <li><kbd>Ctrl</kbd>+ドラッグ …… つまんで聴く（スクラブ）。すべてのチャンネルを左右にまとめます（レベルメーターも左右だけ動きます）。</li>
         <li><kbd>G</kbd> …… ステータスバーの NOW POS を入力。Enter で移動。コピー／貼り付け可。右クリックで時間／サンプル数。</li>
         <li><kbd>Z</kbd> またはテンキーの <kbd>.</kbd>…… 中央寄せ。再生中はセンターロックの切替、停止で解除（キーボードの <kbd>.</kbd> は早送り）。</li>
         <li><kbd>L</kbd> …… 選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生。</li>
-        <li><kbd>Alt</kbd>+<kbd>L</kbd> …… <span class="ui">Single Loop</span> のオン／オフ（ステータスバー。エディタでも同じ。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B があるときはそちら優先。くわしくは <a href="#layout-single-loop">Single Loop</a>）。</li>
+        <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> …… <span class="ui">Single Loop</span> のオン／オフ（ステータスバー。エディタでも同じ。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B があるときはそちら優先。くわしくは <a href="#layout-single-loop">Single Loop</a>）。</li>
         <li><kbd>J</kbd> …… 5 秒戻し、<kbd>K</kbd> …… 5 秒送り（0.75 秒クロスフェード。押しっぱなしは少し待ってから繰り返す）</li>
         <li><kbd>Ctrl</kbd>+<kbd>+</kbd>／<kbd>Ctrl</kbd>+<kbd>-</kbd> …… 再生中のピッチを半音上げる／下げる（キーボードとテンキー。キーボードの <kbd>+</kbd> は Shift 付きでも可）。<kbd>Ctrl</kbd>+<kbd>0</kbd>（キーボードとテンキー）で 0 に戻す。中央に半音のトーストを出す。エディタとプレイヤーで同じ。長さと再生位置はそのまま。範囲は ±2 オクターブ。別の曲を再生し始めると忘れる。</li>
         <li><kbd>,</kbd> …… 早戻し、<kbd>.</kbd> …… 早送り（±3 倍・ピッチ据え置き。推移中は -4 dB。停止中でも可。離すとその位置で停止のまま）</li>
@@ -839,7 +854,8 @@
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd>／<span class="ui">FADE OUT</span> <kbd>O</kbd> …… カーブを選び Space で試聴、Enter で実行。1–9 でカーブ。</li>
         <li><kbd>X</kbd> …… シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。サンプルループの継ぎ目向けの調整は <kbd>Shift</kbd>+<kbd>X</kbd>（<a href="#fade-adjust">フェード調整ツール</a>）。</li>
-        <li><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> …… 単一タブではラウドネス曲線を表示して音量。dB を直接入力、または ↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。Short Term 曲線と停止中メーターも同じ dB で追従します。<kbd>Esc</kbd> または <kbd>Shift</kbd>+<kbd>V</kbd> で曲線を閉じます。エディタでは両方、プレイヤーでは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ有効です。</li>
+        <li><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> …… 単一タブではラウドネス曲線を表示して音量。dB を直接入力、または ↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。Short Term 曲線と停止中メーターも同じ dB で追従します。音量の入力を閉じただけでは曲線は残ります。曲線を閉じるのは <kbd>Shift</kbd>+<kbd>V</kbd>（または <kbd>Esc</kbd>／<kbd>Shift</kbd>+<kbd>A</kbd>。くわしくは <a href="#spectrogram">スペクトログラム／ラウドネス解析</a>）。エディタでは両方、プレイヤーでは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ有効です。</li>
+        <li><kbd>E</kbd> …… ラウドネス曲線が出ているときペンにする（もう一度で戻す。右上のボタン、曲線上の右クリックでも同じ。ドラッグは範囲選択せず、元の曲線は残る。離すと音量を反映。両端はフェード。<kbd>Ctrl</kbd>+<kbd>Z</kbd> で一筆を戻す。<kbd>Esc</kbd> はペンを先に戻す。くわしくは <a href="#spectrogram">スペクトログラム／ラウドネス解析</a>）。</li>
         <li><strong>ラウドネスを揃える</strong>（プレイヤーのプレイリスト右クリック／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>、またはエディタでタブを複数選択して <kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>）…… 選択中の Wave／AIFF を指定 LKFS（既定は設定のラウドネスターゲット）へファイル全体のゲインで揃える簡易調整です。曲線ベースの音量（単一ファイルの <kbd>V</kbd>）とは別です。プレイヤーでは揃え後に既存パスへ保存し、この編集は元に戻せません。素の <kbd>V</kbd> はプレイヤーでは無効です。MP3 など非対応はスキップ／対象なしなら案内します。</li>
         <li><kbd>P</kbd> …… ピッチ。単一タブでは<a href="#pitch-curve">ピッチカーブ</a>ウィンドウを開きます（選択があればその範囲、無ければ全体）。タブを複数選んでいるときは一括用の半音指定ダイアログです。実行中は半透明の画面で進捗を出します。</li>
         <li><kbd>T</kbd> …… タイムストレッチ（ピッチ据え置き）。選択があればその時間、無ければ全体。伸ばした時間と割合（％）が連動。↑↓／ホイール（時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分。割合は 0.1／Shift 1／Ctrl 10／Ctrl+Shift 25％）。<kbd>Tab</kbd> で時間と割合。Space で試聴、Enter で実行。10–1000％。実行中は半透明の画面。</li>
@@ -1055,15 +1071,15 @@
       <h3 id="export-how">9-1. 手順</h3>
       <ol>
         <li>Wwise Authoring を起動します。</li>
-        <li>レベルメーター上の <span class="ui">WAAPI</span> をオンにします（<kbd>Alt</kbd>+<kbd>W</kbd>）。</li>
+        <li>レベルメーター上の <span class="ui">WAAPI</span> をオンにします（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>）。</li>
         <li>Wwise で作成先オブジェクトを選びます。<span class="ui">Keep Target</span> でパスを固定できます。</li>
         <li>書き出し先は接続中プロジェクトの Originals 配下である必要があります。</li>
         <li><span class="ui">EXPORT</span> または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。WAAPI 接続中だけ有効です。</li>
       </ol>
       <ul>
-        <li><span class="ui">Play -E</span>（<kbd>Alt</kbd>+<kbd>E</kbd>。WAAPI オン時）…… 出口のあとも鳴らします。アプリ内ではループの折り返しでその部分を二重に再生し、再生位置が 2 本になります。EXPORT すると、つなぎのときも出口のあとを鳴らします。</li>
-        <li><span class="ui">Auto Active</span> …… EXPORT 後に Wwise を前面へ出します。</li>
-        <li>プロジェクト名 …… クリック、または <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面に出します。WAAPI がオフでもバーを出してから起動します。覚えたプロジェクトが無ければ起動せず、その旨を出します。</li>
+        <li><span class="ui">Play -E</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。WAAPI オン時）…… 出口のあとも鳴らします。アプリ内ではループの折り返しでその部分を二重に再生し、再生位置が 2 本になります。EXPORT すると、つなぎのときも出口のあとを鳴らします。</li>
+        <li><span class="ui">Auto Active</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>。WAAPI オン時）…… EXPORT 後に Wwise を前面へ出します。</li>
+        <li>プロジェクト名 …… エディタ時のみ。クリック、波形の右クリック → Wwise → プロジェクトを起動、または <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面に出します（プレイヤー最大化中は無効）。WAAPI がオフでもバーを出してから起動します。覚えたプロジェクトが無ければ起動せず、その旨を出します。</li>
       </ul>
 
       <h3 id="export-plan">9-2. リージョンの組み立て</h3>
@@ -1102,13 +1118,13 @@
       </div>
 
       <h2 id="settings">10. 設定と言語</h2>
-      <p>設定は左上の歯車、または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd> です。タブは一般／表示項目／オーディオ／プレイヤー／編集／書き出し・パス／Wwise。各項目の内容は <a href="#layout-settings">画面の見方 → 設定</a> にあります。<kbd>Esc</kbd> で閉じます。</p>
+      <p>設定は左上の歯車、または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd> です。タブは一般／レイアウト／表示項目／カラー／オーディオ／プレイヤー／編集／書き出し・パス／Wwise。各項目の内容は <a href="#layout-settings">画面の見方 → 設定</a> にあります。<kbd>Esc</kbd> で閉じます。</p>
       <ul>
         <li>表示言語は一般タブです。最初は <span class="ui">Auto</span>（パソコンが日本語なら Japanese、それ以外は English）。日本語の画面でも、ボタン名などに英語が残ることがあります。</li>
         <li>壁紙も一般タブです。最初は無し。動的背景の上に、比率を保ったまま画面全体を覆うように重ねます。くわしくは <a href="#layout-settings">画面の見方 → 設定</a> です。</li>
         <li>マニュアルは画面の <span class="ui">?</span>、またはブラウザで開きます。表示言語に合わせて日本語／英語になります。</li>
         <li>設定や、開いていたタブは、このパソコンのユーザー用フォルダ（<code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>）に残ります。アプリの横には書きません。</li>
-        <li>MP3 は、設定で LAME の場所が正しければそれを使い、空欄や無効なら Windows で書き出します（128〜320 kbps。最初は 192）。今聴いている左右 2 本にまとめた音になります（<a href="#mp3-downmix">くわしく</a>）。書き出した MP3 は今のタブへは開きません。LAME はこのアプリには入っていません。</li>
+        <li>MP3 は、設定で LAME の場所が正しければそれを使い（オプション空欄時は <code>-V2 --noreplaygain</code>）、空欄や無効なら Windows で書き出します（128〜320 kbps。最初は 192）。今聴いている左右 2 本にまとめた音になります（<a href="#mp3-downmix">くわしく</a>）。書き出した MP3 は今のタブへは開きません。LAME はこのアプリには入っていません。</li>
         <li>アプリを閉じると、開いていたタブとウィンドウの位置を覚えます。プレイヤーとふつうの画面は別々です。保存していない編集も残し、次に起動したときに戻します。プレイヤーのまま終了したときは、リストの曲は覚えません。</li>
         <li>同時に起動できるのは 1 つです。2 回目は今のウィンドウを前面にし、渡したファイルを開きます（mp3／m4a が混ざるとプレイヤー）。</li>
         <li>起動時に、新しい版があれば知らせます。はい＝案内ページを開く（自動ではダウンロードしません）。いいえ＝その版では再通知しません。ネットが無いときはそのまま続けます。</li>
@@ -1139,7 +1155,7 @@
       <h2 id="spectrogram">11. スペクトログラム／ラウドネス解析</h2>
       <h3>切り替え</h3>
       <ul>
-        <li><kbd>A</kbd> でスペクトログラム／重ね表示を切り替えます。</li>
+        <li><kbd>A</kbd> でスペクトログラムと重ね表示を切り替えます。ラウドネス曲線が出ているときはスペクトログラムへ移ります（三状態の巡回ではありません）。</li>
         <li><kbd>V</kbd> でラウドネス解析（Short Term 曲線）を出して音量入力を開きます。</li>
         <li>抜けるのは <kbd>Esc</kbd>、<kbd>Shift</kbd>+<kbd>A</kbd>、または <kbd>Shift</kbd>+<kbd>V</kbd> です。今の表示にかかわらず通常の波形へ戻ります。<kbd>Esc</kbd> は入力、選択、ペンカーソルを先に解除します。音量の入力を閉じただけでは曲線は残ります。</li>
         <li>VIEW のラウドネスボタンは表示だけ切り替えます。</li>
@@ -1176,20 +1192,21 @@
       <h2 id="shortcuts">12. ショートカット</h2>
       <p>ほかの節で出てきたものも含め、キー操作を一覧にしています。状況別のキーは、その画面が開いているときだけ効きます。くわしくはこのマニュアルの各節を参照してください。</p>
 
-      <h3 id="shortcuts-accesskeys">UI に下線が出ない Alt キー</h3>
-      <p>右クリックメニューの項目には <code>(_X)</code> 表記があり、メニューを開くと下線付きのアクセスキーが分かります。一方、ステータスバーやモニター列、プレイリスト上段のトグルは、ラベルにアンダースコアがなく、画面上でも下線が出ません。次のキーはコード側の Alt ハンドラだけで効きます（メニューの AccessKey とは別系統）。F8／F9 でバーが隠れても、記載のものは多くがそのまま効きます。</p>
+      <h3 id="shortcuts-accesskeys">UI に下線が出ない Alt+Shift キー</h3>
+      <p>右クリックメニューの項目には <code>(_X)</code> 表記があり、メニューを開くと下線付きのアクセスキーが分かります。ウィンドウ上部のメニューバー（設定のレイアウト「メニューバーを表示」。既定オン。中身は波形の右クリックと同じで「この位置」は無し）が表示中のとき、<kbd>Alt</kbd>+文字はルートを開きます。<kbd>F</kbd> ファイル／<kbd>E</kbd> 編集／<kbd>N</kbd> 変換／<kbd>X</kbd> 書き出し／<kbd>V</kbd> 表示／<kbd>T</kbd> タイムライン／<kbd>B</kbd> タブ／<kbd>P</kbd> 再生／<kbd>A</kbd> オーディオ／<kbd>W</kbd> Wwise／<kbd>O</kbd> その他。メニューバーをオフにしているとき、これらの Alt+文字はメニューには使いません。一方、ステータスバーやモニター列、プレイリスト上段のトグルは、ラベルにアンダースコアがなく、画面上でも下線が出ません。次のキーはコード側の <kbd>Alt</kbd>+<kbd>Shift</kbd> ハンドラだけで効きます（メニューの AccessKey とは別系統）。F8／F9 でバーが隠れても、記載のものは多くがそのまま効きます。</p>
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip（ステータスバー。ラベルに下線なし）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top（ステータスバー。ラベルに下線なし）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span>（ステータスバー。ラベルに下線なし）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td><span class="ui">Random</span>（シャッフル。ラベルに下線なし）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td><span class="ui">Auto Next</span>（次の曲を自動再生。ラベルに下線なし）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span>（追加時の自動再生。ラベルに下線なし）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>B</kbd>／<kbd>M</kbd>／<kbd>D</kbd>／<kbd>C</kbd></td><td>モニター BPM／MONO／DIM／LC（ボタン文言に下線なし。ツールチップには Alt 表記あり）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>W</kbd></td><td>WAAPI バーの表示切替</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>E</kbd></td><td>Play -E（WAAPI オン時）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Silent Skip（ステータスバー。ラベルに下線なし）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Always on Top（ステータスバー。ラベルに下線なし）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span>（ステータスバー。ラベルに下線なし）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td><span class="ui">Random</span>（シャッフル。ラベルに下線なし）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td><span class="ui">Auto Next</span>（次の曲を自動再生。ラベルに下線なし）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span>（追加時の自動再生。ラベルに下線なし）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>／<kbd>M</kbd>／<kbd>D</kbd>／<kbd>C</kbd></td><td>モニター BPM／MONO／DIM／LC（いずれも Alt+Shift。ボタン文言に下線なし。ツールチップには Alt+Shift 表記あり）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>WAAPI バーの表示切替</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E（WAAPI オン時）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active（WAAPI オン時。ラベルに下線なし）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し（タイル検索フォーカス中はヒット以外を閉じる）</td></tr>
         </tbody>
       </table>
@@ -1232,13 +1249,13 @@
           <tr><td>←／→</td><td>再生中は押しっぱなしで 3 倍早送り／巻き戻し（ピッチ据え置き。推移中は -4 dB。Silent Skip は止める）。停止中はシーク。プレイヤーでは左右キーの早送り／巻き戻しはしない（<kbd>,</kbd>／<kbd>.</kbd>）。動画の本再生中またはフレーム一時停止中は、一時停止して 1 フレーム戻し／送り（押しっぱなしは最初だけ待ってから繰り返す）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>波形フォーカス時だけ 3 秒前から再生（プリロール。プレイリストでは使わない）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し（タイル検索ボックスにフォーカスがあるときはヒット以外を閉じる）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Silent Skip（無音を飛ばして再生。録音ではしきい値超だけ書く）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>B</kbd></td><td>モニター <span class="ui">BPM</span>（オフ／オン。オン時は表示＋クリック。表示は拍間隔から算出）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>M</kbd></td><td>モニター <span class="ui">MONO</span>（L+R 合算）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>D</kbd></td><td>モニター <span class="ui">DIM</span>（減衰。量は設定のオーディオタブ）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>C</kbd></td><td>モニター <span class="ui">LC</span>（ローシェルフ −20 dB 固定。周波数は設定のオーディオタブ）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Silent Skip（無音を飛ばして再生。録音ではしきい値超だけ書く）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>モニター <span class="ui">BPM</span>（オフ／オン。オン時は表示＋クリック。表示は拍間隔から算出）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>モニター <span class="ui">MONO</span>（L+R 合算）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>モニター <span class="ui">DIM</span>（減衰。量は設定のオーディオタブ）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>モニター <span class="ui">LC</span>（ローシェルフ −20 dB 固定。周波数は設定のオーディオタブ）</td></tr>
           <tr><td><kbd>L</kbd></td><td>選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前からループ再生</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span>（サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> とは別）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span>（サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> とは別）</td></tr>
           <tr><td><kbd>J</kbd>／<kbd>K</kbd></td><td>5 秒戻し／送り（0.75 秒クロスフェード。押しっぱなしは少し待ってから繰り返す）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd>／<kbd>Ctrl</kbd>+<kbd>-</kbd>／<kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>再生ピッチを半音上げ／下げ、または 0 に戻す（<kbd>Ctrl</kbd>+<kbd>0</kbd> はキーボードとテンキー）。中央に半音のトースト。±2 オクターブ。長さは据え置き。再生中の音にすぐ掛かる。別の曲を再生し始めると忘れる</td></tr>
           <tr><td><kbd>,</kbd>／<kbd>.</kbd></td><td>早戻し／早送り（±3 倍・ピッチ据え置き。推移中は -4 dB。停止中でも可。離すとその位置で停止のまま）</td></tr>
@@ -1263,18 +1280,18 @@
           <tr><td>ホイール</td><td>時間ズーム（再生ヘッド基準。全体波形上も同じ）</td></tr>
           <tr><td><kbd>Shift</kbd>+ホイール</td><td>パン（波形上）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+ホイール</td><td>振幅ズーム（波形上）</td></tr>
-          <tr><td><kbd>F10</kbd></td><td>プレイヤーモード／解除。全画面にはしません。もう一度 <kbd>F10</kbd> で戻します。エディタから入るとき未保存があるとダイアログが出て、未保存が無くなるまで移れません（保存する／保存しない／キャンセル。詳しくは <a href="#layout-player">プレイヤーモード</a>）。動画／PDF の本再生中やフレーム一時停止中はエディタへ落とさず、暗いバックグラウンド再生へ戻して前面 UI＝プレイリストを出す。画面、再生、ライブラリ、ジャケットも同節。</td></tr>
+          <tr><td><kbd>F10</kbd></td><td>プレイヤーモード。全画面にはしません。同じ <kbd>F10</kbd> の再押下ではエディタに戻らない（見た目の再適用のみ）。エディタへ戻すときは <kbd>F11</kbd>／<kbd>F12</kbd>。エディタから入るとき未保存があるとダイアログが出て、未保存が無くなるまで移れません（保存する／保存しない／キャンセル。詳しくは <a href="#layout-player">プレイヤーモード</a>）。動画／PDF の本再生中やフレーム一時停止中はエディタへ落とさず、暗いバックグラウンド再生へ戻して前面 UI＝プレイリストを出す。画面、再生、ライブラリ、ジャケットも同節。</td></tr>
           <tr><td><kbd>F11</kbd></td><td>波形エリアをフルスクリーン／解除（タスクバーは隠す。チャンネル名と dB 目盛りも出さない。全体波形とステータスバーは残す。タイル表示でも可。もう一度 <kbd>F11</kbd> で戻す。プレイヤーから移るとき動画／PDF はファイルごと持ち込まず、選択中の音声ファイルだけ残す）</td></tr>
           <tr><td><kbd>F12</kbd></td><td>タイトルバーだけ隠すフルスクリーン／解除（タブ・トランスポート・メーター・WAAPI・チャンネル名・dB 目盛りは残す。スペクトラム／ラウドネス／レベルメーター／ベクタースコープは 1.5 倍。Windows の画面の大きさと表示倍率のうえ。タイル表示でも可。もう一度 <kbd>F12</kbd> で戻す。プレイヤーから移るとき動画／PDF はファイルごと持ち込まず、選択中の音声ファイルだけ残す）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>タイル表示の配置を巡回（左右→上下→上下左右→解除。見た目が同じ配置、波形エリアに収まらない配置は飛ばす。左右・上下が収まらなければ格子を試し、格子も無理なら動かない。2 タブ以上）</td></tr>
-          <tr><td><kbd>A</kbd></td><td>スペクトログラム／重ね表示</td></tr>
+          <tr><td><kbd>A</kbd></td><td>スペクトログラム／重ね表示の切替（ラウドネス曲線中はスペクトログラムへ。三状態の巡回ではない）</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>通常の波形表示へ（今の表示にかかわらず）</td></tr>
           <tr><td><kbd>Alt</kbd>+↑／↓</td><td>スペクトログラムの暗部持ち上げ（押しっぱなしで連続）</td></tr>
           <tr><td><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>ラウドネス解析を表示して音量入力（エディタは両方、プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ）</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>通常の波形表示へ（今の表示にかかわらず）</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>チャンネルをソロ（次／前。最後の次で解除。左端の名前をクリックでも可。Ctrl＋クリックで追加。Shift＋クリックでミュート／解除。時間選択は変えない。編集はそのレーンだけ。ミュートはグレー）</td></tr>
           <tr><td><kbd>G</kbd></td><td>ステータスバーの NOW POS を入力</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Always on Top（ウィンドウを最前面に固定／解除。どのモードでも。F8／F9 中も効く）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Always on Top（ウィンドウを最前面に固定／解除。どのモードでも。F8／F9 中も効く）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>色設定（ダーク固定）</td></tr>
         </tbody>
       </table>
@@ -1311,7 +1328,7 @@
           <tr><td><kbd>I</kbd></td><td>フェードイン</td></tr>
           <tr><td><kbd>O</kbd></td><td>フェードアウト</td></tr>
           <tr><td><kbd>X</kbd></td><td>シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。一括適用の対象外</td></tr>
-          <tr><td><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>単一タブ: ラウドネス曲線を表示して音量（dB を直接入力。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示。入力を閉じても曲線は残る。<kbd>Shift</kbd>+<kbd>V</kbd> で曲線を閉じる）。複数タブ選択時: ラウドネスを揃える（簡易）。エディタは両方有効。プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ（素の <kbd>V</kbd> は無効。プレイリスト右クリックからも可）</td></tr>
+          <tr><td><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>単一タブ: ラウドネス曲線を表示して音量（dB を直接入力。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示。入力を閉じても曲線は残る。曲線を閉じるのは <kbd>Shift</kbd>+<kbd>V</kbd>／<kbd>Esc</kbd>／<kbd>Shift</kbd>+<kbd>A</kbd>）。複数タブ選択時: ラウドネスを揃える（簡易）。エディタは両方有効。プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ（素の <kbd>V</kbd> は無効。プレイリスト右クリックからも可）</td></tr>
           <tr><td><kbd>E</kbd></td><td>ラウドネス曲線が出ているときペンにする（もう一度で戻す。右上のボタン、曲線上の右クリックでも同じ。ドラッグは範囲選択せず、元の曲線は残る。離すと音量を反映。両端はフェード。<kbd>Ctrl</kbd>+<kbd>Z</kbd> で一筆を戻す。<kbd>Esc</kbd> はペンを先に戻す）</td></tr>
           <tr><td><kbd>P</kbd></td><td>ピッチ。単一タブは<a href="#pitch-curve">ピッチカーブ</a>ウィンドウ（選択または全体）。複数タブ選択時は一括の半音指定。実行中は半透明の画面</td></tr>
           <tr><td><kbd>T</kbd></td><td>タイムストレッチ（時間と割合を連動。Space 試聴、Enter 実行。実行中は半透明の画面）</td></tr>
@@ -1360,9 +1377,10 @@
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Alt</kbd>+<kbd>W</kbd></td><td>WAAPI バーの表示切替</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Wwise プロジェクトを起動／前面に出す（波形の右クリック → Wwise → プロジェクトを起動。WAAPI がオフでもバーを表示。覚えたプロジェクトが無ければ起動せず通知）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>E</kbd></td><td>Play -E の切替（WAAPI オン時）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>WAAPI バーの表示切替</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Wwise プロジェクトを起動／前面に出す（エディタ時のみ。プレイヤー最大化中は無効。波形の右クリック → Wwise → プロジェクトを起動。WAAPI がオフでもバーを表示。覚えたプロジェクトが無ければ起動せず通知）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E の切替（WAAPI オン時）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active の切替（WAAPI オン時。EXPORT 後に Wwise を前面へ）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Wwise EXPORT（Wave 単体）</td></tr>
         </tbody>
       </table>
@@ -1518,7 +1536,7 @@
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>F8</kbd></td><td>動画／PDF ミニプレイヤー（トグル。プレイリスト等は無し。ウィンドウのクライアント領域が映像／PDF ページの縦横比になるよう原寸配置／位置は動かした時点で中心を覚え、次の動画本再生でも中心を合わせて使う。<kbd>+</kbd>／<kbd>-</kbd>（キーボード・テンキー）だけ常に 25% 刻み（枠ドラッグで中途半端な大きさでも、次のキーは近い 25% へ着地。原寸で一旦停止。25〜300%。縦横比は維持。倍率は F8 を抜けるまで覚え、抜けると忘れる）。窓枠のドラッグは連続拡縮（25% 刻みではない。縦横比固定。ホイールは使わない）。<kbd>A</kbd>／<kbd>T</kbd> の表示は引数起動と共通に覚え、既定はどちらもオン（変えた状態は本再生とミニで共通に覚え、以後ずっと使う）。背面に動画または PDF があるとき（本再生または暗いバックグラウンドプレビュー）かつプレイリストに再生対象があるときだけ入れる。拡張子連動／引数で動画を開いたときは自動で入る。もう一度 <kbd>F8</kbd> で通常のプレイヤーへ（再生は続ける）。<kbd>Escape</kbd>／<kbd>Q</kbd> でプレイリストへ戻る（動画ミニで In／Out があるとき <kbd>Escape</kbd> は解除して留まる）。<kbd>F9</kbd>／<kbd>F10</kbd> でプレイリストへ戻る（本再生は止める）。<kbd>F11</kbd>／<kbd>F12</kbd> へ移るとき動画／PDF はファイルごと持ち込まない（音声だけ残すこともない）</td></tr>
-          <tr><td><kbd>F9</kbd></td><td>プレイリストと波形だけを出す（トグル。既定オフ。デスクトップの占有面積を節約したいとき）。どのモードからでも入れる。ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+S（Silent Skip）、Alt+L（Single Loop）、Alt+T（Always on Top）は効く。もう一度 <kbd>F9</kbd> で通常のエディタへ戻す（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。<kbd>F10</kbd> で通常のプレイヤー（F10）表示に戻す（再生は続ける）。ウィンドウ位置・サイズはモード別に覚える</td></tr>
+          <tr><td><kbd>F9</kbd></td><td>プレイリストと波形だけを出す（既定オフ。デスクトップの占有面積を節約したいとき）。どのモードからでも入れる。メニューバー／ライブラリ／お気に入り／レベルメーター／アナライザ／トランスポート／ステータスバーは出さない。Alt+Shift+S（Silent Skip）、Alt+Shift+L（Single Loop）、Alt+Shift+T（Always on Top）は効く。同じ <kbd>F9</kbd> の再押下ではエディタに戻らない（見た目の再適用のみ）。エディタへ戻すときは <kbd>F11</kbd>／<kbd>F12</kbd>（再生を止めてから、選択したファイルだけ残し、タブの複数選択は解除する）。<kbd>F10</kbd> で通常のプレイヤー（F10）表示へ（再生は続ける）。ウィンドウ位置・サイズはモード別に覚える</td></tr>
           <tr><td><kbd>F1</kbd>／<kbd>F3</kbd></td><td>割り当てなし（ツリー／お気に入り／プレイリストへの移動には使わない）</td></tr>
           <tr><td><kbd>F2</kbd></td><td>名前の変更。ツリーは選択フォルダ、お気に入りは選択フォルダ（ディスク上の実体）、プレイリストは選択ファイル。索引のフルパスも書き換え、<kbd>Ctrl</kbd>+<kbd>F5</kbd> は不要。エディタのファイル名変更とは別</td></tr>
           <tr><td><kbd>F7</kbd></td><td>ツリーだけ。選択フォルダの直下に、指定した名前で新しいフォルダを作る。お気に入りとプレイリストでは何もしない</td></tr>
@@ -1552,11 +1570,11 @@
           <tr><td>ツリー／お気に入り <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>プレイリストをクリアせず、配下を再帰的に追加（再生しない）</td></tr>
           <tr><td>ツリーのダブルクリック</td><td>フォルダの開閉のみ（プレイリストへは載せない。追加は <kbd>Enter</kbd>）</td></tr>
           <tr><td>リストへのフォルダドロップ</td><td><kbd>Enter</kbd> と同じ修飾（なし＝クリア直下、Ctrl＝クリア再帰、Shift＝追加直下、Ctrl+Shift＝追加再帰）</td></tr>
-          <tr><td><kbd>Space</kbd></td><td>選択曲だけ再生し、終わったら停止する（次の曲へは進まない。同じ動画の暗いプレビューから戻すときは今の位置から。再生中は止めて開始位置へ戻す。動画本再生中は停止時に再生開始、再生中は一時停止、もう一度で再開。プレイリストは出さない。暗いプレビューへは落とさない。バックグラウンドへ戻すのは Escape／Q。PDF の明るい表示モード中の抜けも Escape／Q。トランスポートの再生も同じ。曲末で次へ進むかは「次の曲を自動再生」チェック／<kbd>Alt</kbd>+<kbd>N</kbd>）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td>ランダム再生（<span class="ui">Random</span>）のオン／オフ（プレイリストが空でも可。既定オフ。一巡するまで同じ曲を繰り返さない。モード切替と次回起動でも設定に覚える）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span> のオン／オフ（既定オン。クリアして追加したとき先頭から再生するか。最後の状態を設定に覚える。素の <kbd>P</kbd> は前の曲）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>次の曲を自動再生（<span class="ui">Auto Next</span>）のオン／オフ（プレイリストが空でも可。既定オフ。オンのとき曲末で次へ進みギャップレス先読みもする。モード切替と次回起動でも設定に覚える。素の <kbd>N</kbd> は次の曲への手動送り）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> のオン／オフ（プレイリストが空でも可。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生）</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>選択曲だけ再生し、終わったら停止する（次の曲へは進まない。同じ動画の暗いプレビューから戻すときは今の位置から。再生中は止めて開始位置へ戻す。動画本再生中は停止時に再生開始、再生中は一時停止、もう一度で再開。プレイリストは出さない。暗いプレビューへは落とさない。バックグラウンドへ戻すのは Escape／Q。PDF の明るい表示モード中の抜けも Escape／Q。トランスポートの再生も同じ。曲末で次へ進むかは「次の曲を自動再生」チェック／<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>ランダム再生（<span class="ui">Random</span>）のオン／オフ（プレイリストが空でも可。既定オフ。一巡するまで同じ曲を繰り返さない。モード切替と次回起動でも設定に覚える）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span> のオン／オフ（既定オン。クリアして追加したとき先頭から再生するか。最後の状態を設定に覚える。素の <kbd>P</kbd> は前の曲）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>次の曲を自動再生（<span class="ui">Auto Next</span>）のオン／オフ（プレイリストが空でも可。既定オフ。オンのとき曲末で次へ進みギャップレス先読みもする。モード切替と次回起動でも設定に覚える。素の <kbd>N</kbd> は次の曲への手動送り）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> のオン／オフ（プレイリストが空でも可。サンプルループあり＝頭通しのあと S–E 無限。無し＝曲末で先頭へ。選択／A-B 優先。素の <kbd>L</kbd> は末尾 3 秒前からのループ再生）</td></tr>
           <tr><td>←／→</td><td>動画の本再生中（またはフレーム一時停止中）は一時停止して 1 フレーム戻し／送り（押しっぱなしは最初だけ待ってから繰り返す。本再生中／一時停止中の <kbd>F10</kbd> はエディタへ落とさず、暗いバックグラウンド再生へ落として前面 UI＝プレイリストを出す）。ツリーではフォルダの展開／折りたたみ。それ以外では早送り／巻き戻しには使わない</td></tr>
           <tr><td>ツリー <kbd>*</kbd></td><td>選択フォルダ以下をすべて展開する（エクスプローラーと同じ。テンキーの <kbd>*</kbd> と Shift+8。展開状況は覚える）</td></tr>
           <tr><td>ツリー <kbd>/</kbd></td><td>選択フォルダ以下を閉じる（テンキーの <kbd>/</kbd> と <kbd>/</kbd> キー）</td></tr>
@@ -1600,7 +1618,7 @@
           <tr><td>プレイリスト検索</td><td>対象はファイル名、フォルダ名（親フォルダ）、コメント、タイトル、アルバム、アーティスト、作曲、ジャンル、アルバムアーティスト（表示の有無は問わない）。空白で分けた語は列をまたいで全部含む必要がある（例: アーティスト名と曲名）。ヒットした行だけ残す。次／前の曲も表示中の行だけを巡る</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>入力した条件で検索し、ライブラリならツリー、プレイリストならリストへフォーカスを返す。空欄ならフィルター解除</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>未確定の入力を捨ててフォーカスを返す（今の検索条件は変えない）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>R</kbd>／<kbd>N</kbd>／<kbd>P</kbd>／<kbd>L</kbd></td><td>検索欄フォーカス中でもランダム／Auto Next／Auto Play／Single Loop をトグル（文字は入らない）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>／<kbd>N</kbd>／<kbd>P</kbd>／<kbd>L</kbd></td><td>検索欄フォーカス中でもランダム／Auto Next／Auto Play／Single Loop をトグル（いずれも Alt+Shift。文字は入らない）</td></tr>
         </tbody>
       </table>
       <p>ステータスバーの時刻を編集しているとき</p>
