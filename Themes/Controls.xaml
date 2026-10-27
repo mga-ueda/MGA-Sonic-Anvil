@@ -1281,7 +1281,8 @@
                                     SnapsToDevicePixels="True"
                                     Grid.IsSharedSizeScope="True">
                                 <ScrollViewer Background="Transparent" CanContentScroll="True">
-                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
+                                    <!-- Aero2 既定と同じ Contained。Cycle だと葉の ←→ が親 Menu へバブルする前に食いやすい。 -->
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"
                                                     Margin="0"
                                                     SnapsToDevicePixels="True"/>
                                 </ScrollViewer>

@@ -76,7 +76,7 @@ public partial class MainWindow
         ApplyWaapiPanelVisible();
     }
 
-    /// <summary>Play -E チェックを切り替える（Alt+E）。WAAPI オフ時は何もしない。</summary>
+    /// <summary>Play -E チェックを切り替える（Alt+Shift+E）。WAAPI オフ時は何もしない。</summary>
     private void TogglePlayPostExit()
     {
         if (!_waapiPanelVisible)

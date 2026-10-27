@@ -23,8 +23,8 @@ internal static partial class UiStrings
         "Look-ahead Time は 0 から 10000 の ms で入力してください。",
         "Enter a Look-ahead Time between 0 and 10000 ms.");
     public static string LabelUnnamedProject => Get("(無名)", "(unnamed)");
-    public static string LabelAutoActive => Get("Auto Active (_A)", "Auto Active (_A)");
-    public static string LabelPlayMinusE => Get("Play -_E", "Play -_E");
+    public static string LabelAutoActive => Get("Auto Active", "Auto Active");
+    public static string LabelPlayMinusE => Get("Play -E", "Play -E");
     public static string ButtonExport => Get("EXPORT", "EXPORT");
 
     public static string StatusChecking => Get("確認中…", "Checking…");

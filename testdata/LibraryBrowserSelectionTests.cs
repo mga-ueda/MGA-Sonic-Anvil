@@ -1045,7 +1045,7 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal(MenuGestures.PreviousTrack, ((MenuItem)listPlaylist.Items[0]).InputGestureText);
             Assert.Equal(MenuGestures.NextTrack, ((MenuItem)listPlaylist.Items[1]).InputGestureText);
             Assert.Equal(MenuGestures.RestartTrack, ((MenuItem)listPlaylist.Items[2]).InputGestureText);
-            Assert.Equal("Alt+P", ((MenuItem)listPlaylist.Items[4]).InputGestureText);
+            Assert.Equal("Alt+Shift+P", ((MenuItem)listPlaylist.Items[4]).InputGestureText);
             Assert.Equal(MenuGestures.PitchUp, listPlayback.Items.OfType<MenuItem>()
                 .First(item => item.InputGestureText == MenuGestures.PitchUp).InputGestureText);
             // 編集末尾はシェル操作＋プレイリストからクリア。
@@ -2286,18 +2286,18 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void LabelLibraryShuffle_IsEnglishWithAccessKeyR()
+    public void LabelLibraryShuffle_IsEnglishWithoutAccessKey()
     {
         var previous = UiStrings.Language;
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Equal("_Random", UiStrings.LabelLibraryShuffle);
-            Assert.Equal('R', MenuAccessKeys.Read(UiStrings.LabelLibraryShuffle));
+            Assert.Equal("Random", UiStrings.LabelLibraryShuffle);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryShuffle));
             Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryShuffle, StringComparison.OrdinalIgnoreCase);
             UiStrings.SetLanguage(UiLanguage.English);
-            Assert.Equal("_Random", UiStrings.LabelLibraryShuffle);
-            Assert.Equal('R', MenuAccessKeys.Read(UiStrings.LabelLibraryShuffle));
+            Assert.Equal("Random", UiStrings.LabelLibraryShuffle);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryShuffle));
         }
         finally
         {
@@ -2363,18 +2363,18 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void LabelLibraryAutoPlay_IsEnglishWithAccessKeyP()
+    public void LabelLibraryAutoPlay_IsEnglishWithoutAccessKey()
     {
         var previous = UiStrings.Language;
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Equal("Auto _Play", UiStrings.LabelLibraryAutoPlay);
-            Assert.Equal('P', MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlay));
+            Assert.Equal("Auto Play", UiStrings.LabelLibraryAutoPlay);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlay));
             Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryAutoPlay, StringComparison.OrdinalIgnoreCase);
             UiStrings.SetLanguage(UiLanguage.English);
-            Assert.Equal("Auto _Play", UiStrings.LabelLibraryAutoPlay);
-            Assert.Equal('P', MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlay));
+            Assert.Equal("Auto Play", UiStrings.LabelLibraryAutoPlay);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlay));
         }
         finally
         {
@@ -2409,18 +2409,18 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void LabelLibraryAutoPlayNext_IsEnglishWithAccessKeyN()
+    public void LabelLibraryAutoPlayNext_IsEnglishWithoutAccessKey()
     {
         var previous = UiStrings.Language;
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Equal("Auto _Next", UiStrings.LabelLibraryAutoPlayNext);
-            Assert.Equal('N', MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlayNext));
+            Assert.Equal("Auto Next", UiStrings.LabelLibraryAutoPlayNext);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlayNext));
             Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryAutoPlayNext, StringComparison.OrdinalIgnoreCase);
             UiStrings.SetLanguage(UiLanguage.English);
-            Assert.Equal("Auto _Next", UiStrings.LabelLibraryAutoPlayNext);
-            Assert.Equal('N', MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlayNext));
+            Assert.Equal("Auto Next", UiStrings.LabelLibraryAutoPlayNext);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoPlayNext));
         }
         finally
         {
@@ -2455,18 +2455,18 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void LabelLibraryAutoLoop_IsEnglishWithAccessKeyL()
+    public void LabelLibraryAutoLoop_IsEnglishWithoutAccessKey()
     {
         var previous = UiStrings.Language;
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Equal("Single _Loop", UiStrings.LabelLibraryAutoLoop);
-            Assert.Equal('L', MenuAccessKeys.Read(UiStrings.LabelLibraryAutoLoop));
+            Assert.Equal("Single Loop", UiStrings.LabelLibraryAutoLoop);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoLoop));
             Assert.DoesNotContain("Alt+", UiStrings.LabelLibraryAutoLoop, StringComparison.OrdinalIgnoreCase);
             UiStrings.SetLanguage(UiLanguage.English);
-            Assert.Equal("Single _Loop", UiStrings.LabelLibraryAutoLoop);
-            Assert.Equal('L', MenuAccessKeys.Read(UiStrings.LabelLibraryAutoLoop));
+            Assert.Equal("Single Loop", UiStrings.LabelLibraryAutoLoop);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryAutoLoop));
         }
         finally
         {

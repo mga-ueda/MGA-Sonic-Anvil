@@ -119,11 +119,11 @@ internal static partial class UiStrings
     public static string WaveMenuRestart => Get("やり直し再生(_A)", "Rest_art Playback");
     public static string WaveMenuLoopPlay => Get("ループ再生(_L)", "_Loop Play");
     public static string WaveMenuPlayExit => Get("Play -E(_X)", "Play -E (_X)");
-    /// <summary>再生カテゴリ内で Preroll(R) と重ならないよう U。ショートカット表示は Alt+R。</summary>
+    /// <summary>再生カテゴリ内で Preroll(R) と重ならないよう U。ショートカット表示は Alt+Shift+R。</summary>
     public static string WaveMenuShuffle => Get("ランダム再生(_U)", "Sh_uffle");
-    /// <summary>再生カテゴリ内で Restart(A)／GoEnd(N) と重ならないよう M。ショートカット表示は Alt+N。</summary>
+    /// <summary>再生カテゴリ内で Restart(A)／GoEnd(N) と重ならないよう M。ショートカット表示は Alt+Shift+N。</summary>
     public static string WaveMenuAutoPlayNext => Get("次の曲を自動再生(_M)", "Auto ne_xt");
-    /// <summary>再生カテゴリ内。ショートカット表示は Alt+P。チェックはライブラリの Auto Play と同じ。</summary>
+    /// <summary>再生カテゴリ内。ショートカット表示は Alt+Shift+P。チェックはライブラリの Auto Play と同じ。</summary>
     public static string WaveMenuAutoPlay => Get("追加時に自動再生(_I)", "Auto Play on Add (_I)");
     /// <summary>再生カテゴリ内。P／N／R はプレイリストの前後曲と頭出し。アクセスキーは再生(P) などと重ならない。</summary>
     public static string WaveMenuPreviousTrack => Get("前の曲(_K)", "Previous Track (_K)");
@@ -207,7 +207,7 @@ internal static partial class UiStrings
     /// <summary>Wwise カテゴリ内。Play -E(X) と重なる X をやめて E。</summary>
     public static string WaveMenuWaapiPanel => Get("WAAPI パネル(_P)", "WAAPI _Panel");
     public static string WaveMenuKeepTarget => Get("Keep Target(_K)", "Keep Target (_K)");
-    public static string WaveMenuAutoActive => Get("Auto Active(_A)", "Auto Active (_A)");
+    public static string WaveMenuAutoActive => Get("Auto Active", "Auto Active");
     public static string WaveMenuWwiseExport => Get("Wwise へ EXPORT(_E)", "EXPORT to Wwise (_E)");
     public static string WaveMenuLaunchWwise => Get("プロジェクトを起動(_L)", "Launch Project (_L)");
     public static string WaveMenuOutputFolder => Get("書き出し先フォルダ(_F)", "Output Folder (_F)");

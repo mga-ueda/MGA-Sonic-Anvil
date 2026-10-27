@@ -287,7 +287,7 @@ internal sealed class CrossfadeEditWindow : Window
 
     public void SyncFromHost(bool updateSplice = true) => SyncFromState(updateSplice);
 
-    /// <summary>ステータスバー／Alt+L 側の Single Loop 状態を反映する。</summary>
+    /// <summary>ステータスバー／Alt+Shift+L 側の Single Loop 状態を反映する。</summary>
     public void SetSingleLoopChecked(bool enabled)
     {
         if (_singleLoopCheck.IsChecked == enabled)

@@ -427,7 +427,6 @@ public partial class MainWindow : Window
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         // クラスハンドラが先に Handled にしても、Alt 解放直後のテンキーを見る。
         AddHandler(PreviewKeyUpEvent, new KeyEventHandler(MainWindow_PreviewKeyUp), handledEventsToo: true);
-        AddHandler(KeyUpEvent, new KeyEventHandler(MainWindow_AltMenuKeyUp), handledEventsToo: true);
         AttachNumpadShiftHook();
         PreviewMouseDown += MainWindow_PreviewMouseDown;
         PreviewMouseDoubleClick += MainWindow_PreviewMouseDoubleClick;
