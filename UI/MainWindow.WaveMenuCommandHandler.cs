@@ -243,6 +243,9 @@ public partial class MainWindow
             case WaveMenuCommand.Shuffle:
                 LibraryBrowser.ToggleShuffle();
                 break;
+            case WaveMenuCommand.CheckSelectMode:
+                LibraryBrowser.ToggleCheckSelectMode();
+                break;
             case WaveMenuCommand.AutoPlay:
                 LibraryBrowser.ToggleAutoPlay();
                 break;

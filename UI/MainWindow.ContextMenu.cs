@@ -815,6 +815,7 @@ public partial class MainWindow
             Shuffle = LibraryBrowser.ShuffleEnabled,
             AutoPlayNext = LibraryBrowser.AutoPlayNextEnabled,
             AutoPlay = LibraryBrowser.AutoPlayEnabled,
+            CheckSelectMode = LibraryBrowser.CheckSelectMode,
             CanStepPlaylist = _sessions.Count > 0,
             CanRestartTrack = _sessions.Count > 0,
             VideoMini = IsVideoMiniPlayerActive(),

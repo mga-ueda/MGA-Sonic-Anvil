@@ -271,6 +271,9 @@ public sealed class WaveformContextMenuTests
             Assert.Equal("Alt+Shift+N", Find(tree, WaveMenuCommand.AutoPlayNext)?.Gesture);
             Assert.Contains(WaveMenuCommand.AutoPlay, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal("Alt+Shift+P", Find(tree, WaveMenuCommand.AutoPlay)?.Gesture);
+            Assert.Contains(WaveMenuCommand.CheckSelectMode, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
+            Assert.Equal("Shift+Space", Find(tree, WaveMenuCommand.CheckSelectMode)?.Gesture);
+            Assert.True(Find(tree, WaveMenuCommand.CheckSelectMode)?.Checkable);
             var view = Category(tree, UiStrings.WaveMenuCatView).Children!;
             Assert.Contains(UiStrings.WaveMenuCatAnalysis, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(UiStrings.WaveMenuCatScreen, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
