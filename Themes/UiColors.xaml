@@ -20,8 +20,8 @@
     <SolidColorBrush x:Key="MenuSeparatorBrush" Color="#FF3A3A3E" />
     <SolidColorBrush x:Key="MenuHighlightBackBrush" Color="#FF37373A" />
     <SolidColorBrush x:Key="MenuDisabledForeBrush" Color="#FF8C8C90" />
-    <!-- ウィンドウ上部メニューバー背景。既定は透明。 -->
-    <SolidColorBrush x:Key="MainMenuBarBackBrush" Color="#00000000" />
+    <!-- ウィンドウ上部メニューバー背景。薄い黒（約 23%）。 -->
+    <SolidColorBrush x:Key="MainMenuBarBackBrush" Color="#3A000000" />
 
     <SolidColorBrush x:Key="WaveformBackBrush" Color="#FF262626" />
     <SolidColorBrush x:Key="WaveformRecordBackBrush" Color="#FF3A1C1C" />

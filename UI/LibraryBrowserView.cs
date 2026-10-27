@@ -1833,6 +1833,17 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
     }
 
+    /// <summary>
+    /// 遅延のツリー／リスト Focus 予約を無効化する（上部メニューへフォーカスを渡すときなど）。
+    /// </summary>
+    internal void CancelPendingFocusRequests()
+    {
+        _explorerFocusTicket++;
+        _listFocusTicket++;
+        ReleasePlaylistFocusHold();
+        CancelPlaylistFocusRestore();
+    }
+
     public void FocusExplorer()
     {
         CancelPlaylistFocusRestore();

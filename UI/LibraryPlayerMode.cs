@@ -240,17 +240,17 @@ internal static class LibraryPlayerMode
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt or ModifierKeys.Shift
                 or ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift)) => true,
             (Key.L, ModifierKeys.None) => true,
-            (Key.L, ModifierKeys.Alt) => true,
+            (Key.L, ModifierKeys.Alt | ModifierKeys.Shift) => true,
             // N／P／R 素押しは曲送り・頭出し専用（AllowsKey より前で処理）。破壊編集ショートカットには通さない。
-            (Key.N, ModifierKeys.Alt) => true,
-            (Key.P, ModifierKeys.Alt) => true,
+            (Key.N, ModifierKeys.Alt | ModifierKeys.Shift) => true,
+            (Key.P, ModifierKeys.Alt | ModifierKeys.Shift) => true,
             (Key.P, ModifierKeys.Control | ModifierKeys.Shift) => true,
-            (Key.R, ModifierKeys.Alt) => true,
+            (Key.R, ModifierKeys.Alt | ModifierKeys.Shift) => true,
             // モニター列（MONO／DIM／LC／BPM）。素の B／C／M／D は破壊編集やフォーマットのまま。
-            (Key.B, ModifierKeys.Alt) => true,
-            (Key.C, ModifierKeys.Alt) => true,
-            (Key.D, ModifierKeys.Alt) => true,
-            (Key.M, ModifierKeys.Alt) => true,
+            (Key.B, ModifierKeys.Alt | ModifierKeys.Shift) => true,
+            (Key.C, ModifierKeys.Alt | ModifierKeys.Shift) => true,
+            (Key.D, ModifierKeys.Alt | ModifierKeys.Shift) => true,
+            (Key.M, ModifierKeys.Alt | ModifierKeys.Shift) => true,
             (Key.J, ModifierKeys.None) => true,
             (Key.K, ModifierKeys.None) => true,
             (Key.OemComma, ModifierKeys.None) => true,
@@ -262,8 +262,9 @@ internal static class LibraryPlayerMode
             (Key.R, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.A, ModifierKeys.Control) => true,
             (Key.F, ModifierKeys.Control) => true,
-            (Key.S, ModifierKeys.Alt) => true,
-            (Key.T, ModifierKeys.Alt) => true,
+            (Key.S, ModifierKeys.Alt | ModifierKeys.Shift) => true,
+            (Key.T, ModifierKeys.Alt | ModifierKeys.Shift) => true,
+            (Key.A, ModifierKeys.Alt | ModifierKeys.Shift) => true,
             (Key.O, ModifierKeys.Control) => true,
             (Key.O, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Q, ModifierKeys.Control) => true,
@@ -438,54 +439,57 @@ internal static class LibraryPlayerMode
         && !audioPlaying
         && !frameOrImmersivePaused;
 
+    /// <summary>ステータス／モニター／プレイリスト系の Alt+Shift＋文字。</summary>
+    public const ModifierKeys AltShift = ModifierKeys.Alt | ModifierKeys.Shift;
+
     /// <summary>
     /// ランダム再生の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
     /// 素の R は検索入力または再生し直しのまま。
     /// </summary>
     public static bool IsShuffleToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.R && modifiers == ModifierKeys.Alt;
+        key == Key.R && modifiers == AltShift;
 
     /// <summary>
     /// 次の曲を自動再生の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
     /// 素の N は検索入力または次の曲のまま。
     /// </summary>
     public static bool IsAutoPlayNextToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.N && modifiers == ModifierKeys.Alt;
+        key == Key.N && modifiers == AltShift;
 
     /// <summary>
-    /// Single Loop の切替（Alt+L）。ステータスバーのチェックと対。エディタ／プレイヤー共通。
+    /// Single Loop の切替（Alt+Shift+L）。ステータスバーのチェックと対。エディタ／プレイヤー共通。
     /// 素の L はループ再生のまま。検索フォーカス中も通す（<see cref="BypassesSearchFocus"/>）。
     /// 仕様は <see cref="AutoLoopPlayback"/>（エディタ＋サンプルループ＝頭→S 通し後に S–E 無限、プレイヤー＝曲末→先頭でサンプルループ無視）。
     /// </summary>
     public static bool IsAutoLoopToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.L && modifiers == ModifierKeys.Alt;
+        key == Key.L && modifiers == AltShift;
 
     /// <summary>
     /// Enter 追加時の自動再生の切替。プレイリストが空でも、ツリー／お気に入り／検索フォーカスでも効く。
     /// 素の P は検索入力または前の曲のまま。
     /// </summary>
     public static bool IsAutoPlayToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.P && modifiers == ModifierKeys.Alt;
+        key == Key.P && modifiers == AltShift;
 
-    /// <summary>モニター MONO（Alt+M）。素の M はマーカーのまま。</summary>
+    /// <summary>モニター MONO（Alt+Shift+M）。素の M はマーカーのまま。</summary>
     public static bool IsMonitorMonoToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.M && modifiers == ModifierKeys.Alt;
+        key == Key.M && modifiers == AltShift;
 
-    /// <summary>モニター DIM（Alt+D）。</summary>
+    /// <summary>モニター DIM（Alt+Shift+D）。</summary>
     public static bool IsMonitorDimToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.D && modifiers == ModifierKeys.Alt;
+        key == Key.D && modifiers == AltShift;
 
-    /// <summary>モニター LC（Alt+C）。素の C／Ctrl+C は別用途のまま。</summary>
+    /// <summary>モニター LC（Alt+Shift+C）。素の C／Ctrl+C は別用途のまま。</summary>
     public static bool IsMonitorLowCutToggle(Key key, ModifierKeys modifiers) =>
-        key == Key.C && modifiers == ModifierKeys.Alt;
+        key == Key.C && modifiers == AltShift;
 
-    /// <summary>モニター BPM オフ／オン（Alt+B）。素の B はビット深度変換のまま。</summary>
+    /// <summary>モニター BPM オフ／オン（Alt+Shift+B）。素の B はビット深度変換のまま。</summary>
     public static bool IsMonitorBpmCycle(Key key, ModifierKeys modifiers) =>
-        key == Key.B && modifiers == ModifierKeys.Alt;
+        key == Key.B && modifiers == AltShift;
 
     /// <summary>
     /// 検索欄フォーカス中でもショートカット側で先に拾うキー。
-    /// 文字入力（素の N／P／R など）は検索へ残し、Alt＋トグルと Ctrl+Shift+P だけ通す。
+    /// 文字入力（素の N／P／R など）は検索へ残し、Alt+Shift トグルと Ctrl+Shift+P だけ通す。
     /// </summary>
     public static bool BypassesSearchFocus(Key key, ModifierKeys modifiers) =>
         IsShuffleToggle(key, modifiers)
@@ -710,7 +714,7 @@ internal static class LibraryPlayerMode
         }
 
         if ((key == Key.Q && modifiers == ModifierKeys.Control)
-            || (key == Key.S && (modifiers & ModifierKeys.Alt) != 0))
+            || (key == Key.S && modifiers == AltShift))
         {
             return false;
         }

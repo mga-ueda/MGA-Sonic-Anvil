@@ -351,6 +351,12 @@ internal static class MenuAccessKeys
         key == Key.Apps && modifiers == ModifierKeys.None
         || key == Key.F10 && modifiers == ModifierKeys.Shift;
 
+    /// <summary>A〜Z のキーをメニューアクセスキー文字へ。それ以外は null。</summary>
+    public static char? FromKey(Key key) =>
+        key is >= Key.A and <= Key.Z
+            ? (char)('A' + (key - Key.A))
+            : null;
+
     public static char? Read(string header)
     {
         if (string.IsNullOrEmpty(header))
@@ -840,7 +846,7 @@ internal static class WaveformContextMenuBuilder
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuPreroll, WaveMenuCommand.Preroll, "Ctrl+Space", SingleFileOnly(m) && m.CanNavigate),
         Cmd(UiStrings.WaveMenuRestart, WaveMenuCommand.Restart, "Alt+Enter", SingleFileOnly(m) && m.CanNavigate),
-        Check(UiStrings.WaveMenuSilentSkip, WaveMenuCommand.SilentSkip, "Alt+S", m.SilentSkip, enabled: true),
+        Check(UiStrings.WaveMenuSilentSkip, WaveMenuCommand.SilentSkip, "Alt+Shift+S", m.SilentSkip, enabled: true),
         Check(UiStrings.WaveMenuRangeClick, WaveMenuCommand.RangeClick, "Q", m.RangeClick, SingleFileOnly(m) && m.CanEdit),
     ];
 
@@ -862,9 +868,9 @@ internal static class WaveformContextMenuBuilder
             MenuGestures.RestartTrack,
             SingleFileOnly(m) && m.LibraryMaximized && m.CanRestartTrack && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
-        Check(UiStrings.WaveMenuAutoPlay, WaveMenuCommand.AutoPlay, "Alt+P", m.AutoPlay, m.LibraryMaximized && !m.IsBusy),
-        Check(UiStrings.WaveMenuAutoPlayNext, WaveMenuCommand.AutoPlayNext, "Alt+N", m.AutoPlayNext, m.LibraryMaximized && !m.IsBusy),
-        Check(UiStrings.WaveMenuShuffle, WaveMenuCommand.Shuffle, "Alt+R", m.Shuffle, m.LibraryMaximized && !m.IsBusy),
+        Check(UiStrings.WaveMenuAutoPlay, WaveMenuCommand.AutoPlay, "Alt+Shift+P", m.AutoPlay, m.LibraryMaximized && !m.IsBusy),
+        Check(UiStrings.WaveMenuAutoPlayNext, WaveMenuCommand.AutoPlayNext, "Alt+Shift+N", m.AutoPlayNext, m.LibraryMaximized && !m.IsBusy),
+        Check(UiStrings.WaveMenuShuffle, WaveMenuCommand.Shuffle, "Alt+Shift+R", m.Shuffle, m.LibraryMaximized && !m.IsBusy),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> SeekPlaybackItems(WaveformContextMenuModel m) =>
@@ -925,7 +931,7 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuMaximizeLibrary, WaveMenuCommand.MaximizeLibrary, "F10", m.LibraryMaximized, enabled: true),
         Check(UiStrings.WaveMenuMinimalChrome, WaveMenuCommand.MinimalChrome, "F9", m.MinimalChrome, !m.IsBusy),
         Check(UiStrings.WaveMenuVideoMini, WaveMenuCommand.VideoMini, "F8", m.VideoMini, m.CanToggleVideoMini && !m.IsBusy),
-        Check(UiStrings.WaveMenuAlwaysOnTop, WaveMenuCommand.AlwaysOnTop, "Alt+T", m.AlwaysOnTop, enabled: true),
+        Check(UiStrings.WaveMenuAlwaysOnTop, WaveMenuCommand.AlwaysOnTop, "Alt+Shift+T", m.AlwaysOnTop, enabled: true),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> VideoChromeItems(WaveformContextMenuModel m) =>
@@ -984,14 +990,14 @@ internal static class WaveformContextMenuBuilder
 
     private static IReadOnlyList<WaveMenuEntry> WwiseItems(WaveformContextMenuModel m) =>
     [
-        Check(UiStrings.WaveMenuWaapiPanel, WaveMenuCommand.WaapiPanel, "Alt+W", m.WaapiVisible, !m.IsBusy && !m.LibraryMaximized),
+        Check(UiStrings.WaveMenuWaapiPanel, WaveMenuCommand.WaapiPanel, "Alt+Shift+W", m.WaapiVisible, !m.IsBusy && !m.LibraryMaximized),
         Cmd(UiStrings.WaveMenuWwiseExport, WaveMenuCommand.WwiseExport, "Ctrl+Shift+E", m.WaapiExportEnabled && !m.IsBusy && !m.LibraryMaximized),
         Cmd(UiStrings.WaveMenuLaunchWwise, WaveMenuCommand.LaunchWwise, "Ctrl+Alt+Shift+W", !m.IsBusy && !m.LibraryMaximized),
         Cmd(UiStrings.WaveMenuOutputFolder, WaveMenuCommand.OutputFolder, enabled: m.WaapiVisible && !m.IsBusy && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Check(UiStrings.WaveMenuKeepTarget, WaveMenuCommand.KeepTarget, checkedState: m.KeepTarget, enabled: m.WaapiVisible && m.CanKeepTarget && !m.IsBusy && !m.LibraryMaximized),
-        Check(UiStrings.WaveMenuAutoActive, WaveMenuCommand.AutoActive, checkedState: m.AutoActive, enabled: m.WaapiVisible && !m.IsBusy && !m.LibraryMaximized),
-        Check(UiStrings.WaveMenuPlayExit, WaveMenuCommand.PlayExit, "Alt+E", m.PlayExit, m.WaapiVisible && m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
+        Check(UiStrings.WaveMenuAutoActive, WaveMenuCommand.AutoActive, "Alt+Shift+A", m.AutoActive, m.WaapiVisible && !m.IsBusy && !m.LibraryMaximized),
+        Check(UiStrings.WaveMenuPlayExit, WaveMenuCommand.PlayExit, "Alt+Shift+E", m.PlayExit, m.WaapiVisible && m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
     ];
 
     /// <summary>

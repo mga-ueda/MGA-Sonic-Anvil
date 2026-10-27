@@ -218,16 +218,16 @@ internal sealed class MonitorToggleColumn : StackPanel
         _lowCut.IsLatched = _player.MonitorLowCut;
     }
 
-    /// <summary>MONO 切替（ボタン／Alt+M）。</summary>
+    /// <summary>MONO 切替（ボタン／Alt+Shift+M）。</summary>
     public void ToggleMono() => Mono_Click(_mono, new RoutedEventArgs());
 
-    /// <summary>DIM 切替（ボタン／Alt+D）。</summary>
+    /// <summary>DIM 切替（ボタン／Alt+Shift+D）。</summary>
     public void ToggleDim() => Dim_Click(_dim, new RoutedEventArgs());
 
-    /// <summary>LC 切替（ボタン／Alt+C）。</summary>
+    /// <summary>LC 切替（ボタン／Alt+Shift+C）。</summary>
     public void ToggleLowCut() => LowCut_Click(_lowCut, new RoutedEventArgs());
 
-    /// <summary>BPM オフ／オン切替（ボタン／Alt+B）。オン時は表示＋クリック。</summary>
+    /// <summary>BPM オフ／オン切替（ボタン／Alt+Shift+B）。オン時は表示＋クリック。</summary>
     public void CycleBpmMode() => Bpm_Click(_bpm, new RoutedEventArgs());
 
     private void Mono_Click(object sender, RoutedEventArgs e)

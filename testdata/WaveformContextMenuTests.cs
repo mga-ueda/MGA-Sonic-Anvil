@@ -27,7 +27,12 @@ public sealed class WaveformContextMenuTests
                         foreach (var header in group)
                         {
                             var key = MenuAccessKeys.Read(header);
-                            Assert.True(key is not null, $"{language}: missing access key: {header}");
+                            // Alt+Shift ジェスチャ専用（例: Auto Active）は AccessKey なしでよい。
+                            if (key is null)
+                            {
+                                continue;
+                            }
+
                             keys.Add(key.Value);
                         }
 
@@ -37,6 +42,8 @@ public sealed class WaveformContextMenuTests
                             .Select(g => $"{g.Key}: {string.Join(" / ", group.Where(h => MenuAccessKeys.Read(h) == g.Key))}");
                         Assert.True(keys.Count == keys.Distinct().Count(), $"{language} (selected={hasSelectedTabs}): {string.Join("; ", dupes)}");
                     }
+
+                    Assert.Null(MenuAccessKeys.Read(UiStrings.WaveMenuAutoActive));
                 }
             }
         }
@@ -226,10 +233,10 @@ public sealed class WaveformContextMenuTests
             Assert.Equal(MenuGestures.PitchReset, Find(tree, WaveMenuCommand.PlaybackPitchReset)?.Gesture);
             Assert.Contains(WaveMenuCommand.SilentSkip, commands);
             var silentSkip = Find(tree, WaveMenuCommand.SilentSkip);
-            Assert.Equal("Alt+S", silentSkip?.Gesture);
+            Assert.Equal("Alt+Shift+S", silentSkip?.Gesture);
             Assert.Contains(WaveMenuCommand.AlwaysOnTop, commands);
             var alwaysOnTop = Find(tree, WaveMenuCommand.AlwaysOnTop);
-            Assert.Equal("Alt+T", alwaysOnTop?.Gesture);
+            Assert.Equal("Alt+Shift+T", alwaysOnTop?.Gesture);
             Assert.Contains(WaveMenuCommand.Volume, commands);
             var volume = Find(tree, WaveMenuCommand.Volume);
             var loudness = Find(tree, WaveMenuCommand.ViewLoudness);
@@ -259,11 +266,11 @@ public sealed class WaveformContextMenuTests
             Assert.Equal("Q", Find(tree, WaveMenuCommand.RangeClick)?.Gesture);
             Assert.True(Find(tree, WaveMenuCommand.RangeClick)?.Checkable);
             Assert.Contains(WaveMenuCommand.Shuffle, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
-            Assert.Equal("Alt+R", Find(tree, WaveMenuCommand.Shuffle)?.Gesture);
+            Assert.Equal("Alt+Shift+R", Find(tree, WaveMenuCommand.Shuffle)?.Gesture);
             Assert.Contains(WaveMenuCommand.AutoPlayNext, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
-            Assert.Equal("Alt+N", Find(tree, WaveMenuCommand.AutoPlayNext)?.Gesture);
+            Assert.Equal("Alt+Shift+N", Find(tree, WaveMenuCommand.AutoPlayNext)?.Gesture);
             Assert.Contains(WaveMenuCommand.AutoPlay, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
-            Assert.Equal("Alt+P", Find(tree, WaveMenuCommand.AutoPlay)?.Gesture);
+            Assert.Equal("Alt+Shift+P", Find(tree, WaveMenuCommand.AutoPlay)?.Gesture);
             var view = Category(tree, UiStrings.WaveMenuCatView).Children!;
             Assert.Contains(UiStrings.WaveMenuCatAnalysis, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(UiStrings.WaveMenuCatScreen, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
@@ -278,7 +285,7 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.LaunchWwise, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
             Assert.Equal("Ctrl+Alt+Shift+W", Find(tree, WaveMenuCommand.LaunchWwise)?.Gesture);
             Assert.Contains(WaveMenuCommand.WaapiPanel, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
-            Assert.Equal("Alt+W", Find(tree, WaveMenuCommand.WaapiPanel)?.Gesture);
+            Assert.Equal("Alt+Shift+W", Find(tree, WaveMenuCommand.WaapiPanel)?.Gesture);
             Assert.Contains(WaveMenuCommand.KeepTarget, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
             Assert.Contains(WaveMenuCommand.AutoActive, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
             Assert.Contains(WaveMenuCommand.PlayExit, CommandsIn(tree, UiStrings.WaveMenuCatWwise));
@@ -430,7 +437,9 @@ public sealed class WaveformContextMenuTests
             WaapiVisible = true,
         });
         Assert.True(Find(waapiOn, WaveMenuCommand.PlayExit)?.Enabled);
-        Assert.Equal("Alt+E", Find(waapiOn, WaveMenuCommand.PlayExit)?.Gesture);
+        Assert.Equal("Alt+Shift+E", Find(waapiOn, WaveMenuCommand.PlayExit)?.Gesture);
+        Assert.True(Find(waapiOn, WaveMenuCommand.AutoActive)?.Enabled);
+        Assert.Equal("Alt+Shift+A", Find(waapiOn, WaveMenuCommand.AutoActive)?.Gesture);
     }
 
     [Fact]
@@ -646,6 +655,69 @@ public sealed class WaveformContextMenuTests
         Assert.Equal('W', MenuAccessKeys.Read("Export _Wave"));
         Assert.Equal('P', MenuAccessKeys.Read("Stop to Start (_P)"));
         Assert.Null(MenuAccessKeys.Read("No key"));
+    }
+
+    [Fact]
+    public void MenuAccessKeys_FromKey_MapsLettersOnly()
+    {
+        Assert.Equal('F', MenuAccessKeys.FromKey(Key.F));
+        Assert.Equal('A', MenuAccessKeys.FromKey(Key.A));
+        Assert.Equal('Z', MenuAccessKeys.FromKey(Key.Z));
+        Assert.Null(MenuAccessKeys.FromKey(Key.Enter));
+        Assert.Null(MenuAccessKeys.FromKey(Key.D1));
+        Assert.Null(MenuAccessKeys.FromKey(Key.F10));
+    }
+
+    [Fact]
+    public void TopLevelMenuAccessKeys_DocumentAltShortcutConflicts()
+    {
+        // メニューバー表示時は Alt+文字がルートメニューを開く。
+        // アプリ側トグルは Alt+Shift＋文字なのでルートと衝突しない。
+        var previous = UiStrings.Language;
+        try
+        {
+            foreach (var language in new[] { UiLanguage.Japanese, UiLanguage.English })
+            {
+                UiStrings.SetLanguage(language);
+                var roots = WaveformContextMenuBuilder.Build(
+                        WaveformContextMenuModel.AllEnabledForTests(),
+                        includeHere: false)
+                    .OfType<WaveMenuItemEntry>()
+                    .Select(item => (item.Header, Key: MenuAccessKeys.Read(item.Header)))
+                    .ToList();
+                Assert.All(roots, r => Assert.True(r.Key is not null, r.Header));
+
+                var byKey = roots.ToDictionary(r => r.Key!.Value, r => r.Header);
+                Assert.Equal(UiStrings.WaveMenuCatFile, byKey['F']);
+                Assert.Equal(UiStrings.WaveMenuCatEdit, byKey['E']);
+                Assert.Equal(UiStrings.WaveMenuCatFormat, byKey['N']);
+                Assert.Equal(UiStrings.WaveMenuCatExport, byKey['X']);
+                Assert.Equal(UiStrings.WaveMenuCatView, byKey['V']);
+                Assert.Equal(UiStrings.WaveMenuCatTimeline, byKey['T']);
+                Assert.Equal(UiStrings.WaveMenuCatTabs, byKey['B']);
+                Assert.Equal(UiStrings.WaveMenuCatPlayback, byKey['P']);
+                Assert.Equal(UiStrings.WaveMenuCatAudio, byKey['A']);
+                Assert.Equal(UiStrings.WaveMenuCatWwise, byKey['W']);
+                Assert.Equal(UiStrings.WaveMenuCatOther, byKey['O']);
+
+                // アプリ側トグルは Alt+Shift＋文字。ルートの Alt＋文字はメニュー専用で衝突しない。
+                Assert.Contains('E', byKey.Keys); // 編集（アプリは Alt+Shift+E）
+                Assert.Contains('W', byKey.Keys); // Wwise（アプリは Alt+Shift+W）
+                Assert.Contains('T', byKey.Keys); // タイムライン（アプリは Alt+Shift+T）
+                Assert.Contains('B', byKey.Keys); // タブ（アプリは Alt+Shift+B）
+                Assert.Contains('N', byKey.Keys); // 変換（アプリは Alt+Shift+N）
+                Assert.Contains('P', byKey.Keys); // 再生（アプリは Alt+Shift+P）
+                Assert.Contains('F', byKey.Keys);
+                Assert.Contains('V', byKey.Keys);
+                Assert.Contains('X', byKey.Keys);
+                Assert.Contains('A', byKey.Keys);
+                Assert.Contains('O', byKey.Keys);
+            }
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
     }
 
     private static WaveMenuItemEntry Category(IReadOnlyList<WaveMenuEntry> entries, string header) =>

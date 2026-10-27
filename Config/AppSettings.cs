@@ -72,7 +72,7 @@ internal sealed class AppSettings
     /// <summary>ユーザー用意の lame.exe。空または無効なら Windows で MP3 出力。</summary>
     public string LameExePath { get; set; } = string.Empty;
 
-    /// <summary>lame に渡すオプション。入出力パスは含めない。空欄は既定（-V2）。</summary>
+    /// <summary>lame に渡すオプション。入出力パスは含めない。空欄は既定（-V2 --noreplaygain）。</summary>
     public string LameOptions { get; set; } = Mp3Encode.DefaultLameOptions;
 
     /// <summary>同時処理数（書き出し・破壊編集の並列）。0 は Auto（コア数の 1/4）。上限はコア数の 1/2。</summary>

@@ -48,6 +48,9 @@ public partial class MainWindow
     private readonly HashSet<int> _altNumpadDown = new();
     private readonly HashSet<int> _staleSysNumpadDown = new();
     private int _altDownMask;
+
+    /// <summary>Alt 押下中に他キーが来たら true。単独 Alt アップでの EnterMenuMode 判定用。</summary>
+    private bool _altMenuChordHadOtherKey;
     private long _altReleasedAt = -1;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -307,6 +310,12 @@ public partial class MainWindow
         };
         if (bit == 0)
         {
+            // Alt 押下中の他キー → 単独 Alt ではない（Alt+F 等）。
+            if (!up && (_altDownMask != 0 || IsPhysicalAltDown()))
+            {
+                _altMenuChordHadOtherKey = true;
+            }
+
             return;
         }
 
@@ -314,6 +323,7 @@ public partial class MainWindow
         {
             _altDownMask |= bit;
             _altReleasedAt = -1;
+            _altMenuChordHadOtherKey = false;
             return;
         }
 
@@ -333,8 +343,32 @@ public partial class MainWindow
         Dispatcher.BeginInvoke(LeaveWin32MenuMode, System.Windows.Threading.DispatcherPriority.Send);
     }
 
+    /// <summary>
+    /// 単独 Alt のキーアップ。WPF Menu.OnEnterMenuMode / MenuBase の SystemKey Alt と同じく、
+    /// 未展開なら先頭トップレベルへフォーカス、セッション中なら解除。
+    /// Preview で Alt を Handled にするため、ネイティブ EnterMenuMode は届かないので自前で行う。
+    /// </summary>
+    private void HandleBareAltKeyUp()
+    {
+        var cleanAlt = !_altMenuChordHadOtherKey;
+        if (cleanAlt)
+        {
+            TryEnterOrLeaveMainMenuModeFromBareAlt();
+        }
+
+        ClearLatchedAlt();
+        LeaveWin32MenuMode();
+    }
+
     private void LeaveWin32MenuMode()
     {
+        // WPF Menu.IsMainMenu の EnterMenuMode（単独 Alt）や Alt+文字で開いたあとは触らない。
+        // OnLeaveMenuMode を呼ぶと KeyboardNavigation / MenuBase のメニューモードが落ちる。
+        if (IsMainMenuBarSessionActive())
+        {
+            return;
+        }
+
         if (PresentationSource.FromVisual(this) is not HwndSource source)
         {
             return;
@@ -475,7 +509,8 @@ public partial class MainWindow
         || (IsLibraryMaximized && LibraryBrowser.IsSearchFocused);
 
     private bool IsMenuTakingNumpadKeys() =>
-        _volumeMenu is { IsOpen: true }
+        IsMainMenuBarTakingKeys()
+        || _volumeMenu is { IsOpen: true }
         || _timeStretchMenu is { IsOpen: true }
         || _fadeMenu is { IsOpen: true }
         || _formatMenu is { IsOpen: true };
@@ -617,6 +652,15 @@ public partial class MainWindow
         var modifiers = NumpadShiftPassesToText()
             ? Keyboard.Modifiers
             : EffectiveShortcutModifiers(Keyboard.Modifiers);
+
+        // メニュー AccessKey は EffectiveShortcutModifiers で Alt を落としてはいけない。
+        // Key.System（Alt+文字）や物理 Alt 押下中は WPF AccessKeyManager と同じく Alt 付きとして扱う。
+        var menuModifiers = Keyboard.Modifiers;
+        if (e.Key == Key.System || IsPhysicalAltDown())
+        {
+            menuModifiers |= ModifierKeys.Alt;
+        }
+
         if (MenuAccessKeys.IsContextMenuKey(key, modifiers))
         {
             if (!e.IsRepeat)
@@ -625,6 +669,26 @@ public partial class MainWindow
             }
 
             e.Handled = true;
+            return;
+        }
+
+        // Alt+F 等はアプリショートカットより先に上部メニューを開く（MenuItem.OnAccessKey 相当）。
+        if (!e.IsRepeat && TryOpenMainMenuAccessKey(key, menuModifiers))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        // Escape のみここで処理。←→ は Handled にせず Menu/MenuItem.OnKeyDown へ渡す。
+        if (TryHandleMainMenuBarKey(e))
+        {
+            return;
+        }
+
+        // メニューセッション中はアプリショートカットへ抜かさない（バー見出しフォーカス含む）。
+        // Popup 内キーは別 Hwnd のためここには来ない。
+        if (IsMainMenuBarSessionActive())
+        {
             return;
         }
 
@@ -753,10 +817,9 @@ public partial class MainWindow
 
         if (key is Key.LeftAlt or Key.RightAlt)
         {
-            // 単独 Alt のキーアップと同じく、修飾と Win32 メニュー状態をここで終わらせる。
             // Handled にしないと DefWindowProc がメニュー不一致のシステム音を鳴らす。
-            ClearLatchedAlt();
-            LeaveWin32MenuMode();
+            // その代わり単独 Alt の EnterMenuMode は自前（HandleBareAltKeyUp）。
+            HandleBareAltKeyUp();
             if (_markerNudgeDirection != 0)
             {
                 StopMarkerNudge();
@@ -774,19 +837,6 @@ public partial class MainWindow
         {
             StopPlaceRepeat();
         }
-    }
-
-    private void MainWindow_AltMenuKeyUp(object sender, KeyEventArgs e)
-    {
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key is not (Key.LeftAlt or Key.RightAlt))
-        {
-            return;
-        }
-
-        ClearLatchedAlt();
-        LeaveWin32MenuMode();
-        e.Handled = true;
     }
 
     private void MainWindow_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -1260,13 +1310,20 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.E && modifiers == ModifierKeys.Alt && _waapiPanelVisible)
+        if (key == Key.E && modifiers == LibraryPlayerMode.AltShift && _waapiPanelVisible)
         {
             TogglePlayPostExit();
             return true;
         }
 
-        if (key == Key.W && modifiers == ModifierKeys.Alt)
+        if (key == Key.A && modifiers == LibraryPlayerMode.AltShift && _waapiPanelVisible)
+        {
+            WaapiBar.AutoActiveChecked = !WaapiBar.AutoActiveChecked;
+            PersistWaapiSettings();
+            return true;
+        }
+
+        if (key == Key.W && modifiers == LibraryPlayerMode.AltShift)
         {
             ToggleWaapiPanel();
             return true;
@@ -1641,13 +1698,13 @@ public partial class MainWindow
         }
 
         // ステータスバー系は F8／F9 でバーが隠れても、エディタ／プレイヤー共通で効かせる。
-        if (key == Key.S && modifiers == ModifierKeys.Alt)
+        if (key == Key.S && modifiers == LibraryPlayerMode.AltShift)
         {
             SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
             return true;
         }
 
-        if (key == Key.T && modifiers == ModifierKeys.Alt)
+        if (key == Key.T && modifiers == LibraryPlayerMode.AltShift)
         {
             AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
             return true;
@@ -1710,7 +1767,7 @@ public partial class MainWindow
         }
 
         // ライブラリ／プレイリスト検索フォーカス中は文字入力を優先。
-        // Alt+R／N／P（と Ctrl+Shift+P）だけは下のトグルへ通す（Alt は検索に文字を入れない）。
+        // Alt+Shift+R／N／P（と Ctrl+Shift+P）だけは下のトグルへ通す（Alt は検索に文字を入れない）。
         if (IsLibraryMaximized
             && LibraryBrowser.IsSearchFocused
             && !LibraryPlayerMode.BypassesSearchFocus(key, modifiers))
@@ -1801,7 +1858,7 @@ public partial class MainWindow
             return true;
         }
 
-        // 空リスト／ツリー／検索フォーカスでも Alt+R はランダム切替。タイプアヘッドより先に拾う。
+        // 空リスト／ツリー／検索フォーカスでも Alt+Shift+R はランダム切替。タイプアヘッドより先に拾う。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
@@ -1811,7 +1868,7 @@ public partial class MainWindow
             return true;
         }
 
-        // Alt+N は次の曲を自動再生。素の N（次の曲）より先、タイプアヘッド／検索入力より先。
+        // Alt+Shift+N は次の曲を自動再生。素の N（次の曲）より先、タイプアヘッド／検索入力より先。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
@@ -1821,9 +1878,9 @@ public partial class MainWindow
             return true;
         }
 
-        // Alt+L（Single Loop）は先頭のステータスバー系で処理済み。
+        // Alt+Shift+L（Single Loop）は先頭のステータスバー系で処理済み。
 
-        // Alt+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッド／検索入力より先。
+        // Alt+Shift+P は Enter 追加時の自動再生。素の P（前の曲）より先、タイプアヘッド／検索入力より先。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
@@ -1856,7 +1913,7 @@ public partial class MainWindow
             return true;
         }
 
-        // R は再生し直し（テンキー 5）。Alt+R のランダムより後。ツリー／検索中はタイプアヘッド優先。
+        // R は再生し直し（テンキー 5）。Alt+Shift+R のランダムより後。ツリー／検索中はタイプアヘッド優先。
         if (IsLibraryMaximized
             && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
             && !IsLibraryGroupComboFocused

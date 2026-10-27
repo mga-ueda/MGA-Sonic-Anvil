@@ -119,8 +119,8 @@ internal static partial class UiStrings
 
     public static string UntitledDocument => Get("untitled", "untitled");
 
-    public static string LabelAlwaysOnTop => Get("Always on _Top", "Always on _Top");
-    public static string LabelSilentSkip => Get("_Silent Skip", "_Silent Skip");
+    public static string LabelAlwaysOnTop => Get("Always on Top", "Always on Top");
+    public static string LabelSilentSkip => Get("Silent Skip", "Silent Skip");
     public static string LabelSilentSkipThreshold => Get(
         "無音しきい値（Silent Skip）",
         "Silence threshold (Silent Skip)");
@@ -175,7 +175,7 @@ internal static partial class UiStrings
     public static string LabelLibraryPlaylistWaveformSizeM => Get("M（中）", "M (medium)");
     public static string LabelLibraryPlaylistWaveformSizeL => Get("L（長）", "L (long)");
     public static string LabelGaplessPlayback => Get("ギャップレス再生(_G)", "_Gapless playback");
-    /// <summary>設定・一般。ウィンドウ上部メニューバーの表示。</summary>
+    /// <summary>設定・レイアウト。ウィンドウ上部メニューバーの表示。</summary>
     public static string LabelShowMainMenuBar => Get(
         "メニューバーを表示(_M)",
         "Show _menu bar");
@@ -453,26 +453,26 @@ internal static partial class UiStrings
     public static string LabelMonitorMono => Get("MONO", "MONO");
 
     public static string TooltipMonitorMono => Get(
-        "MONO：L+R を合算して聴く（クリック／Alt+M）",
-        "MONO: listen to L+R summed (click / Alt+M)");
+        "MONO：L+R を合算して聴く（クリック／Alt+Shift+M）",
+        "MONO: listen to L+R summed (click / Alt+Shift+M)");
 
     public static string LabelMonitorDim => Get("DIM", "DIM");
 
     public static string TooltipMonitorDim(double db) => Format(
-        "DIM：モニターを {0}（クリック／Alt+D）",
-        "DIM: monitor {0} (click / Alt+D)",
+        "DIM：モニターを {0}（クリック／Alt+Shift+D）",
+        "DIM: monitor {0} (click / Alt+Shift+D)",
         FormatSignedDb(db));
 
     public static string LabelMonitorLowCut => Get("LC", "LC");
 
     public static string TooltipMonitorLowCut(double hz) => Format(
-        "LC：モニターに {0} Hz ローシェルフ −20 dB（クリック／Alt+C）",
-        "LC: {0} Hz low-shelf −20 dB on monitor (click / Alt+C)",
+        "LC：モニターに {0} Hz ローシェルフ −20 dB（クリック／Alt+Shift+C）",
+        "LC: {0} Hz low-shelf −20 dB on monitor (click / Alt+Shift+C)",
         hz.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture));
 
     public static string TooltipMonitorBpm => Get(
-        "BPM：解析・表示・クリック（クリック／Alt+B）。既定オフ。表示は拍間隔から算出",
-        "BPM: analysis, display, and click (click / Alt+B). Default off. Display from beat intervals");
+        "BPM：解析・表示・クリック（クリック／Alt+Shift+B）。既定オフ。表示は拍間隔から算出",
+        "BPM: analysis, display, and click (click / Alt+Shift+B). Default off. Display from beat intervals");
 
     public static string LabelMonitor => Get("モニター", "Monitor");
 
@@ -1086,14 +1086,14 @@ internal static partial class UiStrings
     public static string LibraryExplorerLabel => Get("ライブラリ", "Library");
     public static string LibraryPlaylistLabel => Get("プレイリスト", "Playlist");
     public static string LibrarySearchHint => Get("検索", "Find");
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+R。</summary>
-    public static string LabelLibraryShuffle => "_Random";
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+P。</summary>
-    public static string LabelLibraryAutoPlay => "Auto _Play";
-    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+N。</summary>
-    public static string LabelLibraryAutoPlayNext => "Auto _Next";
-    /// <summary>ステータスバーの Single Loop。UI 言語に関わらず英語。Alt+L。</summary>
-    public static string LabelLibraryAutoLoop => "Single _Loop";
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+Shift+R。</summary>
+    public static string LabelLibraryShuffle => "Random";
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+Shift+P。</summary>
+    public static string LabelLibraryAutoPlay => "Auto Play";
+    /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+Shift+N。</summary>
+    public static string LabelLibraryAutoPlayNext => "Auto Next";
+    /// <summary>ステータスバーの Single Loop。UI 言語に関わらず英語。Alt+Shift+L。</summary>
+    public static string LabelLibraryAutoLoop => "Single Loop";
     /// <summary>Single Loop の動作説明（エディタ＝サンプルループ／プレイヤー＝全長、選択・A-B 優先）。</summary>
     public static string TipLibraryAutoLoop => Get(
         "オン時: エディタではサンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。プレイヤーではサンプルループを無視し曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。",
