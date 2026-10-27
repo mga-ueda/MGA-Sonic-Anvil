@@ -160,6 +160,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly CheckBox _shuffleCheck = new();
     private readonly CheckBox _autoPlayCheck = new();
     private readonly CheckBox _autoPlayNextCheck = new();
+    private readonly CheckBox _checkSelectCheck = new();
     private readonly LibraryPlaylistShuffle _shuffle = new();
     private bool _shuffleEnabled;
     private bool _shuffleBusy;
@@ -167,6 +168,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     private bool _autoPlayBusy;
     private bool _autoPlayNextEnabled;
     private bool _autoPlayNextBusy;
+    private bool _checkSelectBusy;
     private bool _autoLoopEnabled;
     private readonly List<string[]> _playlistSearchGroups = [];
     private readonly List<string[]> _explorerSearchGroups = [];
@@ -789,7 +791,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     public DocumentSession? SelectedSession =>
         _grid.SelectedItem is LibraryFileRow { Tag: DocumentSession session } ? session : null;
 
-    /// <summary>F4 チェック選択モード。初期はオフ（再起動で戻る）。</summary>
+    /// <summary>チェック選択モード。初期オフ。設定には記憶せず、プレイヤー退出でオフへ戻す。</summary>
     public bool CheckSelectMode => _checkSelectMode;
 
     public DocumentSession[] SelectedSessions
@@ -820,7 +822,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
     }
 
-    /// <summary>チェック選択モードのトグル（F4）。</summary>
+    /// <summary>チェック選択モードのトグル（Shift+Space／Check Box）。</summary>
     public void ToggleCheckSelectMode()
     {
         SetCheckSelectMode(!_checkSelectMode);
@@ -830,6 +832,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     {
         if (_checkSelectMode == on)
         {
+            SyncCheckSelectCheck();
             return;
         }
 
@@ -839,12 +842,32 @@ internal sealed partial class LibraryBrowserView : UserControl
             _checkColumn.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        SyncCheckSelectCheck();
+
         if (!on)
         {
             // チェック行を選択として残してから、チェック状態は忘れる。
             // オンに戻したときは空のチェックから始まる。ツリーは対象外。
             ApplyPlaylistSelectionFromChecks();
             ClearAllPlaylistChecks();
+        }
+    }
+
+    private void SyncCheckSelectCheck()
+    {
+        if (_checkSelectCheck.IsChecked == _checkSelectMode)
+        {
+            return;
+        }
+
+        _checkSelectBusy = true;
+        try
+        {
+            _checkSelectCheck.IsChecked = _checkSelectMode;
+        }
+        finally
+        {
+            _checkSelectBusy = false;
         }
     }
 
@@ -3280,6 +3303,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
         _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
         _autoPlayCheck.Content = UiStrings.LabelLibraryAutoPlay;
+        _checkSelectCheck.Content = UiStrings.LabelLibraryCheckSelect;
         _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
         _explorerSearchHint.Text = UiStrings.LibrarySearchHint;
         _playlistSearchHint.Text = UiStrings.LibrarySearchHint;
@@ -8773,6 +8797,16 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         SetAutoPlayEnabled(_autoPlayCheck.IsChecked == true, raise: true);
+    }
+
+    private void CheckSelectCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_checkSelectBusy)
+        {
+            return;
+        }
+
+        SetCheckSelectMode(_checkSelectCheck.IsChecked == true);
     }
 
     private void AutoPlayNextCheck_Changed(object sender, RoutedEventArgs e)

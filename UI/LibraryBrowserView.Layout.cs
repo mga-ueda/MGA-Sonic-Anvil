@@ -195,8 +195,8 @@ internal sealed partial class LibraryBrowserView
         DockPanel.SetDock(_shuffleCheck, Dock.Right);
         bar.Children.Add(_shuffleCheck);
 
-        // Dock.Right は先に足したものが右。Shuffle → AutoNext → AutoPlay で
-        // 見た目は Auto Play | Auto Next | Random。Single Loop はステータスバーへ。
+        // Dock.Right は先に足したものが右。Shuffle → AutoNext → AutoPlay → CheckBox で
+        // 見た目は Check Box | Auto Play | Auto Next | Random。Single Loop はステータスバーへ。
         _autoPlayNextCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
         _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
         _autoPlayNextCheck.IsChecked = false;
@@ -222,6 +222,20 @@ internal sealed partial class LibraryBrowserView
         _autoPlayCheck.Unchecked += AutoPlayCheck_Changed;
         DockPanel.SetDock(_autoPlayCheck, Dock.Right);
         bar.Children.Add(_autoPlayCheck);
+
+        _checkSelectCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
+        _checkSelectCheck.Content = UiStrings.LabelLibraryCheckSelect;
+        _checkSelectCheck.IsChecked = false;
+        _checkSelectCheck.Focusable = false;
+        _checkSelectCheck.VerticalAlignment = VerticalAlignment.Center;
+        _checkSelectCheck.FontSize = 11;
+        _checkSelectCheck.Margin = new Thickness(8, 0, 0, 0);
+        _checkSelectCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        _checkSelectCheck.ToolTip = "Shift+Space";
+        _checkSelectCheck.Checked += CheckSelectCheck_Changed;
+        _checkSelectCheck.Unchecked += CheckSelectCheck_Changed;
+        DockPanel.SetDock(_checkSelectCheck, Dock.Right);
+        bar.Children.Add(_checkSelectCheck);
 
         _playlistLabel.VerticalAlignment = VerticalAlignment.Center;
         _playlistLabel.TextTrimming = TextTrimming.CharacterEllipsis;
