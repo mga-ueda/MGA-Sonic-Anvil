@@ -161,6 +161,8 @@ internal enum WaveMenuCommand
     ExportByChannels,
     Manual,
     GitHub,
+    License,
+    About,
 }
 
 internal sealed class WaveformContextHit
@@ -936,11 +938,11 @@ internal static class WaveformContextMenuBuilder
 
     private static IReadOnlyList<WaveMenuEntry> ScreenViewItems(WaveformContextMenuModel m) =>
     [
+        Check(UiStrings.WaveMenuVideoMini, WaveMenuCommand.VideoMini, "F8", m.VideoMini, m.CanToggleVideoMini && !m.IsBusy),
+        Check(UiStrings.WaveMenuMinimalChrome, WaveMenuCommand.MinimalChrome, "F9", m.MinimalChrome, !m.IsBusy),
+        Check(UiStrings.WaveMenuMaximizeLibrary, WaveMenuCommand.MaximizeLibrary, "F10", m.LibraryMaximized, enabled: true),
         Check(UiStrings.WaveMenuMaximizeWaveform, WaveMenuCommand.MaximizeWaveform, "F11", m.WaveformMaximized, enabled: true),
         Check(UiStrings.WaveMenuMaximizeAnalyzers, WaveMenuCommand.MaximizeAnalyzers, "F12", m.AnalyzersMaximized, enabled: true),
-        Check(UiStrings.WaveMenuMaximizeLibrary, WaveMenuCommand.MaximizeLibrary, "F10", m.LibraryMaximized, enabled: true),
-        Check(UiStrings.WaveMenuMinimalChrome, WaveMenuCommand.MinimalChrome, "F9", m.MinimalChrome, !m.IsBusy),
-        Check(UiStrings.WaveMenuVideoMini, WaveMenuCommand.VideoMini, "F8", m.VideoMini, m.CanToggleVideoMini && !m.IsBusy),
         Check(UiStrings.WaveMenuAlwaysOnTop, WaveMenuCommand.AlwaysOnTop, "Alt+Shift+T", m.AlwaysOnTop, enabled: true),
     ];
 
@@ -1097,6 +1099,8 @@ internal static class WaveformContextMenuBuilder
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuManual, WaveMenuCommand.Manual),
         Cmd(UiStrings.WaveMenuGitHub, WaveMenuCommand.GitHub),
+        Cmd(UiStrings.WaveMenuLicense, WaveMenuCommand.License),
+        Cmd(UiStrings.WaveMenuAbout, WaveMenuCommand.About),
     ];
 
     private static WaveMenuItemEntry Sub(string header, IReadOnlyList<WaveMenuEntry> children) =>

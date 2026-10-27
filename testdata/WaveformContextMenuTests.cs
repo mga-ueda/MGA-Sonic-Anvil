@@ -258,6 +258,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.CopyAllTabTimes, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Contains(WaveMenuCommand.Settings, CommandsIn(tree, UiStrings.WaveMenuCatOther));
             Assert.Contains(WaveMenuCommand.ColorPanel, CommandsIn(tree, UiStrings.WaveMenuCatOther));
+            Assert.Contains(WaveMenuCommand.License, CommandsIn(tree, UiStrings.WaveMenuCatOther));
+            Assert.Contains(WaveMenuCommand.About, CommandsIn(tree, UiStrings.WaveMenuCatOther));
             Assert.Contains(WaveMenuCommand.TimeZoomIn, CommandsIn(tree, UiStrings.WaveMenuCatView));
             Assert.Contains(WaveMenuCommand.SilentSkip, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Contains(WaveMenuCommand.AlwaysOnTop, CommandsIn(tree, UiStrings.WaveMenuCatView));

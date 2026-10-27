@@ -159,9 +159,6 @@ public partial class MainWindow : Window
     /// <summary>直前にトーストした位置キー（同じ曲では再フラッシュしない）。</summary>
     private string? _playlistTrackIndexToastKey;
     private int _autoSpeakerSeenChannels = int.MinValue;
-    private ImageSource? _brandLogoDark;
-    private int _brandLogoDecodeWidth;
-    private double _brandLogoInkBottomFrac = 1;
     private TimeScrollBar TimeScroll => TimeScrollStrip.Bar;
     private WaveformView Waveform => _tileActiveView ?? PrimaryWaveform;
 
@@ -240,13 +237,6 @@ public partial class MainWindow : Window
         LibraryBrowser.ShuffleEnabled = AppStorage.Settings.LibraryShuffle;
         LibraryBrowser.AutoPlayNextEnabled = AppStorage.Settings.LibraryAutoPlayNext;
         LibraryBrowser.AutoLoopEnabled = AppStorage.Settings.LibraryAutoLoop;
-        DpiChanged += (_, _) =>
-        {
-            _brandLogoDark = null;
-            LoadBrandLogo();
-        };
-        LoadBrandLogo();
-        Loaded += (_, _) => AlignBrandLicense();
         UipiFileDrop.Attach(this, OnUipiFilesDropped);
         if (LaunchFiles.StartupHasVideo())
         {
@@ -874,8 +864,6 @@ public partial class MainWindow : Window
 
     private void RefreshLocalizedText()
     {
-        BrandLicenseHost.LinkText = UiStrings.CopyrightText;
-        QueueAlignBrandLicense();
         AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
         SilentSkipCheck.Content = UiStrings.LabelSilentSkip;
         StatusTimes.ApplyLocalizedText();
@@ -1735,146 +1723,6 @@ public partial class MainWindow : Window
             enabled,
             thresholdDb,
             AppStorage.Settings.ResolvedSilentSkipRecordPadMs());
-    }
-
-    private void BrandLicenseHost_LinkClick(object sender, BrandLicenseLinkClickEventArgs e)
-    {
-        var url = e.LinkId switch
-        {
-            "mit" => AppVersion.LicenseUrl,
-            "lame" => AppVersion.LameProjectUrl,
-            "ffmpeg" => AppVersion.FfmpegProjectUrl,
-            // GitHub 上の blob は未 push だと 404 になるため、同梱の通知を優先する。
-            "effetune" => ResolveEffetuneNoticesTarget(),
-            _ => AppVersion.RepositoryUrl,
-        };
-        TryOpenUrl(url);
-        e.Handled = true;
-    }
-
-    /// <summary>
-    /// 出力横の <c>THIRD_PARTY_NOTICES.md</c>。無いときだけ上流 EffeTune の MIT 全文へ。
-    /// </summary>
-    internal static string ResolveEffetuneNoticesTarget()
-    {
-        var local = Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_NOTICES.md");
-        return File.Exists(local) ? local : AppVersion.EffetuneLicenseUrl;
-    }
-
-    private void BrandLogo_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        TryOpenUrl(AppVersion.CompanyUrl);
-        e.Handled = true;
-    }
-
-    private void LoadBrandLogo()
-    {
-        try
-        {
-            var decodeWidth = BrandLogoDecodePixelWidth();
-            if (decodeWidth != _brandLogoDecodeWidth)
-            {
-                _brandLogoDark = null;
-                _brandLogoDecodeWidth = decodeWidth;
-            }
-
-            var cached = _brandLogoDark;
-            if (cached is null)
-            {
-                using var logoStream = AppEmbeddedResources.OpenLogo();
-                if (logoStream is null)
-                {
-                    BrandLogo.Visibility = Visibility.Collapsed;
-                    return;
-                }
-
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-                bitmap.DecodePixelWidth = decodeWidth;
-                bitmap.StreamSource = logoStream;
-                bitmap.EndInit();
-                bitmap.Freeze();
-                cached = bitmap;
-                _brandLogoDark = cached;
-            }
-
-            RenderOptions.SetBitmapScalingMode(BrandLogo, BitmapScalingMode.HighQuality);
-            BrandLogo.Source = cached;
-            BrandLogo.Visibility = Visibility.Visible;
-            if (cached is BitmapSource bitmapSource
-                && BrandLicenseAlign.TryInkFractions(bitmapSource, out _, out var bottomFrac))
-            {
-                _brandLogoInkBottomFrac = bottomFrac;
-            }
-            else
-            {
-                _brandLogoInkBottomFrac = 1;
-            }
-
-            QueueAlignBrandLicense();
-        }
-        catch
-        {
-            BrandLogo.Visibility = Visibility.Collapsed;
-        }
-    }
-
-    private void BrandLogo_SizeChanged(object sender, SizeChangedEventArgs e) => QueueAlignBrandLicense();
-
-    private void BrandLicenseHost_SizeChanged(object sender, SizeChangedEventArgs e) => QueueAlignBrandLicense();
-
-    private void QueueAlignBrandLicense() =>
-        Dispatcher.BeginInvoke(AlignBrandLicense, DispatcherPriority.Loaded);
-
-    private void AlignBrandLicense()
-    {
-        if (BrandLogo.Visibility != Visibility.Visible
-            || BrandLogo.Source is not BitmapSource source)
-        {
-            return;
-        }
-
-        var dpi = UiDpi.Get(BrandLicenseHost).PixelsPerDip;
-        var wwise = BrandLicenseAlign.MeasureLine(
-            BrandLicenseHost,
-            UiStrings.CopyrightWwiseLine,
-            dpi);
-        var lineBox = BrandLicenseHost.LineHeight > 0 ? BrandLicenseHost.LineHeight : wwise.Height;
-        var wwiseIndex = BrandLicenseAlign.FindLineIndex(
-            UiStrings.CopyrightText,
-            UiStrings.CopyrightWwiseLine);
-        var boxWidth = BrandLogo.ActualWidth > 0 ? BrandLogo.ActualWidth : DesignMetrics.BrandLogoWidth;
-        var boxHeight = BrandLogo.ActualHeight > 0 ? BrandLogo.ActualHeight : DesignMetrics.BrandLogoHeight;
-        var logoInkBottom = BrandLicenseAlign.LogoInkBottomInBox(
-            boxWidth,
-            boxHeight,
-            source.PixelWidth,
-            source.PixelHeight,
-            _brandLogoInkBottomFrac);
-        var shift = BrandLicenseAlign.LineBaselineShiftY(
-            logoInkBottom,
-            lineBox,
-            wwiseIndex < 0 ? 0 : wwiseIndex,
-            wwise.Baseline);
-        BrandLicenseHost.RenderTransform = null;
-        if (shift >= 0)
-        {
-            BrandLicenseHost.Margin = new Thickness(0, shift, 0, 0);
-            BrandLogo.Margin = new Thickness(0, 0, DesignMetrics.BrandLogoTextGap, 0);
-        }
-        else
-        {
-            BrandLicenseHost.Margin = new Thickness(0, 0, 0, 0);
-            BrandLogo.Margin = new Thickness(0, -shift, DesignMetrics.BrandLogoTextGap, 0);
-        }
-    }
-
-    private int BrandLogoDecodePixelWidth()
-    {
-        var scale = UiDpi.Get(this).DpiScaleX;
-        return Math.Max(1, (int)Math.Round(DesignMetrics.BrandLogoWidth * scale));
     }
 
     private async Task CheckForAppUpdateAsync()

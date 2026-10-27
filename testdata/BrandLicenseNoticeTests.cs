@@ -23,14 +23,18 @@ public sealed class BrandLicenseNoticeTests
         Assert.Contains(UiStrings.CopyrightFfmpegLink, text, StringComparison.Ordinal);
         Assert.Contains(UiStrings.CopyrightEffetuneLink, text, StringComparison.Ordinal);
         Assert.DoesNotContain("SIL Open Font License", text, StringComparison.Ordinal);
-        Assert.Equal(2, BrandLicenseAlign.LineCount(text));
-        var first = BrandLicenseAlign.FirstLine(text);
-        Assert.Contains(
-            UiStrings.CopyrightGitHub + " / " + UiStrings.CopyrightMitLink + " / " + UiStrings.CopyrightLameLink
-                + " / " + UiStrings.CopyrightFfmpegLink + " / " + UiStrings.CopyrightEffetuneLink,
-            first,
-            StringComparison.Ordinal);
+        Assert.Equal(3, BrandLicenseAlign.LineCount(text));
+        Assert.Equal(
+            "© 2026 " + AppVersion.CompanyName,
+            BrandLicenseAlign.FirstLine(text));
         Assert.Equal(1, BrandLicenseAlign.FindLineIndex(text, UiStrings.CopyrightWwiseLine));
+        Assert.Equal(
+            2,
+            BrandLicenseAlign.FindLineIndex(
+                text,
+                UiStrings.CopyrightGitHub + " / " + UiStrings.CopyrightMitLink + " / "
+                    + UiStrings.CopyrightLameLink + " / " + UiStrings.CopyrightFfmpegLink
+                    + " / " + UiStrings.CopyrightEffetuneLink));
     }
 
     [Fact]
@@ -73,13 +77,24 @@ public sealed class BrandLicenseNoticeTests
     }
 
     [Fact]
-    public void ResolveEffetuneNoticesTarget_PrefersBundledThirdPartyNotices()
+    public void ThirdPartyNotices_ResolvePath_IsAlongsideExecutable()
     {
-        var target = MainWindow.ResolveEffetuneNoticesTarget();
-        Assert.True(File.Exists(target), target);
         Assert.Equal(
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_NOTICES.md")),
-            Path.GetFullPath(target));
+            Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_NOTICES.md"),
+            ThirdPartyNotices.ResolvePath());
+        Assert.True(ThirdPartyNotices.TryRead(out var text));
+        Assert.Contains("MIT License", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EffetuneAboutLink_UsesBundledNoticesDialogNotBrowserOnly()
+    {
+        // EffeTune は About から LicenseNoticesWindow（同梱 md）を開く。
+        // URL 定数はリポジトリ参照用に残す。
+        Assert.Equal(
+            AppVersion.RepositoryUrl + "/blob/main/THIRD_PARTY_NOTICES.md",
+            AppVersion.ThirdPartyNoticesUrl);
+        Assert.Equal("THIRD_PARTY_NOTICES.md", ThirdPartyNotices.FileName);
     }
 
     [Fact]
@@ -93,10 +108,8 @@ public sealed class BrandLicenseNoticeTests
     }
 
     [Fact]
-    public void BrandRowHeight_FitsTwoLineLicenseBlock()
+    public void TransportHostMinHeight_IsTransportBarOnly()
     {
-        var need = Math.Max(DesignMetrics.BrandLogoHeight, DesignMetrics.BrandLicenseHeight)
-            + DesignMetrics.BrandRowPad;
-        Assert.Equal(need, DesignMetrics.BrandRowHeight);
+        Assert.Equal(DesignMetrics.TransportBarHeight, DesignMetrics.TransportHostMinHeight);
     }
 }

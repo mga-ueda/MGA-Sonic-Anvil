@@ -333,7 +333,7 @@ internal sealed partial class LibraryBrowserView
             entries,
             command => PlaylistWaveMenuRequested?.Invoke(this, command));
 
-        // ライブラリ固有のシェル操作・クリアはウィンドウ編集／その他の末尾へ（同名の無効項目の下）。
+        // ライブラリ固有: 編集は末尾へ。その他のコピー／エクスプローラーは先頭（例外配置）。
         if (FindMenuCategory(menu, UiStrings.WaveMenuCatEdit) is { } edit)
         {
             edit.Items.Add(new Separator());
@@ -349,10 +349,10 @@ internal sealed partial class LibraryBrowserView
 
         if (FindMenuCategory(menu, UiStrings.WaveMenuCatOther) is { } other)
         {
-            other.Items.Add(new Separator());
-            other.Items.Add(copyNames);
-            other.Items.Add(copyPaths);
-            other.Items.Add(explorer);
+            other.Items.Insert(0, new Separator());
+            other.Items.Insert(0, explorer);
+            other.Items.Insert(0, copyPaths);
+            other.Items.Insert(0, copyNames);
             SyncSubmenuEnabled(other);
         }
     }

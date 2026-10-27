@@ -94,14 +94,24 @@ internal static partial class UiStrings
             Get(japaneseFormat, englishFormat),
             args);
 
+    /// <summary>設定ラベルなどアクセスキー無し文言へ <c>(_X)</c> を付ける。</summary>
+    public static string WithParenAccessKey(string label, char accessKey) =>
+        $"{label}(_{char.ToUpperInvariant(accessKey)})";
+
     public const string AppName = AppVersion.ProductName;
 
-    /// <summary>フッタ権利表記。リンク文言と Wwise 商標行は IM Importer と同様に常に英語。</summary>
+    /// <summary>
+    /// バージョン情報の権利表記。会社行・Wwise 商標・リンク行。
+    /// リンク文言と Wwise 行は IM Importer と同様に常に英語。
+    /// </summary>
     public static string CopyrightText =>
-        "© 2026 " + AppVersion.CompanyName + "  " + CopyrightGitHub
-        + " / " + CopyrightMitLink + " / " + CopyrightLameLink + " / " + CopyrightFfmpegLink
-        + " / " + CopyrightEffetuneLink
-        + "\n" + CopyrightWwiseLine;
+        "© 2026 " + AppVersion.CompanyName
+        + "\n" + CopyrightWwiseLine
+        + "\n" + CopyrightGitHub
+        + " / " + CopyrightMitLink
+        + " / " + CopyrightLameLink
+        + " / " + CopyrightFfmpegLink
+        + " / " + CopyrightEffetuneLink;
 
     public const string CopyrightGitHub = "GitHub";
 
@@ -327,6 +337,13 @@ internal static partial class UiStrings
     public static string LabelDefaultFadeIn => Get("波形フェードイン", "Waveform Fade In");
     public static string LabelDefaultFadeOut => Get("波形フェードアウト", "Waveform Fade Out");
     public static string DialogNewDocumentTitle => Get("新規", "New");
+    public static string DialogAboutTitle => Get("バージョン情報", "About");
+    public static string DialogLicenseTitle => Get("ライセンス", "License");
+    public static string DialogLicenseMissing => Get(
+        "THIRD_PARTY_NOTICES.md を読み込めませんでした。",
+        "Could not read THIRD_PARTY_NOTICES.md.");
+    /// <summary>バージョン情報ダイアログの版表示。言語に関わらず Version。</summary>
+    public static string AboutVersionLabel(string version) => "Version " + version;
     public static string DialogSilenceDetectTitle => Get("無音・ヒット検出", "Silence & Hit Detection");
     public static string LabelSilenceDetectOpenThreshold => Get("オープンスレッショルド", "Open Threshold");
     public static string LabelSilenceDetectCloseThreshold => Get("クローズスレッショルド", "Close Threshold");
@@ -912,8 +929,8 @@ internal static partial class UiStrings
         "Draw with the pen (E)  volume changes when you release. The curve stays while you draw. Undo with Ctrl+Z. Also right-click the curve");
     public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
     public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
-    public static string TooltipLibraryMaximize => Get("レイアウト F10", "Layout F10");
-    public static string TooltipAnalyzerMaximize => Get("レイアウト F12", "Layout F12");
+    public static string TooltipLibraryMaximize => LabelLayoutPresetF10;
+    public static string TooltipAnalyzerMaximize => LabelLayoutPresetF12;
     public static string TooltipColorPanel => Get("色設定 (Ctrl+Shift+C)", "Color settings (Ctrl+Shift+C)");
 
 

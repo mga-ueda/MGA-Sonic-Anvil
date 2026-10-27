@@ -101,6 +101,8 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.CopyFilePath
             or WaveMenuCommand.Manual
             or WaveMenuCommand.GitHub
+            or WaveMenuCommand.License
+            or WaveMenuCommand.About
             or WaveMenuCommand.AddMarker
             or WaveMenuCommand.AddMarkerHere
             or WaveMenuCommand.ClearMarkers

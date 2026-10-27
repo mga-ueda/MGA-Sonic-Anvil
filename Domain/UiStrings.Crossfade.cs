@@ -100,11 +100,11 @@ internal static partial class UiStrings
         "ホイールまたは上下キーで増減",
         "Wheel or ↑↓ to nudge");
     public static string CrossfadeTipValueNudge => Get(
-        "時間表示: ↑↓／ホイール＝1秒、Shift＝10秒、Ctrl＝1分、Ctrl+Shift＝10分。サンプル表示: 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。見出しの時間／サンプル数、または数値欄の右クリックで切替（ステータスバーと共有）。",
-        "Time: ↑↓/wheel=1 s, Shift=10 s, Ctrl=1 min, Ctrl+Shift=10 min. Samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Switch via the Time/Samples header or right-click on a value box (shared with the status bar).");
+        "時間表示: ↑↓／ホイール＝1秒、Shift＝10秒、Ctrl＝1分、Ctrl+Shift＝10分。サンプル表示: 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。見出しの時間／サンプル数、または数値欄の右クリックで切替（このウィンドウ内のみ。ステータスバーとは別）。",
+        "Time: ↑↓/wheel=1 s, Shift=10 s, Ctrl=1 min, Ctrl+Shift=10 min. Samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Switch via the Time/Samples header or right-click on a value box (this window only; independent of the status bar).");
     public static string CrossfadeUnitTime => Get("時間", "Time");
     public static string CrossfadeUnitSamples => Get("サンプル数", "Samples");
     public static string CrossfadeTipUnitToggle => Get(
-        "表示を時間とサンプル数で切り替えます（ステータスバーと共有）。数値欄の右クリックでも同じです。",
-        "Switch display between time and samples (shared with the status bar). Same via right-click on a value box.");
+        "表示を時間とサンプル数で切り替えます（このウィンドウ内のみ。ステータスバーとは別）。数値欄の右クリックでも同じです。",
+        "Switch display between time and samples (this window only; independent of the status bar). Same via right-click on a value box.");
 }

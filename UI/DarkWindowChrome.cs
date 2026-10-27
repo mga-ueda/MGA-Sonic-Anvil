@@ -123,7 +123,10 @@ internal static class DarkWindowChrome
             return IntPtr.Zero;
         }
 
-        if (window.Background is SolidColorBrush solid && GetClientRect(hwnd, out var rect))
+        // 透明背景（Acrylic すりガラス）は塗りつぶすとデスクトップ透かしが潰れる。
+        if (window.Background is SolidColorBrush solid
+            && solid.Color.A >= 250
+            && GetClientRect(hwnd, out var rect))
         {
             var brush = CreateSolidBrush(ToColorRef(solid.Color));
             if (brush != IntPtr.Zero)

@@ -590,6 +590,12 @@ public partial class MainWindow
             case WaveMenuCommand.GitHub:
                 TryOpenUrl(AppVersion.RepositoryUrl);
                 break;
+            case WaveMenuCommand.License:
+                LicenseNoticesWindow.Show(this);
+                break;
+            case WaveMenuCommand.About:
+                AboutWindow.Show(this);
+                break;
         }
     }
 }

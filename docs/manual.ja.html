@@ -557,7 +557,7 @@
           <li>音声のプレイリスト波形と動画本再生／F8 では <kbd>I</kbd>／<kbd>O</kbd> の捨て A-B と <kbd>M</kbd>／<kbd>Ins</kbd> の一時マーカーを使えます（別ファイル再生で忘れる。音声はエディタへ戻すとき既存マーカーとマージし、揃った A-B はサンプルループにして未保存のまま持ち越す。動画／PDF は持ち込まないので捨てる）。</li>
           <li>動画／PDF の暗いプレビューでは使いません。範囲は反転して半透明です。拡大しません。</li>
           <li>画面用の波形だけ作り、短いファイルは粗くしません。スペクトラムやラウドネスの曲線表示には切り替えません。波形上の右クリックでは、シーク・選択・再生まわりが中心です（ドキュメントへの破壊編集はプレイリスト側のメニューから行います。下記）。</li>
-          <li>右クリック／メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd> でメニューを開けます。表示の中は、ズーム・解析・画面（<kbd>F8</kbd>〜<kbd>F12</kbd> と常に最前面）のあと、再生ヘッド、ソロ、映像（全画面 <kbd>F</kbd>、ミニ窓、オーバーレイ <kbd>A</kbd>、タイムコード <kbd>T</kbd>、PDF の固定 <kbd>W</kbd>、プレビューへ戻る <kbd>Q</kbd>、プロキシ <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>）です。タイムラインはマーカー／リージョン／ループです。再生は再生操作と、プレイリスト・端への移動に分かれ、Silent Skip もここにあります。ファイルの時間はタブ、設定と色設定はその他です。クリックした位置の再生・移動・マーカー・区間・時間のコピーは「この位置」です。再生に追加時の自動再生（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>）・前の曲（<kbd>P</kbd>）・次の曲（<kbd>N</kbd>）・頭から再生（<kbd>R</kbd>）があります。元に戻すは捨てマーカーです。プレイリストの右クリックにも前後の曲・頭出し・Auto Play があります。</li>
+          <li>右クリック／メニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd> でメニューを開けます。表示の中は、ズーム・解析・画面（<kbd>F8</kbd>〜<kbd>F12</kbd> と常に最前面）のあと、再生ヘッド、ソロ、映像（全画面 <kbd>F</kbd>、ミニ窓、オーバーレイ <kbd>A</kbd>、タイムコード <kbd>T</kbd>、PDF の固定 <kbd>W</kbd>、プレビューへ戻る <kbd>Q</kbd>、プロキシ <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>）です。タイムラインはマーカー／リージョン／ループです。再生は再生操作と、プレイリスト・端への移動に分かれ、Silent Skip もここにあります。ファイルの時間はタブ、設定・色設定・ライセンス・バージョンはその他です。クリックした位置の再生・移動・マーカー・区間・時間のコピーは「この位置」です。再生に追加時の自動再生（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>）・前の曲（<kbd>P</kbd>）・次の曲（<kbd>N</kbd>）・頭から再生（<kbd>R</kbd>）があります。元に戻すは捨てマーカーです。プレイリストの右クリックにも前後の曲・頭出し・Auto Play があります。</li>
         </ul>
 
         <h4>プレイリストの破壊編集</h4>
@@ -696,7 +696,7 @@
         <ul>
           <li>上段は再生・ズーム。下段はフェード／ノーマライズ／削除／新規／保存／MP3 出力、マニュアル <span class="ui">?</span>。トランスポートのボタンには短いツールチップ（ショートカット付き）が出ます。操作の詳細はこのマニュアルを参照してください。</li>
           <li><span class="ui">マーカークリック</span>（<kbd>Q</kbd>）…… マーカー／リージョン端の位置でクリックを鳴らします。選択があればその範囲、なければファイル全体。ボタンまたは <kbd>Q</kbd> でオン／オフ（既定オフ。自動ではオンになりません）。波形の右クリック → 再生からも切り替えできます。プレイヤーの動画本再生／フレーム一時停止／PDF 明るい表示では <kbd>Escape</kbd> と同じく暗いプレビューへ戻します（F8／引数起動ミニではプレイリストへ戻る（動画の In／Out がある Escape は解除して留まる）。マーカークリックはプレイヤーでは効きません）。</li>
-          <li>会社ロゴとライセンスはボタン列の下です（ロゴの右が表記）。ロゴは会社サイト。GitHub はリポジトリ、MIT License は本アプリの全文、LAME／FFmpeg は各公式サイト、EffeTune は同梱の第三者通知（MIT 全文・学習データ帰属。画面左下のリンクからも開けます）。Wwise®／Audiokinetic® の商標行があります。くわしくは <a href="#trademarks">商標とライセンス</a>。</li>
+          <li>会社ロゴとライセンス表記はトランスポートには出しません。メニューの<span class="ui">その他</span> → <span class="ui">バージョン</span>で、すりガラスのダイアログにアプリアイコン・アプリ名・版・権利リンクを出します。GitHub はリポジトリ、MIT License は本アプリの全文、LAME／FFmpeg は各公式サイトをブラウザで開き、EffeTune は同梱の第三者通知ダイアログを開きます。<span class="ui">その他</span> → <span class="ui">ライセンス</span>でも同じ通知（同梱 <code>THIRD_PARTY_NOTICES.md</code>）をすりガラスダイアログで読めます。Wwise®／Audiokinetic® の商標行もあります。くわしくは <a href="#trademarks">商標とライセンス</a>。</li>
         </ul>
       </article>
 
@@ -1032,7 +1032,7 @@
         <li><strong>開き方</strong> …… <kbd>Shift</kbd>+<kbd>X</kbd>、または波形の右クリック → オーディオ → フェード調整ツール。プレイヤー最大化中は開きません。</li>
         <li><strong>初期値</strong> …… 選択があればその範囲、無ければ既存のサンプルループを始点／終点にします。プリクロスフェードは 0、ポストはツールが覚える前回値です。</li>
         <li><strong>プレビュー</strong> …… 本体の再生で試せます（サンプルループを再生窓にし、始点より前からの頭通しも可）。左の継ぎ目プレビューは左＝終点側・右＝始点側。下の「クロスフェード表示」は継ぎ目での合成を出すかどうか（既定オフ）。</li>
-        <li><strong>数値</strong> …… 始点 (S)／終点 (E)／プリ（<kbd>X</kbd>／<kbd>F</kbd>／<kbd>Alt</kbd>+<kbd>P</kbd>）／ポスト（<kbd>P</kbd>／<kbd>Alt</kbd>+<kbd>T</kbd>）。入力欄へは <kbd>Alt</kbd>+<kbd>S</kbd>／<kbd>E</kbd>／<kbd>P</kbd>／<kbd>T</kbd> でも移動（欄フォーカス中も可）。既定は時間表示（ステータスバーと共有。「ループ」見出しの 時間／サンプル数、または数値欄の右クリックで切替）。↑↓／ホイールはフォーカス無しでもマウスオーバーで増減（時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000）。値は入力中もループ／旗へ即反映。各欄の 0 ボタンで近いゼロクロスへ吸着。</li>
+        <li><strong>数値</strong> …… 始点 (S)／終点 (E)／プリ（<kbd>X</kbd>／<kbd>F</kbd>／<kbd>Alt</kbd>+<kbd>P</kbd>）／ポスト（<kbd>P</kbd>／<kbd>Alt</kbd>+<kbd>T</kbd>）。入力欄へは <kbd>Alt</kbd>+<kbd>S</kbd>／<kbd>E</kbd>／<kbd>P</kbd>／<kbd>T</kbd> でも移動（欄フォーカス中も可）。既定は時間表示（このウィンドウ内のみ。「ループ」見出しの 時間／サンプル数、または数値欄の右クリックで切替。ステータスバー／トランスポートとは連動しない）。↑↓／ホイールはフォーカス無しでもマウスオーバーで増減（時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000）。値は入力中もループ／旗へ即反映。各欄の 0 ボタンで近いゼロクロスへ吸着。</li>
         <li><strong>自動探索</strong> …… 「始点を探す」「終点を探す」「始点と終点をずらす」。継ぎ目が似る位置へ進め続けます。</li>
         <li><strong>28の倍数</strong> …… オンのとき始点と終点は 28 サンプル刻みだけ動きます。</li>
         <li><strong>範囲外を切り落とし</strong> …… OK 時に始点より前と終点以降を削除します（エンド側は材料として焼いたあと切り落します）。</li>
@@ -1651,7 +1651,7 @@
         <li><strong>LAME</strong> は LAME project の名称です。このアプリには入っていません。設定で指定した <code>lame.exe</code> を呼び出すだけです。入手とライセンスの確認は利用者側です。</li>
         <li><strong>FFmpeg</strong> は FFmpeg プロジェクトの名称です。このアプリには入っていません。設定で指定した <code>ffmpeg.exe</code> を呼び出すだけです。空欄や無効なら動画プロキシは作りません。入手とライセンスの確認は利用者側です。</li>
         <li><strong>Signalsmith Stretch</strong>（Signalsmith Audio、MIT）はピッチ変更に同梱しています。MIT 全文は <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にあります。</li>
-        <li><strong>EffeTune</strong>（Copyright © 2025–2026 Yoshiyuki Kobayashi、MIT）の Rhythm Analyzer DSP を、BPM／ビート解析に利用します（モニター列の BPM がオンのとき）。画面上のテンポ数値は、EffeTune が返す半／倍テンポの候補値ではなく、検出した拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算した値です。オン時のクリックも同じ拍タイミングに合わせます。コードと学習済み重みは MIT のもとで同梱し、学習用の音声データそのものは同梱しません。MIT 全文と学習データ由来の帰属（Slakh2100-redux／Groove MIDI など CC BY 4.0、および T48M 学習セット名）は同梱の <code>THIRD_PARTY_NOTICES.md</code>（画面左下の <span class="ui">EffeTune</span> リンク、またはリポジトリの <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>）にあります。上流プロジェクトは <a href="https://github.com/Frieve-A/effetune">Frieve-A/effetune</a> です。</li>
+        <li><strong>EffeTune</strong>（Copyright © 2025–2026 Yoshiyuki Kobayashi、MIT）の Rhythm Analyzer DSP を、BPM／ビート解析に利用します（モニター列の BPM がオンのとき）。画面上のテンポ数値は、EffeTune が返す半／倍テンポの候補値ではなく、検出した拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算した値です。オン時のクリックも同じ拍タイミングに合わせます。コードと学習済み重みは MIT のもとで同梱し、学習用の音声データそのものは同梱しません。MIT 全文と学習データ由来の帰属（Slakh2100-redux／Groove MIDI など CC BY 4.0、および T48M 学習セット名）は同梱およびリポジトリの <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>（メニューの<span class="ui">その他</span> → <span class="ui">ライセンス</span>、または<span class="ui">バージョン</span>の <span class="ui">EffeTune</span>）にあります。上流プロジェクトは <a href="https://github.com/Frieve-A/effetune">Frieve-A/effetune</a> です。</li>
       </ul>
 
       <h2 id="planned-improvements">15. 長時間利用向けの改善</h2>

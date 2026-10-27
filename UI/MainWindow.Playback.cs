@@ -3420,14 +3420,13 @@ public partial class MainWindow
             DockPanel.SetDock(VectorScope, gonioDock);
         }
 
-        // 上下ドックともアイコン＋ロゴを一塊のまま帯の垂直中央へ（F12 拡大時も分解しない）。
+        // 上下ドックともトランスポートを一塊のまま帯の垂直中央へ（F12 拡大時も分解しない）。
         TransportBrandStack.VerticalAlignment = VerticalAlignment.Center;
-        BrandRowHost.Margin = new Thickness(12, 0, 0, 0);
         ApplyTransportBrandLeftInset();
         // アナライザ行の高さは ApplyWaveformMaximizeChrome 側で設定。
     }
 
-    /// <summary>トランスポート／ロゴ左を波形描画開始（dB 目盛り列）に揃える。</summary>
+    /// <summary>トランスポート左を波形描画開始（dB 目盛り列）に揃える。</summary>
     private void ApplyTransportBrandLeftInset()
     {
         var left = ShowWaveformScaleLane ? DesignMetrics.DbScaleWidth : 0;
