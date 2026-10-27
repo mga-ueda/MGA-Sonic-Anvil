@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -51,6 +50,10 @@ internal sealed class CrossfadeEditWindow : Window
     private CurveIconRow? _postInCurve;
     private StackPanel? _preCurveSide;
     private StackPanel? _postCurveSide;
+    private TextBlock? _loopSectionTitle;
+    private TextBlock? _loopNudgeHint;
+    private TextBlock? _unitTimeLabel;
+    private TextBlock? _unitSamplesLabel;
     private CrossfadeEditState? _state;
     private bool _syncing;
     private bool _hidingFromHost;
@@ -64,18 +67,23 @@ internal sealed class CrossfadeEditWindow : Window
     private bool _valueNudgeRepeatStarted;
     private const int ValueNudgeRepeatDelayMs = 400;
     private const int ValueNudgeRepeatIntervalMs = 50;
-    /// <summary>?????????????????? 0.5 ??????</summary>
+    /// <summary>数値入力の確定デバウンス（0.5 秒）。</summary>
     private readonly DispatcherTimer _valueCommitTimer;
     private TextBox? _valueCommitBox;
     private CrossfadeEditState.FocusField _valueCommitFocus;
     private const int ValueCommitDebounceMs = 500;
 
-    /// <summary>??? true ??????????????? 0.5 ???????????</summary>
-    public event Action<bool>? DraftChanged;
+    /// <summary>
+    /// 数値変更通知。<paramref name="debounceWave"/> は本体ピークの 0.5 秒デバウンス、
+    /// <paramref name="prePostLight"/> は Pre/Post のみ（サンプルループ非更新）。
+    /// </summary>
+    public event Action<bool, bool>? DraftChanged;
     public event Action? LoopMixRequested;
     public event Action? ExitRequested;
     public event Action<CrossfadeAutoSearchKind>? AutoSearchRequested;
     public event Action<CrossfadeEditState.FocusField>? SnapZeroRequested;
+    /// <summary>数値欄へフォーカスしたとき（本体の表示寄せ用）。</summary>
+    public event Action<CrossfadeEditState.FocusField>? FieldFocusRequested;
     /// <summary>Single Loop チェック変更（ホストの LibraryBrowser.AutoLoop と連動）。</summary>
     public event Action<bool>? SingleLoopChanged;
 
@@ -132,7 +140,7 @@ internal sealed class CrossfadeEditWindow : Window
         _splice.LoopEndsChanged += () =>
         {
             SyncFromState();
-            DraftChanged?.Invoke(false);
+            NotifyDraftChanged();
         };
 
         _valueNudgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ValueNudgeRepeatDelayMs) };
@@ -178,16 +186,73 @@ internal sealed class CrossfadeEditWindow : Window
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0
+            && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0
+            && TryFocusValueFieldShortcut(key))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.FocusedElement is TextBox)
         {
             return;
         }
 
-        if (_splice.TryHandleZoomKey(e.Key, Keyboard.Modifiers))
+        if (_splice.TryHandleZoomKey(key, Keyboard.Modifiers))
         {
             e.Handled = true;
         }
     }
+
+    /// <summary>始点／終点／プリ／ポストの入力欄へフォーカスし、本体表示も寄せる。</summary>
+    public void FocusValueField(CrossfadeEditState.FocusField focus)
+    {
+        var box = BoxForFocus(focus);
+        if (_state is not null)
+        {
+            _state.Focus = focus;
+        }
+
+        if (!IsVisible)
+        {
+            Present();
+        }
+
+        Activate();
+        box.Focus();
+        box.SelectAll();
+        FieldFocusRequested?.Invoke(focus);
+    }
+
+    private bool TryFocusValueFieldShortcut(Key key)
+    {
+        CrossfadeEditState.FocusField? focus = key switch
+        {
+            Key.S => CrossfadeEditState.FocusField.Start,
+            Key.E => CrossfadeEditState.FocusField.End,
+            Key.P => CrossfadeEditState.FocusField.PreCrossfade,
+            Key.T => CrossfadeEditState.FocusField.PostCrossfade,
+            _ => null,
+        };
+        if (focus is null)
+        {
+            return false;
+        }
+
+        FocusValueField(focus.Value);
+        return true;
+    }
+
+    private TextBox BoxForFocus(CrossfadeEditState.FocusField focus) =>
+        focus switch
+        {
+            CrossfadeEditState.FocusField.End => _endBox,
+            CrossfadeEditState.FocusField.PreCrossfade => _fadeInBox,
+            CrossfadeEditState.FocusField.PostCrossfade => _postBox,
+            _ => _startBox,
+        };
 
     public void Present()
     {
@@ -280,6 +345,17 @@ internal sealed class CrossfadeEditWindow : Window
         _singleLoopCheck.ToolTip = UiStrings.CrossfadeTipSingleLoop;
         _xfadeCheck.Content = UiStrings.CrossfadeLabelXfade;
         _xfadeCheck.ToolTip = UiStrings.CrossfadeTipXfade;
+        if (_loopSectionTitle is not null)
+        {
+            _loopSectionTitle.Text = UiStrings.CrossfadeSectionParams;
+        }
+
+        if (_loopNudgeHint is not null)
+        {
+            _loopNudgeHint.Text = UiStrings.CrossfadeHintValueNudge;
+            _loopNudgeHint.ToolTip = UiStrings.CrossfadeTipValueNudge;
+        }
+
         SyncFromState();
     }
 
@@ -435,10 +511,7 @@ internal sealed class CrossfadeEditWindow : Window
     /// </summary>
     private UIElement LoopParamsGrid()
     {
-        ApplyValueBoxWidth(_startBox, CompactValueBoxWidth);
-        ApplyValueBoxWidth(_endBox, CompactValueBoxWidth);
-        ApplyValueBoxWidth(_fadeInBox, CompactValueBoxWidth);
-        ApplyValueBoxWidth(_postBox, CompactValueBoxWidth);
+        RefreshValueBoxChrome();
 
         var grid = new Grid { Margin = new Thickness(0, 0, 0, 2), HorizontalAlignment = HorizontalAlignment.Left };
         // 0:左ラベル 1:左入力 2:左0 3:列間 4:右ラベル 5:右入力 6:右0
@@ -521,7 +594,7 @@ internal sealed class CrossfadeEditWindow : Window
         Grid.SetColumn(text, labelCol);
         grid.Children.Add(text);
 
-        PrepareValueBox(box, tip, focus);
+        PrepareValueBox(box, focus);
         box.Height = ValueRowControlHeight;
         box.MinHeight = ValueRowControlHeight;
         box.MaxHeight = ValueRowControlHeight;
@@ -555,20 +628,90 @@ internal sealed class CrossfadeEditWindow : Window
         grid.Children.Add(zero);
     }
 
-    private void PrepareValueBox(TextBox box, string tip, CrossfadeEditState.FocusField focus)
+    private void PrepareValueBox(TextBox box, CrossfadeEditState.FocusField focus)
     {
-        box.ToolTip = tip + "\n" + UiStrings.CrossfadeTipValueNudge;
         box.GotKeyboardFocus -= OnLoopBoxGotFocus;
         box.LostKeyboardFocus -= OnLoopBoxLostFocus;
         box.PreviewKeyDown -= OnLoopBoxPreviewKeyDown;
         box.PreviewMouseWheel -= OnLoopBoxPreviewMouseWheel;
         box.TextChanged -= OnLoopBoxTextChanged;
         box.Tag = focus;
+        box.ContextMenu = BuildValueUnitMenu();
         box.GotKeyboardFocus += OnLoopBoxGotFocus;
         box.LostKeyboardFocus += OnLoopBoxLostFocus;
         box.PreviewKeyDown += OnLoopBoxPreviewKeyDown;
         box.PreviewMouseWheel += OnLoopBoxPreviewMouseWheel;
         box.TextChanged += OnLoopBoxTextChanged;
+    }
+
+    private ContextMenu BuildValueUnitMenu()
+    {
+        var menu = new ContextMenu();
+        var timeItem = new MenuItem { IsCheckable = true };
+        var sampleItem = new MenuItem { IsCheckable = true };
+        timeItem.Click += (_, _) => SetShowSamples(false);
+        sampleItem.Click += (_, _) => SetShowSamples(true);
+        menu.Items.Add(timeItem);
+        menu.Items.Add(sampleItem);
+        menu.Opened += (_, _) =>
+        {
+            var showSamples = ShowSamples;
+            timeItem.Header = UiStrings.MenuShowTime;
+            sampleItem.Header = UiStrings.MenuShowSamples;
+            timeItem.IsChecked = !showSamples;
+            sampleItem.IsChecked = showSamples;
+        };
+        return menu;
+    }
+
+    private void SetShowSamples(bool showSamples)
+    {
+        if (ShowSamples == showSamples)
+        {
+            return;
+        }
+
+        CancelPendingValueCommit();
+        StopValueNudge();
+        AppStorage.Settings.StatusShowSamples = showSamples;
+        AppStorage.Save();
+        SyncFromState(updateSplice: false);
+    }
+
+    private bool ShowSamples => AppStorage.Settings.StatusShowSamples;
+
+    private int CurrentSampleRate =>
+        Math.Max(1, _splice.Document?.SampleRate ?? 48_000);
+
+    private void RefreshUnitToggle()
+    {
+        if (_unitTimeLabel is null || _unitSamplesLabel is null)
+        {
+            return;
+        }
+
+        var showSamples = ShowSamples;
+        var active = BrushOf("AccentCyanBrush");
+        var muted = BrushOf("MutedForeBrush");
+        _unitTimeLabel.Text = UiStrings.CrossfadeUnitTime;
+        _unitSamplesLabel.Text = UiStrings.CrossfadeUnitSamples;
+        _unitTimeLabel.Foreground = showSamples ? muted : active;
+        _unitSamplesLabel.Foreground = showSamples ? active : muted;
+        _unitTimeLabel.FontWeight = showSamples ? FontWeights.Normal : FontWeights.SemiBold;
+        _unitSamplesLabel.FontWeight = showSamples ? FontWeights.SemiBold : FontWeights.Normal;
+        var tip = UiStrings.CrossfadeTipUnitToggle;
+        _unitTimeLabel.ToolTip = tip;
+        _unitSamplesLabel.ToolTip = tip;
+    }
+
+    private void RefreshValueBoxChrome()
+    {
+        var width = ShowSamples ? CompactValueBoxWidthSamples : CompactValueBoxWidthTime;
+        ApplyValueBoxWidth(_startBox, width);
+        ApplyValueBoxWidth(_endBox, width);
+        ApplyValueBoxWidth(_fadeInBox, width);
+        ApplyValueBoxWidth(_postBox, width);
+        RefreshUnitToggle();
     }
 
     private void OnLoopBoxGotFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -596,7 +739,9 @@ internal sealed class CrossfadeEditWindow : Window
             return;
         }
 
-        // ?????????????? 0.5 ???????????
+        // パースできる値は即ステート／ループへ反映（表示テキストは入力中のまま）
+        TryApplyBoxValue(box, focus, syncText: false, notify: true, debounceWave: true);
+        // 整形表示は入力停止後に寄せる
         ScheduleValueCommit(box, focus);
     }
 
@@ -625,7 +770,7 @@ internal sealed class CrossfadeEditWindow : Window
 
         var focus = _valueCommitFocus;
         _valueCommitBox = null;
-        // ????????????????????????????Enter ????
+        // 入力停止後の整形反映（無効値は戻さない。Enter／フォーカスアウトは別経路）
         CommitBox(box, focus, revertOnInvalid: false);
     }
 
@@ -667,13 +812,18 @@ internal sealed class CrossfadeEditWindow : Window
 
     private void OnLoopBoxPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (sender is not TextBox { Tag: CrossfadeEditState.FocusField focus } box
-            || !box.IsKeyboardFocusWithin)
+        if (sender is not TextBox { Tag: CrossfadeEditState.FocusField focus } box)
         {
             return;
         }
 
-        if (TryNudgeValueBox(box, focus, e.Delta > 0 ? 1 : -1, Keyboard.Modifiers))
+        // フォーカス無しでもマウスオーバー＋ホイールで増減（Enter 不要）
+        if (TryNudgeValueBox(
+                box,
+                focus,
+                e.Delta > 0 ? 1 : -1,
+                Keyboard.Modifiers,
+                requireFocus: false))
         {
             e.Handled = true;
         }
@@ -690,7 +840,7 @@ internal sealed class CrossfadeEditWindow : Window
             Foreground = BrushOf("PrimaryForeBrush"),
         };
 
-    private static UIElement SectionHeaderWithNudgeHint(string title)
+    private UIElement SectionHeaderWithNudgeHint(string title)
     {
         var row = new StackPanel
         {
@@ -698,15 +848,16 @@ internal sealed class CrossfadeEditWindow : Window
             Margin = new Thickness(0, 10, 0, 4),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        row.Children.Add(new TextBlock
+        _loopSectionTitle = new TextBlock
         {
             Text = title,
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center,
             Foreground = BrushOf("PrimaryForeBrush"),
-        });
-        row.Children.Add(new TextBlock
+        };
+        row.Children.Add(_loopSectionTitle);
+        _loopNudgeHint = new TextBlock
         {
             Text = UiStrings.CrossfadeHintValueNudge,
             FontSize = 10,
@@ -714,8 +865,53 @@ internal sealed class CrossfadeEditWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Foreground = BrushOf("MutedForeBrush"),
             ToolTip = UiStrings.CrossfadeTipValueNudge,
+        };
+        row.Children.Add(_loopNudgeHint);
+
+        _unitTimeLabel = CreateUnitToggleLabel(() => SetShowSamples(false));
+        _unitSamplesLabel = CreateUnitToggleLabel(() => SetShowSamples(true));
+        var unitRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(14, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Cursor = Cursors.Hand,
+            ToolTip = UiStrings.CrossfadeTipUnitToggle,
+        };
+        unitRow.Children.Add(_unitTimeLabel);
+        unitRow.Children.Add(new TextBlock
+        {
+            Text = " / ",
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = BrushOf("MutedForeBrush"),
         });
+        unitRow.Children.Add(_unitSamplesLabel);
+        unitRow.MouseLeftButtonDown += (_, e) =>
+        {
+            SetShowSamples(!ShowSamples);
+            e.Handled = true;
+        };
+        unitRow.ContextMenu = BuildValueUnitMenu();
+        row.Children.Add(unitRow);
+        RefreshUnitToggle();
         return row;
+    }
+
+    private static TextBlock CreateUnitToggleLabel(Action onClick)
+    {
+        var label = new TextBlock
+        {
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            Cursor = Cursors.Hand,
+        };
+        label.MouseLeftButtonDown += (_, e) =>
+        {
+            onClick();
+            e.Handled = true;
+        };
+        return label;
     }
 
     private UIElement CurveSection()
@@ -738,7 +934,7 @@ internal sealed class CrossfadeEditWindow : Window
 
                 _state.PreOutShape = shape;
                 RefreshCurveIcons();
-                DraftChanged?.Invoke(false);
+                NotifyDraftChanged();
             });
         _preInCurve = CreateCurveIconRow(
             UiStrings.CrossfadeLabelCurveLegIn,
@@ -752,7 +948,7 @@ internal sealed class CrossfadeEditWindow : Window
 
                 _state.PreInShape = shape;
                 RefreshCurveIcons();
-                DraftChanged?.Invoke(false);
+                NotifyDraftChanged();
             });
         _postOutCurve = CreateCurveIconRow(
             UiStrings.CrossfadeLabelCurveLegOut,
@@ -766,7 +962,7 @@ internal sealed class CrossfadeEditWindow : Window
 
                 _state.PostOutShape = shape;
                 RefreshCurveIcons();
-                DraftChanged?.Invoke(false);
+                NotifyDraftChanged();
             });
         _postInCurve = CreateCurveIconRow(
             UiStrings.CrossfadeLabelCurveLegIn,
@@ -780,7 +976,7 @@ internal sealed class CrossfadeEditWindow : Window
 
                 _state.PostInShape = shape;
                 RefreshCurveIcons();
-                DraftChanged?.Invoke(false);
+                NotifyDraftChanged();
             });
 
         _preCurveSide = CurveSideRow(
@@ -849,9 +1045,7 @@ internal sealed class CrossfadeEditWindow : Window
             new StackPanel { Margin = new Thickness(0, 0, 0, 2) },
             buttons,
             order,
-            order[0],
-            isFadeIn,
-            legLabel);
+            order[0]);
 
         row.Root.Children.Add(new TextBlock
         {
@@ -943,16 +1137,12 @@ internal sealed class CrossfadeEditWindow : Window
         StackPanel root,
         List<Border> buttons,
         IReadOnlyList<FadeShape> order,
-        FadeShape selected,
-        bool isFadeIn,
-        string legLabel)
+        FadeShape selected)
     {
         public StackPanel Root { get; } = root;
         public List<Border> Buttons { get; } = buttons;
         public IReadOnlyList<FadeShape> Order { get; } = order;
         public FadeShape Selected { get; set; } = selected;
-        public bool IsFadeIn { get; } = isFadeIn;
-        public string LegLabel { get; } = legLabel;
     }
 
     private UIElement AutoSearchRow()
@@ -1028,7 +1218,7 @@ internal sealed class CrossfadeEditWindow : Window
         CrossfadeEditState.FocusField focus,
         int direction)
     {
-        if (direction == 0 || !CanNudgeValueBox(box))
+        if (direction == 0 || !CanNudgeValueBox(box, requireFocus: true))
         {
             return false;
         }
@@ -1113,47 +1303,53 @@ internal sealed class CrossfadeEditWindow : Window
             Keyboard.Modifiers);
     }
 
-    private bool CanNudgeValueBox(TextBox box) =>
+    private bool CanNudgeValueBox(TextBox box, bool requireFocus) =>
         !_syncing
         && _state is not null
         && _splice.Document is not null
-        && box.IsKeyboardFocusWithin;
+        && (!requireFocus || box.IsKeyboardFocusWithin);
 
     private bool TryNudgeValueBox(
         TextBox box,
         CrossfadeEditState.FocusField focus,
         int direction,
-        ModifierKeys modifiers)
+        ModifierKeys modifiers,
+        bool requireFocus = true)
     {
-        if (!CanNudgeValueBox(box) || direction == 0)
+        if (!CanNudgeValueBox(box, requireFocus) || direction == 0)
         {
             return false;
         }
 
-        // Ctrl alone / Alt などはキャレット移動などに任せる
-        if (modifiers is not (ModifierKeys.None or ModifierKeys.Shift
+        // Alt などはキャレット移動などに任せる（Ctrl 単独は時間モードの 1 分ステップ用）
+        if ((modifiers & ModifierKeys.Alt) != 0)
+        {
+            return false;
+        }
+
+        if (modifiers is not (ModifierKeys.None or ModifierKeys.Shift or ModifierKeys.Control
             or (ModifierKeys.Control | ModifierKeys.Shift)))
         {
             return false;
         }
 
-        var step = NudgeStepSamples(modifiers);
+        var step = StatusTimeEdit.NudgeStep(ShowSamples, CurrentSampleRate, modifiers);
         _state!.Focus = focus;
         _state.Nudge(focus, direction * step, _splice.Document!.FrameCount);
         SyncFromState();
-        // ?????????: ????????? 0.5 ?????????????
-        DraftChanged?.Invoke(true);
+        NotifyDraftChanged(debounceWave: true, focus);
         return true;
     }
 
-    /// <summary>なし＝1 / Shift＝10 / Ctrl+Shift＝100 サンプル。</summary>
-    private static long NudgeStepSamples(ModifierKeys modifiers) =>
-        modifiers switch
-        {
-            ModifierKeys.Control | ModifierKeys.Shift => 100,
-            ModifierKeys.Shift => 10,
-            _ => 1,
-        };
+    private void NotifyDraftChanged(bool debounceWave, CrossfadeEditState.FocusField focus)
+    {
+        var prePostLight = focus is CrossfadeEditState.FocusField.PreCrossfade
+            or CrossfadeEditState.FocusField.PostCrossfade;
+        DraftChanged?.Invoke(debounceWave, prePostLight);
+    }
+
+    private void NotifyDraftChanged(bool debounceWave = false) =>
+        DraftChanged?.Invoke(debounceWave, false);
 
     private void SetTruncate(bool value)
     {
@@ -1168,7 +1364,7 @@ internal sealed class CrossfadeEditWindow : Window
             _state.Clamp(_splice.Document.FrameCount);
         }
 
-        DraftChanged?.Invoke(false);
+        NotifyDraftChanged();
     }
 
     private void SetDeleteAfterLoop(bool value)
@@ -1184,7 +1380,7 @@ internal sealed class CrossfadeEditWindow : Window
             _state.Clamp(_splice.Document.FrameCount);
         }
 
-        DraftChanged?.Invoke(false);
+        NotifyDraftChanged();
     }
 
     private void SetAlignTwentyEight(bool value)
@@ -1203,7 +1399,7 @@ internal sealed class CrossfadeEditWindow : Window
         }
 
         SyncFromState();
-        DraftChanged?.Invoke(false);
+        NotifyDraftChanged();
     }
 
     private void SetXfadePreview(bool value)
@@ -1215,7 +1411,7 @@ internal sealed class CrossfadeEditWindow : Window
 
         _state.ShowXfadePreview = value;
         _splice.InvalidateVisual();
-        DraftChanged?.Invoke(false);
+        NotifyDraftChanged();
     }
 
     private void SetSingleLoop(bool value)
@@ -1230,9 +1426,26 @@ internal sealed class CrossfadeEditWindow : Window
 
     private void CommitBox(TextBox box, CrossfadeEditState.FocusField focus, bool revertOnInvalid = true)
     {
+        if (!TryApplyBoxValue(box, focus, syncText: true, notify: true, debounceWave: false)
+            && revertOnInvalid)
+        {
+            SyncFromState();
+        }
+    }
+
+    /// <summary>
+    /// 入力欄の値をステートへ反映。<paramref name="syncText"/> が false のときは入力中テキストを保つ。
+    /// </summary>
+    private bool TryApplyBoxValue(
+        TextBox box,
+        CrossfadeEditState.FocusField focus,
+        bool syncText,
+        bool notify,
+        bool debounceWave)
+    {
         if (_syncing || _state is null || _splice.Document is null)
         {
-            return;
+            return false;
         }
 
         var frames = _splice.Document.FrameCount;
@@ -1244,14 +1457,9 @@ internal sealed class CrossfadeEditWindow : Window
         }
 
         raw = raw.Trim().TrimEnd('%');
-        if (!long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+        if (!UiStrings.TryParseStatusTime(raw, CurrentSampleRate, ShowSamples, out var value))
         {
-            if (revertOnInvalid)
-            {
-                SyncFromState();
-            }
-
-            return;
+            return false;
         }
 
         switch (focus)
@@ -1274,16 +1482,33 @@ internal sealed class CrossfadeEditWindow : Window
                 break;
         }
 
-        var caret = box.IsKeyboardFocusWithin ? box.CaretIndex : -1;
-        SyncFromState();
-        if (caret >= 0 && box.IsKeyboardFocusWithin)
+        if (syncText)
         {
-            box.CaretIndex = Math.Clamp(caret, 0, box.Text.Length);
+            var caret = box.IsKeyboardFocusWithin ? box.CaretIndex : -1;
+            SyncFromState();
+            if (caret >= 0 && box.IsKeyboardFocusWithin)
+            {
+                box.CaretIndex = Math.Clamp(caret, 0, box.Text.Length);
+            }
+        }
+        else
+        {
+            _splice.State = _state;
+            _splice.InvalidateVisual();
         }
 
-        // Enter ????????????????????? 0.5 ????????
-        DraftChanged?.Invoke(false);
+        if (notify)
+        {
+            NotifyDraftChanged(debounceWave, focus);
+        }
+
+        return true;
     }
+
+    private bool ShouldPreserveEditingText(TextBox box) =>
+        box.IsKeyboardFocusWithin
+        && _valueCommitTimer.IsEnabled
+        && ReferenceEquals(_valueCommitBox, box);
 
     private void SyncFromState(bool updateSplice = true)
     {
@@ -1292,20 +1517,43 @@ internal sealed class CrossfadeEditWindow : Window
             return;
         }
 
+        // 入力中の欄はホスト同期で上書きしない（ライブ反映と両立）
+        var preserveStart = ShouldPreserveEditingText(_startBox);
+        var preserveEnd = ShouldPreserveEditingText(_endBox);
+        var preservePre = ShouldPreserveEditingText(_fadeInBox);
+        var preservePost = ShouldPreserveEditingText(_postBox);
+
         _syncing = true;
         try
         {
-            _startBox.Text = _state.StartFrame.ToString(CultureInfo.InvariantCulture);
-            _endBox.Text = _state.EndFrame.ToString(CultureInfo.InvariantCulture);
-            _fadeInBox.Text = _state.PreCrossfadeFrames.ToString(CultureInfo.InvariantCulture);
-            _postBox.Text = _state.PostCrossfadeFrames.ToString(CultureInfo.InvariantCulture);
+            RefreshValueBoxChrome();
+            var rate = CurrentSampleRate;
+            var asSamples = ShowSamples;
+            if (!preserveStart)
+            {
+                _startBox.Text = UiStrings.FormatStatusTime(_state.StartFrame, rate, asSamples);
+            }
+
+            if (!preserveEnd)
+            {
+                _endBox.Text = UiStrings.FormatStatusTime(_state.EndFrame, rate, asSamples);
+            }
+
+            if (!preservePre)
+            {
+                _fadeInBox.Text = UiStrings.FormatStatusTime(_state.PreCrossfadeFrames, rate, asSamples);
+            }
+
+            if (!preservePost)
+            {
+                _postBox.Text = UiStrings.FormatStatusTime(_state.PostCrossfadeFrames, rate, asSamples);
+            }
             _truncateCheck.IsChecked = _state.TruncateOutside;
             _deleteAfterLoopCheck.IsChecked = _state.DeleteAfterLoop;
             _align28Check.IsChecked = _state.AlignLoopEndsToTwentyEight;
             _xfadeCheck.IsChecked = _state.ShowXfadePreview;
             RefreshCurveIcons();
             _splice.State = _state;
-            // ???????????????????????????????? S/E ??????
             if (updateSplice)
             {
                 _splice.InvalidateVisual();
@@ -1317,11 +1565,11 @@ internal sealed class CrossfadeEditWindow : Window
         }
     }
 
-    /// <summary>サンプル位置／フェード長用。桁数で伸びないよう固定幅。</summary>
-    private const double ValueBoxWidth = 120;
+    /// <summary>ループ二列・サンプル表示。</summary>
+    private const double CompactValueBoxWidthSamples = 88;
 
-    /// <summary>ループ二列レイアウト用。</summary>
-    private const double CompactValueBoxWidth = 88;
+    /// <summary>ループ二列・時間表示（00:00.000 程度）。</summary>
+    private const double CompactValueBoxWidthTime = 100;
 
     /// <summary>ループ行の入力欄と 0 ボタンの共通高さ（縦位置揃え）。</summary>
     private const double ValueRowControlHeight = 28;
@@ -1350,9 +1598,9 @@ internal sealed class CrossfadeEditWindow : Window
         {
             FontFamily = new FontFamily("Consolas"),
             FontSize = 12,
-            Width = ValueBoxWidth,
-            MinWidth = ValueBoxWidth,
-            MaxWidth = ValueBoxWidth,
+            Width = CompactValueBoxWidthTime,
+            MinWidth = CompactValueBoxWidthTime,
+            MaxWidth = CompactValueBoxWidthTime,
             HorizontalAlignment = HorizontalAlignment.Left,
             TextAlignment = TextAlignment.Center,
             Padding = new Thickness(6, 3, 6, 3),
@@ -1456,6 +1704,4 @@ internal enum CrossfadeEditJump
     End,
     StartPlusX,
     EndPlusX,
-    StartAndEnd,
-    FadeAndCut,
 }

@@ -9,8 +9,8 @@ internal static partial class UiStrings
     public static string CrossfadeSectionParams => Get("ループ", "Loop");
     public static string CrossfadeLabelStart => Get("始点 (S)", "Start (S)");
     public static string CrossfadeLabelEnd => Get("終点 (E)", "End (E)");
-    public static string CrossfadeLabelPostFade => Get("ポストクロスフェード", "Post-crossfade");
-    public static string CrossfadeLabelFadeIn => Get("プリクロスフェード", "Pre-crossfade");
+    public static string CrossfadeLabelPostFade => Get("ポストクロスフェード (T)", "Post-crossfade (T)");
+    public static string CrossfadeLabelFadeIn => Get("プリクロスフェード (P)", "Pre-crossfade (P)");
     public static string CrossfadeMarkerPre => "Pre";
     /// <summary>アクセスキー無し（ショートカットは付けない）。</summary>
     public static string CrossfadeLabelTruncate => Get("ループ前後を削除(_T)", "Delete before/after loop (_T)");
@@ -31,11 +31,11 @@ internal static partial class UiStrings
     public static string CrossfadeMarkerPost => "Post";
 
     public static string CrossfadeTipStart => Get(
-        "ループの開始サンプル位置。",
-        "Loop start sample frame.");
+        "ループの開始位置。",
+        "Loop start position.");
     public static string CrossfadeTipEnd => Get(
-        "ループの終了サンプル位置（この位置の手前までがループ）。",
-        "Loop end sample frame (exclusive).");
+        "ループの終了位置（この位置の手前までがループ）。",
+        "Loop end position (exclusive).");
     public static string CrossfadeTipPostFade => Get(
         "ポストクロスフェード長（赤旗・バーはループスタート側）。描画は終点後ろへスタート波形を重ねます。旗と描画位置は別です。",
         "Post-crossfade (red flag/bar at loop Start). Drawing overlays Start onto after-End — flag and draw are separate.");
@@ -100,6 +100,11 @@ internal static partial class UiStrings
         "ホイールまたは上下キーで増減",
         "Wheel or ↑↓ to nudge");
     public static string CrossfadeTipValueNudge => Get(
-        "↑↓／ホイール＝1サンプル、Shift＝10、Ctrl+Shift＝100。",
-        "↑↓/wheel=1 sample, Shift=10, Ctrl+Shift=100.");
+        "時間表示: ↑↓／ホイール＝1秒、Shift＝10秒、Ctrl＝1分、Ctrl+Shift＝10分。サンプル表示: 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。見出しの時間／サンプル数、または数値欄の右クリックで切替（ステータスバーと共有）。",
+        "Time: ↑↓/wheel=1 s, Shift=10 s, Ctrl=1 min, Ctrl+Shift=10 min. Samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Switch via the Time/Samples header or right-click on a value box (shared with the status bar).");
+    public static string CrossfadeUnitTime => Get("時間", "Time");
+    public static string CrossfadeUnitSamples => Get("サンプル数", "Samples");
+    public static string CrossfadeTipUnitToggle => Get(
+        "表示を時間とサンプル数で切り替えます（ステータスバーと共有）。数値欄の右クリックでも同じです。",
+        "Switch display between time and samples (shared with the status bar). Same via right-click on a value box.");
 }
