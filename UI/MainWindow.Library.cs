@@ -480,12 +480,22 @@ public partial class MainWindow
             return;
         }
 
+        // ミニ寸法の SizeChanged が F10 枠を上書きしないよう、復元まで Persist を止める。
         PersistCurrentWindowPlacement();
-        EndVideoLaunchSession();
-        _libraryMinimalChrome = false;
-        ApplyWaveformMaximizeChrome();
-        TryApplyCurrentModePlacement();
-        SyncPlaylistVideoChromeFade();
+        _suppressLayoutPlacementPersist = true;
+        try
+        {
+            EndVideoLaunchSession();
+            _libraryMinimalChrome = false;
+            ApplyWaveformMaximizeChrome();
+            TryApplyCurrentModePlacement();
+            SyncPlaylistVideoChromeFade();
+        }
+        finally
+        {
+            _suppressLayoutPlacementPersist = false;
+        }
+
         AppStorage.Save();
         FocusLibraryPaneForPlaylist();
     }
@@ -501,18 +511,29 @@ public partial class MainWindow
             return;
         }
 
+        // ミニ窓のまま MinSize 引き上げ等で SizeChanged すると、突入前に残した
+        // F10／F9 枠が映像サイズで潰れる。復元が終わるまで Persist しない。
         PersistCurrentWindowPlacement();
-        EndVideoLaunchSession();
-        _playlistVideoImmersivePause = false;
-        if (IsPlaybackActive() || LibraryBrowser.PlaylistVisualPlaying)
+        _suppressLayoutPlacementPersist = true;
+        try
         {
-            DropPlaylistVideoToDimPreview();
+            EndVideoLaunchSession();
+            _playlistVideoImmersivePause = false;
+            if (IsPlaybackActive() || LibraryBrowser.PlaylistVisualPlaying)
+            {
+                DropPlaylistVideoToDimPreview();
+            }
+
+            _libraryMinimalChrome = minimalChrome;
+            ApplyWaveformMaximizeChrome();
+            TryApplyCurrentModePlacement();
+            SyncPlaylistVideoChromeFade();
+        }
+        finally
+        {
+            _suppressLayoutPlacementPersist = false;
         }
 
-        _libraryMinimalChrome = minimalChrome;
-        ApplyWaveformMaximizeChrome();
-        TryApplyCurrentModePlacement();
-        SyncPlaylistVideoChromeFade();
         AppStorage.Save();
         if (minimalChrome)
         {
@@ -535,13 +556,22 @@ public partial class MainWindow
         }
 
         PersistCurrentWindowPlacement();
-        EndVideoLaunchSession();
-        _playlistVideoImmersivePause = false;
-        _libraryMinimalChrome = false;
-        LibraryBrowser.HidePlaylistVisual();
-        // F11／F12 が覚える枠が映像サイズにならないよう、先に F10 寸法へ戻す。
-        WindowPlacement.TryApply(this, AppStorage.Settings, MainWindowPlacementKind.Player);
-        SyncPlaylistVideoChromeFade();
+        _suppressLayoutPlacementPersist = true;
+        try
+        {
+            EndVideoLaunchSession();
+            _playlistVideoImmersivePause = false;
+            _libraryMinimalChrome = false;
+            LibraryBrowser.HidePlaylistVisual();
+            // F11／F12 が覚える枠が映像サイズにならないよう、先に F10 寸法へ戻す。
+            WindowPlacement.TryApply(this, AppStorage.Settings, MainWindowPlacementKind.Player);
+            SyncPlaylistVideoChromeFade();
+        }
+        finally
+        {
+            _suppressLayoutPlacementPersist = false;
+        }
+
         AppStorage.Save();
     }
 
@@ -744,6 +774,9 @@ public partial class MainWindow
                     hitTestVisible: visible,
                     seconds: LibraryPlayerMode.ChromeFadeSeconds);
             }
+
+            // メニューバーは領域を残したまま見た目だけ合わせる（Collapsed にしない）。
+            SyncMainMenuBarChromeOpacity(instant);
         }
         else if (visible)
         {
