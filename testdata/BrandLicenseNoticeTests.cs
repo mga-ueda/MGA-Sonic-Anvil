@@ -92,6 +92,32 @@ public sealed class BrandLicenseNoticeTests
     }
 
     [Fact]
+    public void ThirdPartyNotices_TryRead_FallsBackToEmbeddedWhenFileMissing()
+    {
+        var path = ThirdPartyNotices.ResolvePath();
+        var backup = path + ".bak-test";
+        Assert.True(File.Exists(path), path);
+        File.Move(path, backup, overwrite: true);
+        try
+        {
+            Assert.False(File.Exists(path));
+            Assert.True(ThirdPartyNotices.TryRead(out var text));
+            Assert.Contains("MIT License", text, StringComparison.Ordinal);
+            Assert.Contains("WinBlur", text, StringComparison.Ordinal);
+            Assert.Equal(
+                "MgaSonicAnvil.THIRD_PARTY_NOTICES.md",
+                ThirdPartyNotices.EmbeddedResourceName);
+        }
+        finally
+        {
+            if (File.Exists(backup))
+            {
+                File.Move(backup, path, overwrite: true);
+            }
+        }
+    }
+
+    [Fact]
     public void VersionThirdPartyLinks_OpenUpstreamGitHub()
     {
         Assert.Equal("https://github.com/Frieve-A/effetune", AppVersion.EffetuneProjectUrl);
