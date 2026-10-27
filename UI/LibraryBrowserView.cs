@@ -1028,6 +1028,15 @@ internal sealed partial class LibraryBrowserView : UserControl
         PlaylistVisualStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// プロキシ作り直しの前に、DXGI が表示中の既存プロキシを閉じる（上書きできるように）。
+    /// 閉じたら true。後で <see cref="ShowPlaylistVisual"/> を呼ぶと同じパスでも開き直す。
+    /// </summary>
+    public bool ReleasePlaylistVideoProxyForRewrite(string sourcePath) =>
+        IsPlaylistVisualSameSource(sourcePath)
+        && VideoProxy.TryGetCached(sourcePath, out var proxy)
+        && _visualStage.ReleaseDxgiSourceForRewrite(proxy);
+
     public void ShowPlaylistVisual(DocumentSession session, bool play)
     {
         var path = session.Document.SourcePath;
@@ -1120,7 +1129,9 @@ internal sealed partial class LibraryBrowserView : UserControl
     public void SeekPlaylistVisual(TimeSpan position) => _visualStage.Seek(position);
 
     /// <summary>ドラッグスクラブ用。再生中シークの蓄積を避ける。</summary>
-    public void ScrubPlaylistVisual(TimeSpan position) => _visualStage.ScrubTo(position);
+    /// <param name="scrubPreview">DXGI 経路だけ: ドラッグ中の粗いプレビュー。MediaElement 経路では無視される。</param>
+    public void ScrubPlaylistVisual(TimeSpan position, bool scrubPreview = false) =>
+        _visualStage.ScrubTo(position, scrubPreview);
 
     public void SetPlaylistVisualSpeed(double ratio) => _visualStage.SetSpeedRatio(ratio);
 

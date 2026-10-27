@@ -1046,6 +1046,13 @@
                       HorizontalAlignment="Left"
                       Margin="0,0,0,12" />
 
+            <CheckBox x:Name="UseDxgiVideoPresenterBox"
+                      Style="{StaticResource DarkCheckBoxStyle}"
+                      Content="{x:Static domain:UiStrings.LabelUseDxgiVideoPresenter}"
+                      Visibility="Collapsed"
+                      HorizontalAlignment="Left"
+                      Margin="0,0,0,12" />
+
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />

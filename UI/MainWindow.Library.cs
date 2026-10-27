@@ -738,7 +738,8 @@ public partial class MainWindow
             LibraryBrowser.PlaylistVisualIsPdf,
             LibraryBrowser.PlaylistVisualIsVideo,
             _playlistVisualChromeBridge,
-            _playlistVideoImmersivePause);
+            _playlistVideoImmersivePause,
+            simpleSeekScrubHold: IsSimpleSeekChromeHoldActive());
         if (LibraryPlayerMode.HidesChromeForVideoFileLaunch(_videoLaunchPlacement, IsLibraryMaximized))
         {
             hide = true;
@@ -1217,13 +1218,21 @@ public partial class MainWindow
     {
         if (_playlistVideoSimpleSeekWantVisible == visible && !instant)
         {
-            // 表示意図が同じでも、フェードアウト開始時に落としたヒットが戻らないことがある。
-            if (PlaylistVideoSimpleSeek.IsHitTestVisible != visible)
+            // フェードアウト Completed が遅延でフェードインを潰すと、意図は表示のまま Opacity 0 に固まる。
+            // そのときは再フェードする。ヒットだけ戻すケースも残す。
+            if (visible && LibraryPlayerMode.NeedsForcedOpaque(PlaylistVideoSimpleSeek))
             {
-                PlaylistVideoSimpleSeek.IsHitTestVisible = visible;
+                // fall through
             }
+            else
+            {
+                if (PlaylistVideoSimpleSeek.IsHitTestVisible != visible)
+                {
+                    PlaylistVideoSimpleSeek.IsHitTestVisible = visible;
+                }
 
-            return;
+                return;
+            }
         }
 
         _playlistVideoSimpleSeekWantVisible = visible;
@@ -1478,6 +1487,12 @@ public partial class MainWindow
         SeekFrame(frame);
     }
 
+    /// <summary>
+    /// 簡易シークのドラッグ／グレイン中は、映像がフレーム停止してもクローム／アナライザを出さない。
+    /// </summary>
+    private bool IsSimpleSeekChromeHoldActive() =>
+        _simpleSeekScrubActive || PlaylistVideoSimpleSeek.IsDragging;
+
     private void BeginSimpleSeekScrubSession(long frame)
     {
         if (_simpleSeekScrubActive || _document is null)
@@ -1544,6 +1559,12 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// DXGI presenter のときだけ、ドラッグ中は粗いプレビュー（Seek＋数枚）にして静止後に正確な絵を出す。
+    /// MediaElement 経路では従来どおり毎回正確な Position 更新（変更なし）。
+    /// </summary>
+    private static bool PlaylistVideoScrubUsesDxgiPreview => LibraryVisualStage.UsingDxgiPresenter;
+
+    /// <summary>
     /// 動画スクラブの Position 更新を間引く。UI ヘッドは呼び出し側が即時更新する。
     /// </summary>
     private void RequestPlaylistVideoScrub(long frame, bool force = false)
@@ -1554,11 +1575,16 @@ public partial class MainWindow
         }
 
         _playlistVideoScrubFrame = frame;
+        if (PlaylistVideoScrubUsesDxgiPreview)
+        {
+            RestartPlaylistVideoScrubExactTimer();
+        }
+
         var now = Environment.TickCount64;
         if (force
             || now - _playlistVideoScrubLastMs >= LibraryPlayerMode.VideoScrubSeekMinIntervalMs)
         {
-            FlushPlaylistVideoScrub();
+            FlushPlaylistVideoScrub(exact: false);
             return;
         }
 
@@ -1579,28 +1605,73 @@ public partial class MainWindow
     private void OnPlaylistVideoScrubTimerTick(object? sender, EventArgs e)
     {
         _playlistVideoScrubTimer?.Stop();
-        FlushPlaylistVideoScrub();
+        FlushPlaylistVideoScrub(exact: false);
     }
 
-    private void FlushPlaylistVideoScrub()
+    /// <summary>
+    /// 溜めたスクラブ位置を映像へ渡す。
+    /// <paramref name="exact"/> が false で DXGI presenter のときは粗いプレビュー（ドラッグ中）。それ以外は正確な絵で、
+    /// 溜めた位置が無くても粗い絵だけ出していたフレームがあればそれを正確に出し直す（離した直後・静止後）。
+    /// MediaElement 経路では常に従来どおりの正確な Position 更新。
+    /// </summary>
+    private void FlushPlaylistVideoScrub(bool exact = true)
     {
         _playlistVideoScrubTimer?.Stop();
-        if (_document is null || _playlistVideoScrubFrame < 0)
+        if (_document is null)
         {
             return;
         }
 
+        var preview = !exact && PlaylistVideoScrubUsesDxgiPreview;
         var frame = _playlistVideoScrubFrame;
+        if (frame < 0)
+        {
+            if (preview || _playlistVideoScrubPreviewFrame < 0)
+            {
+                return;
+            }
+
+            frame = _playlistVideoScrubPreviewFrame;
+        }
+
         _playlistVideoScrubFrame = -1;
+        _playlistVideoScrubPreviewFrame = preview ? frame : -1;
+        if (!preview)
+        {
+            _playlistVideoScrubExactTimer?.Stop();
+        }
+
         _playlistVideoScrubLastMs = Environment.TickCount64;
         LibraryBrowser.ScrubPlaylistVisual(
-            TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)));
+            TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)),
+            scrubPreview: preview);
+    }
+
+    /// <summary>最後のスクラブ要求から <see cref="LibraryPlayerMode.VideoScrubExactIdleMs"/> 静止したら正確な絵を 1 回出す（DXGI のみ）。</summary>
+    private void RestartPlaylistVideoScrubExactTimer()
+    {
+        _playlistVideoScrubExactTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(LibraryPlayerMode.VideoScrubExactIdleMs),
+        };
+        _playlistVideoScrubExactTimer.Tick -= OnPlaylistVideoScrubExactTimerTick;
+        _playlistVideoScrubExactTimer.Tick += OnPlaylistVideoScrubExactTimerTick;
+        _playlistVideoScrubExactTimer.Stop();
+        _playlistVideoScrubExactTimer.Start();
+    }
+
+    private void OnPlaylistVideoScrubExactTimerTick(object? sender, EventArgs e)
+    {
+        _playlistVideoScrubExactTimer?.Stop();
+        FlushPlaylistVideoScrub(exact: true);
     }
 
     private void CancelPlaylistVideoScrub()
     {
         _playlistVideoScrubTimer?.Stop();
+        _playlistVideoScrubExactTimer?.Stop();
         _playlistVideoScrubFrame = -1;
+        _playlistVideoScrubPreviewFrame = -1;
     }
 
     private void ApplyPlaylistVideoTimecodeFade(bool show, bool instant)
@@ -2415,7 +2486,8 @@ public partial class MainWindow
                 LibraryBrowser.PlaylistVisualIsPdf,
                 LibraryBrowser.PlaylistVisualIsVideo,
                 _playlistVisualChromeBridge,
-                _playlistVideoImmersivePause);
+                _playlistVideoImmersivePause,
+                simpleSeekScrubHold: IsSimpleSeekChromeHoldActive());
         if (visible
             && chromeHiddenVisual
             && (!_playlistVideoHud
@@ -7099,9 +7171,17 @@ public partial class MainWindow
             StopPlayback();
         }
 
+        // DXGI が既存プロキシを開いたままだと上書き Move に失敗し、作り直した絵も載らない。
+        var released = wasShown && LibraryBrowser.ReleasePlaylistVideoProxyForRewrite(path);
         if (!await TryPrepareVideoProxyAsync(session, playTicket: -1, forceEncode: true)
                 .ConfigureAwait(true))
         {
+            // 失敗／取消でも閉じたままにしない。
+            if (released && IsLoaded && LibraryBrowser.IsPlaylistVisualSameSource(path))
+            {
+                LibraryBrowser.ShowPlaylistVisual(session, play: false);
+            }
+
             return;
         }
 

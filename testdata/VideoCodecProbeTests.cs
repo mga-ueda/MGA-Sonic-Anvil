@@ -374,7 +374,7 @@ public sealed class VideoCodecProbeTests
         return buffer;
     }
 
-    private static byte[] BuildMovie(string videoFourcc, uint timescale = 0, uint duration = 0)
+    internal static byte[] BuildMovie(string videoFourcc, uint timescale = 0, uint duration = 0)
     {
         var stsd = Concat(
             U32(0),

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -1096,6 +1097,7 @@ internal static class LibraryPlayerMode
     /// 選択プレビュー（暗表示）ではクロームを残す。
     /// 上下キーなどで次の本再生へつなぐあいだは <paramref name="bridgeHold"/> で隠したままにする。
     /// テンキー 0 などで本再生から一時停止したあとは <paramref name="immersivePauseHold"/> で隠したままにする。
+    /// 簡易シーク操作中は映像がフレーム停止しても <paramref name="simpleSeekScrubHold"/> で隠したままにする。
     /// </summary>
     public static bool HidesChromeForPlaylistVisual(
         bool player,
@@ -1104,14 +1106,16 @@ internal static class LibraryPlayerMode
         bool isPdf,
         bool isVideo,
         bool bridgeHold = false,
-        bool immersivePauseHold = false)
+        bool immersivePauseHold = false,
+        bool simpleSeekScrubHold = false)
     {
         if (!player || !visualShown)
         {
             return false;
         }
 
-        if ((bridgeHold || immersivePauseHold) && (isPdf || isVideo || visualPlaying))
+        if ((bridgeHold || immersivePauseHold || simpleSeekScrubHold)
+            && (isPdf || isVideo || visualPlaying))
         {
             return true;
         }
@@ -1150,6 +1154,13 @@ internal static class LibraryPlayerMode
     /// これより短い連打は最新位置へ畳む（再生中シークの蓄積を防ぐ）。
     /// </summary>
     public const int VideoScrubSeekMinIntervalMs = 50;
+
+    /// <summary>
+    /// DXGI presenter の動画スクラブで、ドラッグが止まってから正確なフレームを出し直すまでの静止時間。
+    /// ドラッグ中は粗いプレビュー（Seek＋数枚）だけにして、これだけ新しい要求が来なければ 1 回だけ正確に出す。
+    /// MediaElement 経路では使わない。
+    /// </summary>
+    public const int VideoScrubExactIdleMs = 90;
 
     /// <summary>
     /// 本再生中に早送り・巻き戻しで映像クロックを止めているときは、Position スクラブだけにする。
@@ -1923,6 +1934,13 @@ internal static class LibraryPlayerMode
         return anim;
     }
 
+    private sealed class OpacityFadeTicket
+    {
+        public int Generation;
+    }
+
+    private static readonly ConditionalWeakTable<UIElement, OpacityFadeTicket> OpacityFadeTickets = new();
+
     public static void FadeElementOpacity(
         UIElement target,
         double to,
@@ -1946,6 +1964,11 @@ internal static class LibraryPlayerMode
             return;
         }
 
+        // Completed がディスパッチ遅延で後から来ると、新しいフェードインを BeginAnimation(null) で潰す。
+        // 世代チケットで古い完了処理を捨てる（暗転フェードと同じ）。
+        var ticket = OpacityFadeTickets.GetOrCreateValue(target);
+        var generation = ++ticket.Generation;
+
         target.BeginAnimation(UIElement.OpacityProperty, null);
         target.Opacity = from;
 
@@ -1958,6 +1981,11 @@ internal static class LibraryPlayerMode
         var anim = CreateOpacityFade(from, to, seconds ?? MeterFadeSeconds);
         anim.Completed += (_, _) =>
         {
+            if (ticket.Generation != generation)
+            {
+                return;
+            }
+
             target.BeginAnimation(UIElement.OpacityProperty, null);
             target.Opacity = to;
         };

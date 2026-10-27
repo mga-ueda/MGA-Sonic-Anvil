@@ -248,6 +248,9 @@ internal static partial class UiStrings
     public static string LabelVideoProxyDisableAutoEncode => Get(
         "プロキシを自動生成しない(_D)",
         "_Do not auto-build proxies");
+    public static string LabelUseDxgiVideoPresenter => Get(
+        "D3D11+DXGI で動画を描画（試作）(_3)",
+        "Draw video with D3D11+DXGI (prototype) (_3)");
     public static string LabelVideoProxyUsage(long bytes) =>
         Format("現在の容量: {0}", "Current size: {0}", FormatFileBytesCompact(bytes));
     public static string ButtonVideoProxyClearAll => Get("すべて削除", "Delete all");

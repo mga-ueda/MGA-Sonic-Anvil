@@ -15,7 +15,7 @@ namespace MgaSonicAnvil.UI;
 /// ウィンドウ全体の動画／PDF。動的背景より前、クロームより後ろ。
 /// 再生中は明るく、停止中は暗くしてリストを読む。音楽再生時は隠す。
 /// </summary>
-internal sealed class LibraryVisualStage : Grid
+internal sealed partial class LibraryVisualStage : Grid
 {
     internal const double StoppedDimOpacity = 0.72;
 
@@ -210,9 +210,11 @@ internal sealed class LibraryVisualStage : Grid
         _hudDimBrush.Visual = _hudDimFeather;
         _glassHost.OpacityMask = _hudDimBrush;
         _pdfHost.Children.Add(_pdf);
-        // 光漏れ → Media → HUD の薄い暗幕 → PDF → dim で暗く → 格子。
+        // 光漏れ → Media（試作 DXGI も同じ層）→ HUD の薄い暗幕 → PDF → dim で暗く → 格子。
         Children.Add(_spillHost);
         Children.Add(_media);
+        Children.Add(_dxgiHost);
+        InitDxgiHost();
         Children.Add(_glassHost);
         Children.Add(_pdfHost);
         Children.Add(_dim);
@@ -344,6 +346,13 @@ internal sealed class LibraryVisualStage : Grid
 
     public bool TryGetNaturalVideoPixels(out int width, out int height)
     {
+        if (UsingDxgi)
+        {
+            width = _dxgiWidth;
+            height = _dxgiHeight;
+            return width > 0 && height > 0;
+        }
+
         if (_video)
         {
             width = _media.NaturalVideoWidth;
@@ -405,6 +414,11 @@ internal sealed class LibraryVisualStage : Grid
     {
         get
         {
+            if (UsingDxgi)
+            {
+                return LibraryPlayerMode.VisualDurationOrFallback(_dxgiDuration, _fallbackDuration);
+            }
+
             if (_video)
             {
                 return LibraryPlayerMode.VisualDurationOrFallback(
@@ -471,7 +485,10 @@ internal sealed class LibraryVisualStage : Grid
         _pdfSharp = null;
         ClearPdfSources();
         _video = true;
-        var pathChanged = !string.Equals(_path, path, StringComparison.OrdinalIgnoreCase);
+        var presenterChanged = LatchVideoPresenterMode();
+        var pathChanged = ConsumeDxgiReopenPending()
+            || presenterChanged
+            || !string.Equals(_path, path, StringComparison.OrdinalIgnoreCase);
         var resumeSameClip = play && sameSourceClip;
         // 同じクリップのホバー→本再生／本再生の再入では黒フラッシュしない
         //（Opacity=0 のまま固着するのを防ぐ。プロキシ差し替えも同じ）。
@@ -480,7 +497,7 @@ internal sealed class LibraryVisualStage : Grid
             SnapMediaBlack();
         }
 
-        _media.Visibility = Visibility.Visible;
+        SyncVideoPresenterVisibility();
         Visibility = Visibility.Visible;
         if (pathChanged)
         {
@@ -690,8 +707,10 @@ internal sealed class LibraryVisualStage : Grid
     /// スクラブ用シーク。再生中なら一度だけ止め、あとは Position だけ更新する。
     /// 通常の Seek は再生中に Play＋クロック再始動、フレーム停止中は Play→Pause を毎回やるため、
     /// ドラッグ連打だとデコードが積み上がって離したあとに追いつく。
+    /// <paramref name="scrubPreview"/> は DXGI 経路だけの粗いプレビュー（ドラッグ中: Seek＋数枚。静止後に false で正確な絵）。
+    /// MediaElement 経路では無視する。
     /// </summary>
-    public void ScrubTo(TimeSpan position)
+    public void ScrubTo(TimeSpan position, bool scrubPreview = false)
     {
         if (!_video || !IsShown)
         {
@@ -703,9 +722,7 @@ internal sealed class LibraryVisualStage : Grid
             position = TimeSpan.Zero;
         }
 
-        var duration = _media.NaturalDuration.HasTimeSpan
-            ? _media.NaturalDuration.TimeSpan
-            : TimeSpan.MaxValue;
+        var duration = MediaSeekLimit();
         if (position > duration)
         {
             position = duration;
@@ -728,6 +745,8 @@ internal sealed class LibraryVisualStage : Grid
             _framePaused = true;
         }
 
+        // DXGI: 粗い／正確の切り替えを先に伝えてから位置を確定する（次の tick の RequestPosition がそのモードで読む）。
+        SetDxgiScrubPreview(scrubPreview);
         SetMediaPosition(position);
         StopVisualClock(position);
     }
@@ -960,6 +979,11 @@ internal sealed class LibraryVisualStage : Grid
 
     private void ForceMediaSpeedRatio(double speedRatio)
     {
+        if (UsingDxgi)
+        {
+            return;
+        }
+
         try
         {
             _media.SpeedRatio = speedRatio;
@@ -1155,14 +1179,14 @@ internal sealed class LibraryVisualStage : Grid
 
         if (_video)
         {
-            var duration = _media.NaturalDuration.HasTimeSpan
-                ? _media.NaturalDuration.TimeSpan
-                : TimeSpan.MaxValue;
+            var duration = MediaSeekLimit();
             if (position > duration)
             {
                 position = duration;
             }
 
+            // 通常の Seek は正確な絵（スクラブ プレビューが残っていれば解除）。
+            SetDxgiScrubPreview(false);
             SetMediaPosition(position);
             if (_playing)
             {
@@ -1316,6 +1340,8 @@ internal sealed class LibraryVisualStage : Grid
             return;
         }
 
+        // クロックが走る（再生／プレビューループ）ならスクラブ プレビューは終わり。DXGI 以外では何もしない。
+        SetDxgiScrubPreview(false);
         _visualClock.Restart();
     }
 
@@ -1478,7 +1504,21 @@ internal sealed class LibraryVisualStage : Grid
         Opened?.Invoke(this, Duration);
     }
 
-    private void StopMedia() => ClearMediaSource();
+    private void StopMedia()
+    {
+        ClearMediaSource();
+        StopDxgiPresenter();
+    }
+
+    private TimeSpan MediaSeekLimit()
+    {
+        if (UsingDxgi)
+        {
+            return Duration > TimeSpan.Zero ? Duration : TimeSpan.MaxValue;
+        }
+
+        return _media.NaturalDuration.HasTimeSpan ? _media.NaturalDuration.TimeSpan : TimeSpan.MaxValue;
+    }
 
     /// <summary>
     /// 波形・メーター・ファイル名の矩形だけ少し暗くする。clip はステージ座標。
@@ -1618,7 +1658,7 @@ internal sealed class LibraryVisualStage : Grid
     /// </summary>
     private void SyncAmbientSpill()
     {
-        if (!_video || !IsShown)
+        if (!_video || !IsShown || UsingDxgi)
         {
             ClearAmbientSpill();
             return;
@@ -1667,6 +1707,12 @@ internal sealed class LibraryVisualStage : Grid
 
     private void SetMediaSource(Uri uri)
     {
+        if (UsingDxgi)
+        {
+            OpenDxgiSource(uri.IsFile ? uri.LocalPath : uri.OriginalString);
+            return;
+        }
+
         _media.Source = uri;
         try
         {
@@ -1702,6 +1748,11 @@ internal sealed class LibraryVisualStage : Grid
 
     private void SetMediaPosition(TimeSpan position)
     {
+        if (UsingDxgi)
+        {
+            return;
+        }
+
         try
         {
             _media.Position = position;
@@ -1722,6 +1773,11 @@ internal sealed class LibraryVisualStage : Grid
     /// <summary>すでに近い位置ならシークしない（本再生→プレビュー移行の一発ヒッチ対策）。</summary>
     private void SeekMediaIfNeeded(TimeSpan position)
     {
+        if (UsingDxgi)
+        {
+            return;
+        }
+
         try
         {
             if (Math.Abs((_media.Position - position).TotalMilliseconds) < 80)
@@ -1738,6 +1794,11 @@ internal sealed class LibraryVisualStage : Grid
 
     private void PlayMedia(double speedRatio)
     {
+        if (UsingDxgi)
+        {
+            return;
+        }
+
         try
         {
             _media.Volume = 0;
@@ -1764,6 +1825,11 @@ internal sealed class LibraryVisualStage : Grid
 
     private void PauseMedia()
     {
+        if (UsingDxgi)
+        {
+            return;
+        }
+
         try
         {
             _media.Pause();

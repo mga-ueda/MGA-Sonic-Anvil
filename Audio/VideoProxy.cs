@@ -15,9 +15,34 @@ namespace MgaSonicAnvil.Audio;
 /// </summary>
 internal static class VideoProxy
 {
-    /// <summary>フレーム内完結の MJPEG。フレームレートはソースのまま。</summary>
-    internal const string EncodeVersion = "mjpeg-avi-srcfps";
+    /// <summary>
+    /// フレーム内完結の MJPEG。フレームレートはソースのまま。1920x1080 に収まるよう縮小（未満は据え置き）、
+    /// TV レンジの yuv420p。レシピ（解像度・色・画質）を変えたら必ず上げて旧キャッシュを無効化する。
+    /// </summary>
+    internal const string EncodeVersion = "mjpeg-avi-srcfps-max1080p-yuv420p-tv";
     internal const string AudioExtractVersion = "pcm-wav-s16";
+
+    /// <summary>プロキシの最大寸法。これより大きいソースだけ縮める（4K は 1080p、720p は据え置き）。</summary>
+    internal const int ProxyMaxWidth = 1920;
+    internal const int ProxyMaxHeight = 1080;
+
+    /// <summary>
+    /// プロキシ映像フィルタ。<c>min(1920,iw)</c>／<c>min(1080,ih)</c>＋ force_original_aspect_ratio=decrease で
+    /// 「1920x1080 の箱に収まる最大寸法、ただし拡大はしない」。MJPEG 4:2:0 のため偶数へ丸める。
+    /// 入力のレンジは自動判定して TV レンジへ揃え（フルレンジ JPEG 系ソースもここで落とす）、yuv420p にする。
+    /// 表示側（D3D NV12 シェーダ）はプロキシを常にリミテッドレンジとして扱う。
+    /// </summary>
+    internal static readonly string ProxyVideoFilter =
+        "scale=w='min(" + ProxyMaxWidth.ToString(CultureInfo.InvariantCulture) + ",iw)'"
+        + ":h='min(" + ProxyMaxHeight.ToString(CultureInfo.InvariantCulture) + ",ih)'"
+        + ":force_original_aspect_ratio=decrease:force_divisible_by=2"
+        + ":flags=bicubic+accurate_rnd+full_chroma_int:in_range=auto:out_range=tv,format=yuv420p";
+
+    /// <summary>
+    /// ソースのデコードに試す hwaccel（新しい順）。エンコードは MJPEG なので CPU のまま、デコードだけ GPU に任せる。
+    /// 末尾の null は CPU デコード。ひとつ通れば <see cref="ProvenHwaccel"/> に覚え、次回からそれを先に試す。
+    /// </summary>
+    internal static readonly string?[] HwaccelCandidates = ["d3d12va", "d3d11va", "cuda", "vulkan", "auto", null];
     internal const int DefaultRetentionDays = 7;
 
     /// <summary>
@@ -30,7 +55,55 @@ internal static class VideoProxy
 
     internal static readonly int[] RetentionChoices = [1, 7, 14, 30];
 
-    internal static string CacheDirectory => Path.Combine(AppStorage.RootDirectory, "video-proxy");
+    private static string? _cacheDirectoryOverride;
+
+    internal static string CacheDirectory =>
+        _cacheDirectoryOverride ?? Path.Combine(AppStorage.RootDirectory, "video-proxy");
+
+    /// <summary>テスト専用。実ユーザーのキャッシュを汚さないよう一時フォルダへ向ける。</summary>
+    internal static void UseCacheDirectoryForTests(string directory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        lock (Gate)
+        {
+            _cacheDirectoryOverride = Path.GetFullPath(directory);
+            DisplayBySource.Clear();
+            AudioBySource.Clear();
+        }
+    }
+
+    internal static void ResetCacheDirectoryForTests()
+    {
+        lock (Gate)
+        {
+            _cacheDirectoryOverride = null;
+            DisplayBySource.Clear();
+            AudioBySource.Clear();
+        }
+    }
+
+    /// <summary>キャッシュフォルダ直下のプロキシ／抽出物か（プロキシをさらに引き直さないため）。</summary>
+    internal static bool IsProxyPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var dir = Path.GetDirectoryName(Path.GetFullPath(path));
+            return dir is not null
+                && string.Equals(
+                    dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    Path.GetFullPath(CacheDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+    }
 
     internal static int ClampRetentionDays(int days)
     {
@@ -177,6 +250,14 @@ internal static class VideoProxy
 
         if (VideoCodecProbe.CanPlayWithoutProxy(sourcePath))
         {
+            // 直接再生できても、既存プロキシ（同名同サイズ共有・旧版の生成物）があればスクラブ用にそちらを返す。
+            // 先に Remember(source, source) すると表示先の記録が原ファイルで上書きされる。
+            if (TryGetCached(sourcePath, out var directCached))
+            {
+                progress?.Report(1);
+                return directCached;
+            }
+
             Remember(sourcePath, sourcePath);
             progress?.Report(1);
             return sourcePath;
@@ -660,10 +741,121 @@ internal static class VideoProxy
     private static void RememberUnlocked(string source, string display) =>
         DisplayBySource[SourceKey(source)] = display;
 
+    private static readonly object HwaccelGate = new();
+    private static bool _hwaccelProven;
+    private static string? _provenHwaccel;
+
+    /// <summary>
+    /// このプロセスで一度エンコードが通った hwaccel（null は CPU）。<see cref="HasProvenHwaccel"/> が false なら未確定。
+    /// 設定には保存しない（GPU やドライバが変われば結果も変わるので、起動ごとに試し直す）。
+    /// </summary>
+    internal static string? ProvenHwaccel
+    {
+        get
+        {
+            lock (HwaccelGate)
+            {
+                return _provenHwaccel;
+            }
+        }
+    }
+
+    internal static bool HasProvenHwaccel
+    {
+        get
+        {
+            lock (HwaccelGate)
+            {
+                return _hwaccelProven;
+            }
+        }
+    }
+
+    /// <summary>テスト専用。覚えた hwaccel を忘れる。</summary>
+    internal static void ResetProvenHwaccelForTests()
+    {
+        lock (HwaccelGate)
+        {
+            _hwaccelProven = false;
+            _provenHwaccel = null;
+        }
+    }
+
+    private static void RememberHwaccel(string? hwaccel)
+    {
+        lock (HwaccelGate)
+        {
+            _hwaccelProven = true;
+            _provenHwaccel = hwaccel;
+        }
+    }
+
+    /// <summary>
+    /// 試す順。覚えた hwaccel（<paramref name="hasProven"/>）があればそれを先頭に置き、失敗したときのために
+    /// 残りの候補と CPU（null）を後ろに続ける（覚えたのが CPU なら CPU だけ）。未確定なら候補順＋CPU。
+    /// TimeCaster は毎回全部試すが、ここでは成功した経路を覚えて起動のたびに同じ失敗を繰り返さない。
+    /// </summary>
+    internal static IReadOnlyList<string?> HwaccelAttemptOrder(bool hasProven, string? proven)
+    {
+        var order = new List<string?>(HwaccelCandidates.Length + 1);
+        if (hasProven)
+        {
+            order.Add(proven);
+            if (proven is null)
+            {
+                return order;
+            }
+        }
+
+        foreach (var candidate in HwaccelCandidates)
+        {
+            if (hasProven && string.Equals(candidate, proven, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            order.Add(candidate);
+        }
+
+        return order;
+    }
+
+    /// <summary>
+    /// hwaccel を順に試してエンコードする。GPU デコードの失敗（未対応 ffmpeg・デバイス作成失敗）はほぼ即座に
+    /// 非 0 終了になるので、次の候補で .part を作り直す。最後の CPU でも駄目なら最後のエラーで投げる。
+    /// キャンセルは試行を続けない。
+    /// </summary>
     private static async Task RunFfmpegAsync(
         string ffmpeg,
         string input,
         string output,
+        IProgress<double>? progress,
+        CancellationToken cancellationToken)
+    {
+        var lastError = string.Empty;
+        foreach (var hwaccel in HwaccelAttemptOrder(HasProvenHwaccel, ProvenHwaccel))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TryDelete(output);
+            if (await RunFfmpegOnceAsync(ffmpeg, input, output, hwaccel, progress, cancellationToken).ConfigureAwait(false) is { } error)
+            {
+                lastError = error;
+                continue;
+            }
+
+            RememberHwaccel(hwaccel);
+            return;
+        }
+
+        throw new InvalidDataException(UiStrings.ErrorVideoProxyFailedDetail(lastError));
+    }
+
+    /// <summary>1 回ぶんの ffmpeg 実行。成功なら null、非 0 終了なら stderr の最後の有用な行を返す。</summary>
+    private static async Task<string?> RunFfmpegOnceAsync(
+        string ffmpeg,
+        string input,
+        string output,
+        string? hwaccel,
         IProgress<double>? progress,
         CancellationToken cancellationToken)
     {
@@ -674,7 +866,7 @@ internal static class VideoProxy
             RedirectStandardError = true,
             RedirectStandardOutput = true,
         };
-        foreach (var arg in BuildFfmpegArguments(input, output))
+        foreach (var arg in BuildFfmpegArguments(input, output, hwaccel))
         {
             start.ArgumentList.Add(arg);
         }
@@ -748,7 +940,6 @@ internal static class VideoProxy
         }
 
         await stdoutTask.ConfigureAwait(false);
-        state.Report(progress, FinalizeProgressCap);
         if (process.ExitCode != 0)
         {
             string log;
@@ -757,8 +948,11 @@ internal static class VideoProxy
                 log = stderr.ToString();
             }
 
-            throw new InvalidDataException(UiStrings.ErrorVideoProxyFailedDetail(LastFfmpegError(log)));
+            return LastFfmpegError(log);
         }
+
+        state.Report(progress, FinalizeProgressCap);
+        return null;
     }
 
     private static bool IsProxyExtension(string ext) =>
@@ -766,29 +960,50 @@ internal static class VideoProxy
         || ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase)
         || ext.Equals(".wav", StringComparison.OrdinalIgnoreCase);
 
-    internal static IReadOnlyList<string> BuildFfmpegArguments(string input, string output)
+    /// <summary>
+    /// プロキシ生成の引数。<paramref name="hwaccel"/> は入力側（-i の前）に置くソースデコードの hwaccel（null なら CPU）。
+    /// 映像は <see cref="ProxyVideoFilter"/>（最大 1080p・TV レンジ yuv420p）→ MJPEG。
+    /// FFmpeg 8 以降の MJPEG はリミテッドレンジを標準外として拒むので -strict unofficial を付ける。
+    /// 音声は従来どおり PCM で同梱する（Anvil は AVI の音声も使う。TimeCaster の -an とは違う）。
+    /// </summary>
+    internal static IReadOnlyList<string> BuildFfmpegArguments(string input, string output, string? hwaccel = null)
     {
         var source = LameEncoder.PreferShortPath(input);
-        return
-        [
+        var args = new List<string>(40)
+        {
             "-hide_banner",
             "-nostdin",
             "-y",
             "-progress",
             "pipe:1",
             "-nostats",
+        };
+        if (!string.IsNullOrWhiteSpace(hwaccel))
+        {
+            args.Add("-hwaccel");
+            args.Add(hwaccel);
+        }
+
+        args.AddRange(
+        [
             "-i",
             source,
             "-map",
             "0:v:0",
             "-map",
             "0:a:0?",
+            "-vf",
+            ProxyVideoFilter,
             "-c:v",
             "mjpeg",
             "-q:v",
             "5",
             "-pix_fmt",
-            "yuvj420p",
+            "yuv420p",
+            "-color_range",
+            "tv",
+            "-strict",
+            "unofficial",
             "-c:a",
             "pcm_s16le",
             "-ac",
@@ -798,7 +1013,8 @@ internal static class VideoProxy
             "-f",
             "avi",
             output,
-        ];
+        ]);
+        return args;
     }
 
     /// <summary>一覧ジャケット用。プロキシがあればそれを見て、無ければ原ファイルの先頭フレーム。</summary>

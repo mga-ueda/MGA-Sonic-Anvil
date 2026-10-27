@@ -132,6 +132,8 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedVideoProxyDisableAutoEncode { get; private set; }
 
+    public bool SelectedUseDxgiVideoPresenter { get; private set; }
+
     public string SelectedWallpaperPath { get; private set; } = string.Empty;
 
     public double SelectedWallpaperOpacity { get; private set; } = AppSettings.WallpaperOpacityDefault;
@@ -220,6 +222,7 @@ internal partial class AudioSettingsWindow : Window
         int videoProxyRetentionDays = VideoProxy.DefaultRetentionDays,
         string? ffmpegExePath = null,
         bool videoProxyDisableAutoEncode = false,
+        bool useDxgiVideoPresenter = false,
         WindowLayoutSlot launchMode = WindowLayoutSlot.F12,
         string? wallpaperPath = null,
         double wallpaperOpacity = AppSettings.WallpaperOpacityDefault,
@@ -288,6 +291,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedVideoProxyRetentionDays = VideoProxy.ClampRetentionDays(videoProxyRetentionDays);
         SelectedFfmpegExePath = ffmpegExePath ?? string.Empty;
         SelectedVideoProxyDisableAutoEncode = videoProxyDisableAutoEncode;
+        SelectedUseDxgiVideoPresenter = useDxgiVideoPresenter;
         SelectedWallpaperPath = string.IsNullOrWhiteSpace(wallpaperPath) ? string.Empty : wallpaperPath.Trim();
         SelectedWallpaperOpacity = AppSettings.ClampWallpaperOpacity(wallpaperOpacity);
         _wallpaperPathOpenedAt = SelectedWallpaperPath;
@@ -458,6 +462,7 @@ internal partial class AudioSettingsWindow : Window
         RefreshLibraryCatalogUsage();
         FfmpegPathBox.Text = SelectedFfmpegExePath;
         VideoProxyDisableAutoEncodeBox.IsChecked = SelectedVideoProxyDisableAutoEncode;
+        UseDxgiVideoPresenterBox.IsChecked = SelectedUseDxgiVideoPresenter;
         SyncFfmpegDependentControls();
         FillDefaultAudioFormat();
         RefreshSilentSkipThresholdFloorText();
@@ -1509,6 +1514,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedVideoProxyRetentionDays = ReadVideoProxyRetentionDays();
         SelectedFfmpegExePath = FfmpegPathBox.Text.Trim();
         SelectedVideoProxyDisableAutoEncode = VideoProxyDisableAutoEncodeBox.IsChecked == true;
+        SelectedUseDxgiVideoPresenter = UseDxgiVideoPresenterBox.IsChecked == true;
         SelectedAutoSpeakerSelect = AutoSpeakerSelectBox.IsChecked == true;
         SelectedActiveSpeakerId = CurrentSpeaker()?.Id ?? _presets[0].Id;
         SelectedRecordDeviceId = ReadRecordDeviceId();
