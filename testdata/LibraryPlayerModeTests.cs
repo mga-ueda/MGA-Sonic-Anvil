@@ -893,9 +893,15 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.HidesChromeForPlaylistVisual(
             player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: true,
             immersivePauseHold: true));
+        Assert.True(LibraryPlayerMode.HidesChromeForPlaylistVisual(
+            player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: true,
+            simpleSeekScrubHold: true));
         Assert.False(LibraryPlayerMode.HidesChromeForPlaylistVisual(
             player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: false,
             immersivePauseHold: true));
+        Assert.False(LibraryPlayerMode.HidesChromeForPlaylistVisual(
+            player: true, visualShown: true, visualPlaying: false, isPdf: false, isVideo: false,
+            simpleSeekScrubHold: true));
         Assert.True(LibraryPlayerMode.KeepsChromeHiddenForSettingsWhileVisualPlaying(
             player: true, visualPlaying: true, isVideo: true, isPdf: false));
         Assert.True(LibraryPlayerMode.KeepsChromeHiddenForSettingsWhileVisualPlaying(
@@ -1358,6 +1364,42 @@ public sealed class LibraryPlayerModeTests
             Assert.True(box.HasAnimatedProperties);
             LibraryPlayerMode.FadeElementOpacity(box, 0, instant: false);
             Assert.True(box.HasAnimatedProperties);
+        });
+    }
+
+    [Fact]
+    public void FadeElementOpacity_StaleCompletedDoesNotStompNewerFadeIn()
+    {
+        RunSta(() =>
+        {
+            var box = new Rectangle { Opacity = 1 };
+            // フェードアウト完了の Completed が、直後のフェードインより後に走っても Opacity 0 に戻さない。
+            LibraryPlayerMode.FadeElementOpacity(box, 0, instant: false, seconds: 0.04);
+            var frame = new DispatcherFrame();
+            var armIn = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(35) };
+            armIn.Tick += (_, _) =>
+            {
+                armIn.Stop();
+                LibraryPlayerMode.FadeElementOpacity(box, 1, instant: false, seconds: 0.04);
+                var settle = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+                settle.Tick += (_, _) =>
+                {
+                    settle.Stop();
+                    frame.Continue = false;
+                };
+                settle.Start();
+            };
+            armIn.Start();
+            try
+            {
+                Dispatcher.PushFrame(frame);
+                Assert.True(box.Opacity > 0.5, $"expected fade-in to survive stale Completed, got {box.Opacity}");
+            }
+            finally
+            {
+                // STA スレッド終了時の HwndSubclass クラッシュを防ぐ。
+                Dispatcher.CurrentDispatcher.InvokeShutdown();
+            }
         });
     }
 

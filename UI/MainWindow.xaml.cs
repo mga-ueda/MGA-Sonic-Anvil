@@ -135,6 +135,12 @@ public partial class MainWindow : Window
     private long _playlistVideoScrubFrame = -1;
     private long _playlistVideoScrubLastMs;
     private DispatcherTimer? _playlistVideoScrubTimer;
+
+    /// <summary>DXGI スクラブで粗い絵だけ出していて、まだ正確に出し直していないフレーム（無ければ -1）。</summary>
+    private long _playlistVideoScrubPreviewFrame = -1;
+
+    /// <summary>DXGI スクラブの静止判定。最後の要求から <see cref="LibraryPlayerMode.VideoScrubExactIdleMs"/> で正確な絵を 1 回出す。</summary>
+    private DispatcherTimer? _playlistVideoScrubExactTimer;
     private bool _closing;
     private bool _exitAfterFlush;
     private bool _bindingWorkspace;
