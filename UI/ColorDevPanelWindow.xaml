@@ -4,15 +4,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
         xmlns:domain="clr-namespace:MgaSonicAnvil.Domain"
-        WindowStyle="ToolWindow"
-        ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False"
         ShowActivated="False"
         Width="720"
         MinWidth="720"
         MinHeight="420"
         Height="640"
-        Background="{DynamicResource ColorPanelBackBrush}"
+        Background="Transparent"
         Foreground="{DynamicResource PrimaryForeBrush}"
         KeyboardNavigation.TabNavigation="Cycle">
   <Grid Margin="10">

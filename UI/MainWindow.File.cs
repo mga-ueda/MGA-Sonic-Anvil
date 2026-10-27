@@ -2204,7 +2204,8 @@ public partial class MainWindow
                 bool? accepted;
         try
         {
-            accepted = WindowPaintReveal.ShowDialogWhenPainted(dialog);
+            WindowPaintReveal.EnsureRevealedForDialog(this);
+            accepted = AcrylicDialogChrome.ShowDialog(dialog);
         }
         finally
         {

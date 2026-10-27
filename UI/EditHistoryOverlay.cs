@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -18,18 +19,22 @@ internal sealed class EditHistoryOverlay : Border
     private readonly TextBlock _title;
     private readonly TextBlock _hint;
     private readonly DispatcherTimer _statusTimer;
+    private Popup? _acrylicHost;
 
     public event EventHandler<HistoryItemClick>? ItemClicked;
 
     public event EventHandler? CloseRequested;
+
+    /// <summary>すりガラス用 Popup が開いているか。</summary>
+    public bool IsPanelOpen => _acrylicHost?.IsOpen == true;
 
     public EditHistoryOverlay()
     {
         Width = 340;
         MaxHeight = 360;
         Padding = new Thickness(0, 0, 0, 6);
-        // サンプルレート変換と同じコンテキストメニューの塗りと枠。
-        SetResourceReference(BackgroundProperty, "PlayerComboDropFillBrush");
+        // 塗りは DWM Acrylic ティント。枠だけ描く。
+        Background = Brushes.Transparent;
         SetResourceReference(BorderBrushProperty, "PlayerComboDropBorderBrush");
         BorderThickness = new Thickness(1);
         CornerRadius = DesignMetrics.ControlCorner;
@@ -83,6 +88,24 @@ internal sealed class EditHistoryOverlay : Border
         root.Children.Add(_hint);
         root.Children.Add(_scroll);
         Child = root;
+    }
+
+    public void Open(UIElement placementTarget)
+    {
+        ArgumentNullException.ThrowIfNull(placementTarget);
+        EnsureAcrylicHost(placementTarget);
+        Visibility = Visibility.Visible;
+        _acrylicHost!.IsOpen = true;
+    }
+
+    public void Close()
+    {
+        if (_acrylicHost is not null)
+        {
+            _acrylicHost.IsOpen = false;
+        }
+
+        Visibility = Visibility.Collapsed;
     }
 
     public void ApplyLocalizedText()
@@ -158,5 +181,46 @@ internal sealed class EditHistoryOverlay : Border
         }
 
         selectedRow?.BringIntoView();
+    }
+
+    private void EnsureAcrylicHost(UIElement placementTarget)
+    {
+        if (_acrylicHost is not null)
+        {
+            _acrylicHost.PlacementTarget = placementTarget;
+            return;
+        }
+
+        DetachFromParent();
+        Background = Brushes.Transparent;
+        _acrylicHost = new Popup
+        {
+            AllowsTransparency = false,
+            Placement = PlacementMode.Center,
+            PlacementTarget = placementTarget,
+            StaysOpen = true,
+            Focusable = false,
+            Child = this,
+        };
+        AcrylicPopup.Attach(_acrylicHost);
+    }
+
+    private void DetachFromParent()
+    {
+        switch (Parent)
+        {
+            case Panel panel:
+                panel.Children.Remove(this);
+                break;
+            case Decorator decorator when ReferenceEquals(decorator.Child, this):
+                decorator.Child = null;
+                break;
+            case ContentControl content when ReferenceEquals(content.Content, this):
+                content.Content = null;
+                break;
+            case Popup popup when ReferenceEquals(popup.Child, this):
+                popup.Child = null;
+                break;
+        }
     }
 }

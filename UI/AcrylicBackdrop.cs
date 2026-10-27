@@ -6,13 +6,19 @@ using System.Windows.Media;
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// ウィンドウへすりガラスを適用する（MGA After Drive と同じ ACCENT Acrylic）。
-/// 透け具合は <see cref="TintAlpha"/>。DwmExtendFrameIntoClientArea は呼ばないこと。
+/// ウィンドウへすりガラスを適用する（MGA After Drive と同じ ACCENT Acrylic。
+/// DWM 呼び出し方針は WinBlur 由来 — THIRD_PARTY_NOTICES.md の WinBlur 項を参照）。
+/// ティントは色設定の <c>AcrylicDialogTintBrush</c>（#AARRGGBB）。DwmExtendFrameIntoClientArea は呼ばないこと。
 /// </summary>
 internal static class AcrylicBackdrop
 {
-    /// <summary>ABGR 黒ティントのアルファ。低いほど透ける。</summary>
-    internal const byte TintAlpha = 0x40;
+    internal const string TintBrushKey = "AcrylicDialogTintBrush";
+
+    /// <summary>XAML 既定と同じ黒ティント 0xC0。</summary>
+    internal const byte DefaultTintAlpha = 0xC0;
+
+    private static readonly object TrackGate = new();
+    private static readonly List<WeakReference<Window>> Tracked = [];
 
     private const int GwlExStyle = -20;
     private const int WsExLayered = 0x00080000;
@@ -26,6 +32,47 @@ internal static class AcrylicBackdrop
     private enum AccentState
     {
         AccentEnableAcrylicBlurBehind = 4,
+    }
+
+    public static void Track(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        lock (TrackGate)
+        {
+            PruneTracked();
+            foreach (var weak in Tracked)
+            {
+                if (weak.TryGetTarget(out var existing) && ReferenceEquals(existing, window))
+                {
+                    return;
+                }
+            }
+
+            Tracked.Add(new WeakReference<Window>(window));
+        }
+    }
+
+    /// <summary>色設定のライブ更新後に、開いているすりガラス窓へティントを載せ直す。</summary>
+    public static void RefreshTracked()
+    {
+        Window[] live;
+        lock (TrackGate)
+        {
+            PruneTracked();
+            live = Tracked
+                .Select(weak => weak.TryGetTarget(out var window) ? window : null)
+                .Where(window => window is not null)
+                .Cast<Window>()
+                .ToArray();
+        }
+
+        foreach (var window in live)
+        {
+            if (window.IsLoaded)
+            {
+                Apply(window);
+            }
+        }
     }
 
     /// <summary>
@@ -45,6 +92,29 @@ internal static class AcrylicBackdrop
         Apply(hwnd);
     }
 
+    /// <summary>ContextMenu / Popup 子など、Visual の HWND へ Acrylic を載せる。</summary>
+    public static bool TryApplyToVisual(Visual? visual)
+    {
+        if (visual is null)
+        {
+            return false;
+        }
+
+        if (PresentationSource.FromVisual(visual) is not HwndSource source
+            || source.Handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (source.CompositionTarget is not null)
+        {
+            source.CompositionTarget.BackgroundColor = Colors.Transparent;
+        }
+
+        Apply(source.Handle);
+        return true;
+    }
+
     public static void Apply(IntPtr hwnd)
     {
         if (hwnd == IntPtr.Zero)
@@ -54,7 +124,8 @@ internal static class AcrylicBackdrop
 
         try
         {
-            var darkMode = 1;
+            var tint = ResolveTintColor();
+            var darkMode = TintLuma(tint) < 0.55 ? 1 : 0;
             _ = DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref darkMode, sizeof(int));
 
             var backdrop = DwmsbtNone;
@@ -64,7 +135,7 @@ internal static class AcrylicBackdrop
             _ = DwmSetWindowAttribute(hwnd, DwmwaWindowCornerPreference, ref corner, sizeof(int));
 
             ClearLayeredStyle(hwnd);
-            ApplyAccent(hwnd, AccentState.AccentEnableAcrylicBlurBehind, TintAlpha);
+            ApplyAccent(hwnd, AccentState.AccentEnableAcrylicBlurBehind, tint);
         }
         catch (Exception ex) when (
             ex is ExternalException
@@ -74,13 +145,35 @@ internal static class AcrylicBackdrop
         }
     }
 
-    private static void ApplyAccent(IntPtr hwnd, AccentState state, byte alpha)
+    internal static Color ResolveTintColor()
+    {
+        try
+        {
+            return Theme.Get(TintBrushKey);
+        }
+        catch (InvalidOperationException)
+        {
+            return Color.FromArgb(DefaultTintAlpha, 0, 0, 0);
+        }
+    }
+
+    /// <summary>ACCENT GradientColor 用 ABGR。</summary>
+    internal static int ToAccentGradient(Color tint) =>
+        Math.Max((byte)1, tint.A) << 24
+        | tint.B << 16
+        | tint.G << 8
+        | tint.R;
+
+    private static double TintLuma(Color tint) =>
+        (0.2126 * tint.R + 0.7152 * tint.G + 0.0722 * tint.B) / 255d;
+
+    private static void ApplyAccent(IntPtr hwnd, AccentState state, Color tint)
     {
         var policy = new AccentPolicy
         {
             AccentState = state,
             AccentFlags = 0,
-            GradientColor = Math.Max((byte)1, alpha) << 24,
+            GradientColor = ToAccentGradient(tint),
             AnimationId = 0,
         };
 
@@ -112,6 +205,17 @@ internal static class AcrylicBackdrop
         }
 
         _ = SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(exStyle & ~WsExLayered));
+    }
+
+    private static void PruneTracked()
+    {
+        for (var i = Tracked.Count - 1; i >= 0; i--)
+        {
+            if (!Tracked[i].TryGetTarget(out _))
+            {
+                Tracked.RemoveAt(i);
+            }
+        }
     }
 
     private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex) =>

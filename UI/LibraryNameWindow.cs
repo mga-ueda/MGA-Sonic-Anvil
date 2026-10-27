@@ -20,7 +20,12 @@ internal static class LibraryNameWindow
             dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
-        WindowPaintReveal.ShowDialogWhenPainted(dialog);
+        if (owner is not null)
+        {
+            WindowPaintReveal.EnsureRevealedForDialog(owner);
+        }
+
+        AcrylicDialogChrome.ShowDialog(dialog);
         return dialog.Accepted ? dialog.Typed : null;
     }
 
@@ -35,12 +40,8 @@ internal static class LibraryNameWindow
         public NameDialog(string title, string initial, bool selectStem)
         {
             Title = title;
-            WindowStyle = WindowStyle.SingleBorderWindow;
-            ResizeMode = ResizeMode.NoResize;
-            ShowInTaskbar = false;
-            SizeToContent = SizeToContent.WidthAndHeight;
-            Background = (System.Windows.Media.Brush)FindResource("WindowBackBrush");
             Foreground = (System.Windows.Media.Brush)FindResource("PrimaryForeBrush");
+            AcrylicDialogChrome.Prepare(this);
             _box = new TextBox
             {
                 Text = initial,
@@ -81,14 +82,13 @@ internal static class LibraryNameWindow
             var root = new StackPanel();
             root.Children.Add(_box);
             root.Children.Add(row);
-            Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
+            AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
             Loaded += (_, _) =>
             {
                 _box.Focus();
                 var length = selectStem ? DocumentFileNames.StemSelectLength(_box.Text) : _box.Text.Length;
                 _box.Select(0, length);
             };
-            WindowPaintReveal.Attach(this);
             AppDialogKeys.Attach(this, Close);
         }
     }

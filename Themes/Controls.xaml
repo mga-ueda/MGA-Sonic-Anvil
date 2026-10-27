@@ -287,10 +287,10 @@
                         </Border>
                         <Popup Placement="Bottom"
                                IsOpen="{TemplateBinding IsDropDownOpen}"
-                               AllowsTransparency="True"
+                               AllowsTransparency="False"
                                Focusable="False"
                                PopupAnimation="Slide">
-                            <Border Background="{DynamicResource PlayerComboDropFillBrush}"
+                            <Border Background="Transparent"
                                     BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
@@ -593,12 +593,12 @@
                         </Border>
                         <Popup Placement="Bottom"
                                IsOpen="{TemplateBinding IsDropDownOpen}"
-                               AllowsTransparency="True"
+                               AllowsTransparency="False"
                                Focusable="False"
                                PopupAnimation="Slide">
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <Border Background="{DynamicResource PlayerComboDropFillBrush}"
+                                <Border Background="Transparent"
                                         CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
@@ -747,12 +747,12 @@
                         </Border>
                         <Popup Placement="Bottom"
                                IsOpen="{TemplateBinding IsDropDownOpen}"
-                               AllowsTransparency="True"
+                               AllowsTransparency="False"
                                Focusable="False"
                                PopupAnimation="Slide">
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <Border Background="{DynamicResource StatusTimecodeFillBrush}"
+                                <Border Background="Transparent"
                                         CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
@@ -1130,7 +1130,8 @@
 
     <Style x:Key="DarkContextMenuStyle" TargetType="ContextMenu">
         <Setter Property="OverridesDefaultStyle" Value="True" />
-        <Setter Property="Background" Value="{DynamicResource PlayerComboDropFillBrush}" />
+        <!-- Acrylic すりガラス用。塗りは DWM ティント（AcrylicDialogTintBrush）。 -->
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource PlayerComboDropBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -1266,13 +1267,13 @@
                             </Grid>
                         </Border>
                         <Popup x:Name="PART_Popup"
-                               AllowsTransparency="True"
+                               AllowsTransparency="False"
                                Focusable="False"
                                Placement="Right"
                                HorizontalOffset="-1"
                                VerticalOffset="-2"
                                IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
-                            <Border Background="{DynamicResource PlayerComboDropFillBrush}"
+                            <Border Background="Transparent"
                                     BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"

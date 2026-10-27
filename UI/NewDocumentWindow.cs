@@ -22,7 +22,8 @@ internal sealed class NewDocumentWindow : Window
         {
             Owner = owner,
         };
-        return WindowPaintReveal.ShowDialogWhenPainted(dialog) == true ? dialog.SelectedFormat : null;
+        WindowPaintReveal.EnsureRevealedForDialog(owner);
+        return AcrylicDialogChrome.ShowDialog(dialog) == true ? dialog.SelectedFormat : null;
     }
 
     private NewDocumentWindow(DefaultAudioFormat.Spec current, IEnumerable<string> visibleIds)
@@ -30,13 +31,9 @@ internal sealed class NewDocumentWindow : Window
         _visibleIds = [.. visibleIds];
         SelectedFormat = current;
         Title = UiStrings.DialogNewDocumentTitle;
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.NoResize;
-        ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        SizeToContent = SizeToContent.WidthAndHeight;
-        Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(this);
         AudioFormatComboFill.Fill(_rateCombo, _bitsCombo, _layoutCombo, current, _visibleIds);
                         
         var ok = CreateButton(UiStrings.ButtonOk, accept: true, accent: true, isDefault: true);
@@ -53,9 +50,7 @@ internal sealed class NewDocumentWindow : Window
         var root = new StackPanel();
         root.Children.Add(FormatRow());
         root.Children.Add(buttons);
-        Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
-
-        WindowPaintReveal.Attach(this);
+        AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
         SourceInitialized += (_, _) =>
         {
             ComboBoxFit.Apply(_rateCombo);

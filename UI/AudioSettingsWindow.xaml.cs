@@ -323,9 +323,13 @@ internal partial class AudioSettingsWindow : Window
         _inputEditor.MapChanged += OnInputMapChanged;
         _outputEditor.MapChanged += OnOutputMapChanged;
         _outputEditor.TestClicked += OnOutputTest;
-        WindowPaintReveal.Attach(this);
-        VerticalResizeOnly.LockWidth(this);
         Title = UiStrings.DialogSettingsTitle;
+        AcrylicDialogChrome.Prepare(
+            this,
+            ResizeMode.CanResizeWithGrip,
+            SizeToContent.Manual);
+        AcrylicDialogChrome.AdoptContent(this);
+        VerticalResizeOnly.LockWidth(this);
 
         LanguageCombo.Items.Add(new LanguageItem(UiLanguageChoice.Auto, UiStrings.LabelLanguageAuto));
         LanguageCombo.Items.Add(new LanguageItem(UiLanguageChoice.Japanese, UiStrings.LabelLanguageJapanese));
@@ -2864,7 +2868,7 @@ internal partial class AudioSettingsWindow : Window
 
     private void OnUiThemeChanged(object? sender, EventArgs e)
     {
-        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        AcrylicBackdrop.Apply(this);
         ApplySettingsTabChrome();
         SlidingTabAccent.RefreshAllBrushes();
         RefreshFadeRowChrome(_fadeInRow);

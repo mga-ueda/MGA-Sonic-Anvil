@@ -36,7 +36,8 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
         {
             Owner = owner,
         };
-        WindowPaintReveal.ShowDialogWhenPainted(dialog);
+        WindowPaintReveal.EnsureRevealedForDialog(owner);
+        AcrylicDialogChrome.ShowDialog(dialog);
         return new ConfirmRecordSilentSkipResult(dialog.Choice, dialog.UseSilentSkip, dialog.AddRegion);
     }
 
@@ -47,13 +48,9 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
         bool addRegion)
     {
         Title = UiStrings.AppName;
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.NoResize;
-        ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        SizeToContent = SizeToContent.WidthAndHeight;
-        Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(this);
         UseSilentSkip = useSilentSkip;
         AddRegion = addRegion;
 
@@ -123,8 +120,7 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
         root.Children.Add(addRegionBox);
         root.Children.Add(buttons);
 
-        Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
-        WindowPaintReveal.Attach(this);
+        AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
         AppDialogKeys.Attach(this, () =>
         {
             Choice = ConfirmRecordSilentSkipChoice.Cancel;

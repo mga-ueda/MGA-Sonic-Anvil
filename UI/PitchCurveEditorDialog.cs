@@ -1,12 +1,10 @@
 using System.Globalization;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -112,7 +110,8 @@ internal sealed class PitchCurveEditorDialog : Window
         {
             Owner = owner,
         };
-        WindowPaintReveal.ShowDialogWhenPainted(dialog);
+        WindowPaintReveal.EnsureRevealedForDialog(owner);
+        AcrylicDialogChrome.ShowDialog(dialog);
         return dialog.Result;
     }
 
@@ -138,17 +137,15 @@ internal sealed class PitchCurveEditorDialog : Window
             + (selectionScoped
                 ? UiStrings.DialogPitchCurveSelectionSuffix
                 : UiStrings.DialogPitchCurveEntireSuffix);
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.CanResizeWithGrip;
-        ShowInTaskbar = false;
-        SourceInitialized += (_, _) => DisableMinimizeBox(this);
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Width = DesignMetrics.From96(1080);
         // 仮の下限。Loaded で下部 UI の実測幅に差し替える。
         MinWidth = DesignMetrics.From96(560);
-        SizeToContent = SizeToContent.Height;
-        Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(
+            this,
+            ResizeMode.CanResizeWithGrip,
+            SizeToContent.Height);
 
         _preview = new PitchCurveWavePreview
         {
@@ -395,7 +392,7 @@ internal sealed class PitchCurveEditorDialog : Window
         _contentBorder = new Border { Padding = DesignMetrics.AudioPad, Child = root };
         _contentHost = new Grid();
         _contentHost.Children.Add(_contentBorder);
-        Content = _contentHost;
+        AcrylicDialogChrome.SetBody(this, _contentHost, new Thickness(0));
         SizeChanged += (_, _) =>
         {
             if (_busyGlass.IsShowingBusy)
@@ -436,7 +433,6 @@ internal sealed class PitchCurveEditorDialog : Window
                 _preview.ResetPointEditCapture();
             }
         };
-        WindowPaintReveal.Attach(this);
         AppDialogKeys.Attach(this, () => Close());
         Closing += (_, _) =>
         {
@@ -1860,49 +1856,6 @@ internal sealed class PitchCurveEditorDialog : Window
         return radio;
     }
 
-    private const int GwlStyle = -16;
-    private const int WsMinimizeBox = 0x00020000;
-    private const int SwpFrameChanged = 0x0020;
-    private const int SwpNoMove = 0x0002;
-    private const int SwpNoSize = 0x0001;
-    private const int SwpNoZOrder = 0x0004;
-    private const int SwpNoActivate = 0x0010;
-
-    private static void DisableMinimizeBox(Window window)
-    {
-        var hwnd = new WindowInteropHelper(window).Handle;
-        if (hwnd == IntPtr.Zero)
-        {
-            return;
-        }
-
-        var style = GetWindowLongPtr(hwnd, GwlStyle).ToInt64();
-        _ = SetWindowLongPtr(hwnd, GwlStyle, new IntPtr(style & ~WsMinimizeBox));
-        _ = SetWindowPos(
-            hwnd,
-            IntPtr.Zero,
-            0,
-            0,
-            0,
-            0,
-            SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
-    }
-
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
-    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
-
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
-    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SetWindowPos(
-        IntPtr hWnd,
-        IntPtr hWndInsertAfter,
-        int x,
-        int y,
-        int cx,
-        int cy,
-        int uFlags);
 }
 
 /// <summary>一括編集向けの定数ピッチ入力。</summary>
@@ -1923,15 +1876,11 @@ internal static class PitchConstantBatchDialog
         var window = new Window
         {
             Title = UiStrings.DialogPitchConstantTitle,
-            WindowStyle = WindowStyle.SingleBorderWindow,
-            ResizeMode = ResizeMode.NoResize,
-            ShowInTaskbar = false,
             Owner = owner,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            SizeToContent = SizeToContent.WidthAndHeight,
-            Background = (Brush)owner.FindResource("WindowBackBrush"),
             Foreground = (Brush)owner.FindResource("PrimaryForeBrush"),
         };
+        AcrylicDialogChrome.Prepare(window);
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -1980,13 +1929,14 @@ internal static class PitchConstantBatchDialog
             box.Style = flatStyle;
         }
 
-        var root = new StackPanel { Margin = DesignMetrics.AudioPad };
+        var root = new StackPanel();
         root.Children.Add(pitchLabel);
         root.Children.Add(box);
         root.Children.Add(buttons);
-        window.Content = root;
+        AcrylicDialogChrome.SetBody(window, root, DesignMetrics.AudioPad);
         AppDialogKeys.Attach(window, () => window.Close());
-        WindowPaintReveal.ShowDialogWhenPainted(window);
+        WindowPaintReveal.EnsureRevealedForDialog(owner);
+        AcrylicDialogChrome.ShowDialog(window);
         semitones = chosen;
         return ok;
     }

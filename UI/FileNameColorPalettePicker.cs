@@ -48,16 +48,17 @@ internal sealed class FileNameColorPalettePicker : Border
             Child = _board,
             SnapsToDevicePixels = true,
         };
-        drop.SetResourceReference(BackgroundProperty, "PlayerComboDropFillBrush");
+        drop.Background = Brushes.Transparent;
         drop.SetResourceReference(BorderBrushProperty, "PlayerComboDropBorderBrush");
         _popup = new Popup
         {
             PlacementTarget = this,
             Placement = PlacementMode.Bottom,
             StaysOpen = false,
-            AllowsTransparency = true,
+            AllowsTransparency = false,
             Child = drop,
         };
+        AcrylicPopup.Attach(_popup);
         _board.ColorSelected += (_, index) =>
         {
             SetIndex(index);

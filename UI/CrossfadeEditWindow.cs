@@ -111,12 +111,12 @@ internal sealed class CrossfadeEditWindow : Window
         MinWidth = DefaultWidth;
         Height = DefaultHeight;
         MinHeight = DefaultHeight;
-        ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        // ColorDev / SilenceDetect / TabTime と同じ右下リサイズ印。
-        ResizeMode = ResizeMode.CanResizeWithGrip;
-        Background = BrushOf("WindowBackBrush");
         Foreground = BrushOf("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(
+            this,
+            ResizeMode.CanResizeWithGrip,
+            SizeToContent.Manual);
 
         _spliceFrame.BorderBrush = BrushOf("ChromeBorderBrush");
         _spliceFrame.Background = BrushOf("WaveformBackBrush");
@@ -150,16 +150,9 @@ internal sealed class CrossfadeEditWindow : Window
         _valueCommitTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ValueCommitDebounceMs) };
         _valueCommitTimer.Tick += (_, _) => OnValueCommitTimerTick();
 
-        Content = new Border
-        {
-            Padding = new Thickness(12),
-            Background = BrushOf("WindowBackBrush"),
-            Child = BuildLayout(),
-        };
+        AcrylicDialogChrome.SetBody(this, BuildLayout(), new Thickness(12));
 
         RefreshUiStrings();
-        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
-        WindowPaintReveal.Attach(this, activateOnReveal: true);
         UiThemeService.Changed += OnUiThemeChanged;
         Closed += (_, _) => UiThemeService.Changed -= OnUiThemeChanged;
         AppDialogKeys.Attach(this, RequestExit);
@@ -171,7 +164,7 @@ internal sealed class CrossfadeEditWindow : Window
     }
 
     private void OnUiThemeChanged(object? sender, EventArgs e) =>
-        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        AcrylicBackdrop.Apply(this);
 
     private void OnPreviewKeyUp(object sender, KeyEventArgs e)
     {
@@ -275,8 +268,7 @@ internal sealed class CrossfadeEditWindow : Window
             _placementApplied = true;
         }
 
-        // 描画完了まで DWM クロークし、白い未描画フレームを出さない。
-        WindowPaintReveal.ShowWhenPainted(this);
+        AcrylicDialogChrome.Show(this);
     }
 
     /// <summary>ホスト側から隠す（Close しないので再表示可能）。</summary>

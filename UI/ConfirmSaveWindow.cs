@@ -27,20 +27,16 @@ internal sealed class ConfirmSaveWindow : Window
         // 起動クローク中の本体を Owner にすると、ダイアログも見えず操作不能になる。
         WindowPaintReveal.EnsureRevealedForDialog(owner);
         var dialog = new ConfirmSaveWindow(displayName, remainingDirty, closing) { Owner = owner };
-        WindowPaintReveal.ShowDialogWhenPainted(dialog);
+        AcrylicDialogChrome.ShowDialog(dialog);
         return dialog.Choice;
     }
 
     private ConfirmSaveWindow(string displayName, int remainingDirty, bool closing)
     {
         Title = UiStrings.AppName;
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        ResizeMode = ResizeMode.NoResize;
-        ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        SizeToContent = SizeToContent.WidthAndHeight;
-        Background = (Brush)FindResource("WindowBackBrush");
         Foreground = (Brush)FindResource("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(this);
         var message = new TextBlock
         {
             Text = remainingDirty >= 2
@@ -86,8 +82,7 @@ internal sealed class ConfirmSaveWindow : Window
         root.Children.Add(first);
         root.Children.Add(second);
 
-        Content = new Border { Padding = DesignMetrics.AudioPad, Child = root };
-        WindowPaintReveal.Attach(this);
+        AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
         AppDialogKeys.Attach(this, () =>
         {
             Choice = ConfirmSaveChoice.Cancel;

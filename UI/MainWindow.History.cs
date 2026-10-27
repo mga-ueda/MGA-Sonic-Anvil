@@ -29,7 +29,7 @@ public partial class MainWindow
     /// <summary>Shift+↑↓ セッション開始時の選択。範囲の伸縮でここへ戻せるようにする。</summary>
     private HashSet<int>? _historyShiftBase;
 
-    private bool HistoryOpen => HistoryOverlay.Visibility == Visibility.Visible;
+    private bool HistoryOpen => HistoryOverlay.IsPanelOpen;
 
     private void OpenEditHistory()
     {
@@ -52,7 +52,7 @@ public partial class MainWindow
         _historyCopyAnchor = -1;
         _historyShiftBase = null;
         RefreshHistoryOverlay();
-        HistoryOverlay.Visibility = Visibility.Visible;
+        HistoryOverlay.Open(this);
     }
 
     private void CloseEditHistory(bool commit)
@@ -67,7 +67,7 @@ public partial class MainWindow
             AfterEdit();
         }
 
-        HistoryOverlay.Visibility = Visibility.Collapsed;
+        HistoryOverlay.Close();
     }
 
     private void MainWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)
