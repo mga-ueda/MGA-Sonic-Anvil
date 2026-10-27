@@ -99,14 +99,59 @@ public partial class MainWindow
 
     private void ApplyMainMenuBarVisibility()
     {
+        // 設定オフ／F9 最小は領域ごと畳む。動画ミニは Opacity で隠すため Visible を保つ。
         var show = AppStorage.Settings.ShowMainMenuBar
-            && !(_libraryMinimalChrome && IsLibraryMaximized);
-        MainMenuBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        if (show)
+            && !(_libraryMinimalChrome && IsLibraryMaximized && !_videoLaunchPlacement);
+        if (!show)
         {
-            RebuildMainMenuBar();
+            MainMenuBar.BeginAnimation(UIElement.OpacityProperty, null);
+            MainMenuBar.Opacity = 1;
+            MainMenuBar.IsHitTestVisible = true;
+            MainMenuBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        MainMenuBar.Visibility = Visibility.Visible;
+        RebuildMainMenuBar();
+        if (!_playlistVideoChromeVisible)
+        {
+            // クローム隠れ中に設定で出したときは、領域だけ残して即透明。
+            SyncMainMenuBarChromeOpacity(instant: true);
+        }
+        else if (LibraryPlayerMode.NeedsForcedOpaque(MainMenuBar))
+        {
+            // フェードイン中は触らず、不透明なのに固まったときだけ直す。
+            LibraryPlayerMode.FadeElementOpacity(MainMenuBar, 1, instant: true, hitTestVisible: true);
         }
     }
+
+    /// <summary>
+    /// 動画本再生／PDF 明るい表示／動画ミニでは見た目だけ消す（レイアウト高さは残す）。
+    /// </summary>
+    private void SyncMainMenuBarChromeOpacity(bool instant)
+    {
+        if (MainMenuBar.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        var visible = _playlistVideoChromeVisible;
+        if (!visible && FindOpenMainMenuRoot() is not null)
+        {
+            DismissMainMenuAndRestoreFocus();
+        }
+
+        LibraryPlayerMode.FadeElementOpacity(
+            MainMenuBar,
+            visible ? 1 : 0,
+            instant,
+            hitTestVisible: visible,
+            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+    }
+
+    /// <summary>設定上は出していても、クローム隠れ中はキー／フォーカスを受けない。</summary>
+    private bool IsMainMenuBarVisuallyAvailable() =>
+        MainMenuBar.Visibility == Visibility.Visible && MainMenuBar.IsHitTestVisible;
 
     private void RebuildMainMenuBar()
     {
@@ -139,9 +184,10 @@ public partial class MainWindow
     /// </summary>
     private bool IsMainMenuBarSessionActive() =>
         MainMenuBar.Visibility == Visibility.Visible
-        && (IsMainMenuBarTakingKeys()
-            || MainMenuBar.IsKeyboardFocusWithin
-            || MenuBaseIsMenuModeProperty?.GetValue(MainMenuBar) is true);
+        && (FindOpenMainMenuRoot() is not null
+            || (MainMenuBar.IsHitTestVisible
+                && (MainMenuBar.IsKeyboardFocusWithin
+                    || MenuBaseIsMenuModeProperty?.GetValue(MainMenuBar) is true)));
 
     /// <summary>
     /// WPF <c>Menu.OnEnterMenuMode</c> / <c>MenuBase.OnKeyDown(System Alt)</c> 相当。
@@ -149,12 +195,12 @@ public partial class MainWindow
     /// </summary>
     private void TryEnterOrLeaveMainMenuModeFromBareAlt()
     {
-        if (MainMenuBar.Visibility != Visibility.Visible)
+        if (!IsMainMenuBarVisuallyAvailable())
         {
             EnsureMainMenuBar();
         }
 
-        if (MainMenuBar.Visibility != Visibility.Visible)
+        if (!IsMainMenuBarVisuallyAvailable())
         {
             return;
         }
@@ -259,12 +305,12 @@ public partial class MainWindow
             return false;
         }
 
-        if (MainMenuBar.Visibility != Visibility.Visible)
+        if (!IsMainMenuBarVisuallyAvailable())
         {
             EnsureMainMenuBar();
         }
 
-        if (MainMenuBar.Visibility != Visibility.Visible)
+        if (!IsMainMenuBarVisuallyAvailable())
         {
             return false;
         }

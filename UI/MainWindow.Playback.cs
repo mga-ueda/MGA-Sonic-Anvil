@@ -3502,8 +3502,8 @@ public partial class MainWindow
         }
 
         // 動画ミニ: アナライザ類＋WAAPI トグルを残す（リスト／トランスポート／タブは隠す）。
+        // メニューバーは Collapsed にせず、SyncPlaylistVideoChromeFade の Opacity で隠す（高さは残す）。
         StatusBarHost.Visibility = Visibility.Collapsed;
-        MainMenuBar.Visibility = Visibility.Collapsed;
         TransportChromeHost.Visibility = Visibility.Visible;
         MeterColumn.Visibility = Visibility.Visible;
         MeterColumnSplitter.Visibility = Visibility.Collapsed;
