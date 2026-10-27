@@ -206,7 +206,8 @@ internal static partial class UiStrings
     public static string WaveMenuNextTab => Get("次のタブ(_N)", "_Next Tab");
     public static string WaveMenuPrevTab => Get("前のタブ(_V)", "Pre_vious Tab");
     public static string WaveMenuFindTabs => Get("タブを検索(_F)", "Find Tabs (_F)");
-    public static string WaveMenuClearTileSearch => Get("検索を解除(_C)", "Clear Tab Search (_C)");
+    /// <summary>タブ右クリックはフラットのため、チャンネルごと(_C) と重ならないよう Z。</summary>
+    public static string WaveMenuClearTileSearch => Get("検索を解除(_Z)", "Clear Tab Search (_Z)");
     /// <summary>Wwise カテゴリ内。Play -E(X) と重なる X をやめて E。</summary>
     public static string WaveMenuWaapiPanel => Get("WAAPI パネル(_P)", "WAAPI _Panel");
     public static string WaveMenuKeepTarget => Get("Keep Target(_K)", "Keep Target (_K)");
@@ -220,8 +221,9 @@ internal static partial class UiStrings
     public static string WaveMenuExportWaveSelected => Get("選択したファイルを Wave で書き出す(_W)", "Export Selected Files as _Wave");
     public static string WaveMenuExportMp3 => Get("MP3 で書き出す(_M)", "Export _MP3");
     public static string WaveMenuExportMp3Selected => Get("選択したファイルを MP3 で書き出す(_M)", "Export Selected Files as _MP3");
-    public static string WaveMenuExportByMarkers => Get("マーカーでセパレート(_K)", "Separate by Mar_kers");
-    public static string WaveMenuExportByMarkersSelected => Get("選択したファイルをマーカーでセパレート(_K)", "Separate Selected Files by Mar_kers");
+    /// <summary>タブ右クリックはフラットのため、選択時間コピー(_K) と重ならないよう H。</summary>
+    public static string WaveMenuExportByMarkers => Get("マーカーでセパレート(_H)", "Separate by Markers (_H)");
+    public static string WaveMenuExportByMarkersSelected => Get("選択したファイルをマーカーでセパレート(_H)", "Separate Selected Files by Markers (_H)");
     public static string WaveMenuExportByRegions => Get("リージョンでセパレート(_G)", "Separate by Re_gions");
     public static string WaveMenuExportByRegionsSelected => Get("選択したファイルをリージョンでセパレート(_G)", "Separate Selected Files by Re_gions");
     public static string WaveMenuExportByChannels => Get("チャンネルごとに書き出す(_C)", "Export by _Channel");
