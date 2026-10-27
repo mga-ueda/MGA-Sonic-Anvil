@@ -63,6 +63,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.Shuffle
             or WaveMenuCommand.AutoPlayNext
             or WaveMenuCommand.AutoPlay
+            or WaveMenuCommand.CheckSelectMode
             or WaveMenuCommand.PreviousTrack
             or WaveMenuCommand.NextTrack
             or WaveMenuCommand.RestartTrack

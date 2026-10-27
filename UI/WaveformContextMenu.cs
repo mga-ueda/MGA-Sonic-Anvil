@@ -76,6 +76,7 @@ internal enum WaveMenuCommand
     Shuffle,
     AutoPlayNext,
     AutoPlay,
+    CheckSelectMode,
     PreviousTrack,
     NextTrack,
     RestartTrack,
@@ -207,6 +208,7 @@ internal sealed class WaveformContextMenuModel
     public bool Shuffle { get; init; }
     public bool AutoPlayNext { get; init; }
     public bool AutoPlay { get; init; }
+    public bool CheckSelectMode { get; init; }
     public bool CanStepPlaylist { get; init; }
     public bool CanRestartTrack { get; init; }
     public bool VideoMini { get; init; }
@@ -302,6 +304,8 @@ internal sealed class WaveformContextMenuModel
         RangeClick = true,
         Shuffle = true,
         AutoPlayNext = true,
+        AutoPlay = true,
+        CheckSelectMode = true,
         KeepTarget = true,
         AutoActive = true,
         CanKeepTarget = true,
@@ -871,6 +875,12 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuAutoPlay, WaveMenuCommand.AutoPlay, "Alt+Shift+P", m.AutoPlay, m.LibraryMaximized && !m.IsBusy),
         Check(UiStrings.WaveMenuAutoPlayNext, WaveMenuCommand.AutoPlayNext, "Alt+Shift+N", m.AutoPlayNext, m.LibraryMaximized && !m.IsBusy),
         Check(UiStrings.WaveMenuShuffle, WaveMenuCommand.Shuffle, "Alt+Shift+R", m.Shuffle, m.LibraryMaximized && !m.IsBusy),
+        Check(
+            UiStrings.WaveMenuCheckSelectMode,
+            WaveMenuCommand.CheckSelectMode,
+            "Shift+Space",
+            m.CheckSelectMode,
+            m.LibraryMaximized && !m.IsBusy),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> SeekPlaybackItems(WaveformContextMenuModel m) =>

@@ -125,6 +125,8 @@ internal static partial class UiStrings
     public static string WaveMenuAutoPlayNext => Get("次の曲を自動再生(_M)", "Auto ne_xt");
     /// <summary>再生カテゴリ内。ショートカット表示は Alt+Shift+P。チェックはライブラリの Auto Play と同じ。</summary>
     public static string WaveMenuAutoPlay => Get("追加時に自動再生(_I)", "Auto Play on Add (_I)");
+    /// <summary>プレイリストサブメニュー。録音(C) と階層が違うので C。ショートカット表示は Shift+Space。</summary>
+    public static string WaveMenuCheckSelectMode => Get("チェックボックス表示(_C)", "Show _Checkboxes");
     /// <summary>再生カテゴリ内。P／N／R はプレイリストの前後曲と頭出し。アクセスキーは再生(P) などと重ならない。</summary>
     public static string WaveMenuPreviousTrack => Get("前の曲(_K)", "Previous Track (_K)");
     public static string WaveMenuNextTrack => Get("次の曲(_J)", "Next Track (_J)");
