@@ -1268,28 +1268,30 @@ internal static partial class UiStrings
     public static string TabTimeFileNamePdf => Get("ファイルの時間.pdf", "FileTimes.pdf");
     public static string TabMenuCloseAll => Get("すべてのタブを閉じる(_A)", "Close _All Tabs");
 
-    /// <summary>通常メニュー用。「全部のタブを選択する(_A)」とアクセスキーが重ならないよう W。</summary>
-    public static string TabMenuCloseAllNormal => Get("すべてのタブを閉じる(_W)", "Close All Tabs (_W)");
+    /// <summary>通常メニュー用。A は全選択、W は Wave 書き出しと重ならないよう X。</summary>
+    public static string TabMenuCloseAllNormal => Get("すべてのタブを閉じる(_X)", "Close All Tabs (_X)");
     public static string TabMenuPasteToAll => Get("編集データを全てにペーストする(_V)", "Paste Copied Edits to All Tabs (_V)");
     public static string TabMenuCloseSelected => Get("選択したタブを閉じる(_A)", "Close Selected Tabs (_A)");
     public static string TabMenuPasteToSelected => Get("選択したタブにペーストする(_V)", "Paste Copied Edits to Selected Tabs (_V)");
     /// <summary>アクセスキーは B が「タブのまま(B)」と重なるため J のまま。</summary>
     public static string TabMenuMergeSelected => WaveMenuMergeTabs;
-    public static string TabMenuExportWave => Get("Wave で書き出す(_E)", "Export _Wave");
+    /// <summary>波形メニューの Wave 書き出し(_W) に合わせる。ファイル名コピー(_E) と重ならない。</summary>
+    public static string TabMenuExportWave => Get("Wave で書き出す(_W)", "Export _Wave");
     public static string TabMenuExportMp3 => Get("MP3 で書き出す(_M)", "Export _MP3");
-    public static string TabMenuExportWaveSelected => Get("選択したタブを Wave で書き出す(_E)", "Export Selected Tabs as _Wave");
+    public static string TabMenuExportWaveSelected => Get("選択したタブを Wave で書き出す(_W)", "Export Selected Tabs as _Wave");
     public static string TabMenuExportMp3Selected => WaveMenuExportMp3Selected;
-    public static string TabMenuExportWaveAll => Get("選択ファイルを Wave で保存(_E)", "Save Selected Files as _Wave");
-    public static string TabMenuExportMp3All => Get("選択ファイルを MP3 で保存(_M)", "Save Selected Files as _MP3");
+    public static string TabMenuExportWaveAll => Get("選択ファイルを Wave で書き出す(_W)", "Export Selected Files as _Wave");
+    public static string TabMenuExportMp3All => Get("選択ファイルを MP3 で書き出す(_M)", "Export Selected Files as _MP3");
+    /// <summary>選択時間コピー(_K) と重ならないよう H（波形メニューのマーカーセパレートと同じ）。</summary>
     public static string TabMenuExportWaveByMarkers => Get(
-        "マーカーでセパレートして書き出す(_K)",
-        "Export Wave Separated by Mar_kers");
+        "マーカーでセパレートして書き出す(_H)",
+        "Export Wave Separated by Markers (_H)");
     public static string TabMenuExportWaveByMarkersSelected => Get(
-        "選択したタブをマーカーでセパレートして書き出す(_K)",
-        "Export Selected Tabs Separated by Mar_kers");
+        "選択したタブをマーカーでセパレートして書き出す(_H)",
+        "Export Selected Tabs Separated by Markers (_H)");
     public static string TabMenuExportWaveByMarkersAll => Get(
-        "選択ファイルをマーカーでセパレートして書き出す(_K)",
-        "Export Selected Files Separated by Mar_kers");
+        "選択ファイルをマーカーでセパレートして書き出す(_H)",
+        "Export Selected Files Separated by Markers (_H)");
     public static string TabMenuExportWaveByRegions => Get(
         "リージョンでセパレートして書き出す(_G)",
         "Export Wave Separated by Re_gions");
