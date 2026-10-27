@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -21,7 +22,20 @@ internal static class AcrylicPopup
         "HookupParentPopup",
         BindingFlags.Instance | BindingFlags.NonPublic);
 
+    /// <summary>
+    /// Acrylic HWND では Background=Transparent の空白がヒットしない。
+    /// ほぼ透明だがヒットする塗り（見た目はティントのまま）。
+    /// </summary>
+    internal static Brush HitFill { get; } = CreateHitFill();
+
     private static int _installed;
+
+    private static Brush CreateHitFill()
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
+        brush.Freeze();
+        return brush;
+    }
 
     public static void Install()
     {
@@ -45,6 +59,12 @@ internal static class AcrylicPopup
             typeof(MenuItem),
             MenuItem.SubmenuOpenedEvent,
             new RoutedEventHandler(OnMenuItemSubmenuOpened));
+        // マウスのサブメニューは SystemParameters.MenuShowDelay（~400ms）待ち。
+        // キーボードは即開くので、マウスも即開くように揃える。
+        EventManager.RegisterClassHandler(
+            typeof(MenuItem),
+            MenuItem.MouseEnterEvent,
+            new MouseEventHandler(OnMenuItemMouseEnter));
         // ComboBox.DropDownOpened は CLR イベントのみなので Loaded で購読する。
         EventManager.RegisterClassHandler(
             typeof(ComboBox),
@@ -83,7 +103,7 @@ internal static class AcrylicPopup
         }
 
         PrepareContextMenuHost(menu);
-        menu.Background = Brushes.Transparent;
+        menu.Background = HitFill;
         ClearOpaqueFill(menu);
         ScheduleFrost(menu);
     }
@@ -102,6 +122,22 @@ internal static class AcrylicPopup
         }
 
         FrostPopupSurface(popup);
+    }
+
+    private static void OnMenuItemMouseEnter(object sender, MouseEventArgs e)
+    {
+        if (sender is not MenuItem { HasItems: true, IsEnabled: true, IsSubmenuOpen: false } item)
+        {
+            return;
+        }
+
+        // TopLevelHeader はメニューモード突入後のみ。SubmenuHeader の遅延が体感の主因。
+        if (item.Role != MenuItemRole.SubmenuHeader)
+        {
+            return;
+        }
+
+        item.IsSubmenuOpen = true;
     }
 
     private static void OnComboDropDownOpened(object? sender, EventArgs e)
@@ -176,12 +212,13 @@ internal static class AcrylicPopup
         switch (child)
         {
             case Border border:
-                border.Background = Brushes.Transparent;
+                border.Background = HitFill;
                 break;
             case ContextMenu menu:
+                menu.Background = HitFill;
                 if (menu.Template?.FindName("Bd", menu) is Border chrome)
                 {
-                    chrome.Background = Brushes.Transparent;
+                    chrome.Background = HitFill;
                 }
 
                 break;
@@ -190,7 +227,7 @@ internal static class AcrylicPopup
                 {
                     if (element is Border fill && fill.BorderThickness.Left < 0.5)
                     {
-                        fill.Background = Brushes.Transparent;
+                        fill.Background = HitFill;
                     }
                 }
 
@@ -221,15 +258,18 @@ internal static class AcrylicPopup
             return;
         }
 
-        AcrylicBackdrop.TryApplyToVisual(visual);
+        // 開いた直後に Loaded/Render で何度も DWM を叩くと、メニューの
+        // IsHighlighted 更新が遅れたり欠けることがある。HWND 成立後に1回だけ。
+        if (AcrylicBackdrop.TryApplyToVisual(visual))
+        {
+            return;
+        }
+
         if (visual is DispatcherObject dispatcherObject)
         {
             dispatcherObject.Dispatcher.BeginInvoke(
                 () => AcrylicBackdrop.TryApplyToVisual(visual),
                 DispatcherPriority.Loaded);
-            dispatcherObject.Dispatcher.BeginInvoke(
-                () => AcrylicBackdrop.TryApplyToVisual(visual),
-                DispatcherPriority.Render);
         }
     }
 
