@@ -55,12 +55,6 @@
     <EmbeddedResource Include="Assets\Branding\MgaSonicAnvil.ico">
       <LogicalName>MgaSonicAnvil.Branding.MgaSonicAnvil.ico</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Assets\Branding\MiyabiGameAudio.png">
-      <LogicalName>MgaSonicAnvil.Branding.MiyabiGameAudio.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Assets\Branding\MiyabiGameAudio.Light.png">
-      <LogicalName>MgaSonicAnvil.Branding.MiyabiGameAudio.Light.png</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="Assets\Click\Low.wav">
       <LogicalName>MgaSonicAnvil.Assets.Click.Low.wav</LogicalName>
     </EmbeddedResource>
@@ -71,8 +65,6 @@
 
   <ItemGroup>
     <Resource Include="Assets\Branding\MgaSonicAnvil.ico" />
-    <Resource Include="Assets\Branding\MiyabiGameAudio.png" />
-    <Resource Include="Assets\Branding\MiyabiGameAudio.Light.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,6 +1,4 @@
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using MgaSonicAnvil.UI;
 
 namespace MgaSonicAnvil;

@@ -176,18 +176,6 @@ internal static class DesignMetrics
     /// <summary>バージョン情報ダイアログなどの権利表記フォント。</summary>
     public static double BrandLicenseFontSize => From96(8);
 
-    public static double BrandLicenseLineBox
-    {
-        get
-        {
-            var spacing = SystemFonts.MessageFontFamily.LineSpacing;
-            return BrandLicenseFontSize * (spacing > 0 ? spacing : 1.2);
-        }
-    }
-
-    public static double BrandLicenseHeight =>
-        BrandLicenseLineBox * BrandLicenseAlign.LineCount(UiStrings.CopyrightText);
-
     public static double TransportHostMinHeight => TransportBarHeight;
 
     /// <summary>トランスポート右の履歴・ラウドネス・モニター列・スペアナと、右端メーター列。</summary>
