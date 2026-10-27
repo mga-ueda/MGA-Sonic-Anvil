@@ -67,8 +67,9 @@ public partial class MainWindow
         }
 
         var window = new CrossfadeEditWindow(this);
-        window.DraftChanged += debounceWave =>
-            OnCrossfadeStateChanged(debounceWaveRedraw: debounceWave, prePostLight: debounceWave);
+        window.DraftChanged += (debounceWave, prePostLight) =>
+            OnCrossfadeStateChanged(debounceWaveRedraw: debounceWave, prePostLight: prePostLight);
+        window.FieldFocusRequested += OnCrossfadeFieldFocusRequested;
         window.LoopMixRequested += () => ExitCrossfadeEditMode(apply: true);
         window.ExitRequested += () => ExitCrossfadeEditMode(apply: false);
         window.AutoSearchRequested += RunCrossfadeAutoSearch;
@@ -334,6 +335,22 @@ public partial class MainWindow
         AfterEdit();
     }
 
+    private void OnCrossfadeFieldFocusRequested(CrossfadeEditState.FocusField field)
+    {
+        if (_crossfadeEdit is null)
+        {
+            return;
+        }
+
+        JumpCrossfade(field switch
+        {
+            CrossfadeEditState.FocusField.End => CrossfadeEditJump.End,
+            CrossfadeEditState.FocusField.PreCrossfade => CrossfadeEditJump.StartPlusX,
+            CrossfadeEditState.FocusField.PostCrossfade => CrossfadeEditJump.EndPlusX,
+            _ => CrossfadeEditJump.Start,
+        });
+    }
+
     private void JumpCrossfade(CrossfadeEditJump jump)
     {
         if (_document is null || _crossfadeEdit is null)
@@ -347,24 +364,9 @@ public partial class MainWindow
             CrossfadeEditJump.End => _crossfadeEdit.EndFrame,
             CrossfadeEditJump.StartPlusX => _crossfadeEdit.PreFlagFrame,
             CrossfadeEditJump.EndPlusX => _crossfadeEdit.PostFlagFrame,
-            CrossfadeEditJump.StartAndEnd => _crossfadeEdit.StartFrame,
-            CrossfadeEditJump.FadeAndCut => _crossfadeEdit.TruncateOutside
-                ? 0
-                : Math.Max(0, _crossfadeEdit.StartFrame),
             _ => _crossfadeEdit.StartFrame,
         };
         frame = Math.Clamp(frame, 0, _document.FrameCount);
-
-        if (jump == CrossfadeEditJump.StartAndEnd)
-        {
-            // 始点と終点の両方が見えるよう、ループ全体を選択して中央寄せ
-            var loop = _crossfadeEdit.LoopRange.Clamp(_document.FrameCount);
-            Waveform.SetSelection(loop);
-            Waveform.SeekKeepingSelection(loop.StartFrame);
-            Waveform.CenterViewOnPlayhead();
-            return;
-        }
-
         Waveform.SeekKeepingSelection(frame);
         Waveform.CenterViewOnPlayhead();
     }
@@ -508,29 +510,46 @@ public partial class MainWindow
 
         // Space／停止は本体トランスポートに任せ、サンプルループ無限再生にする。
 
+        if (modifiers == ModifierKeys.Alt)
+        {
+            switch (key)
+            {
+                case Key.S:
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.Start);
+                    return true;
+                case Key.E:
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.End);
+                    return true;
+                case Key.P:
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.PreCrossfade);
+                    return true;
+                case Key.T:
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.PostCrossfade);
+                    return true;
+            }
+        }
+
         if (modifiers == ModifierKeys.None)
         {
             switch (key)
             {
                 case Key.S:
-                    _crossfadeEdit.Focus = CrossfadeEditState.FocusField.Start;
-                    JumpCrossfade(CrossfadeEditJump.Start);
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.Start);
                     return true;
                 case Key.E:
-                    _crossfadeEdit.Focus = CrossfadeEditState.FocusField.End;
-                    JumpCrossfade(CrossfadeEditJump.End);
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.End);
                     return true;
                 case Key.X:
-                    _crossfadeEdit.Focus = CrossfadeEditState.FocusField.PreCrossfade;
-                    JumpCrossfade(CrossfadeEditJump.StartPlusX);
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.PreCrossfade);
                     return true;
                 case Key.F:
-                    _crossfadeEdit.Focus = CrossfadeEditState.FocusField.PreCrossfade;
-                    JumpCrossfade(CrossfadeEditJump.StartPlusX);
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.PreCrossfade);
                     return true;
                 case Key.P:
-                    _crossfadeEdit.Focus = CrossfadeEditState.FocusField.PostCrossfade;
-                    JumpCrossfade(CrossfadeEditJump.EndPlusX);
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.PostCrossfade);
+                    return true;
+                case Key.T:
+                    EnsureCrossfadeWindow().FocusValueField(CrossfadeEditState.FocusField.PostCrossfade);
                     return true;
                 case Key.Left:
                     _crossfadeEdit.Nudge(_crossfadeEdit.Focus, -1, _document.FrameCount);

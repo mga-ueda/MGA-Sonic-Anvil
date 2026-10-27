@@ -1032,7 +1032,7 @@
         <li><strong>開き方</strong> …… <kbd>Shift</kbd>+<kbd>X</kbd>、または波形の右クリック → オーディオ → フェード調整ツール。プレイヤー最大化中は開きません。</li>
         <li><strong>初期値</strong> …… 選択があればその範囲、無ければ既存のサンプルループを始点／終点にします。プリクロスフェードは 0、ポストはツールが覚える前回値です。</li>
         <li><strong>プレビュー</strong> …… 本体の再生で試せます（サンプルループを再生窓にし、始点より前からの頭通しも可）。左の継ぎ目プレビューは左＝終点側・右＝始点側。下の「クロスフェード表示」は継ぎ目での合成を出すかどうか（既定オフ）。</li>
-        <li><strong>数値</strong> …… 始点 (S)／終点 (E)／プリ（<kbd>X</kbd> または <kbd>F</kbd>）／ポスト (<kbd>P</kbd>)。↑↓／ホイールで 1 サンプル（Shift 10／Ctrl+Shift 100）。各欄のボタンで近いゼロクロスへ吸着。</li>
+        <li><strong>数値</strong> …… 始点 (S)／終点 (E)／プリ（<kbd>X</kbd>／<kbd>F</kbd>／<kbd>Alt</kbd>+<kbd>P</kbd>）／ポスト（<kbd>P</kbd>／<kbd>Alt</kbd>+<kbd>T</kbd>）。入力欄へは <kbd>Alt</kbd>+<kbd>S</kbd>／<kbd>E</kbd>／<kbd>P</kbd>／<kbd>T</kbd> でも移動（欄フォーカス中も可）。既定は時間表示（ステータスバーと共有。「ループ」見出しの 時間／サンプル数、または数値欄の右クリックで切替）。↑↓／ホイールはフォーカス無しでもマウスオーバーで増減（時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000）。値は入力中もループ／旗へ即反映。各欄の 0 ボタンで近いゼロクロスへ吸着。</li>
         <li><strong>自動探索</strong> …… 「始点を探す」「終点を探す」「始点と終点をずらす」。継ぎ目が似る位置へ進め続けます。</li>
         <li><strong>28の倍数</strong> …… オンのとき始点と終点は 28 サンプル刻みだけ動きます。</li>
         <li><strong>範囲外を切り落とし</strong> …… OK 時に始点より前と終点以降を削除します（エンド側は材料として焼いたあと切り落します）。</li>
@@ -1454,7 +1454,8 @@
         <tbody>
           <tr><td><kbd>Enter</kbd></td><td>OK（焼き込みして閉じる）</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Cancel（破棄して閉じる）</td></tr>
-          <tr><td><kbd>S</kbd>／<kbd>E</kbd>／<kbd>X</kbd>／<kbd>F</kbd>／<kbd>P</kbd></td><td>始点／終点／プリ（<kbd>X</kbd> と <kbd>F</kbd> は同じ）／ポストへフォーカスし、その位置へ表示を寄せる</td></tr>
+          <tr><td><kbd>S</kbd>／<kbd>E</kbd>／<kbd>X</kbd>／<kbd>F</kbd>／<kbd>P</kbd>／<kbd>T</kbd></td><td>始点／終点／プリ（<kbd>X</kbd> と <kbd>F</kbd> は同じ）／ポスト（<kbd>P</kbd> と <kbd>T</kbd>）へフォーカスし、その位置へ表示を寄せる</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>S</kbd>／<kbd>E</kbd>／<kbd>P</kbd>／<kbd>T</kbd></td><td>始点／終点／プリ／ポストの入力欄へ移動（数値入力中でも切替可）</td></tr>
           <tr><td>←／→</td><td>フォーカス中の値を 1 サンプル動かす</td></tr>
           <tr><td><kbd>Space</kbd></td><td>本体の再生／停止（サンプルループ無限再生）</td></tr>
         </tbody>

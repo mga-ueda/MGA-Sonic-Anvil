@@ -974,7 +974,7 @@
         <li><strong>Open</strong> — <kbd>Shift</kbd>+<kbd>X</kbd>, or waveform right-click → Audio → Fade Adjust Tool. Not available while the player is maximized.</li>
         <li><strong>Defaults</strong> — uses the selection when present, otherwise the existing sample loop for Start / End. Pre-crossfade starts at 0; Post remembers the last value from the tool.</li>
         <li><strong>Preview</strong> — use the main transport (sample loop as the play window, including playback from before Start). The left seam preview is left=End side / right=Start side. “Show crossfade” below toggles the baked blend in that view (off by default).</li>
-        <li><strong>Values</strong> — Start (S) / End (E) / Pre (<kbd>X</kbd> or <kbd>F</kbd>) / Post (<kbd>P</kbd>). ↑↓ / wheel nudge by 1 sample (Shift 10 / Ctrl+Shift 100). Each field’s button snaps to a nearby zero-crossing.</li>
+        <li><strong>Values</strong> — Start (S) / End (E) / Pre (<kbd>X</kbd> / <kbd>F</kbd> / <kbd>Alt</kbd>+<kbd>P</kbd>) / Post (<kbd>P</kbd> / <kbd>Alt</kbd>+<kbd>T</kbd>). <kbd>Alt</kbd>+<kbd>S</kbd> / <kbd>E</kbd> / <kbd>P</kbd> / <kbd>T</kbd> also moves to that field (works while a value box is focused). Default is time (shared with the status bar; switch via Time/Samples next to the Loop header, or right-click a value box). ↑↓ / wheel nudge on hover without focus (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Values update the loop / flags live while typing. Each field’s 0 button snaps to a nearby zero-crossing.</li>
         <li><strong>Auto-search</strong> — Find Start, Find End, Shift Start and End. Keeps searching toward a better-matching seam.</li>
         <li><strong>Multiples of 28</strong> — when on, Start and End move only on 28-sample steps.</li>
         <li><strong>Truncate outside</strong> — on OK, deletes audio before Start and after End (End-side is used as material, then trimmed).</li>
@@ -1342,7 +1342,8 @@
         <tbody>
           <tr><td><kbd>Enter</kbd></td><td>OK (bake and close)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Cancel (discard and close)</td></tr>
-          <tr><td><kbd>S</kbd> / <kbd>E</kbd> / <kbd>X</kbd> / <kbd>F</kbd> / <kbd>P</kbd></td><td>Focus Start / End / Pre (<kbd>X</kbd> and <kbd>F</kbd> are the same) / Post and jump the view there</td></tr>
+          <tr><td><kbd>S</kbd> / <kbd>E</kbd> / <kbd>X</kbd> / <kbd>F</kbd> / <kbd>P</kbd> / <kbd>T</kbd></td><td>Focus Start / End / Pre (<kbd>X</kbd> and <kbd>F</kbd> are the same) / Post (<kbd>P</kbd> and <kbd>T</kbd>) and jump the view there</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>S</kbd> / <kbd>E</kbd> / <kbd>P</kbd> / <kbd>T</kbd></td><td>Move to the Start / End / Pre / Post value box (works while editing a value)</td></tr>
           <tr><td>← / →</td><td>Nudge the focused value by 1 sample</td></tr>
           <tr><td><kbd>Space</kbd></td><td>Main transport play / stop (sample-loop infinite playback)</td></tr>
         </tbody>
