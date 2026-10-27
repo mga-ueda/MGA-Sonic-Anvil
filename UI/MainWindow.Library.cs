@@ -638,6 +638,8 @@ public partial class MainWindow
             _libraryPlayOnTrackKeyRelease = false;
             _libraryStopAfterTrack = false;
             _libraryHoldJacketWash = false;
+            // チェック選択はプレイヤー専用。設定には覚えず、退出でオフへ戻す。
+            LibraryBrowser.SetCheckSelectMode(false);
             _ = LeaveLibraryMaximizeAsync();
             if (_videoLaunchPlacement)
             {

@@ -1090,6 +1090,8 @@ internal static partial class UiStrings
     public static string LabelLibraryShuffle => "Random";
     /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+Shift+P。</summary>
     public static string LabelLibraryAutoPlay => "Auto Play";
+    /// <summary>プレイリスト上段のチェック選択モード。UI 言語に関わらず英語。Shift+Space。設定には記憶しない。</summary>
+    public static string LabelLibraryCheckSelect => "Check Box";
     /// <summary>プレイリスト上段チェック。UI 言語に関わらず英語。Alt+Shift+N。</summary>
     public static string LabelLibraryAutoPlayNext => "Auto Next";
     /// <summary>ステータスバーの Single Loop。UI 言語に関わらず英語。Alt+Shift+L。</summary>
