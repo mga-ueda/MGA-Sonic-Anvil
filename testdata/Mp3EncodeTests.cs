@@ -26,7 +26,7 @@ public sealed class Mp3EncodeTests
         Assert.Empty(settings.ResolvedRecordInputMap());
         Assert.Empty(settings.ResolvedPlaybackOutputMap());
         Assert.Empty(settings.ResolvedFileChannelMap());
-        Assert.True(settings.WaapiPanelVisible);
+        Assert.False(settings.WaapiPanelVisible);
         var options = settings.ToMp3EncodeOptions();
         Assert.Equal(192, options.WindowsBitRateKbps);
         Assert.Equal(string.Empty, options.LameExePath);
@@ -44,7 +44,7 @@ public sealed class Mp3EncodeTests
         Assert.Equal(string.Empty, settings.LameExePath);
         Assert.Equal(Mp3Encode.DefaultLameOptions, settings.LameOptions);
         Assert.Equal(0, settings.ExportParallelism);
-        Assert.True(settings.WaapiPanelVisible);
+        Assert.False(settings.WaapiPanelVisible);
     }
 
     [Theory]

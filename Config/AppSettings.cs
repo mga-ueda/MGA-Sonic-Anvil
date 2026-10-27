@@ -529,8 +529,8 @@ internal sealed class AppSettings
     /// <summary>Play -E（Wwise Play post-exit）。既定オフ。</summary>
     public bool WaapiPlayPostExit { get; set; }
 
-    /// <summary>WAAPI エリアの表示。既定オン。</summary>
-    public bool WaapiPanelVisible { get; set; } = true;
+    /// <summary>WAAPI エリアの表示。既定オフ。</summary>
+    public bool WaapiPanelVisible { get; set; }
 
     public string WaapiLastProjectName { get; set; } = string.Empty;
 
