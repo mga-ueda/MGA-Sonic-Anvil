@@ -57,7 +57,6 @@ public partial class MainWindow
         // 編集履歴は等倍のまま（ルートの表示倍率を打ち消す）。
         HistoryOverlay.LayoutTransform = UiScaleService.CreateCounterTransform();
         ApplyUiColors();
-        AlignBrandLicense();
     }
 
     internal void ApplyUiColors() => ApplyUiColors(includeColorPanel: true);
@@ -66,8 +65,6 @@ public partial class MainWindow
     {
         ApplyStatusFieldChrome();
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
-        LoadBrandLogo();
-        BrandLicenseHost.ApplyColors();
         ForEachWaveform(view => view.RefreshAppearance());
         RefreshTileChrome();
         Overview.RefreshAppearance();

@@ -173,11 +173,7 @@ internal static class DesignMetrics
     public static double TransportFixedRowWidth =>
         Math.Max(TransportTopRowWidth, TransportBottomRowWidth);
 
-    /// <summary>初期 214×32 の 2/3。トランスポート左下、ボタン列の下。</summary>
-    public static double BrandLogoWidth => From96(214) * 2 / 3;
-
-    public static double BrandLogoHeight => From96(32) * 2 / 3;
-
+    /// <summary>バージョン情報ダイアログなどの権利表記フォント。</summary>
     public static double BrandLicenseFontSize => From96(8);
 
     public static double BrandLicenseLineBox
@@ -192,14 +188,7 @@ internal static class DesignMetrics
     public static double BrandLicenseHeight =>
         BrandLicenseLineBox * BrandLicenseAlign.LineCount(UiStrings.CopyrightText);
 
-    public static double BrandLogoTextGap => From96(8);
-
-    public static double BrandRowPad => From96(6);
-
-    public static double BrandRowHeight =>
-        Math.Max(BrandLogoHeight, BrandLicenseHeight) + BrandRowPad;
-
-    public static double TransportHostMinHeight => TransportBarHeight + BrandRowHeight;
+    public static double TransportHostMinHeight => TransportBarHeight;
 
     /// <summary>トランスポート右の履歴・ラウドネス・モニター列・スペアナと、右端メーター列。</summary>
     public static double TransportSideChromeWidth =>

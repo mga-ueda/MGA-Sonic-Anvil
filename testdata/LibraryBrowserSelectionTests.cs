@@ -1058,7 +1058,12 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[2]).InputGestureText));
             Assert.Equal("Ctrl+Shift+M", ((MenuItem)listExport.Items[1]).InputGestureText);
             Assert.Equal("Ctrl+Shift+B", ((MenuItem)listExport.Items[2]).InputGestureText);
-            Assert.Equal(UiStrings.LibraryMenuOpenInExplorer, (string)((MenuItem)listOther.Items[^1]).Header);
+            // コピー／エクスプローラーは例外でその他の先頭。
+            Assert.Equal(UiStrings.LibraryMenuCopyFileName, (string)((MenuItem)listOther.Items[0]).Header);
+            Assert.Equal(UiStrings.LibraryMenuCopyFilePath, (string)((MenuItem)listOther.Items[1]).Header);
+            Assert.Equal(UiStrings.LibraryMenuOpenInExplorer, (string)((MenuItem)listOther.Items[2]).Header);
+            Assert.IsType<Separator>(listOther.Items[3]);
+            Assert.Equal(UiStrings.WaveMenuSettings, (string)((MenuItem)listOther.Items[4]).Header);
             // Wwise はプレイヤーでは実行不可でもカテゴリ自体は残してグレーアウト。
             Assert.False(view.OpenContextMenuItems[10].IsEnabled);
             Assert.Equal(UiStrings.WaveMenuCatWwise, (string)view.OpenContextMenuItems[10].Header);

@@ -66,8 +66,9 @@ public partial class MainWindow
     /// <summary>
     /// Popup 内 KeyDown は別 Hwnd のため MainWindow.Preview に届かない。
     /// 論理ツリーでは MenuItem → Menu へバブルする（WPF MenuItem.OnKeyDown → MenuItemNavigate →
-    /// 失敗時に親 TopLevelHeader → Menu.NavigateByLine で隣トップレベルへ）。
-    /// 左右はその標準経路に任せ、Escape だけ「全部閉じて開く前フォーカスへ」を上書きする。
+    /// 失敗時に親階層や Menu.NavigateByLine へ）。
+    /// ↑↓ は同一ポップアップ内だけ動かし端ではループする（親へ戻すのは ←）。
+    /// Escape は「全部閉じて開く前フォーカスへ」を上書きする。
     /// MenuBase.OnKeyDown(Escape) はサブメニューを一段閉じるだけなので、Handled にする。
     /// </summary>
     private static void EnsureMainMenuItemKeyHandler()
@@ -90,6 +91,12 @@ public partial class MainWindow
         if (e.Handled
             || sender is not MenuItem item
             || Window.GetWindow(item) is not MainWindow window)
+        {
+            return;
+        }
+
+        window.TryHandleMenuItemVerticalNav(item, e);
+        if (e.Handled)
         {
             return;
         }
@@ -482,8 +489,78 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// サブメニュー内の ↑↓。同一階層の兄弟だけを行き来し、端ではループする。
+    /// トップレベル見出しは WPF 任せ（↓ で開く等）。親階層へ戻るのは ←。
+    /// </summary>
+    private void TryHandleMenuItemVerticalNav(MenuItem item, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is not (Key.Up or Key.Down) || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        // ポップアップ内の項目だけ。TopLevelHeader / TopLevelItem は触らない。
+        if (item.Role is not (MenuItemRole.SubmenuItem or MenuItemRole.SubmenuHeader))
+        {
+            return;
+        }
+
+        TryFocusSiblingMenuItem(item, key == Key.Down ? 1 : -1);
+        // 成否にかかわらず Handled。失敗時のバブルで親メニューや隣トップレベルへ飛ばない。
+        e.Handled = true;
+    }
+
+    /// <summary>同じ ItemsControl 内の、フォーカス可能な前後の MenuItem へ移る。</summary>
+    private static bool TryFocusSiblingMenuItem(MenuItem item, int direction)
+    {
+        if (direction == 0)
+        {
+            return false;
+        }
+
+        var parent = ItemsControl.ItemsControlFromItemContainer(item);
+        if (parent is null)
+        {
+            return false;
+        }
+
+        var siblings = new List<MenuItem>();
+        for (var i = 0; i < parent.Items.Count; i++)
+        {
+            var container = parent.ItemContainerGenerator.ContainerFromIndex(i) as MenuItem
+                ?? parent.Items[i] as MenuItem;
+            if (container is null
+                || !container.IsEnabled
+                || container.Visibility != Visibility.Visible
+                || !container.Focusable)
+            {
+                continue;
+            }
+
+            siblings.Add(container);
+        }
+
+        var index = siblings.IndexOf(item);
+        if (index < 0 || siblings.Count == 0)
+        {
+            return false;
+        }
+
+        // 端では反対側へループ。
+        var next = (index + direction) % siblings.Count;
+        if (next < 0)
+        {
+            next += siblings.Count;
+        }
+
+        var target = siblings[next];
+        return target.Focus() || ReferenceEquals(Keyboard.Focus(target), target);
+    }
+
+    /// <summary>
     /// Escape: メニューをすべて閉じ、Alt+文字前のフォーカスへ戻す。
-    /// ←→ は触らない（葉で MenuItemNavigate が失敗 → TopLevelHeader へバブル → Menu.NavigateByLine）。
+    /// ←→ は WPF 標準（← で親階層／隣トップレベル）。
     /// </summary>
     private void TryHandleMainMenuEscape(MenuItem item, KeyEventArgs e)
     {

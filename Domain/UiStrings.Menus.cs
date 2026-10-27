@@ -165,11 +165,12 @@ internal static partial class UiStrings
     public static string WaveMenuSettings => Get("設定(_O)", "Settings (_O)");
     /// <summary>その他。GitHub(G) と重ならない R。</summary>
     public static string WaveMenuColorPanel => Get("色設定(_R)", "Colo_r Settings");
-    public static string WaveMenuMaximizeWaveform => Get("レイアウト F11(_F)", "Layout F1_1");
-    public static string WaveMenuMaximizeAnalyzers => Get("レイアウト F12(_A)", "Layout F1_2");
-    public static string WaveMenuMaximizeLibrary => Get("レイアウト F10(_B)", "Layout F1_0");
+    /// <summary>設定のレイアウト名と同じ。アクセスキーは F9→F12 を A〜D。</summary>
+    public static string WaveMenuMaximizeWaveform => WithParenAccessKey(LabelLayoutPresetF11, 'C');
+    public static string WaveMenuMaximizeAnalyzers => WithParenAccessKey(LabelLayoutPresetF12, 'D');
+    public static string WaveMenuMaximizeLibrary => WithParenAccessKey(LabelLayoutPresetF10, 'B');
     public static string WaveMenuVideoMini => Get("動画ミニ(_M)", "Video _Mini");
-    public static string WaveMenuMinimalChrome => Get("レイアウト F9(_D)", "Layout _F9");
+    public static string WaveMenuMinimalChrome => WithParenAccessKey(LabelLayoutPresetF9, 'A');
     public static string WaveMenuVideoFullscreen => Get("映像を全画面(_Q)", "Full Screen Video (_Q)");
     public static string WaveMenuVideoMiniZoomIn => Get("ミニ窓を拡大(_U)", "Enlarge Mini Window (_U)");
     public static string WaveMenuVideoMiniZoomOut => Get("ミニ窓を縮小(_Z)", "Shrink Mini Window (_Z)");
@@ -228,4 +229,8 @@ internal static partial class UiStrings
 
     public static string WaveMenuManual => Get("マニュアル(_M)", "_Manual");
     public static string WaveMenuGitHub => Get("GitHub(_G)", "_GitHub");
+    /// <summary>その他。マニュアル(M)／GitHub(G)／バージョン(V) と重ならない L。</summary>
+    public static string WaveMenuLicense => Get("ライセンス(_L)", "_License");
+    /// <summary>その他。設定(O)／色(R)／マニュアル(M)／GitHub(G)／ライセンス(L) と重ならない V。</summary>
+    public static string WaveMenuAbout => Get("バージョン(_V)", "_Version");
 }

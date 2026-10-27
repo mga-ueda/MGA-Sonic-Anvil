@@ -54,6 +54,8 @@ internal sealed class CrossfadeEditWindow : Window
     private TextBlock? _loopNudgeHint;
     private TextBlock? _unitTimeLabel;
     private TextBlock? _unitSamplesLabel;
+    /// <summary>このウィンドウだけの時間／サンプル表示。ステータスバー（トランスポート）とは共有しない。</summary>
+    private bool _showSamples;
     private CrossfadeEditState? _state;
     private bool _syncing;
     private bool _hidingFromHost;
@@ -666,19 +668,18 @@ internal sealed class CrossfadeEditWindow : Window
 
     private void SetShowSamples(bool showSamples)
     {
-        if (ShowSamples == showSamples)
+        if (_showSamples == showSamples)
         {
             return;
         }
 
         CancelPendingValueCommit();
         StopValueNudge();
-        AppStorage.Settings.StatusShowSamples = showSamples;
-        AppStorage.Save();
+        _showSamples = showSamples;
         SyncFromState(updateSplice: false);
     }
 
-    private bool ShowSamples => AppStorage.Settings.StatusShowSamples;
+    private bool ShowSamples => _showSamples;
 
     private int CurrentSampleRate =>
         Math.Max(1, _splice.Document?.SampleRate ?? 48_000);
