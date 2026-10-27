@@ -24,19 +24,16 @@ public sealed class BrandLicenseNoticeTests
         Assert.Contains(UiStrings.CopyrightEffetuneLink, text, StringComparison.Ordinal);
         Assert.Contains(UiStrings.CopyrightWinBlurLink, text, StringComparison.Ordinal);
         Assert.DoesNotContain("SIL Open Font License", text, StringComparison.Ordinal);
-        Assert.Equal(3, BrandLicenseAlign.LineCount(text));
+        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        Assert.Equal(3, lines.Length);
+        Assert.Equal("© 2026 " + AppVersion.CompanyName, lines[0]);
+        Assert.Equal(UiStrings.CopyrightWwiseLine, lines[1]);
         Assert.Equal(
-            "© 2026 " + AppVersion.CompanyName,
-            BrandLicenseAlign.FirstLine(text));
-        Assert.Equal(1, BrandLicenseAlign.FindLineIndex(text, UiStrings.CopyrightWwiseLine));
-        Assert.Equal(
-            2,
-            BrandLicenseAlign.FindLineIndex(
-                text,
-                UiStrings.CopyrightGitHub + " / " + UiStrings.CopyrightMitLink + " / "
-                    + UiStrings.CopyrightLameLink + " / " + UiStrings.CopyrightFfmpegLink
-                    + " / " + UiStrings.CopyrightEffetuneLink
-                    + " / " + UiStrings.CopyrightWinBlurLink));
+            UiStrings.CopyrightGitHub + " / " + UiStrings.CopyrightMitLink + " / "
+                + UiStrings.CopyrightLameLink + " / " + UiStrings.CopyrightFfmpegLink
+                + " / " + UiStrings.CopyrightEffetuneLink
+                + " / " + UiStrings.CopyrightWinBlurLink,
+            lines[2]);
     }
 
     [Fact]

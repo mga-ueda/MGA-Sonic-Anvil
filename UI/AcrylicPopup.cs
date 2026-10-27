@@ -26,7 +26,7 @@ internal static class AcrylicPopup
     /// Acrylic HWND では Background=Transparent の空白がヒットしない。
     /// ほぼ透明だがヒットする塗り（見た目はティントのまま）。
     /// </summary>
-    internal static Brush HitFill { get; } = CreateHitFill();
+    private static readonly Brush HitFill = CreateHitFill();
 
     private static int _installed;
 
@@ -103,7 +103,6 @@ internal static class AcrylicPopup
         }
 
         PrepareContextMenuHost(menu);
-        menu.Background = HitFill;
         ClearOpaqueFill(menu);
         ScheduleFrost(menu);
     }
@@ -216,11 +215,6 @@ internal static class AcrylicPopup
                 break;
             case ContextMenu menu:
                 menu.Background = HitFill;
-                if (menu.Template?.FindName("Bd", menu) is Border chrome)
-                {
-                    chrome.Background = HitFill;
-                }
-
                 break;
             case Panel panel:
                 foreach (UIElement element in panel.Children)
