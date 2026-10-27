@@ -696,7 +696,7 @@
         <ul>
           <li>上段は再生・ズーム。下段はフェード／ノーマライズ／削除／新規／保存／MP3 出力、マニュアル <span class="ui">?</span>。トランスポートのボタンには短いツールチップ（ショートカット付き）が出ます。操作の詳細はこのマニュアルを参照してください。</li>
           <li><span class="ui">マーカークリック</span>（<kbd>Q</kbd>）…… マーカー／リージョン端の位置でクリックを鳴らします。選択があればその範囲、なければファイル全体。ボタンまたは <kbd>Q</kbd> でオン／オフ（既定オフ。自動ではオンになりません）。波形の右クリック → 再生からも切り替えできます。プレイヤーの動画本再生／フレーム一時停止／PDF 明るい表示では <kbd>Escape</kbd> と同じく暗いプレビューへ戻します（F8／引数起動ミニではプレイリストへ戻る（動画の In／Out がある Escape は解除して留まる）。マーカークリックはプレイヤーでは効きません）。</li>
-          <li>会社ロゴとライセンス表記はトランスポートには出しません。メニューの<span class="ui">その他</span> → <span class="ui">バージョン</span>で、すりガラスのダイアログにアプリアイコン・アプリ名・版・権利リンクを出します。GitHub はリポジトリ、MIT License は本アプリの全文、LAME／FFmpeg は各公式サイトをブラウザで開き、EffeTune は同梱の第三者通知ダイアログを開きます。<span class="ui">その他</span> → <span class="ui">ライセンス</span>でも同じ通知（同梱 <code>THIRD_PARTY_NOTICES.md</code>）をすりガラスダイアログで読めます。Wwise®／Audiokinetic® の商標行もあります。くわしくは <a href="#trademarks">商標とライセンス</a>。</li>
+          <li>会社ロゴとライセンス表記はトランスポートには出しません。メニューの<span class="ui">その他</span> → <span class="ui">バージョン</span>で、すりガラスのダイアログにアプリアイコン・アプリ名・版・権利リンクを出します。GitHub はリポジトリ、MIT License は本アプリの全文、LAME／FFmpeg は各公式サイト、EffeTune／WinBlur は各 GitHub をブラウザで開きます。Wwise®／Audiokinetic® の商標行もあります。<span class="ui">その他</span> → <span class="ui">ライセンス</span>でも同梱 <code>THIRD_PARTY_NOTICES.md</code>（同じ商標、EffeTune／WinBlur など）をすりガラスダイアログで読めます。くわしくは <a href="#trademarks">商標とライセンス</a>。</li>
         </ul>
       </article>
 
@@ -951,7 +951,7 @@
       <h2 id="silence-hit">6. 無音・ヒット検出</h2>
       <p>音の切れ目や打点を自動で見つけ、無音の削除・リージョン／マーカー付け・ヒットポイント打点に使います。</p>
       <p>再生の Silent Skip（無音区間を飛ばす）とは別機能です。Silent Skip は <a href="#layout-silent">画面の見方 → Silent Skip</a> です。</p>
-      <p>開き方 …… 波形の右クリック → 編集 → 無音・ヒット検出（<kbd>Ctrl</kbd>+<kbd>D</kbd>）。</p>
+      <p>開き方 …… 波形の右クリック → 編集 → 無音・ヒット検出（<kbd>Ctrl</kbd>+<kbd>D</kbd>）。ダイアログはすりガラス表示です。</p>
       <ul>
         <li>対象は選択範囲。選択が無ければファイル全体。</li>
         <li>ダイアログを閉じると設定を覚え、次回も同じ値から始めます。</li>
@@ -1651,7 +1651,7 @@
         <li><strong>LAME</strong> は LAME project の名称です。このアプリには入っていません。設定で指定した <code>lame.exe</code> を呼び出すだけです。入手とライセンスの確認は利用者側です。</li>
         <li><strong>FFmpeg</strong> は FFmpeg プロジェクトの名称です。このアプリには入っていません。設定で指定した <code>ffmpeg.exe</code> を呼び出すだけです。空欄や無効なら動画プロキシは作りません。入手とライセンスの確認は利用者側です。</li>
         <li><strong>Signalsmith Stretch</strong>（Signalsmith Audio、MIT）はピッチ変更に同梱しています。MIT 全文は <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にあります。</li>
-        <li><strong>EffeTune</strong>（Copyright © 2025–2026 Yoshiyuki Kobayashi、MIT）の Rhythm Analyzer DSP を、BPM／ビート解析に利用します（モニター列の BPM がオンのとき）。画面上のテンポ数値は、EffeTune が返す半／倍テンポの候補値ではなく、検出した拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算した値です。オン時のクリックも同じ拍タイミングに合わせます。コードと学習済み重みは MIT のもとで同梱し、学習用の音声データそのものは同梱しません。MIT 全文と学習データ由来の帰属（Slakh2100-redux／Groove MIDI など CC BY 4.0、および T48M 学習セット名）は同梱およびリポジトリの <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>（メニューの<span class="ui">その他</span> → <span class="ui">ライセンス</span>、または<span class="ui">バージョン</span>の <span class="ui">EffeTune</span>）にあります。上流プロジェクトは <a href="https://github.com/Frieve-A/effetune">Frieve-A/effetune</a> です。</li>
+        <li><strong>EffeTune</strong>（Copyright © 2025–2026 Yoshiyuki Kobayashi、MIT）の Rhythm Analyzer DSP を、BPM／ビート解析に利用します（モニター列の BPM がオンのとき）。画面上のテンポ数値は、EffeTune が返す半／倍テンポの候補値ではなく、検出した拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算した値です。オン時のクリックも同じ拍タイミングに合わせます。コードと学習済み重みは MIT のもとで同梱し、学習用の音声データそのものは同梱しません。MIT 全文と学習データ由来の帰属（Slakh2100-redux／Groove MIDI など CC BY 4.0、および T48M 学習セット名）は同梱およびリポジトリの <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>（メニューの<span class="ui">その他</span> → <span class="ui">ライセンス</span>）にあります。<span class="ui">バージョン</span>の <span class="ui">EffeTune</span> は上流 GitHub を開きます。上流プロジェクトは <a href="https://github.com/Frieve-A/effetune">Frieve-A/effetune</a> です。</li>
       </ul>
 
       <h2 id="planned-improvements">15. 長時間利用向けの改善</h2>

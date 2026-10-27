@@ -103,6 +103,7 @@ internal static partial class UiStrings
     /// <summary>
     /// バージョン情報の権利表記。会社行・Wwise 商標・リンク行。
     /// リンク文言と Wwise 行は IM Importer と同様に常に英語。
+    /// 商標一文は <c>THIRD_PARTY_NOTICES.md</c>（ライセンス）にも載せる。
     /// </summary>
     public static string CopyrightText =>
         "© 2026 " + AppVersion.CompanyName
@@ -111,10 +112,12 @@ internal static partial class UiStrings
         + " / " + CopyrightMitLink
         + " / " + CopyrightLameLink
         + " / " + CopyrightFfmpegLink
-        + " / " + CopyrightEffetuneLink;
+        + " / " + CopyrightEffetuneLink
+        + " / " + CopyrightWinBlurLink;
 
     public const string CopyrightGitHub = "GitHub";
 
+    /// <summary>IM Importer と同じ英語の商標一文。</summary>
     public const string CopyrightWwiseLine =
         "Wwise® and Audiokinetic® are trademarks of Audiokinetic Inc.";
 
@@ -124,8 +127,11 @@ internal static partial class UiStrings
 
     public const string CopyrightFfmpegLink = "FFmpeg";
 
-    /// <summary>第三者通知（EffeTune MIT 全文・学習データ帰属など）へのフッタリンク。</summary>
+    /// <summary>Version フッタ。EffeTune 上流 GitHub へのリンク。</summary>
     public const string CopyrightEffetuneLink = "EffeTune";
+
+    /// <summary>Version フッタ。WinBlur 上流 GitHub へのリンク。</summary>
+    public const string CopyrightWinBlurLink = "WinBlur";
 
     public static string UntitledDocument => Get("untitled", "untitled");
 

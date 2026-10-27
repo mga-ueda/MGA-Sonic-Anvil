@@ -19,6 +19,7 @@ internal static partial class AppVersion
     public const string EffetuneLicenseUrl = EffetuneProjectUrl + "/blob/main/LICENSE";
     public const string LameProjectUrl = "https://lame.sourceforge.io/";
     public const string FfmpegProjectUrl = "https://ffmpeg.org/";
+    public const string WinBlurProjectUrl = "https://github.com/xauuzd/WinBlur";
     public const string CompanyName = "MIYABI GAME AUDIO INC.";
     public const string CompanyUrl = "https://www.miyabi-ga.co.jp/";
     public const string CompanyFolderName = "MGA";

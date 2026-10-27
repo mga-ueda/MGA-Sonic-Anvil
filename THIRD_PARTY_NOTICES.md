@@ -6,6 +6,14 @@ The application itself is MIT-licensed; see [LICENSE](LICENSE).
 
 ---
 
+## Wwise® / Audiokinetic® (trademarks)
+
+Wwise® and Audiokinetic® are trademarks of Audiokinetic Inc.
+This tool is unofficial. WAAPI requires a valid Wwise license.
+Wwise Authoring and the Wwise SDK are **not** redistributed with this app.
+
+---
+
 ## EffeTune Rhythm Analyzer DSP
 
 **Use in this app:** Real-time BPM / beat analysis (Rhythm Analyzer DSP),
@@ -112,6 +120,43 @@ SOFTWARE.
 ```
 
 Signalsmith Linear is also MIT; see `native/signalsmith-linear/LICENSE.txt`.
+
+---
+
+## WinBlur
+
+**Use in this app:** Implementation approach for `AcrylicBackdrop` (DWM
+`SetWindowCompositionAttribute` / ACCENT Acrylic frosted glass), via the same
+pattern used in MGA After Drive.
+
+**Source:** [xauuzd/WinBlur](https://github.com/xauuzd/WinBlur)  
+**Local copy of the license text:** [licenses/WinBlur-LICENSE.txt](licenses/WinBlur-LICENSE.txt)
+
+### MIT License (full text)
+
+```
+MIT License
+
+Copyright (c) 2022 Pronner
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ---
 

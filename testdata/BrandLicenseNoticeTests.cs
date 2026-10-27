@@ -22,6 +22,7 @@ public sealed class BrandLicenseNoticeTests
         Assert.Contains(UiStrings.CopyrightLameLink, text, StringComparison.Ordinal);
         Assert.Contains(UiStrings.CopyrightFfmpegLink, text, StringComparison.Ordinal);
         Assert.Contains(UiStrings.CopyrightEffetuneLink, text, StringComparison.Ordinal);
+        Assert.Contains(UiStrings.CopyrightWinBlurLink, text, StringComparison.Ordinal);
         Assert.DoesNotContain("SIL Open Font License", text, StringComparison.Ordinal);
         Assert.Equal(3, BrandLicenseAlign.LineCount(text));
         Assert.Equal(
@@ -34,7 +35,8 @@ public sealed class BrandLicenseNoticeTests
                 text,
                 UiStrings.CopyrightGitHub + " / " + UiStrings.CopyrightMitLink + " / "
                     + UiStrings.CopyrightLameLink + " / " + UiStrings.CopyrightFfmpegLink
-                    + " / " + UiStrings.CopyrightEffetuneLink));
+                    + " / " + UiStrings.CopyrightEffetuneLink
+                    + " / " + UiStrings.CopyrightWinBlurLink));
     }
 
     [Fact]
@@ -50,6 +52,7 @@ public sealed class BrandLicenseNoticeTests
             AppVersion.EffetuneLicenseUrl);
         Assert.Equal("https://lame.sourceforge.io/", AppVersion.LameProjectUrl);
         Assert.Equal("https://ffmpeg.org/", AppVersion.FfmpegProjectUrl);
+        Assert.Equal("https://github.com/xauuzd/WinBlur", AppVersion.WinBlurProjectUrl);
     }
 
     [Fact]
@@ -64,6 +67,11 @@ public sealed class BrandLicenseNoticeTests
         Assert.Contains("Groove MIDI Dataset", text, StringComparison.Ordinal);
         Assert.Contains("CC BY 4.0", text, StringComparison.Ordinal);
         Assert.Contains("Ballroom", text, StringComparison.Ordinal);
+        Assert.Contains("WinBlur", text, StringComparison.Ordinal);
+        Assert.Contains("Copyright (c) 2022 Pronner", text, StringComparison.Ordinal);
+        Assert.Contains("https://github.com/xauuzd/WinBlur", text, StringComparison.Ordinal);
+        Assert.Contains(UiStrings.CopyrightWwiseLine, text, StringComparison.Ordinal);
+        Assert.Contains("Audiokinetic Inc.", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -87,13 +95,10 @@ public sealed class BrandLicenseNoticeTests
     }
 
     [Fact]
-    public void EffetuneAboutLink_UsesBundledNoticesDialogNotBrowserOnly()
+    public void VersionThirdPartyLinks_OpenUpstreamGitHub()
     {
-        // EffeTune は About から LicenseNoticesWindow（同梱 md）を開く。
-        // URL 定数はリポジトリ参照用に残す。
-        Assert.Equal(
-            AppVersion.RepositoryUrl + "/blob/main/THIRD_PARTY_NOTICES.md",
-            AppVersion.ThirdPartyNoticesUrl);
+        Assert.Equal("https://github.com/Frieve-A/effetune", AppVersion.EffetuneProjectUrl);
+        Assert.Equal("https://github.com/xauuzd/WinBlur", AppVersion.WinBlurProjectUrl);
         Assert.Equal("THIRD_PARTY_NOTICES.md", ThirdPartyNotices.FileName);
     }
 

@@ -155,18 +155,13 @@ internal sealed class AboutWindow : Window
 
     private void OnLicenseLinkClick(object? sender, BrandLicenseLinkClickEventArgs e)
     {
-        if (e.LinkId == "effetune")
-        {
-            LicenseNoticesWindow.Show(this);
-            e.Handled = true;
-            return;
-        }
-
         var url = e.LinkId switch
         {
             "mit" => AppVersion.LicenseUrl,
             "lame" => AppVersion.LameProjectUrl,
             "ffmpeg" => AppVersion.FfmpegProjectUrl,
+            "effetune" => AppVersion.EffetuneProjectUrl,
+            "winblur" => AppVersion.WinBlurProjectUrl,
             _ => AppVersion.RepositoryUrl,
         };
         TryOpenUrl(url);

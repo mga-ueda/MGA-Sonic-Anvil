@@ -199,6 +199,7 @@ internal sealed class BrandLicenseLabel : TextBlock
         Consider(remaining, UiStrings.CopyrightLameLink, "lame", ref at, ref id, ref length);
         Consider(remaining, UiStrings.CopyrightFfmpegLink, "ffmpeg", ref at, ref id, ref length);
         Consider(remaining, UiStrings.CopyrightEffetuneLink, "effetune", ref at, ref id, ref length);
+        Consider(remaining, UiStrings.CopyrightWinBlurLink, "winblur", ref at, ref id, ref length);
         return at >= 0;
     }
 
