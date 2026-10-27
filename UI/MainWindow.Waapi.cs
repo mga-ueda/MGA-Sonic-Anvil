@@ -23,7 +23,7 @@ public partial class MainWindow
     private bool _waapiPollBusy;
     private int _waapiPollFailCount;
     private bool _keepTarget;
-    private bool _waapiPanelVisible = true;
+    private bool _waapiPanelVisible;
     private string _keptTargetPath = string.Empty;
     private string _keptTargetProjectFilePath = string.Empty;
     private string _lastKnownWwiseProjectFilePath = string.Empty;
