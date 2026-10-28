@@ -720,6 +720,8 @@ public partial class MainWindow
             {
                 StopEditorNumpadSelectionTransport(_transportSelectionDigit);
             }
+
+            FlushDeferredPlaylistSelectionLoudness();
         }
 
         if (key is Key.Apps or Key.F10)
@@ -789,6 +791,8 @@ public partial class MainWindow
                 StopSpectrogramBoostNudge();
             }
 
+            FlushPlaylistExtendPending();
+            FlushDeferredPlaylistSelectionLoudness();
             TryPlayLibraryAfterArrowRelease();
             return;
         }
@@ -800,6 +804,8 @@ public partial class MainWindow
 
         if (key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
         {
+            FlushPlaylistExtendPending();
+            FlushDeferredPlaylistSelectionLoudness();
             if (!LibraryBrowser.PlaylistVisualIsPdf)
             {
                 TryPlayLibraryAfterArrowRelease();
@@ -2263,7 +2269,26 @@ public partial class MainWindow
                 && !IsLibraryExplorerFocused
                 && !IsLibraryFavoritesFocused)
             {
-                LibraryBrowser.MoveSelectionByGroup(key == Key.Up ? -1 : 1, extend: true);
+                if (isRepeat && !Keyboard.IsKeyDown(key))
+                {
+                    FlushPlaylistExtendPending();
+                    FlushDeferredPlaylistSelectionLoudness();
+                    return true;
+                }
+
+                var groupDelta = key == Key.Up ? -1 : 1;
+                if (isRepeat)
+                {
+                    // リピートは Render にまとめる（Input 連打でスペアナ／レベルが止まるのを防ぐ）。
+                    QueuePlaylistExtendStep(groupDelta, byGroup: true);
+                }
+                else
+                {
+                    FlushPlaylistExtendPending();
+                    LibraryBrowser.MoveSelectionByGroup(groupDelta, extend: true);
+                    ScheduleDeferredPlaylistSelectionLoudness();
+                }
+
                 _libraryPlayOnArrowRelease = false;
                 return true;
             }
@@ -2280,6 +2305,34 @@ public partial class MainWindow
                 }
 
                 var extend = modifiers == ModifierKeys.Shift;
+                // 処理遅れでキューに残ったリピートは、もうキーが上がっていれば捨てる。
+                if (isRepeat && extend && !Keyboard.IsKeyDown(key))
+                {
+                    FlushPlaylistExtendPending();
+                    FlushDeferredPlaylistSelectionLoudness();
+                    return true;
+                }
+
+                // Shift+↑↓／Page のリピートはフレーム単位にまとめ、メーター更新の隙間を空ける。
+                if (extend && isRepeat && key is Key.Up or Key.Down or Key.PageUp or Key.PageDown)
+                {
+                    var step = key switch
+                    {
+                        Key.Up => -1,
+                        Key.Down => 1,
+                        Key.PageUp => -LibraryBrowser.PlaylistPageStepRows(),
+                        _ => LibraryBrowser.PlaylistPageStepRows(),
+                    };
+                    QueuePlaylistExtendStep(step, byGroup: false);
+                    _libraryPlayOnArrowRelease = false;
+                    return true;
+                }
+
+                if (extend)
+                {
+                    FlushPlaylistExtendPending();
+                }
+
                 // 単発は端から反対側へ回る。長押し連続は端で一旦止まる（Ctrl+Tab と同じ）。
                 var wrap = !isRepeat;
                 if (key is Key.Home or Key.End)
@@ -2296,6 +2349,11 @@ public partial class MainWindow
                 }
 
                 _libraryPlayOnArrowRelease = !extend;
+                if (extend)
+                {
+                    ScheduleDeferredPlaylistSelectionLoudness();
+                }
+
                 return true;
             }
 

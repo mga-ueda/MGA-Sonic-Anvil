@@ -67,6 +67,7 @@ internal sealed class LibraryFileRow : INotifyPropertyChanged
 
     private bool _cutPending;
     private bool _isChecked;
+    private bool _isPlaylistSelected;
 
     /// <summary>切り取り中。名前を暗い色で出す。</summary>
     public bool CutPending
@@ -97,6 +98,24 @@ internal sealed class LibraryFileRow : INotifyPropertyChanged
 
             _isChecked = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChecked)));
+        }
+    }
+
+    /// <summary>
+    /// プレイリストの選択帯。DataGrid.SelectedItems には載せない（セル IsSelected の多列更新を避ける）。
+    /// </summary>
+    public bool IsPlaylistSelected
+    {
+        get => _isPlaylistSelected;
+        set
+        {
+            if (_isPlaylistSelected == value)
+            {
+                return;
+            }
+
+            _isPlaylistSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsPlaylistSelected)));
         }
     }
 

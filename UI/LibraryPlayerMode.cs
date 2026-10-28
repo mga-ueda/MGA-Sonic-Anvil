@@ -2194,6 +2194,15 @@ internal static class LibraryPlayerMode
     /// </summary>
     public const DispatcherPriority AnalyzerTickPriority = DispatcherPriority.Background;
 
+    /// <summary>
+    /// Shift 範囲選択のキーリピートを1フレームで進める上限行数。
+    /// DataGrid Extended は1行 Add で全セルの IsSelected が走るため、合算しすぎると1フレームが死ぬ。
+    /// </summary>
+    public const int PlaylistExtendMaxRowsPerFrame = 3;
+
+    /// <summary>Ctrl+Shift グループ範囲の1フレーム上限。</summary>
+    public const int PlaylistExtendMaxGroupsPerFrame = 1;
+
     /// <summary>裏スレッドから届いた曲を UI に載せるまとまり（件数）。</summary>
     public const int PlaylistLoadUiFlushCount = 16;
 

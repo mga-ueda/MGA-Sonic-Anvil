@@ -1982,6 +1982,58 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void Playlist_ShiftArrow_ExtendsAndShrinksWithoutCollapsing()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[20];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                sessions[i] = Session($"{i:00}.mp3");
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            for (var i = 0; i < 15; i++)
+            {
+                view.MoveSelection(1, extend: true);
+            }
+
+            Flush();
+            Assert.Equal(16, view.SelectedSessions.Length);
+            Assert.Same(sessions[15], view.SelectedSession);
+
+            for (var i = 0; i < 5; i++)
+            {
+                view.MoveSelection(-1, extend: true);
+            }
+
+            Flush();
+            Assert.Equal(11, view.SelectedSessions.Length);
+            Assert.Same(sessions[10], view.SelectedSession);
+            Assert.Contains(sessions[0], view.SelectedSessions);
+            Assert.Contains(sessions[10], view.SelectedSessions);
+            Assert.DoesNotContain(sessions[11], view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void Playlist_ShiftAndCtrlSelect_KeepsMultipleRows()
     {
         RunSta(() =>

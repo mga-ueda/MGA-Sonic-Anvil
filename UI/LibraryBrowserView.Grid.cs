@@ -96,7 +96,8 @@ internal sealed partial class LibraryBrowserView
         _grid.HorizontalGridLinesBrush = Brushes.Transparent;
         _grid.VerticalGridLinesBrush = Brushes.Transparent;
         _grid.SelectionUnit = DataGridSelectionUnit.FullRow;
-        _grid.SelectionMode = DataGridSelectionMode.Extended;
+        // 複数選択の帯は LibraryFileRow.IsPlaylistSelected。SelectedItems に載せるのはキャレットだけ。
+        _grid.SelectionMode = DataGridSelectionMode.Single;
         // 列再レイアウトで CurrentItem が先頭へ動いても、選択シアンを追従させない。
         _grid.IsSynchronizedWithCurrentItem = false;
         _grid.ClipboardCopyMode = DataGridClipboardCopyMode.None;
