@@ -2189,7 +2189,6 @@ public partial class MainWindow
             settings.ResolvedVideoProxyRetentionDays(),
             settings.FfmpegExePath,
             settings.VideoProxyDisableAutoEncode,
-            settings.UseDxgiVideoPresenter,
             settings.ResolvedLaunchMode(),
             settings.ResolvedWallpaperPath(),
             settings.ResolvedWallpaperOpacity(),
@@ -2270,7 +2269,6 @@ public partial class MainWindow
         settings.VideoProxyRetentionDays = dialog.SelectedVideoProxyRetentionDays;
         settings.FfmpegExePath = dialog.SelectedFfmpegExePath;
         settings.VideoProxyDisableAutoEncode = dialog.SelectedVideoProxyDisableAutoEncode;
-        settings.UseDxgiVideoPresenter = dialog.SelectedUseDxgiVideoPresenter;
         LibraryPlaylistDocuments.ApplyFromSettings(settings);
         VideoProxy.PruneExpired(settings.ResolvedVideoProxyRetentionDays(), DateTime.UtcNow);
         DropPlaylistDocumentSessionsIfDisabled();

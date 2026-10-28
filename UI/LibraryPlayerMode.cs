@@ -1143,22 +1143,21 @@ internal static class LibraryPlayerMode
     public static bool HidesPlaylistVideoChromeOverlaysForPdf(bool isPdf, bool chromeHidden) =>
         isPdf && chromeHidden;
 
-    /// <summary>再生中の映像へ合わせ直す最小ずれ。これ未満のシークは MediaElement を落とす。</summary>
+    /// <summary>再生中の映像へ合わせ直す最小ずれ。これ未満のシークは捨てる。</summary>
     public const double VideoClockSeekSeconds = 1;
 
     /// <summary>1／3 早送り・巻き戻し中は、ほぼ毎フレーム映像を音声へ合わせる。</summary>
     public const double VideoShuttleSeekSeconds = 1.0 / 60;
 
     /// <summary>
-    /// 動画スクラブ中に MediaElement.Position へ渡す最短間隔。
+    /// 動画スクラブ中に映像へ位置を渡す最短間隔。
     /// これより短い連打は最新位置へ畳む（再生中シークの蓄積を防ぐ）。
     /// </summary>
     public const int VideoScrubSeekMinIntervalMs = 50;
 
     /// <summary>
-    /// DXGI presenter の動画スクラブで、ドラッグが止まってから正確なフレームを出し直すまでの静止時間。
+    /// 動画スクラブで、ドラッグが止まってから正確なフレームを出し直すまでの静止時間。
     /// ドラッグ中は粗いプレビュー（Seek＋数枚）だけにして、これだけ新しい要求が来なければ 1 回だけ正確に出す。
-    /// MediaElement 経路では使わない。
     /// </summary>
     public const int VideoScrubExactIdleMs = 90;
 
@@ -1230,7 +1229,7 @@ internal static class LibraryPlayerMode
         return Math.Clamp(frame, 0, Math.Max(0, frameCount));
     }
 
-    /// <summary>MediaElement の尺がまだ無いときは、タグ／mvhd の尺でシークバーを進める。</summary>
+    /// <summary>映像の尺がまだ無いときは、タグ／mvhd の尺でシークバーを進める。</summary>
     public static TimeSpan VisualDurationOrFallback(TimeSpan natural, TimeSpan fallback)
     {
         if (natural > TimeSpan.Zero)
@@ -1242,7 +1241,7 @@ internal static class LibraryPlayerMode
     }
 
     /// <summary>
-    /// MediaElement.Position は無音だと更新されないことがあるので、経過時間で再生位置を出す。
+    /// 無音でも止まらないよう、経過時間で再生位置を出す。
     /// </summary>
     public static TimeSpan VisualPlayPosition(
         TimeSpan origin,

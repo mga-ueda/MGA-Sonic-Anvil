@@ -157,7 +157,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryVisualStage.WantsAmbientSpill(1080, 1920, 0, 1080));
         Assert.InRange(LibraryVisualStage.AmbientSpillBlurRadius, 48, 96);
         Assert.InRange(LibraryVisualStage.AmbientSpillScale, 1.08, 1.2);
-        Assert.InRange(LibraryVisualStage.AmbientSpillOpacity, 0.2, 0.45);
+        Assert.InRange(LibraryVisualStage.AmbientSpillOpacity, 0.35, 0.65);
         Assert.InRange(LibraryVisualStage.AmbientSpillAspectEpsilon, 0.005, 0.05);
         // 格子線はデバイス 1px（pixelsPerDip=2 → DIP 0.5）。
         Assert.Equal(0.5, WpfControlHelpers.DeviceHairline(2), 5);

@@ -1,19 +1,17 @@
 using System.Windows;
-using System.Windows.Data;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
-using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Video.Dxgi;
 
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// 試作: <see cref="AppSettings.UseDxgiVideoPresenter"/> のとき MediaElement の代わりに D3D11＋DXGI で描く。
-/// 再生位置は既存の映像クロック（CurrentVisualPosition）にタイマーで追従するだけ。光漏れは MediaElement 専用。
-/// D3DImage 経由の普通の WPF 要素なので、上の暗幕・格子・HUD・クロームはそのまま重なる（airspace なし）。
-/// フェードは <see cref="_media"/> の Opacity をバインドで写す。
-/// デコードは <see cref="DxgiAsyncFramePump"/> のワーカーが行い、タイマーは位置を要求してキャッシュを引くだけ。
+/// プレイリスト動画は D3D11＋DXGI で描く（MediaElement 経路は無い）。
+/// 再生位置は既存の映像クロック（CurrentVisualPosition）にタイマーで追従するだけ。
+/// D3DImage 経由の普通の WPF 要素なので、上の暗幕・格子・HUD・クローム／背面の光漏れはそのまま重なる（airspace なし）。
+/// フェードは <see cref="_dxgiHost"/> の Opacity（光漏れホストも追従）。デコードは <see cref="DxgiAsyncFramePump"/> の
+/// ワーカーが行い、タイマーは位置を要求してキャッシュを引くだけ。
 /// </summary>
 internal sealed partial class LibraryVisualStage
 {
@@ -32,49 +30,26 @@ internal sealed partial class LibraryVisualStage
     private DxgiDecodedFrame? _dxgiLastFrame;
     private int _dxgiLastRenderVersion = -1;
 
-    /// <summary>ShowVideo 時点で選んだ経路。クリップ途中で設定が変わっても混ぜない。</summary>
-    private bool _dxgiActive;
     private TimeSpan _dxgiDuration;
     private int _dxgiWidth;
     private int _dxgiHeight;
     private int _dxgiOpenTicket;
     private bool _dxgiEnded;
 
-    internal static bool UsingDxgiPresenter => AppStorage.Settings.UseDxgiVideoPresenter;
-
-    private bool UsingDxgi => _dxgiActive && _video;
-
-    /// <summary>フェードイン／SnapMediaBlack は _media.Opacity だけ触るので、アニメ値ごと DXGI 側へ写す。</summary>
-    private void InitDxgiHost() =>
-        _dxgiHost.SetBinding(OpacityProperty, new Binding(nameof(Opacity)) { Source = _media, Mode = BindingMode.OneWay });
-
-    /// <summary>設定を読み直して経路を確定。切り替わったら旧経路を止めて true（同じパスでも開き直す）。</summary>
-    private bool LatchVideoPresenterMode()
-    {
-        var want = UsingDxgiPresenter;
-        if (want == _dxgiActive)
-        {
-            return false;
-        }
-
-        StopMedia();
-        _dxgiActive = want;
-        return true;
-    }
+    private bool UsingDxgi => _video;
 
     private void SyncVideoPresenterVisibility()
     {
-        if (UsingDxgi)
+        if (!UsingDxgi)
         {
-            _media.Visibility = Visibility.Collapsed;
+            _dxgiHost.Visibility = Visibility.Collapsed;
             ClearAmbientSpill();
-            _dxgiHost.Visibility = Visibility.Visible;
-            StartDxgiTimer();
             return;
         }
 
-        _dxgiHost.Visibility = Visibility.Collapsed;
-        _media.Visibility = Visibility.Visible;
+        _dxgiHost.Visibility = Visibility.Visible;
+        StartDxgiTimer();
+        SyncAmbientSpill();
     }
 
     /// <summary>
@@ -84,7 +59,7 @@ internal sealed partial class LibraryVisualStage
 
     /// <summary>
     /// プロキシの作り直し前に、DXGI が掴んでいる <paramref name="path"/> を閉じる（上書き Move が失敗しないように）。
-    /// 閉じたら true。次の ShowVideo は同じパスでも開き直す。MediaElement 経路は触らない。
+    /// 閉じたら true。次の ShowVideo は同じパスでも開き直す。
     /// </summary>
     internal bool ReleaseDxgiSourceForRewrite(string path)
     {
@@ -164,6 +139,7 @@ internal sealed partial class LibraryVisualStage
                     return;
                 }
 
+                SyncAmbientSpill();
                 Opened?.Invoke(this, Duration);
                 if (!_playing && !_framePaused)
                 {
@@ -183,6 +159,7 @@ internal sealed partial class LibraryVisualStage
         _dxgiWidth = 0;
         _dxgiHeight = 0;
         _dxgiEnded = false;
+        ClearAmbientSpill();
         if (_dxgiHost.Visibility == Visibility.Visible)
         {
             // 次に出したとき前のクリップの最終フレームが一瞬見えないように。
@@ -227,7 +204,7 @@ internal sealed partial class LibraryVisualStage
         if (_dxgiPump.IsOpen)
         {
             // シャトル（テンキー 1／3: 音声 3 倍、映像クロック停止で Seek が音声ヘッドに追従）中は、
-            // ポンプの先読みを広げ Seek を控えて、遅れても止まらず追いつかせる。MediaElement 経路には関係しない。
+            // ポンプの先読みを広げ Seek を控えて、遅れても止まらず追いつかせる。
             _dxgiPump.SetShuttleMode(LibraryPlayerMode.VideoSeekIsShuttleScrub(_playing, _visualClock.IsRunning));
 
             // 直前に出した 1 枚がまだこの位置を覆っている（一時停止・スクラブ静止・同じフレーム内の tick）なら、
@@ -250,6 +227,11 @@ internal sealed partial class LibraryVisualStage
                         _dxgiHost.PresentFrame(frame);
                         _dxgiLastFrame = frame;
                         _dxgiLastRenderVersion = _dxgiHost.RenderVersion;
+                        // 光漏れは本編と同じフレームから作る（二重デコードなし）。新フレームのときだけ縮小して書く。
+                        if (_spillHost.Visibility == Visibility.Visible)
+                        {
+                            UpdateAmbientSpillFrame(frame);
+                        }
                     }
                 }
             }
@@ -266,24 +248,23 @@ internal sealed partial class LibraryVisualStage
             _dxgiHost.PresentBgraFrame(_dxgiPattern, _dxgiWidth, _dxgiHeight, _dxgiWidth * 4);
         }
 
+        // 黒帯が出る映像で光漏れがまだ出ていなければ、寸法確定後のここで出す（以後は present ごとに更新）。
+        if (_spillHost.Visibility != Visibility.Visible)
+        {
+            SyncAmbientSpill();
+        }
+
         RaiseDxgiEndedIfReached(pos);
     }
 
     /// <summary>
-    /// スクラブ プレビュー（ドラッグ中の粗い絵: Seek＋数枚だけ）を DXGI ポンプに伝える。DXGI 経路でなければ何もしない
-    /// （MediaElement のスクラブは従来どおり）。false は静止後の正確な絵／通常再生へ戻るとき。
+    /// スクラブ プレビュー（ドラッグ中の粗い絵: Seek＋数枚だけ）を DXGI ポンプに伝える。
+    /// false は静止後の正確な絵／通常再生へ戻るとき。
     /// </summary>
-    private void SetDxgiScrubPreview(bool preview)
-    {
-        if (!_dxgiActive)
-        {
-            return;
-        }
-
+    private void SetDxgiScrubPreview(bool preview) =>
         _dxgiPump.SetScrubPreviewMode(preview);
-    }
 
-    /// <summary>MediaEnded の代わり。本再生でクロックが尺に達したら 1 回だけ Ended。</summary>
+    /// <summary>本再生でクロックが尺に達したら 1 回だけ Ended。</summary>
     private void RaiseDxgiEndedIfReached(TimeSpan pos)
     {
         var duration = Duration;

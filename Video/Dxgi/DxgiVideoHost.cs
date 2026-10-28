@@ -9,7 +9,8 @@ namespace MgaSonicAnvil.Video.Dxgi;
 /// <summary>
 /// D3D11 で描いた共有 RT を D3DImage として出す普通の WPF 要素。HWND を持たないので airspace は無く、
 /// 上に重ねた WPF 要素（暗幕・格子・HUD・クローム）や Opacity はそのまま合成される。
-/// 黒帯は presenter 側で描くので Image は Fill。presenter は初めて見えたときに作り、Unloaded で捨てる。
+/// レターボックス帯は presenter が透明クリアし、Image は Fill。帯から背面の光漏れ／ステージ背景が透ける。
+/// presenter は初めて見えたときに作り、Unloaded で捨てる。
 /// 色: <see cref="SetSourceColorInfo"/> で受けたソース色情報と、載っているモニタの ICC を presenter に渡す。
 /// モニタ移動（LocationChanged）・DPI 変更・ディスプレイ設定変更で読み直す。
 /// </summary>
@@ -32,7 +33,8 @@ internal sealed class DxgiVideoHost : Border
     {
         IsHitTestVisible = false;
         Focusable = false;
-        Background = Brushes.Black;
+        // 不透明黒だと透明帯の下に残って光漏れを隠す。帯の見た目の黒はステージ背景／暗幕側。
+        Background = Brushes.Transparent;
         SnapsToDevicePixels = true;
         Child = _image;
         IsVisibleChanged += (_, _) => EnsurePresenter();

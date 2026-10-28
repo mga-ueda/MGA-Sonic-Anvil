@@ -2,12 +2,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.Video.Dxgi;
 
 namespace MgaSonicAnvil.UI;
 
@@ -28,9 +30,7 @@ internal sealed partial class LibraryVisualStage : Grid
     /// <summary>本再生停止 → 暗いプレビューへ戻るときの速度ランプ秒数（1 → 1/3）。</summary>
     internal const double PreviewSpeedRampSeconds = 1;
 
-    /// <summary>
-    /// 速度ランプの Tick 間隔。MediaElement へ毎フレーム SpeedRatio/Play するとコーデックがカクつく。
-    /// </summary>
+    /// <summary>速度ランプの Tick 間隔（映像クロック更新）。</summary>
     internal const double PreviewSpeedRampTickMs = 50;
 
     /// <summary>本再生停止 → 暗いプレビューへの暗転秒数（現状から）。</summary>
@@ -49,7 +49,7 @@ internal sealed partial class LibraryVisualStage : Grid
     internal const double AmbientSpillScale = 1.12;
 
     /// <summary>光漏れの不透明度。</summary>
-    internal const double AmbientSpillOpacity = 0.32;
+    internal const double AmbientSpillOpacity = 0.50;
 
     /// <summary>映像と描画エリアのアスペクト差。これ未満は黒帯なしとみなす。</summary>
     internal const double AmbientSpillAspectEpsilon = 0.02;
@@ -59,19 +59,8 @@ internal sealed partial class LibraryVisualStage : Grid
 
     private const byte MeshLineAlpha = 160;
 
-    private readonly MediaElement _media = new()
-    {
-        LoadedBehavior = MediaState.Manual,
-        UnloadedBehavior = MediaState.Manual,
-        Stretch = Stretch.Uniform,
-        ScrubbingEnabled = true,
-        IsHitTestVisible = false,
-        Volume = 0,
-        Visibility = Visibility.Collapsed,
-    };
-
     /// <summary>
-    /// 黒帯は黒のまま。本編と同ソースの映像を映像枠だけ広げてぼかし、縁に光をこぼす。
+    /// 黒帯は黒のまま。本編と同ソースの映像を枠いっぱいに広げてぼかし、縁に光をこぼす。
     /// </summary>
     private readonly Grid _spillHost = new()
     {
@@ -80,14 +69,33 @@ internal sealed partial class LibraryVisualStage : Grid
         Visibility = Visibility.Collapsed,
     };
 
-    private readonly MediaElement _spillMedia = new()
+    private readonly Image _spillImage = new()
     {
-        LoadedBehavior = MediaState.Manual,
-        UnloadedBehavior = MediaState.Manual,
         Stretch = Stretch.Fill,
-        ScrubbingEnabled = true,
         IsHitTestVisible = false,
-        Volume = 0,
+    };
+
+    /// <summary>光漏れの縮小フレーム（CPU ビットマップ）。D3DImage は複数 Image で共有できないので使わない。</summary>
+    private WriteableBitmap? _spillBitmap;
+
+    /// <summary>縮小 BGRA の作業バッファ（毎フレーム確保しない）。</summary>
+    private byte[]? _spillScratch;
+
+    private readonly Border _spill = new()
+    {
+        // 旧 MediaElement 経路と同じく、映像の表示矩形（UniformContentRect）に合わせて置く。
+        HorizontalAlignment = HorizontalAlignment.Left,
+        VerticalAlignment = VerticalAlignment.Top,
+        IsHitTestVisible = false,
+        Opacity = AmbientSpillOpacity,
+        RenderTransformOrigin = new Point(0.5, 0.5),
+        RenderTransform = new ScaleTransform(AmbientSpillScale, AmbientSpillScale),
+        Effect = new BlurEffect
+        {
+            Radius = AmbientSpillBlurRadius,
+            KernelType = KernelType.Gaussian,
+            RenderingBias = RenderingBias.Performance,
+        },
     };
 
     /// <summary>波形・メーター・ファイル名の背後。映像はぼかさず、少し暗くするだけ。</summary>
@@ -123,22 +131,6 @@ internal sealed partial class LibraryVisualStage : Grid
     };
 
     private Size _hudFrostMaskSize;
-
-    private readonly Border _spill = new()
-    {
-        HorizontalAlignment = HorizontalAlignment.Left,
-        VerticalAlignment = VerticalAlignment.Top,
-        IsHitTestVisible = false,
-        Opacity = AmbientSpillOpacity,
-        RenderTransformOrigin = new Point(0.5, 0.5),
-        RenderTransform = new ScaleTransform(AmbientSpillScale, AmbientSpillScale),
-        Effect = new BlurEffect
-        {
-            Radius = AmbientSpillBlurRadius,
-            KernelType = KernelType.Gaussian,
-            RenderingBias = RenderingBias.Performance,
-        },
-    };
 
     private readonly Grid _pdfHost = new()
     {
@@ -204,17 +196,19 @@ internal sealed partial class LibraryVisualStage : Grid
         Background = Brushes.Black;
         Visibility = Visibility.Collapsed;
         SnapsToDevicePixels = true;
-        _spill.Child = _spillMedia;
+        _spill.Child = _spillImage;
         _spillHost.Children.Add(_spill);
+        // フェードイン／SnapMediaBlack は _dxgiHost.Opacity。光漏れも同じ値に追従する。
+        _spillHost.SetBinding(
+            OpacityProperty,
+            new Binding(nameof(Opacity)) { Source = _dxgiHost, Mode = BindingMode.OneWay });
         _glassHost.Background = WpfControlHelpers.FrozenBrush(Color.FromArgb(HudDimAlpha, 0, 0, 0));
         _hudDimBrush.Visual = _hudDimFeather;
         _glassHost.OpacityMask = _hudDimBrush;
         _pdfHost.Children.Add(_pdf);
-        // 光漏れ → Media（試作 DXGI も同じ層）→ HUD の薄い暗幕 → PDF → dim で暗く → 格子。
+        // 光漏れ → DXGI 映像 → HUD の薄い暗幕 → PDF → dim で暗く → 格子。
         Children.Add(_spillHost);
-        Children.Add(_media);
         Children.Add(_dxgiHost);
-        InitDxgiHost();
         Children.Add(_glassHost);
         Children.Add(_pdfHost);
         Children.Add(_dim);
@@ -230,53 +224,6 @@ internal sealed partial class LibraryVisualStage : Grid
             {
                 SyncAmbientSpill();
             }
-        };
-        _media.MediaEnded += (_, _) =>
-        {
-            if (_framePaused)
-            {
-                return;
-            }
-
-            if (_video && !_playing && IsShown)
-            {
-                RestartPreviewLoop();
-                return;
-            }
-
-            if (_video && !_playing)
-            {
-                return;
-            }
-
-            Ended?.Invoke(this, EventArgs.Empty);
-        };
-        _media.MediaOpened += (_, _) =>
-        {
-            if (_media.NaturalDuration.HasTimeSpan)
-            {
-                var duration = _media.NaturalDuration.TimeSpan;
-                if (duration > TimeSpan.Zero)
-                {
-                    _fallbackDuration = duration;
-                }
-
-                Opened?.Invoke(this, duration);
-            }
-            else if (_video)
-            {
-                Opened?.Invoke(this, Duration);
-            }
-
-            SyncAmbientSpill();
-            if (_video && !_playing && !_framePaused)
-            {
-                RestartHoverPreviewAtStart();
-            }
-        };
-        _media.MediaFailed += (_, _) =>
-        {
-            // プロキシ無しのコーデックは開けないことがある。ホバーではエラーを出さない。
         };
     }
 
@@ -299,7 +246,7 @@ internal sealed partial class LibraryVisualStage : Grid
         return Math.Abs(videoAspect - stageAspect) > AmbientSpillAspectEpsilon;
     }
 
-    /// <summary>MediaElement Stretch.Uniform と同じ表示矩形。</summary>
+    /// <summary>Stretch.Uniform と同じ表示矩形（HUD／レイアウト計算用）。</summary>
     internal static Rect UniformContentRect(
         int naturalWidth,
         int naturalHeight,
@@ -346,17 +293,10 @@ internal sealed partial class LibraryVisualStage : Grid
 
     public bool TryGetNaturalVideoPixels(out int width, out int height)
     {
-        if (UsingDxgi)
+        if (_video)
         {
             width = _dxgiWidth;
             height = _dxgiHeight;
-            return width > 0 && height > 0;
-        }
-
-        if (_video)
-        {
-            width = _media.NaturalVideoWidth;
-            height = _media.NaturalVideoHeight;
             return width > 0 && height > 0;
         }
 
@@ -414,16 +354,9 @@ internal sealed partial class LibraryVisualStage : Grid
     {
         get
         {
-            if (UsingDxgi)
-            {
-                return LibraryPlayerMode.VisualDurationOrFallback(_dxgiDuration, _fallbackDuration);
-            }
-
             if (_video)
             {
-                return LibraryPlayerMode.VisualDurationOrFallback(
-                    _media.NaturalDuration.HasTimeSpan ? _media.NaturalDuration.TimeSpan : TimeSpan.Zero,
-                    _fallbackDuration);
+                return LibraryPlayerMode.VisualDurationOrFallback(_dxgiDuration, _fallbackDuration);
             }
 
             return TimeSpan.FromSeconds(Math.Max(1, _pdfPages) * LibraryPlaylistDocuments.PdfSecondsPerPage);
@@ -437,15 +370,7 @@ internal sealed partial class LibraryVisualStage : Grid
         _dimFadeTicket++;
         StopMedia();
         LibraryPlayerMode.FadeElementOpacity(_dim, StoppedDimOpacity, instant: true);
-        LibraryPlayerMode.FadeElementOpacity(_media, 1, instant: true);
-        try
-        {
-            _media.SpeedRatio = 1;
-            _spillMedia.SpeedRatio = 1;
-        }
-        catch
-        {
-        }
+        LibraryPlayerMode.FadeElementOpacity(_dxgiHost, 1, instant: true);
 
         _path = null;
         _playing = false;
@@ -459,8 +384,8 @@ internal sealed partial class LibraryVisualStage : Grid
         ClearAmbientSpill();
         SyncPreviewFx(active: false, instant: true);
         CancelVideoFadeIn(restoreOpaque: true);
-        _media.BeginAnimation(OpacityProperty, null);
-        _media.Opacity = 1;
+        _dxgiHost.BeginAnimation(OpacityProperty, null);
+        _dxgiHost.Opacity = 1;
         _pdfHost.Visibility = Visibility.Collapsed;
         Visibility = Visibility.Collapsed;
     }
@@ -485,9 +410,7 @@ internal sealed partial class LibraryVisualStage : Grid
         _pdfSharp = null;
         ClearPdfSources();
         _video = true;
-        var presenterChanged = LatchVideoPresenterMode();
         var pathChanged = ConsumeDxgiReopenPending()
-            || presenterChanged
             || !string.Equals(_path, path, StringComparison.OrdinalIgnoreCase);
         var resumeSameClip = play && sameSourceClip;
         // 同じクリップのホバー→本再生／本再生の再入では黒フラッシュしない
@@ -584,7 +507,7 @@ internal sealed partial class LibraryVisualStage : Grid
         _previewLoopStart = TimeSpan.Zero;
         ClearAmbientSpill();
         SyncPreviewFx(active: false, instant: true);
-        _media.Visibility = Visibility.Collapsed;
+        _dxgiHost.Visibility = Visibility.Collapsed;
         _pdfHost.Visibility = Visibility.Visible;
         var page = PageFromPosition(position);
         var pathChanged = !string.Equals(_path, path, StringComparison.OrdinalIgnoreCase);
@@ -624,7 +547,7 @@ internal sealed partial class LibraryVisualStage : Grid
             }
 
             LibraryPlayerMode.FadeElementOpacity(_dim, playing ? 0 : StoppedDimOpacity, instant: true);
-            LibraryPlayerMode.FadeElementOpacity(_media, 1, instant: true);
+            LibraryPlayerMode.FadeElementOpacity(_dxgiHost, 1, instant: true);
             SyncPreviewFx(active: !playing, instant: playing);
             return;
         }
@@ -633,8 +556,8 @@ internal sealed partial class LibraryVisualStage : Grid
         {
             CancelVideoFadeIn(restoreOpaque: true);
             PlayRealtime(CurrentVisualPosition(), restartClock: false);
-            _media.BeginAnimation(OpacityProperty, null);
-            _media.Opacity = 1;
+            _dxgiHost.BeginAnimation(OpacityProperty, null);
+            _dxgiHost.Opacity = 1;
             return;
         }
 
@@ -657,8 +580,8 @@ internal sealed partial class LibraryVisualStage : Grid
                 var pos = CurrentVisualPosition();
                 CancelVideoFadeIn(restoreOpaque: true);
                 PlayRealtime(pos, restartClock: true);
-                _media.BeginAnimation(OpacityProperty, null);
-                _media.Opacity = 1;
+                _dxgiHost.BeginAnimation(OpacityProperty, null);
+                _dxgiHost.Opacity = 1;
             }
             else
             {
@@ -699,16 +622,14 @@ internal sealed partial class LibraryVisualStage : Grid
         _framePaused = true;
         ApplyVideoDim(instant: true, playing: true);
         SyncPreviewFx(active: false, instant: true);
-        _media.BeginAnimation(OpacityProperty, null);
-        _media.Opacity = 1;
+        _dxgiHost.BeginAnimation(OpacityProperty, null);
+        _dxgiHost.Opacity = 1;
     }
 
     /// <summary>
-    /// スクラブ用シーク。再生中なら一度だけ止め、あとは Position だけ更新する。
-    /// 通常の Seek は再生中に Play＋クロック再始動、フレーム停止中は Play→Pause を毎回やるため、
-    /// ドラッグ連打だとデコードが積み上がって離したあとに追いつく。
-    /// <paramref name="scrubPreview"/> は DXGI 経路だけの粗いプレビュー（ドラッグ中: Seek＋数枚。静止後に false で正確な絵）。
-    /// MediaElement 経路では無視する。
+    /// スクラブ用シーク。再生中なら一度だけ止め、あとは映像クロック位置だけ更新する。
+    /// 通常の Seek は再生中にクロック再始動するため、ドラッグ連打だとデコードが積み上がる。
+    /// <paramref name="scrubPreview"/> が true のとき粗いプレビュー（Seek＋数枚）。静止後に false で正確な絵。
     /// </summary>
     public void ScrubTo(TimeSpan position, bool scrubPreview = false)
     {
@@ -737,8 +658,8 @@ internal sealed partial class LibraryVisualStage : Grid
             _framePaused = true;
             ApplyVideoDim(instant: true, playing: true);
             SyncPreviewFx(active: false, instant: true);
-            _media.BeginAnimation(OpacityProperty, null);
-            _media.Opacity = 1;
+            _dxgiHost.BeginAnimation(OpacityProperty, null);
+            _dxgiHost.Opacity = 1;
         }
         else
         {
@@ -829,8 +750,8 @@ internal sealed partial class LibraryVisualStage : Grid
 
         _previewLoopStart = position;
         CancelVideoFadeIn(restoreOpaque: true);
-        _media.BeginAnimation(OpacityProperty, null);
-        _media.Opacity = 1;
+        _dxgiHost.BeginAnimation(OpacityProperty, null);
+        _dxgiHost.Opacity = 1;
         // 本再生からの引き継ぎでは現在位置付近にいるので、無駄なシークで一発カクつかせない。
         SeekMediaIfNeeded(position);
         FadeDimOpacity(StoppedDimOpacity, instant: false, PreviewDimFadeSeconds);
@@ -842,17 +763,17 @@ internal sealed partial class LibraryVisualStage : Grid
     private void SnapMediaBlack()
     {
         CancelVideoFadeIn(restoreOpaque: false);
-        _media.BeginAnimation(OpacityProperty, null);
-        _media.Opacity = 0;
+        _dxgiHost.BeginAnimation(OpacityProperty, null);
+        _dxgiHost.Opacity = 0;
     }
 
     private void CancelVideoFadeIn(bool restoreOpaque)
     {
         _videoFadeInTicket++;
-        _media.BeginAnimation(OpacityProperty, null);
+        _dxgiHost.BeginAnimation(OpacityProperty, null);
         if (restoreOpaque)
         {
-            _media.Opacity = 1;
+            _dxgiHost.Opacity = 1;
         }
     }
 
@@ -860,8 +781,8 @@ internal sealed partial class LibraryVisualStage : Grid
     private void BeginVideoFadeIn()
     {
         var ticket = ++_videoFadeInTicket;
-        _media.BeginAnimation(OpacityProperty, null);
-        _media.Opacity = 0;
+        _dxgiHost.BeginAnimation(OpacityProperty, null);
+        _dxgiHost.Opacity = 0;
         var seekTicket = _previewSeekTicket;
         var wantPlaying = _playing;
         Dispatcher.BeginInvoke(
@@ -882,8 +803,8 @@ internal sealed partial class LibraryVisualStage : Grid
                 {
                     if (_playing || _framePaused)
                     {
-                        _media.BeginAnimation(OpacityProperty, null);
-                        _media.Opacity = 1;
+                        _dxgiHost.BeginAnimation(OpacityProperty, null);
+                        _dxgiHost.Opacity = 1;
                     }
 
                     return;
@@ -894,8 +815,8 @@ internal sealed partial class LibraryVisualStage : Grid
                     return;
                 }
 
-                _media.BeginAnimation(OpacityProperty, null);
-                _media.Opacity = 0;
+                _dxgiHost.BeginAnimation(OpacityProperty, null);
+                _dxgiHost.Opacity = 0;
                 var anim = new DoubleAnimation
                 {
                     From = 0,
@@ -911,10 +832,10 @@ internal sealed partial class LibraryVisualStage : Grid
                         return;
                     }
 
-                    _media.BeginAnimation(OpacityProperty, null);
-                    _media.Opacity = 1;
+                    _dxgiHost.BeginAnimation(OpacityProperty, null);
+                    _dxgiHost.Opacity = 1;
                 };
-                _media.BeginAnimation(OpacityProperty, anim);
+                _dxgiHost.BeginAnimation(OpacityProperty, anim);
             },
             DispatcherPriority.Render);
     }
@@ -949,13 +870,12 @@ internal sealed partial class LibraryVisualStage : Grid
         FadeDimOpacity(0, instant: false, LibraryPlayerMode.ChromeFadeSeconds);
         SyncPreviewFx(active: false, instant: true);
         PlayRealtime(pos, restartClock: true);
-        _media.BeginAnimation(OpacityProperty, null);
-        _media.Opacity = 1;
+        _dxgiHost.BeginAnimation(OpacityProperty, null);
+        _dxgiHost.Opacity = 1;
     }
 
     /// <summary>
-    /// 本再生の 1 倍へ戻す。速度ランプ中／1/3 速プレビュー中は MediaElement をいったん止め、
-    /// 低速指定を捨ててから 1 倍で Play し直す（SpeedRatio だけの書換は遅れて効く）。
+    /// 本再生の 1 倍へ戻す。速度ランプ中／1/3 速プレビュー中は映像クロックを 1 倍へ戻す。
     /// </summary>
     private void PlayRealtime(TimeSpan position, bool restartClock)
     {
@@ -963,41 +883,9 @@ internal sealed partial class LibraryVisualStage : Grid
         var previewSpeed = Math.Abs(_visualSpeed - 1) > 0.001;
         CancelPreviewSpeedRamp();
         var hardReset = ramping || previewSpeed;
-        if (hardReset)
-        {
-            PauseMedia();
-            ForceMediaSpeedRatio(1);
-            SetMediaPosition(position);
-        }
-
-        PlayMedia(speedRatio: 1);
         if (restartClock || hardReset)
         {
             BeginVisualClock(position, speed: 1);
-        }
-    }
-
-    private void ForceMediaSpeedRatio(double speedRatio)
-    {
-        if (UsingDxgi)
-        {
-            return;
-        }
-
-        try
-        {
-            _media.SpeedRatio = speedRatio;
-        }
-        catch
-        {
-        }
-
-        try
-        {
-            _spillMedia.SpeedRatio = speedRatio;
-        }
-        catch
-        {
         }
     }
 
@@ -1006,8 +894,6 @@ internal sealed partial class LibraryVisualStage : Grid
     {
         CancelPreviewSpeedRamp();
         var ticket = _previewSpeedRampTicket;
-        // Play は開始時だけ。Tick ごとに Play/SpeedRatio を叩き直すとデコーダが途切れる。
-        PlayMedia(speedRatio: 1);
         BeginVisualClock(position, speed: 1);
         _previewSpeedRampWatch.Restart();
         var timer = new DispatcherTimer(DispatcherPriority.Background)
@@ -1044,22 +930,11 @@ internal sealed partial class LibraryVisualStage : Grid
         timer.Start();
     }
 
-    /// <summary>
-    /// プレビュー速度を反映する。ランプ中は SpeedRatio だけ更新し、Play し直さない。
-    /// </summary>
+    /// <summary>プレビュー速度を映像クロックへ反映する。</summary>
     private void ApplyPreviewSpeed(double speed, bool restartPlayback)
     {
-        var pos = CurrentVisualPosition();
-        if (restartPlayback)
-        {
-            PlayMedia(speed);
-        }
-        else if (Math.Abs(speed - _visualSpeed) >= 0.01)
-        {
-            ForceMediaSpeedRatio(speed);
-        }
-
-        BeginVisualClock(pos, speed);
+        _ = restartPlayback;
+        BeginVisualClock(CurrentVisualPosition(), speed);
     }
 
     /// <summary>ホバーは常に 0 秒から。暗転の自動スキップはしない。</summary>
@@ -1140,15 +1015,14 @@ internal sealed partial class LibraryVisualStage : Grid
 
         CancelPreviewSpeedRamp();
         BeginVisualClock(_previewLoopStart, PreviewLoopSpeed);
-        PlayMedia(PreviewLoopSpeed);
         if (fadeIn)
         {
             BeginVideoFadeIn();
         }
         else
         {
-            _media.BeginAnimation(OpacityProperty, null);
-            _media.Opacity = 1;
+            _dxgiHost.BeginAnimation(OpacityProperty, null);
+            _dxgiHost.Opacity = 1;
         }
     }
 
@@ -1160,8 +1034,6 @@ internal sealed partial class LibraryVisualStage : Grid
         }
 
         CancelPreviewSpeedRamp();
-        SetMediaPosition(_previewLoopStart);
-        PlayMedia(PreviewLoopSpeed);
         BeginVisualClock(_previewLoopStart, PreviewLoopSpeed);
     }
 
@@ -1193,31 +1065,23 @@ internal sealed partial class LibraryVisualStage : Grid
                 CancelPreviewSpeedRamp();
                 if (LibraryPlayerMode.VideoSeekIsShuttleScrub(_playing, _visualClock.IsRunning))
                 {
-                    // テンキー 1／3: 一時停止のままコマ送り。Play すると 1 倍に戻る。
-                    PauseMedia();
-                    _visualOrigin = position < TimeSpan.Zero ? TimeSpan.Zero : position;
-                    _visualSpeed = 0;
+                    // テンキー 1／3: 一時停止のままコマ送り。再開すると 1 倍に戻る。
+                    StopVisualClock(position);
                 }
                 else
                 {
-                    PlayMedia(speedRatio: 1);
                     BeginVisualClock(position, speed: 1);
                 }
             }
             else if (_framePaused)
             {
                 CancelPreviewSpeedRamp();
-                // MediaEnded 直後は Pause＋Position だけでは黒のまま残ることがある。
-                // 一度 Play→Pause して、止めた位置のフレームを描画させる。
-                PlayMedia(speedRatio: 1);
-                PauseMedia();
                 StopVisualClock(position);
             }
             else
             {
                 // 暗い選択プレビューの 1/3 速ループは維持する（シークでランプは切る）。
                 CancelPreviewSpeedRamp();
-                PlayMedia(PreviewLoopSpeed);
                 BeginVisualClock(position, PreviewLoopSpeed);
             }
 
@@ -1315,19 +1179,7 @@ internal sealed partial class LibraryVisualStage : Grid
             return pos;
         }
 
-        if (_visualOrigin > TimeSpan.Zero)
-        {
-            return _visualOrigin;
-        }
-
-        try
-        {
-            return _media.Position;
-        }
-        catch
-        {
-            return TimeSpan.Zero;
-        }
+        return _visualOrigin > TimeSpan.Zero ? _visualOrigin : TimeSpan.Zero;
     }
 
     private void BeginVisualClock(TimeSpan origin, double speed)
@@ -1340,7 +1192,7 @@ internal sealed partial class LibraryVisualStage : Grid
             return;
         }
 
-        // クロックが走る（再生／プレビューループ）ならスクラブ プレビューは終わり。DXGI 以外では何もしない。
+        // クロックが走る（再生／プレビューループ）ならスクラブ プレビューは終わり。
         SetDxgiScrubPreview(false);
         _visualClock.Restart();
     }
@@ -1367,20 +1219,9 @@ internal sealed partial class LibraryVisualStage : Grid
             return;
         }
 
-        // MediaElement の負の SpeedRatio／高速再生はカクつきやすい。
         // 早送り・巻き戻しは一時停止して Position スクラブで追従する。
         if (ratio <= 0)
         {
-            try
-            {
-                _media.SpeedRatio = 1;
-                _spillMedia.SpeedRatio = 1;
-            }
-            catch
-            {
-            }
-
-            PauseMedia();
             // _playing は維持し、Stop 時に同じ本再生として 1 倍へ戻せるようにする。
             StopVisualClock(CurrentVisualPosition());
             return;
@@ -1388,13 +1229,12 @@ internal sealed partial class LibraryVisualStage : Grid
 
         if (Math.Abs(ratio - 1) > 0.001)
         {
-            // 本再生の再開以外の倍率は MediaElement に任せず、呼び出し側のプレビュー経路を使う。
+            // 本再生の再開以外の倍率は映像クロック側（プレビュー経路）へ任せる。
             return;
         }
 
         if (_playing)
         {
-            PlayMedia(speedRatio: 1);
             BeginVisualClock(CurrentVisualPosition(), speed: 1);
             return;
         }
@@ -1403,7 +1243,6 @@ internal sealed partial class LibraryVisualStage : Grid
         if (!_framePaused)
         {
             CancelPreviewSpeedRamp();
-            PlayMedia(PreviewLoopSpeed);
             BeginVisualClock(CurrentVisualPosition(), PreviewLoopSpeed);
         }
     }
@@ -1510,15 +1349,8 @@ internal sealed partial class LibraryVisualStage : Grid
         StopDxgiPresenter();
     }
 
-    private TimeSpan MediaSeekLimit()
-    {
-        if (UsingDxgi)
-        {
-            return Duration > TimeSpan.Zero ? Duration : TimeSpan.MaxValue;
-        }
-
-        return _media.NaturalDuration.HasTimeSpan ? _media.NaturalDuration.TimeSpan : TimeSpan.MaxValue;
-    }
+    private TimeSpan MediaSeekLimit() =>
+        Duration > TimeSpan.Zero ? Duration : TimeSpan.MaxValue;
 
     /// <summary>
     /// 波形・メーター・ファイル名の矩形だけ少し暗くする。clip はステージ座標。
@@ -1653,41 +1485,54 @@ internal sealed partial class LibraryVisualStage : Grid
         });
     }
 
+    private void SetMediaSource(Uri uri) =>
+        OpenDxgiSource(uri.IsFile ? uri.LocalPath : uri.OriginalString);
+
+    private void ClearMediaSource() => HideHudFrost();
+
+    private void SetMediaPosition(TimeSpan position) =>
+        _ = position;
+
+    /// <summary>DXGI では常にクロック位置へ追従するので、近接シークの特別扱いは不要。</summary>
+    private void SeekMediaIfNeeded(TimeSpan position) => SetMediaPosition(position);
+
+    private void PlayMedia(double speedRatio) => _ = speedRatio;
+
+    private void PauseMedia()
+    {
+    }
+
     /// <summary>
-    /// 映像とステージのアスペクトがずれて黒帯が出るときだけ、再生中フレームの光漏れを出す。
+    /// 映像とステージのアスペクトがずれて黒帯が出るとき（非最大化の窓でも起き得る）だけ光漏れを出す。
+    /// 映像の表示矩形へ枠を置き、原映像を枠いっぱいに塗って中心から 1.12 倍・強ぼかしで縁へこぼす。
+    /// 中身は <see cref="UpdateAmbientSpillFrame"/> の縮小 CPU ビットマップ。DXGI の帯は透明クリアなので、
+    /// 本編ホストの背面に置いたこの層が帯から透けて見える。
     /// </summary>
     private void SyncAmbientSpill()
     {
-        if (!_video || !IsShown || UsingDxgi)
+        if (!_video
+            || !IsShown
+            || !WantsAmbientSpill(_dxgiWidth, _dxgiHeight, ActualWidth, ActualHeight))
         {
             ClearAmbientSpill();
             return;
         }
 
-        var width = _media.NaturalVideoWidth;
-        var height = _media.NaturalVideoHeight;
-        if (width <= 0
-            || height <= 0
-            || !WantsAmbientSpill(width, height, ActualWidth, ActualHeight))
-        {
-            PauseSpillMedia();
-            _spillHost.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        LayoutAmbientSpill(width, height);
+        LayoutAmbientSpill();
         _spillHost.Visibility = Visibility.Visible;
-        MirrorSpillTransport();
+        // 初回表示や再表示で中身がまだ無いときは、直近フレームで一度埋める（以後は present ごとに更新）。
+        if (_spillBitmap is null && _dxgiLastFrame is not null)
+        {
+            UpdateAmbientSpillFrame(_dxgiLastFrame);
+        }
     }
 
-    private void LayoutAmbientSpill(int naturalWidth, int naturalHeight)
+    /// <summary>光漏れ枠を映像の表示矩形（Stretch.Uniform 相当）へ合わせる。</summary>
+    private void LayoutAmbientSpill()
     {
-        var rect = UniformContentRect(naturalWidth, naturalHeight, ActualWidth, ActualHeight);
-        if (rect.IsEmpty)
+        var rect = UniformContentRect(_dxgiWidth, _dxgiHeight, ActualWidth, ActualHeight);
+        if (rect.IsEmpty || rect.Width < 1 || rect.Height < 1)
         {
-            _spill.Width = 0;
-            _spill.Height = 0;
-            _spill.Margin = new Thickness(0);
             return;
         }
 
@@ -1696,197 +1541,50 @@ internal sealed partial class LibraryVisualStage : Grid
         _spill.Margin = new Thickness(rect.X, rect.Y, 0, 0);
     }
 
+    /// <summary>デコード済みフレームを縮小して光漏れビットマップへ書く。NV12／BGRA 両対応。</summary>
+    private void UpdateAmbientSpillFrame(DxgiDecodedFrame frame)
+    {
+        if (_spillHost.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        var (dw, dh) = AmbientSpillFrame.DownscaledSize(frame.Width, frame.Height);
+        if (dw <= 0 || dh <= 0)
+        {
+            return;
+        }
+
+        var need = dw * dh * 4;
+        if (_spillScratch is null || _spillScratch.Length < need)
+        {
+            _spillScratch = new byte[need];
+        }
+
+        AmbientSpillFrame.FillBgra(frame, _spillScratch, dw, dh);
+        WriteSpillBitmap(dw, dh);
+    }
+
+    private void WriteSpillBitmap(int width, int height)
+    {
+        if (_spillScratch is null)
+        {
+            return;
+        }
+
+        if (_spillBitmap is null || _spillBitmap.PixelWidth != width || _spillBitmap.PixelHeight != height)
+        {
+            _spillBitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgra32, null);
+            _spillImage.Source = _spillBitmap;
+        }
+
+        _spillBitmap.WritePixels(new Int32Rect(0, 0, width, height), _spillScratch, width * 4, 0);
+    }
+
     private void ClearAmbientSpill()
     {
-        PauseSpillMedia();
         _spillHost.Visibility = Visibility.Collapsed;
-        _spill.Width = 0;
-        _spill.Height = 0;
-        _spill.Margin = new Thickness(0);
-    }
-
-    private void SetMediaSource(Uri uri)
-    {
-        if (UsingDxgi)
-        {
-            OpenDxgiSource(uri.IsFile ? uri.LocalPath : uri.OriginalString);
-            return;
-        }
-
-        _media.Source = uri;
-        try
-        {
-            _spillMedia.Source = uri;
-        }
-        catch
-        {
-        }
-    }
-
-    private void ClearMediaSource()
-    {
-        try
-        {
-            _media.Stop();
-            _media.Source = null;
-        }
-        catch
-        {
-        }
-
-        try
-        {
-            _spillMedia.Stop();
-            _spillMedia.Source = null;
-        }
-        catch
-        {
-        }
-
-        HideHudFrost();
-    }
-
-    private void SetMediaPosition(TimeSpan position)
-    {
-        if (UsingDxgi)
-        {
-            return;
-        }
-
-        try
-        {
-            _media.Position = position;
-        }
-        catch
-        {
-        }
-
-        try
-        {
-            _spillMedia.Position = position;
-        }
-        catch
-        {
-        }
-    }
-
-    /// <summary>すでに近い位置ならシークしない（本再生→プレビュー移行の一発ヒッチ対策）。</summary>
-    private void SeekMediaIfNeeded(TimeSpan position)
-    {
-        if (UsingDxgi)
-        {
-            return;
-        }
-
-        try
-        {
-            if (Math.Abs((_media.Position - position).TotalMilliseconds) < 80)
-            {
-                return;
-            }
-        }
-        catch
-        {
-        }
-
-        SetMediaPosition(position);
-    }
-
-    private void PlayMedia(double speedRatio)
-    {
-        if (UsingDxgi)
-        {
-            return;
-        }
-
-        try
-        {
-            _media.Volume = 0;
-            _media.SpeedRatio = speedRatio;
-            _media.Play();
-        }
-        catch
-        {
-        }
-
-        if (_spillHost.Visibility == Visibility.Visible)
-        {
-            try
-            {
-                _spillMedia.Volume = 0;
-                _spillMedia.SpeedRatio = speedRatio;
-                _spillMedia.Play();
-            }
-            catch
-            {
-            }
-        }
-    }
-
-    private void PauseMedia()
-    {
-        if (UsingDxgi)
-        {
-            return;
-        }
-
-        try
-        {
-            _media.Pause();
-        }
-        catch
-        {
-        }
-
-        PauseSpillMedia();
-    }
-
-    private void PauseSpillMedia()
-    {
-        try
-        {
-            _spillMedia.Pause();
-        }
-        catch
-        {
-        }
-    }
-
-    /// <summary>本編の位置・速度に光漏れ側を合わせる。</summary>
-    private void MirrorSpillTransport()
-    {
-        if (_spillHost.Visibility != Visibility.Visible || !_video)
-        {
-            return;
-        }
-
-        // フレーム一時停止中に SizeChanged→Sync で Play すると光漏れだけ 1 倍で回り出す。
-        if (_framePaused)
-        {
-            try
-            {
-                _spillMedia.Position = _media.Position;
-            }
-            catch
-            {
-            }
-
-            PauseSpillMedia();
-            return;
-        }
-
-        try
-        {
-            _spillMedia.Volume = 0;
-            // 暗いプレビュー中は映像クロック速度（ランプ中も含む）に揃える。
-            _spillMedia.SpeedRatio = _playing
-                ? _media.SpeedRatio
-                : (_visualSpeed > 0 ? _visualSpeed : PreviewLoopSpeed);
-            _spillMedia.Position = _media.Position;
-            _spillMedia.Play();
-        }
-        catch
-        {
-        }
+        _spillImage.Source = null;
+        _spillBitmap = null;
     }
 }
