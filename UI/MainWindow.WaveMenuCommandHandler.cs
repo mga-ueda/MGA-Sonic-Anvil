@@ -531,8 +531,7 @@ public partial class MainWindow
                 WaapiBar.ToggleKeepTarget();
                 break;
             case WaveMenuCommand.AutoActive:
-                WaapiBar.AutoActiveChecked = !WaapiBar.AutoActiveChecked;
-                PersistWaapiSettings();
+                ToggleAutoActive();
                 break;
             case WaveMenuCommand.OutputFolder:
                 BrowseExportOutputFolder();

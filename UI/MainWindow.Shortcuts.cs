@@ -1316,16 +1316,26 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.E && modifiers == LibraryPlayerMode.AltShift && _waapiPanelVisible)
+        // Play -E／Auto Active は WAAPI バーが表示されているときだけトグル（非表示時は握らない）。
+        if (key == Key.E && modifiers == LibraryPlayerMode.AltShift)
         {
+            if (!IsWaapiBarShown)
+            {
+                return false;
+            }
+
             TogglePlayPostExit();
             return true;
         }
 
-        if (key == Key.A && modifiers == LibraryPlayerMode.AltShift && _waapiPanelVisible)
+        if (key == Key.A && modifiers == LibraryPlayerMode.AltShift)
         {
-            WaapiBar.AutoActiveChecked = !WaapiBar.AutoActiveChecked;
-            PersistWaapiSettings();
+            if (!IsWaapiBarShown)
+            {
+                return false;
+            }
+
+            ToggleAutoActive();
             return true;
         }
 
