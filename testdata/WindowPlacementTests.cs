@@ -548,7 +548,7 @@ public sealed class WindowPlacementTests
     [Fact]
     public void TryReadMinimalPlayer_AcceptsSavedBounds()
     {
-        var width = DesignMetrics.MinimalPlayerWindowMinWidth + 40;
+        var width = DesignMetrics.WindowMinWidth + 40;
         var settings = new AppSettings
         {
             MinimalPlayerWindowX = 15,
@@ -559,7 +559,7 @@ public sealed class WindowPlacementTests
         };
         Assert.True(WindowPlacement.TryReadMinimalPlayer(
             settings,
-            DesignMetrics.MinimalPlayerWindowMinWidth,
+            DesignMetrics.WindowMinWidth,
             DesignMetrics.WindowMinHeight,
             out var bounds,
             out var maximized));
@@ -571,10 +571,9 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
-    public void TryReadMinimalPlayer_AcceptsWidthBelowEditorMinimum()
+    public void TryReadMinimalPlayer_RejectsWidthBelowSharedMinimum()
     {
-        Assert.True(DesignMetrics.MinimalPlayerWindowMinWidth < DesignMetrics.WindowMinWidth);
-        var width = (int)Math.Ceiling(DesignMetrics.MinimalPlayerWindowMinWidth + 20);
+        var width = (int)Math.Ceiling(DesignMetrics.WindowMinWidth - 20);
         Assert.True(width < DesignMetrics.WindowMinWidth);
         var settings = new AppSettings
         {
@@ -584,14 +583,12 @@ public sealed class WindowPlacementTests
             MinimalPlayerWindowHeight = (int)Math.Ceiling(DesignMetrics.WindowMinHeight + 40),
             MinimalPlayerWindowState = nameof(WindowState.Normal),
         };
-        Assert.True(WindowPlacement.TryReadMinimalPlayer(
+        Assert.False(WindowPlacement.TryReadMinimalPlayer(
             settings,
-            DesignMetrics.MinimalPlayerWindowMinWidth,
+            DesignMetrics.WindowMinWidth,
             DesignMetrics.WindowMinHeight,
-            out var bounds,
-            out var maximized));
-        Assert.False(maximized);
-        Assert.Equal(width, bounds.Width);
+            out _,
+            out _));
     }
 
     [Fact]
@@ -599,7 +596,7 @@ public sealed class WindowPlacementTests
     {
         Assert.False(WindowPlacement.TryReadMinimalPlayer(
             new AppSettings(),
-            DesignMetrics.MinimalPlayerWindowMinWidth,
+            DesignMetrics.WindowMinWidth,
             DesignMetrics.WindowMinHeight,
             out _,
             out _));
