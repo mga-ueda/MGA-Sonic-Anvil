@@ -40,16 +40,24 @@ internal static class AcrylicBackdrop
         lock (TrackGate)
         {
             PruneTracked();
+            var already = false;
             foreach (var weak in Tracked)
             {
                 if (weak.TryGetTarget(out var existing) && ReferenceEquals(existing, window))
                 {
-                    return;
+                    already = true;
+                    break;
                 }
             }
 
-            Tracked.Add(new WeakReference<Window>(window));
+            if (!already)
+            {
+                Tracked.Add(new WeakReference<Window>(window));
+            }
         }
+
+        window.Closed -= OnTrackedClosed;
+        window.Closed += OnTrackedClosed;
     }
 
     /// <summary>色設定のライブ更新後に、開いているすりガラス窓へティントを載せ直す。</summary>
@@ -68,10 +76,14 @@ internal static class AcrylicBackdrop
 
         foreach (var window in live)
         {
-            if (window.IsLoaded)
+            // 閉じ済み窓へ EnsureHandle すると InvalidOperationException になるため、既存 HWND のみ載せ直す。
+            var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero)
             {
-                Apply(window);
+                continue;
             }
+
+            Apply(hwnd);
         }
     }
 
@@ -82,7 +94,17 @@ internal static class AcrylicBackdrop
     {
         ArgumentNullException.ThrowIfNull(window);
 
-        var hwnd = new WindowInteropHelper(window).EnsureHandle();
+        IntPtr hwnd;
+        try
+        {
+            hwnd = new WindowInteropHelper(window).EnsureHandle();
+        }
+        catch (InvalidOperationException)
+        {
+            // Close 後（または Closing 中）の EnsureHandle は不可。
+            return;
+        }
+
         var source = HwndSource.FromHwnd(hwnd);
         if (source?.CompositionTarget is not null)
         {
@@ -207,10 +229,31 @@ internal static class AcrylicBackdrop
         _ = SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(exStyle & ~WsExLayered));
     }
 
+    private static void OnTrackedClosed(object? sender, EventArgs e)
+    {
+        if (sender is not Window window)
+        {
+            return;
+        }
+
+        window.Closed -= OnTrackedClosed;
+        lock (TrackGate)
+        {
+            for (var i = Tracked.Count - 1; i >= 0; i--)
+            {
+                if (!Tracked[i].TryGetTarget(out var existing) || ReferenceEquals(existing, window))
+                {
+                    Tracked.RemoveAt(i);
+                }
+            }
+        }
+    }
+
     private static void PruneTracked()
     {
         for (var i = Tracked.Count - 1; i >= 0; i--)
         {
+            // 未 Show の窓は Handle==0 / IsLoaded==false なので、閉じ判定は Closed で外す。
             if (!Tracked[i].TryGetTarget(out _))
             {
                 Tracked.RemoveAt(i);
