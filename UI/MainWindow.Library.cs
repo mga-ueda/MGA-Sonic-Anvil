@@ -272,7 +272,7 @@ public partial class MainWindow
                 && !LibraryPlaylistDocuments.IsVisual(_document));
 
     /// <summary>
-    /// Shift＋テンキー 1／3／7／9・J／K で選択を伸ばせるか。
+    /// Shift＋J／K で選択を伸ばせるか。
     /// エディタ全般、およびプレイヤーでシーク＆選択できる波形（捨てキューと同じコンテキスト。暗いプレビューは不可）。
     /// </summary>
     private bool AllowsWaveformSelectionTransport() =>
@@ -4743,11 +4743,10 @@ public partial class MainWindow
     {
         if (_transportSelectionExtend)
         {
+            // 選択付きシークは Shift＋J／K のみ（テンキーは割り当てなし）。
             var expected = direction < 0 ? 7 : 9;
             var keyDown = _transportSelectionDigit == expected
-                || (direction < 0
-                    ? Keyboard.IsKeyDown(Key.NumPad7) || Keyboard.IsKeyDown(Key.J)
-                    : Keyboard.IsKeyDown(Key.NumPad9) || Keyboard.IsKeyDown(Key.K));
+                || (direction < 0 ? Keyboard.IsKeyDown(Key.J) : Keyboard.IsKeyDown(Key.K));
             return keyDown
                 && (Keyboard.Modifiers & ModifierKeys.Shift) != 0
                 && (Keyboard.Modifiers & ~(ModifierKeys.Shift)) == 0;

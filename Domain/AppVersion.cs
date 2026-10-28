@@ -13,6 +13,7 @@ internal static partial class AppVersion
     public const string GitHubOwner = "mga-ueda";
     public const string GitHubRepo = "MGA-Sonic-Anvil";
     public const string RepositoryUrl = "https://github.com/" + GitHubOwner + "/" + GitHubRepo;
+    public const string ReleasesUrl = RepositoryUrl + "/releases";
     public const string LicenseUrl = RepositoryUrl + "/blob/main/LICENSE";
     public const string ThirdPartyNoticesUrl = RepositoryUrl + "/blob/main/THIRD_PARTY_NOTICES.md";
     public const string EffetuneProjectUrl = "https://github.com/Frieve-A/effetune";

@@ -1533,7 +1533,7 @@ public sealed class LibraryPlayerModeTests
     [Fact]
     public void PlayerDigitJump_PercentPlain_MarkerWithShift()
     {
-        // プレイヤー／エディタ共通でテンキー再生操作。上段は割合／Shift＋マーカー。
+        // プレイヤー／エディタ共通でテンキー再生操作。上段は割合／Ctrl＋マーカー。
         Assert.True(LibraryPlayerMode.UsesTransportNumpad());
 
         Assert.True(LibraryPlayerMode.IsPlayerNumpadKey(Key.NumPad7, ModifierKeys.None));
@@ -1554,42 +1554,42 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad7, ModifierKeys.Control));
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.D5, ModifierKeys.None));
 
-        Assert.True(LibraryPlayerMode.IsNumpadSelectionTransport(Key.NumPad7, ModifierKeys.Shift));
-        Assert.True(LibraryPlayerMode.IsNumpadSelectionTransport(Key.NumPad1, ModifierKeys.Shift));
-        Assert.True(LibraryPlayerMode.IsNumpadSelectionTransport(Key.J, ModifierKeys.Shift));
-        Assert.True(LibraryPlayerMode.IsNumpadSelectionTransport(Key.K, ModifierKeys.Shift));
-        Assert.False(LibraryPlayerMode.IsNumpadSelectionTransport(Key.NumPad7, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.IsNumpadSelectionTransport(Key.J, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.IsNumpadSelectionTransport(Key.NumPad5, ModifierKeys.Shift));
-        Assert.False(LibraryPlayerMode.IsNumpadSelectionTransport(Key.D7, ModifierKeys.Shift));
+        // 選択付きシークは Shift＋J／K だけ。Shift＋テンキーは NumLock オンで化けるため割り当てない。
+        Assert.True(LibraryPlayerMode.IsSelectionTransportKey(Key.J, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsSelectionTransportKey(Key.K, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsSelectionTransportKey(Key.NumPad7, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsSelectionTransportKey(Key.NumPad1, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsSelectionTransportKey(Key.J, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.TrySelectionTransportDigit(Key.J, out var jDigit));
         Assert.Equal(7, jDigit);
         Assert.True(LibraryPlayerMode.TrySelectionTransportDigit(Key.K, out var kDigit));
         Assert.Equal(9, kDigit);
+        Assert.False(LibraryPlayerMode.TrySelectionTransportDigit(Key.NumPad7, out _));
         Assert.Equal(LibraryNumpadCommand.SeekBack, LibraryPlayerMode.NumpadSelectionTransportCommand(7));
         Assert.Equal(LibraryNumpadCommand.SeekForward, LibraryPlayerMode.NumpadSelectionTransportCommand(9));
-        Assert.Equal(LibraryNumpadCommand.Rewind, LibraryPlayerMode.NumpadSelectionTransportCommand(1));
-        Assert.Equal(LibraryNumpadCommand.FastForward, LibraryPlayerMode.NumpadSelectionTransportCommand(3));
-        Assert.True(LibraryPlayerMode.TryNumpadScanDigit(0x47, out var scan7));
-        Assert.Equal(7, scan7);
+        Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.NumpadSelectionTransportCommand(1));
 
         Assert.True(LibraryPlayerMode.IsTopRowDigitKey(Key.D5));
         Assert.False(LibraryPlayerMode.IsTopRowDigitKey(Key.NumPad5));
         Assert.True(LibraryPlayerMode.IsPercentDigitJump(Key.D5, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPercentDigitJump(Key.NumPad5, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.NumPad5, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.IsMarkerDigitJump(Key.D5, ModifierKeys.Shift));
-        Assert.False(LibraryPlayerMode.IsMarkerDigitJump(Key.NumPad5, ModifierKeys.Shift));
+        // 上段: Ctrl＝マーカー、Shift＝リージョン。
+        Assert.True(LibraryPlayerMode.IsMarkerDigitJump(Key.D5, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsMarkerDigitJump(Key.D5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsMarkerDigitJump(Key.NumPad5, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.NumPad5, ModifierKeys.Shift));
-        Assert.True(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.Shift));
-        Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.D5, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.NumPad5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsDigitJumpChord(Key.NumPad5, ModifierKeys.Control));
+        // Ctrl＋テンキーはマーカー番号（Shift＋テンキーは NumLock オンで化けるため使わない）。
+        Assert.True(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad0, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.None));
-        Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.Control));
-        Assert.True(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Control));
-        Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.NumPad5, ModifierKeys.Control));
-        Assert.True(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.NumPad5, ModifierKeys.Control));
-        Assert.False(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.D5, ModifierKeys.Control));
-        Assert.False(LibraryPlayerMode.IsNumpadRegionDigitJump(Key.NumPad5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.D5, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.IsNumpadMarkerDigitJump(Key.NumPad5, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.NumPad1, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.D1, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsNumpadPercentDigitJump(Key.NumPad1, ModifierKeys.None));
@@ -1601,14 +1601,8 @@ public sealed class LibraryPlayerModeTests
         // Win＋Alt＋テンキーは他アプリのホットキーへ通す（こちらでは割合にしない）。
         Assert.False(LibraryPlayerMode.IsAltNumpadPercentVirtualKey(
             0x61, altDown: true, shiftDown: false, ctrlDown: false, winDown: true));
-        Assert.False(LibraryPlayerMode.IsTranslatedNumpadAltPercent(
-            altDown: true, shiftDown: false, ctrlDown: false, winDown: true));
-        Assert.False(LibraryPlayerMode.IsTranslatedNumpadShiftJump(
-            altDown: false, ctrlDown: false, winDown: true));
         Assert.False(LibraryPlayerMode.IsStaleSysNumpad(
             0x61, systemKey: true, altModifierActive: false, shiftDown: false, ctrlDown: false, winDown: true));
-        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(
-            Scan(0x4F), shiftDown: true, ctrlDown: false, altDown: false, out _, winDown: true));
         Assert.Equal(LibraryNumpadCommand.None, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, ModifierKeys.Alt));
 
         // Alt を離した直後（物理状態が残っていても）は修飾なし。テンキー 1 は巻き戻し。
@@ -1633,14 +1627,11 @@ public sealed class LibraryPlayerModeTests
             ? ModifierKeys.None
             : ModifierKeys.Alt;
         Assert.Equal(LibraryNumpadCommand.Rewind, LibraryPlayerMode.PlayerNumpadCommand(Key.NumPad1, afterAlt));
-        Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsRegionDigitJump(Key.D5, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsDigitJumpChord(Key.D5, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: true));
         Assert.False(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: true, hasScratchMarkers: false));
         Assert.False(LibraryPlayerMode.CanPlayerMarkerDigitJump(playerMarkerContext: false, hasScratchMarkers: true));
-        Assert.True(LibraryPlayerMode.AllowsDocumentRegionDigitJump(playerMode: false));
-        Assert.False(LibraryPlayerMode.AllowsDocumentRegionDigitJump(playerMode: true));
-
         // 上段の二桁: 1→2 で 12、1→0 で 10。
         Assert.True(LibraryPlayerMode.TryResolveMarkerDigitJump(0, 1, 12, out var p1, out var s1, out var pct1));
         Assert.Equal(1, p1);
@@ -1677,36 +1668,6 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(Key.NumPad7, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.NumPad7));
         Assert.Equal(Key.ImeProcessed, LibraryPlayerMode.ResolveDigitKey(Key.ImeProcessed, Key.A));
         Assert.Equal(Key.D3, LibraryPlayerMode.ResolveDigitKey(Key.D3, Key.D5));
-        Assert.True(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x4F), shiftDown: true, ctrlDown: false, altDown: false, out var one));
-        Assert.Equal(1, one);
-        Assert.True(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x47), shiftDown: true, ctrlDown: false, altDown: false, out var seven));
-        Assert.Equal(7, seven);
-        Assert.True(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x52), shiftDown: true, ctrlDown: false, altDown: false, out var zero));
-        Assert.Equal(0, zero);
-        Assert.True(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x49), shiftDown: true, ctrlDown: false, altDown: false, out var nine));
-        Assert.Equal(9, nine);
-        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x47, extended: true), shiftDown: true, ctrlDown: false, altDown: false, out _));
-        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x4F), shiftDown: false, ctrlDown: false, altDown: false, out _));
-        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x4F), shiftDown: true, ctrlDown: true, altDown: false, out _));
-        Assert.False(LibraryPlayerMode.TryShiftedNumpadDigit(Scan(0x4F), shiftDown: true, ctrlDown: false, altDown: true, out _));
-        Assert.True(LibraryPlayerMode.TryTranslatedNumpadDigit(0x23, 0x4F, extended: false, numLockOn: true, out var translatedOne));
-        Assert.Equal(1, translatedOne);
-        Assert.True(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: false, numLockOn: true, out var translatedSeven));
-        Assert.Equal(7, translatedSeven);
-        Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: true, numLockOn: true, out _));
-        Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x67, 0x47, extended: false, numLockOn: true, out _));
-        Assert.False(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: false, numLockOn: false, out _));
-        // Alt＋テンキーが Home 等に化けても Shift 番号ジャンプにせず、割合へ。
-        Assert.True(LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown: true, shiftDown: false, ctrlDown: false));
-        Assert.False(LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown: true, ctrlDown: false));
-        Assert.False(LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown: true, shiftDown: true, ctrlDown: false));
-        Assert.False(LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown: false, shiftDown: false, ctrlDown: false));
-        Assert.True(LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown: false, ctrlDown: false));
-        Assert.False(LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown: false, ctrlDown: true));
-        Assert.True(LibraryPlayerMode.TryTranslatedNumpadDigit(0x24, 0x47, extended: false, numLockOn: true, out var altSeven));
-        Assert.Equal(7, altSeven);
-        Assert.True(LibraryPlayerMode.IsTranslatedNumpadAltPercent(altDown: true, shiftDown: false, ctrlDown: false));
-        Assert.False(LibraryPlayerMode.IsTranslatedNumpadShiftJump(altDown: true, ctrlDown: false));
         Assert.True(LibraryPlayerMode.IsKeyRepeat(Scan(0x47, repeat: true)));
         Assert.False(LibraryPlayerMode.IsKeyRepeat(Scan(0x47)));
         Assert.Equal(5, LibraryPlayerMode.SeekNudgeSeconds);
@@ -1789,14 +1750,9 @@ public sealed class LibraryPlayerModeTests
     private static DocumentSession Session(string name) =>
         new(new AudioDocument([], 48000, 1, 16, AudioFileKind.Wave, name));
 
-    private static long Scan(int code, bool extended = false, bool repeat = false)
+    private static long Scan(int code, bool repeat = false)
     {
         long value = (long)code << 16;
-        if (extended)
-        {
-            value |= 0x01000000;
-        }
-
         if (repeat)
         {
             value |= 0x40000000;

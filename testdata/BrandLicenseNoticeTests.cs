@@ -39,6 +39,7 @@ public sealed class BrandLicenseNoticeTests
     [Fact]
     public void LicenseUrls_PointAtMitLameFfmpegAndThirdPartyNotices()
     {
+        Assert.Equal(AppVersion.RepositoryUrl + "/releases", AppVersion.ReleasesUrl);
         Assert.Equal(AppVersion.RepositoryUrl + "/blob/main/LICENSE", AppVersion.LicenseUrl);
         Assert.Equal(
             AppVersion.RepositoryUrl + "/blob/main/THIRD_PARTY_NOTICES.md",

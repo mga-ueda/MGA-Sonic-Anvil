@@ -350,6 +350,9 @@ internal static partial class UiStrings
         "Could not read THIRD_PARTY_NOTICES.md.");
     /// <summary>バージョン情報ダイアログの版表示。言語に関わらず Version。</summary>
     public static string AboutVersionLabel(string version) => "Version " + version;
+
+    /// <summary>バージョン情報ダイアログから GitHub Releases を開くリンク。言語に関わらず英語。</summary>
+    public const string AboutReleasesLink = "Release Page";
     public static string DialogSilenceDetectTitle => Get("無音・ヒット検出", "Silence & Hit Detection");
     public static string LabelSilenceDetectOpenThreshold => Get("オープンスレッショルド", "Open Threshold");
     public static string LabelSilenceDetectCloseThreshold => Get("クローズスレッショルド", "Close Threshold");
