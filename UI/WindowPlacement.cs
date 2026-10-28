@@ -1014,10 +1014,11 @@ internal static class WindowPlacement
         var hwnd = new WindowInteropHelper(window).Handle;
         if (hwnd != IntPtr.Zero)
         {
-            // Windows 11 のタスクバーは最前面。HWND_TOP のままでは窓がその裏に入る。
+            // 位置・寸法だけ合わせる。Z 順の最前面は呼び出し側の Topmost に任せる。
+            // ここで HWND_TOPMOST すると WPF の Topmost=false と食い違い、他アプリを隠す。
             SetWindowPos(
                 hwnd,
-                HwndTopMost,
+                HwndTop,
                 info.Monitor.Left,
                 info.Monitor.Top,
                 Math.Max(1, info.Monitor.Right - info.Monitor.Left),
@@ -1216,7 +1217,7 @@ internal static class WindowPlacement
     private const uint MonitorDefaultToNearest = 2;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpFrameChanged = 0x0020;
-    private static readonly IntPtr HwndTopMost = new(-1);
+    private static readonly IntPtr HwndTop = IntPtr.Zero;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint

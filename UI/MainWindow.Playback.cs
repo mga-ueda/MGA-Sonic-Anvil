@@ -2720,21 +2720,26 @@ public partial class MainWindow
 
     private void SyncShellFullscreen()
     {
-        var fullscreen = IsWaveformMaximized || _playlistVideoFullscreen;
+        // 非アクティブ時はシェル全画面も外す（他アプリ利用時にタスクバーが隠れたままにしない）。
+        var fullscreen = (IsWaveformMaximized || _playlistVideoFullscreen) && IsActive;
         WindowPlacement.SetShellFullscreen(this, fullscreen);
-        ApplyWindowTopmost();
         if (fullscreen)
         {
             WindowPlacement.TryCoverContainingMonitor(this);
         }
+
+        // 被覆のあとで Topmost を合わせる（アクティブな全画面／常に最前面）。
+        ApplyWindowTopmost();
     }
 
-    /// <summary>フルスクリーン中はタスクバーより前に出す。抜けたら「常に最前面」の設定に戻す。</summary>
+    /// <summary>
+    /// 「常に最前面」は常に従う。フルスクリーンはアクティブなときだけタスクバーより前に出し、
+    /// 非アクティブ時は他アプリを覆わない。
+    /// </summary>
     private void ApplyWindowTopmost()
     {
-        var want = AlwaysOnTopCheck.IsChecked == true
-            || IsWaveformMaximized
-            || _playlistVideoFullscreen;
+        var fullscreenFront = (IsWaveformMaximized || _playlistVideoFullscreen) && IsActive;
+        var want = AlwaysOnTopCheck.IsChecked == true || fullscreenFront;
         if (Topmost != want)
         {
             Topmost = want;
