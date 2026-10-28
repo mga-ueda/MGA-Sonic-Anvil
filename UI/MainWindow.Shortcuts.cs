@@ -695,6 +695,13 @@ public partial class MainWindow
         if (TryProcessShortcut(key, modifiers, e.IsRepeat))
         {
             e.Handled = true;
+            return;
+        }
+
+        // 未割り当ての Alt+Shift＋文字も AccessKeyManager に渡さない（例: WAAPI オフ時の Alt+Shift+E → 編集）。
+        if (MenuAccessKeys.IsAltShiftLetter(key, menuModifiers))
+        {
+            e.Handled = true;
         }
     }
 

@@ -678,6 +678,23 @@ public sealed class WaveformContextMenuTests
     }
 
     [Fact]
+    public void MenuAccessKeys_IsAltShiftLetter_BlocksMenuMnemonicsOnly()
+    {
+        // ルートメニューは Alt＋文字。Alt+Shift＋文字はアプリ用で AccessKey にしない。
+        Assert.True(MenuAccessKeys.IsAltShiftLetter(Key.E, ModifierKeys.Alt | ModifierKeys.Shift));
+        Assert.True(MenuAccessKeys.IsAltShiftLetter(Key.F, ModifierKeys.Alt | ModifierKeys.Shift));
+        Assert.True(MenuAccessKeys.IsAltShiftLetter(Key.A, LibraryPlayerMode.AltShift));
+        Assert.False(MenuAccessKeys.IsAltShiftLetter(Key.E, ModifierKeys.Alt));
+        Assert.False(MenuAccessKeys.IsAltShiftLetter(Key.E, ModifierKeys.Shift));
+        Assert.False(MenuAccessKeys.IsAltShiftLetter(Key.E, ModifierKeys.None));
+        Assert.False(MenuAccessKeys.IsAltShiftLetter(
+            Key.W,
+            ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift));
+        Assert.False(MenuAccessKeys.IsAltShiftLetter(Key.Enter, ModifierKeys.Alt | ModifierKeys.Shift));
+        Assert.False(MenuAccessKeys.IsAltShiftLetter(Key.F10, ModifierKeys.Alt | ModifierKeys.Shift));
+    }
+
+    [Fact]
     public void TopLevelMenuAccessKeys_DocumentAltShortcutConflicts()
     {
         // メニューバー表示時は Alt+文字がルートメニューを開く。

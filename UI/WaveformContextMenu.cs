@@ -359,6 +359,16 @@ internal static class MenuAccessKeys
         key == Key.Apps && modifiers == ModifierKeys.None
         || key == Key.F10 && modifiers == ModifierKeys.Shift;
 
+    /// <summary>
+    /// Alt+Shift＋A〜Z。ルートメニュー AccessKey は Alt＋文字のみ。
+    /// WPF AccessKeyManager は未処理の Alt+Shift＋文字でもメニューを開くことがあるため、呼び出し側で握る。
+    /// </summary>
+    public static bool IsAltShiftLetter(Key key, ModifierKeys modifiers) =>
+        FromKey(key) is not null
+        && (modifiers & ModifierKeys.Alt) != 0
+        && (modifiers & ModifierKeys.Shift) != 0
+        && (modifiers & (ModifierKeys.Control | ModifierKeys.Windows)) == 0;
+
     /// <summary>A〜Z のキーをメニューアクセスキー文字へ。それ以外は null。</summary>
     public static char? FromKey(Key key) =>
         key is >= Key.A and <= Key.Z
