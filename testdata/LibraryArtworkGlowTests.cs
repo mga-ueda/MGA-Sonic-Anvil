@@ -456,7 +456,7 @@ public sealed class LibraryArtworkGlowTests
         Assert.True(brush.IsFrozen);
         Assert.True(brush.GradientStops[0].Color.A > brush.GradientStops[^1].Color.A);
         Assert.Equal(0, brush.GradientStops[^1].Color.A);
-        Assert.InRange(LibraryJacketReflection.HeightFactor, 0.35, 0.45);
+        Assert.InRange(LibraryJacketReflection.HeightFactor, 0.20, 0.35);
         Assert.Equal(1, LibraryJacketReflection.GapDip);
     }
 

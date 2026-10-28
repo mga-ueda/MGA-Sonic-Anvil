@@ -1129,7 +1129,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     public void SeekPlaylistVisual(TimeSpan position) => _visualStage.Seek(position);
 
     /// <summary>ドラッグスクラブ用。再生中シークの蓄積を避ける。</summary>
-    /// <param name="scrubPreview">DXGI 経路だけ: ドラッグ中の粗いプレビュー。MediaElement 経路では無視される。</param>
+    /// <param name="scrubPreview">ドラッグ中の粗いプレビュー。静止後に false で正確な絵。</param>
     public void ScrubPlaylistVisual(TimeSpan position, bool scrubPreview = false) =>
         _visualStage.ScrubTo(position, scrubPreview);
 
@@ -1495,6 +1495,50 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         return index0Based >= 0 && count > 0;
+    }
+
+    /// <summary>
+    /// 表示順で <paramref name="anchor"/> の前後（削除対象を除く）。次グループ先頭を優先するため next を先に見る。
+    /// </summary>
+    public bool TryGetDisplayedNeighbors(
+        DocumentSession anchor,
+        HashSet<DocumentSession> dropSet,
+        out DocumentSession? next,
+        out DocumentSession? prev)
+    {
+        next = null;
+        prev = null;
+        DocumentSession? seen = null;
+        var foundAnchor = false;
+        foreach (var row in PlaylistDisplayRows())
+        {
+            if (row.Tag is not DocumentSession item)
+            {
+                continue;
+            }
+
+            if (ReferenceEquals(item, anchor) || dropSet.Contains(item))
+            {
+                if (ReferenceEquals(item, anchor))
+                {
+                    foundAnchor = true;
+                }
+
+                continue;
+            }
+
+            if (!foundAnchor)
+            {
+                seen = item;
+                continue;
+            }
+
+            next = item;
+            break;
+        }
+
+        prev = seen;
+        return foundAnchor || next is not null || prev is not null;
     }
 
     /// <summary>番号表示用。検索中でも登録全件の表示順を使う。</summary>
@@ -2805,13 +2849,14 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
-        var count = CountPlaylistFiles();
+        var files = SnapshotPlaylistFiles();
+        var count = files.Count;
         if (count <= 0)
         {
             return;
         }
 
-        var index = PlaylistFileIndexOfSelected();
+        var index = PlaylistFileIndexOfSelected(files);
         if (index < 0)
         {
             index = delta > 0 ? 0 : count - 1;
@@ -2832,18 +2877,49 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
-        ApplyMoveSelectionFile(index, extend);
+        ApplyMoveSelectionFile(index, extend, files);
+    }
+
+    /// <summary>
+    /// グループ境界へジャンプ。Ctrl+Shift+↑↓用。グループ無しは曲単位と同じ。
+    /// </summary>
+    public void MoveSelectionByGroup(int direction, bool extend = false)
+    {
+        if (direction == 0)
+        {
+            return;
+        }
+
+        var files = SnapshotPlaylistFiles();
+        var count = files.Count;
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var index = PlaylistFileIndexOfSelected(files);
+        if (index < 0)
+        {
+            index = direction > 0 ? 0 : count - 1;
+        }
+        else
+        {
+            index = FindPlaylistGroupEdgeIndex(files, index, direction);
+        }
+
+        ApplyMoveSelectionFile(index, extend, files);
     }
 
     public void MoveSelectionToEdge(int edge, bool extend = false)
     {
-        var index = LibraryPlayerMode.EdgeIndex(CountPlaylistFiles(), edge);
+        var files = SnapshotPlaylistFiles();
+        var index = LibraryPlayerMode.EdgeIndex(files.Count, edge);
         if (index < 0)
         {
             return;
         }
 
-        ApplyMoveSelectionFile(index, extend);
+        ApplyMoveSelectionFile(index, extend, files);
     }
 
     public void MoveSelectionPage(int direction, bool extend = false, bool wrap = true)
@@ -2857,21 +2933,26 @@ internal sealed partial class LibraryBrowserView : UserControl
         MoveSelection(direction < 0 ? -step : step, extend, wrap);
     }
 
-    private int CountPlaylistFiles()
+    private List<LibraryFileRow> SnapshotPlaylistFiles()
     {
-        var count = 0;
+        var files = new List<LibraryFileRow>(_items.Count);
         foreach (var row in PlaylistRows())
         {
             if (row.Tag is DocumentSession)
             {
-                count++;
+                files.Add(row);
             }
         }
 
-        return count;
+        return files;
     }
 
-    private int PlaylistFileIndexOfSelected()
+    private int CountPlaylistFiles() => SnapshotPlaylistFiles().Count;
+
+    private int PlaylistFileIndexOfSelected() =>
+        PlaylistFileIndexOfSelected(SnapshotPlaylistFiles());
+
+    private int PlaylistFileIndexOfSelected(IReadOnlyList<LibraryFileRow> files)
     {
         var selected = SelectedSession;
         if (selected is null)
@@ -2879,20 +2960,12 @@ internal sealed partial class LibraryBrowserView : UserControl
             return -1;
         }
 
-        var index = 0;
-        foreach (var row in PlaylistRows())
+        for (var i = 0; i < files.Count; i++)
         {
-            if (row.Tag is not DocumentSession session)
+            if (files[i].Tag is DocumentSession session && ReferenceEquals(session, selected))
             {
-                continue;
+                return i;
             }
-
-            if (ReferenceEquals(session, selected))
-            {
-                return index;
-            }
-
-            index++;
         }
 
         return -1;
@@ -2900,33 +2973,62 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     private LibraryFileRow? PlaylistFileAt(int index)
     {
-        var i = 0;
-        foreach (var row in PlaylistRows())
-        {
-            if (row.Tag is not DocumentSession)
-            {
-                continue;
-            }
-
-            if (i == index)
-            {
-                return row;
-            }
-
-            i++;
-        }
-
-        return null;
+        var files = SnapshotPlaylistFiles();
+        return (uint)index < (uint)files.Count ? files[index] : null;
     }
 
-    private void ApplyMoveSelectionFile(int index, bool extend)
+    /// <summary>現在グループの外へ出た先頭（↓）または末尾（↑）のファイル索引。</summary>
+    private static int FindPlaylistGroupEdgeIndex(
+        IReadOnlyList<LibraryFileRow> files,
+        int index,
+        int direction)
     {
-        var row = PlaylistFileAt(index);
-        if (row is null)
+        index = Math.Clamp(index, 0, files.Count - 1);
+        var key = files[index].GroupKey ?? string.Empty;
+        if (direction > 0)
+        {
+            for (var i = index + 1; i < files.Count; i++)
+            {
+                if (!string.Equals(files[i].GroupKey ?? string.Empty, key, StringComparison.Ordinal))
+                {
+                    return i;
+                }
+            }
+
+            return files.Count - 1;
+        }
+
+        for (var i = index - 1; i >= 0; i--)
+        {
+            if (!string.Equals(files[i].GroupKey ?? string.Empty, key, StringComparison.Ordinal))
+            {
+                // 前グループの先頭へ（そのグループ内をさらに遡る）。
+                var prevKey = files[i].GroupKey ?? string.Empty;
+                while (i > 0
+                    && string.Equals(files[i - 1].GroupKey ?? string.Empty, prevKey, StringComparison.Ordinal))
+                {
+                    i--;
+                }
+
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    private void ApplyMoveSelectionFile(
+        int index,
+        bool extend,
+        IReadOnlyList<LibraryFileRow>? files = null)
+    {
+        files ??= SnapshotPlaylistFiles();
+        if ((uint)index >= (uint)files.Count)
         {
             return;
         }
 
+        var row = files[index];
         _deferActivate = true;
         try
         {
@@ -2939,7 +3041,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             else
             {
                 _playlistCaretRow = row;
-                SelectPlaylistFileRange(_anchorIndex, index);
+                SelectPlaylistFileRange(_anchorIndex, index, files);
             }
 
             // キー移動は SelectedItem だけ変えがちで、CurrentItem が先頭のまま残る。
@@ -2973,9 +3075,13 @@ internal sealed partial class LibraryBrowserView : UserControl
         return _grid.SelectedItem as LibraryFileRow;
     }
 
-    private void SelectPlaylistFileRange(int from, int to)
+    private void SelectPlaylistFileRange(
+        int from,
+        int to,
+        IReadOnlyList<LibraryFileRow>? files = null)
     {
-        var count = CountPlaylistFiles();
+        files ??= SnapshotPlaylistFiles();
+        var count = files.Count;
         if (count <= 0)
         {
             return;
@@ -2989,45 +3095,43 @@ internal sealed partial class LibraryBrowserView : UserControl
         SuspendPlaylistSelectionNotify();
         try
         {
-            _grid.SelectedItems.Clear();
-            var i = 0;
-            LibraryFileRow? current = null;
-            foreach (var row in PlaylistRows())
+            // 差分だけ触る（全 Clear→再 Add は大量行でキーリピートが重い）。
+            var want = new HashSet<LibraryFileRow>();
+            for (var i = lo; i <= hi; i++)
             {
-                if (row.Tag is not DocumentSession)
-                {
-                    continue;
-                }
-
-                if (i >= lo && i <= hi)
-                {
-                    _grid.SelectedItems.Add(row);
-                    if (i == to)
-                    {
-                        current = row;
-                    }
-                }
-
-                i++;
+                want.Add(files[i]);
             }
 
-            if (current is not null)
+            for (var i = _grid.SelectedItems.Count - 1; i >= 0; i--)
+            {
+                if (_grid.SelectedItems[i] is LibraryFileRow row && !want.Contains(row))
+                {
+                    _grid.SelectedItems.RemoveAt(i);
+                }
+            }
+
+            for (var i = lo; i <= hi; i++)
+            {
+                var row = files[i];
+                if (!_grid.SelectedItems.Contains(row))
+                {
+                    _grid.SelectedItems.Add(row);
+                }
+            }
+
+            var current = files[to];
+            if (!ReferenceEquals(_grid.SelectedItem, current))
             {
                 _grid.SelectedItem = current;
-                i = 0;
-                foreach (var row in PlaylistRows())
+            }
+
+            // SelectedItem 代入で範囲が崩れることがあるので、欠けていれば足す。
+            for (var i = lo; i <= hi; i++)
+            {
+                var row = files[i];
+                if (!_grid.SelectedItems.Contains(row))
                 {
-                    if (row.Tag is not DocumentSession)
-                    {
-                        continue;
-                    }
-
-                    if (i >= lo && i <= hi && !_grid.SelectedItems.Contains(row))
-                    {
-                        _grid.SelectedItems.Add(row);
-                    }
-
-                    i++;
+                    _grid.SelectedItems.Add(row);
                 }
             }
 
@@ -3214,17 +3318,42 @@ internal sealed partial class LibraryBrowserView : UserControl
             }
         }
 
+        // 既定の ScrollIntoView は長いセルで横へ飛ぶ。縦だけ寄せ、横位置は戻す。
+        var scroll = FindDataGridScrollViewer();
+        var keepX = scroll?.HorizontalOffset ?? 0;
         _grid.ScrollIntoView(item);
+        if (scroll is not null)
+        {
+            RestorePlaylistHorizontalOffset(scroll, keepX);
+        }
+
         var generation = _syncGeneration;
         Dispatcher.BeginInvoke(
             () =>
             {
-                if (generation == _syncGeneration)
+                if (generation != _syncGeneration)
                 {
-                    RevealGroupHeaderIfNearlyClipped(item);
+                    return;
                 }
+
+                if (FindDataGridScrollViewer() is { } later)
+                {
+                    RestorePlaylistHorizontalOffset(later, keepX);
+                }
+
+                RevealGroupHeaderIfNearlyClipped(item);
             },
             DispatcherPriority.Loaded);
+    }
+
+    private static void RestorePlaylistHorizontalOffset(ScrollViewer scroll, double offset)
+    {
+        if (Math.Abs(scroll.HorizontalOffset - offset) < 0.5)
+        {
+            return;
+        }
+
+        scroll.ScrollToHorizontalOffset(offset);
     }
 
     /// <summary>
@@ -10627,7 +10756,7 @@ internal sealed class LibraryFavoriteRow
 internal static class LibraryJacketReflection
 {
     /// <summary>鏡面の見える高さ（元画像に対する比率）。</summary>
-    internal const double HeightFactor = 0.40;
+    internal const double HeightFactor = 0.28;
     /// <summary>本体と鏡面のすき間（DIP）。</summary>
     internal const double GapDip = 1;
 }
@@ -10771,6 +10900,7 @@ internal sealed class LibraryGroupJacketImage : StackPanel
     private readonly TranslateTransform _stick = new();
     private readonly LibraryGroupHorizontalPin _pin;
     private LibraryBrowserView? _owner;
+    private double _contentHeight;
 
     public LibraryGroupJacketImage()
     {
@@ -10778,7 +10908,7 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         Orientation = Orientation.Vertical;
         HorizontalAlignment = HorizontalAlignment.Left;
         VerticalAlignment = VerticalAlignment.Top;
-        Margin = new Thickness(8, 0, 8, 4);
+        Margin = new Thickness(8, 0, 8, 0);
         Width = DesignMetrics.LibraryGroupJacketSize;
         IsHitTestVisible = false;
         RenderTransform = _stick;
@@ -10806,6 +10936,24 @@ internal sealed class LibraryGroupJacketImage : StackPanel
     }
 
     internal double StickyOffsetY => _stick.Y;
+
+    /// <summary>
+    /// ジャケット＋反射は曲行の上に重ねるだけで、グループ高さには入れない。
+    /// （曲数が少ないと反射分がグループ間ギャップになっていた。）
+    /// </summary>
+    protected override Size MeasureOverride(Size constraint)
+    {
+        var measured = base.MeasureOverride(constraint);
+        _contentHeight = measured.Height;
+        return new Size(measured.Width, 0);
+    }
+
+    protected override Size ArrangeOverride(Size arrangeSize)
+    {
+        var height = Math.Max(arrangeSize.Height, _contentHeight);
+        base.ArrangeOverride(new Size(arrangeSize.Width, height));
+        return arrangeSize;
+    }
 
     private void SyncReflectionSize()
     {
@@ -10862,7 +11010,8 @@ internal sealed class LibraryGroupJacketImage : StackPanel
 
     private void UpdateSticky()
     {
-        if (_owner is null || Parent is not FrameworkElement stage || ActualHeight < 1)
+        var jacketH = Math.Max(_contentHeight, ActualHeight);
+        if (_owner is null || Parent is not FrameworkElement stage || jacketH < 1)
         {
             return;
         }
@@ -10873,7 +11022,7 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         {
             var headerBottom = _owner.RowsViewportTop();
             var natural = TransformToAncestor(_owner.FileGrid).Transform(new Point(0, 0)).Y - _stick.Y;
-            var max = Math.Max(0, stage.ActualHeight - ActualHeight);
+            var max = Math.Max(0, stage.ActualHeight - jacketH);
             var offset = Math.Clamp(headerBottom - natural, 0, max);
             if (Math.Abs(_stick.Y - offset) > 0.5)
             {

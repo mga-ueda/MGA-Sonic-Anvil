@@ -2177,6 +2177,83 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void MoveSelectionByGroup_JumpsToNextGroupAndExtends()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var alphaA = Session("01.mp3");
+            alphaA.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Artist = "Alpha",
+                Album = "A",
+                Title = "1",
+            });
+            var alphaB = Session("02.mp3");
+            alphaB.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Artist = "Alpha",
+                Album = "A",
+                Title = "2",
+            });
+            var zebraA = Session("03.mp3");
+            zebraA.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Artist = "Zebra",
+                Album = "Z",
+                Title = "3",
+            });
+            var zebraB = Session("04.mp3");
+            zebraB.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Artist = "Zebra",
+                Album = "Z",
+                Title = "4",
+            });
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([alphaA, alphaB, zebraA, zebraB], alphaA, [alphaA]);
+            view.SetGroup(LibraryFileGroup.Artist);
+            Flush();
+
+            view.MoveSelectionByGroup(1, extend: true);
+            Flush();
+            Assert.Same(zebraA, view.SelectedSession);
+            Assert.Equal(3, view.SelectedSessions.Length);
+            Assert.Contains(alphaA, view.SelectedSessions);
+            Assert.Contains(alphaB, view.SelectedSessions);
+            Assert.Contains(zebraA, view.SelectedSessions);
+
+            view.MoveSelectionByGroup(-1, extend: false);
+            Flush();
+            Assert.Same(alphaA, view.SelectedSession);
+            Assert.Equal([alphaA], view.SelectedSessions);
+
+            Assert.True(view.TryGetDisplayedNeighbors(
+                alphaB,
+                [alphaA, alphaB],
+                out var next,
+                out var prev));
+            Assert.Same(zebraA, next);
+            Assert.Null(prev);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void MoveSelection_WrapsAtEnds()
     {
         RunSta(() =>

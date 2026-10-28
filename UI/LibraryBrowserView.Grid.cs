@@ -144,7 +144,8 @@ internal sealed partial class LibraryBrowserView
 
         var body = new FrameworkElementFactory(typeof(DockPanel));
         body.SetValue(DockPanel.LastChildFillProperty, true);
-        body.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 0, 10));
+        // グループ間は見出し下余白だけ。ジャケット高で広げない（Jacket 側が高さ 0 を報告）。
+        body.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 0, 4));
         body.SetValue(FrameworkElement.ClipToBoundsProperty, false);
         body.AppendChild(headerFactory);
         body.AppendChild(stage);
