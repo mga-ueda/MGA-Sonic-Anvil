@@ -254,7 +254,7 @@ internal sealed class DxgiAsyncFramePump : IDisposable
     /// スクラブ プレビュー（ドラッグ中の粗い絵）。true の間は、含むフレームが無ければ読み進めで追わず
     /// Seek＋数枚だけ読んで最寄り（長 GOP なら着地したキーフレーム）を出し、同じ位置へはそれ以上読まない。
     /// false に戻すと次の要求で通常どおり目標まで読み進める（静止後の正確な絵）。どちらの切り替えでもワーカーを起こす。
-    /// MediaElement 経路には関係しない。既定は false。
+    /// 既定は false。
     /// </summary>
     public void SetScrubPreviewMode(bool preview)
     {

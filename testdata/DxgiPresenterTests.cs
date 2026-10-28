@@ -196,6 +196,75 @@ public sealed class DxgiPresenterTests
         });
     }
 
+    // ---- 光漏れ（ambient spill）の縮小ビットマップ ----
+
+    [Fact]
+    public void AmbientSpill_DownscaledSizeCapsLongestEdgeAndKeepsAspect()
+    {
+        // 最長辺が上限以下ならそのまま。
+        Assert.Equal((320, 240), AmbientSpillFrame.DownscaledSize(320, 240));
+
+        // 横長 1920x1080 → 最長辺 480、アスペクト維持（16:9）。
+        var (w, h) = AmbientSpillFrame.DownscaledSize(1920, 1080);
+        Assert.Equal(AmbientSpillFrame.MaxEdge, w);
+        Assert.Equal(270, h);
+
+        // 縦長もアスペクト維持（最長辺が上限）。
+        var (pw, ph) = AmbientSpillFrame.DownscaledSize(1080, 1920);
+        Assert.Equal(AmbientSpillFrame.MaxEdge, ph);
+        Assert.Equal(270, pw);
+
+        Assert.Equal((0, 0), AmbientSpillFrame.DownscaledSize(0, 100));
+    }
+
+    [Fact]
+    public void AmbientSpill_FillBgraFromNv12GrayIsOpaqueGray()
+    {
+        const int w = 64, h = 48;
+        var pixels = new byte[DxgiDecodedFrame.RequiredBytes(DxgiFramePixelFormat.Nv12, w, h)];
+        Array.Fill(pixels, (byte)128);
+        var frame = new DxgiDecodedFrame(0, 1, w, h, DxgiFramePixelFormat.Nv12, pixels, VideoColorInfo.Default);
+
+        var (dw, dh) = AmbientSpillFrame.DownscaledSize(w, h);
+        var dst = new byte[dw * dh * 4];
+        AmbientSpillFrame.FillBgra(frame, dst, dw, dh);
+
+        // リミテッド 709 の Y=128,U=V=128 は ~130 の無彩色、アルファは不透明。
+        for (var i = 0; i < dst.Length; i += 4)
+        {
+            Assert.InRange((int)dst[i], 120, 140);
+            Assert.InRange((int)dst[i + 1], 120, 140);
+            Assert.InRange((int)dst[i + 2], 120, 140);
+            Assert.Equal(0xFF, dst[i + 3]);
+        }
+    }
+
+    [Fact]
+    public void AmbientSpill_FillBgraFromBgraCopiesAndForcesOpaque()
+    {
+        const int w = 8, h = 8;
+        var src = new byte[w * h * 4];
+        for (var i = 0; i < src.Length; i += 4)
+        {
+            src[i] = 0x10;     // B
+            src[i + 1] = 0x20; // G
+            src[i + 2] = 0x30; // R
+            src[i + 3] = 0x00; // 透明でも結果は不透明にする
+        }
+
+        var frame = new DxgiDecodedFrame(0, 1, w, h, src, VideoColorInfo.Default);
+        // 等倍（最長辺が上限以下）。
+        var dst = new byte[w * h * 4];
+        AmbientSpillFrame.FillBgra(frame, dst, w, h);
+        for (var i = 0; i < dst.Length; i += 4)
+        {
+            Assert.Equal(0x10, dst[i]);
+            Assert.Equal(0x20, dst[i + 1]);
+            Assert.Equal(0x30, dst[i + 2]);
+            Assert.Equal(0xFF, dst[i + 3]);
+        }
+    }
+
     // ---- 非同期ポンプ ----
 
     [Fact]
@@ -988,10 +1057,10 @@ public sealed class DxgiPresenterTests
             Assert.True(presenter.TryReadBackPixel(160, 120, out var full));
             Assert.InRange((int)((full >> 8) & 0xFF), 126, 130);
 
-            // 黒帯部分は黒のまま（64x48 を 320x240 に Uniform → 左右に帯は出ないが上下寸法は一致。左上隅で確認）。
+            // 黒帯は透明（光漏れが背面から透ける）。100x100 → 320x240 で左右に帯。
             presenter.PresentBgraFrame(DxgiPrototypeFrameSource.GenerateTestPattern(TimeSpan.Zero, 100, 100), 100, 100, 400);
             Assert.True(presenter.TryReadBackPixel(2, 120, out var bar));
-            Assert.Equal(0xFF000000u, bar);
+            Assert.Equal(0u, bar);
 
             // HDR（BT.2020／PQ）ソースなら色変換が入る。暗い PQ 値は暗いまま。
             var hdr = VideoColorInfo.FromMediaFoundation(9, 15, 4, 2);
@@ -1085,11 +1154,11 @@ public sealed class DxgiPresenterTests
                     Release(ref nv12);
                 }
 
-                // (4) 非対応形式（R16G16_UNORM）は黒。
+                // (4) 非対応形式（R16G16_UNORM）は透明クリア（帯と同じ扱い）。
                 var odd = CreateTexture(dev2, 16, 16, DXGI_FORMAT_R16G16_UNORM, 0, 0);
                 presenter.PresentTexture(odd);
                 Assert.True(presenter.TryReadBackPixel(32, 32, out px));
-                Assert.Equal(0xFF000000u, px);
+                Assert.Equal(0u, px);
                 Release(ref odd);
             }
             finally

@@ -5,8 +5,9 @@ using static MgaSonicAnvil.Video.Dxgi.D3D9Native;
 namespace MgaSonicAnvil.Video.Dxgi;
 
 /// <summary>
-/// D3D11 のオフスクリーン RT へフレームを Uniform（黒帯）で描き、同じ RT を D3D9Ex の共有サーフェスとして
+/// D3D11 のオフスクリーン RT へフレームを Uniform（透明帯）で描き、同じ RT を D3D9Ex の共有サーフェスとして
 /// <see cref="D3d9Surface"/> に出す（WPF の D3DImage.SetBackBuffer 用）。HWND もスワップチェーンも持たない。
+/// 帯は a=0 でクリアし、背面の光漏れ／ステージ背景が透ける（不透明黒だと隠れる）。
 /// スレッド: AttachForComposition／Resize／Present*／Dispose はすべて作成スレッド（UI）から呼ぶこと。
 /// 描画のあとは D3D11 を Flush するだけ。D3DImage の Lock／AddDirtyRect／Unlock は呼び出し側の仕事。
 /// <para>
@@ -200,7 +201,8 @@ internal sealed unsafe class D3D11ImagePresenter : IDisposable
         }
 
         TryCreateShaderPipeline();
-        CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 1);
+        // 初期クリアも帯と同様に透明（初回 Present 前に不透明黒が一瞬出ないように）。
+        CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 0);
         CtxFlush(_context);
     }
 
@@ -221,7 +223,7 @@ internal sealed unsafe class D3D11ImagePresenter : IDisposable
         }
         else
         {
-            CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 1);
+            CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 0);
             CtxFlush(_context);
         }
 
@@ -336,7 +338,7 @@ internal sealed unsafe class D3D11ImagePresenter : IDisposable
                 : TryPresentViaSharedHandle(tex, desc) || TryPresentViaStaging(owner, tex, desc);
             if (!drawn)
             {
-                CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 1);
+                CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 0);
             }
 
             Commit();
@@ -1090,7 +1092,9 @@ internal sealed unsafe class D3D11ImagePresenter : IDisposable
 
     private void DrawLetterboxed(IntPtr srv0, IntPtr srv1, int srcWidth, int srcHeight, bool yuv)
     {
-        CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 1);
+        // 帯は透明（a=0）。不透明黒で塗ると背面の光漏れが完全に隠れる。
+        // 映像本体はシェーダが a=1 で書く。ステージ背景／光漏れが帯から透ける。
+        CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 0);
         var rect = UniformRect(srcWidth, srcHeight, BackBufferWidth, BackBufferHeight);
         if (rect.Width <= 0 || rect.Height <= 0)
         {
@@ -1201,7 +1205,7 @@ internal sealed unsafe class D3D11ImagePresenter : IDisposable
     /// <summary>シェーダ無し: 拡縮できないので中央へ等倍コピー（はみ出しは切る）。明るさも掛からない。</summary>
     private void CopyCentered(IntPtr texture, int width, int height)
     {
-        CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 1);
+        CtxClearRenderTargetView(_context, _rtv, 0, 0, 0, 0);
         var copyW = Math.Min(width, BackBufferWidth);
         var copyH = Math.Min(height, BackBufferHeight);
         var srcX = (width - copyW) / 2;

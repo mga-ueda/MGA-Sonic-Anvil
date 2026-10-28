@@ -183,9 +183,6 @@ internal sealed class AppSettings
     /// <summary>ユーザーが A／T を変えたことがある。無いときは既定（両方オン）を使う。</summary>
     public bool VideoChromeChosen { get; set; }
 
-    /// <summary>試作: プレイリスト動画を D3D11+DXGI で描画。設定 UI は非表示だが既定オン。</summary>
-    public bool UseDxgiVideoPresenter { get; set; } = true;
-
     /// <summary>ユーザー用意の ffmpeg.exe。空または無効ならプロキシは作らない。</summary>
     public string FfmpegExePath { get; set; } = string.Empty;
 
