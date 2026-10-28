@@ -246,6 +246,20 @@ public partial class MainWindow
             case WaveMenuCommand.CheckSelectMode:
                 LibraryBrowser.ToggleCheckSelectMode();
                 break;
+            case WaveMenuCommand.SelectByGroupUp:
+                if (IsLibraryMaximized)
+                {
+                    LibraryBrowser.MoveSelectionByGroup(-1, extend: true);
+                }
+
+                break;
+            case WaveMenuCommand.SelectByGroupDown:
+                if (IsLibraryMaximized)
+                {
+                    LibraryBrowser.MoveSelectionByGroup(1, extend: true);
+                }
+
+                break;
             case WaveMenuCommand.AutoPlay:
                 LibraryBrowser.ToggleAutoPlay();
                 break;

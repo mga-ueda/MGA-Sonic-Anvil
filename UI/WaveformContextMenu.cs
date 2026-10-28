@@ -77,6 +77,8 @@ internal enum WaveMenuCommand
     AutoPlayNext,
     AutoPlay,
     CheckSelectMode,
+    SelectByGroupUp,
+    SelectByGroupDown,
     PreviousTrack,
     NextTrack,
     RestartTrack,
@@ -883,6 +885,17 @@ internal static class WaveformContextMenuBuilder
             "Shift+Space",
             m.CheckSelectMode,
             m.LibraryMaximized && !m.IsBusy),
+        WaveMenuSeparatorEntry.Instance,
+        Cmd(
+            UiStrings.WaveMenuSelectByGroupUp,
+            WaveMenuCommand.SelectByGroupUp,
+            MenuGestures.SelectByGroupUp,
+            m.LibraryMaximized && m.CanStepPlaylist && !m.IsBusy),
+        Cmd(
+            UiStrings.WaveMenuSelectByGroupDown,
+            WaveMenuCommand.SelectByGroupDown,
+            MenuGestures.SelectByGroupDown,
+            m.LibraryMaximized && m.CanStepPlaylist && !m.IsBusy),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> SeekPlaybackItems(WaveformContextMenuModel m) =>

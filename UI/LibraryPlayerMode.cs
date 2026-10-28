@@ -65,6 +65,8 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.AutoPlayNext
             or WaveMenuCommand.AutoPlay
             or WaveMenuCommand.CheckSelectMode
+            or WaveMenuCommand.SelectByGroupUp
+            or WaveMenuCommand.SelectByGroupDown
             or WaveMenuCommand.PreviousTrack
             or WaveMenuCommand.NextTrack
             or WaveMenuCommand.RestartTrack

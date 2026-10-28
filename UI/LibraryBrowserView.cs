@@ -2881,7 +2881,8 @@ internal sealed partial class LibraryBrowserView : UserControl
     }
 
     /// <summary>
-    /// グループ境界へジャンプ。Ctrl+Shift+↑↓用。グループ無しは曲単位と同じ。
+    /// グループ境界へジャンプ。Ctrl+Shift+↑↓（extend）は現グループの端まで選択し、
+    /// 既に端なら隣グループの端へ伸ばす。非 extend は隣グループ先頭へ。
     /// </summary>
     public void MoveSelectionByGroup(int direction, bool extend = false)
     {
@@ -2904,7 +2905,9 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
         else
         {
-            index = FindPlaylistGroupEdgeIndex(files, index, direction);
+            index = extend
+                ? FindPlaylistGroupExtendIndex(files, index, direction)
+                : FindPlaylistGroupEdgeIndex(files, index, direction);
         }
 
         ApplyMoveSelectionFile(index, extend, files);
@@ -2977,7 +2980,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         return (uint)index < (uint)files.Count ? files[index] : null;
     }
 
-    /// <summary>現在グループの外へ出た先頭（↓）または末尾（↑）のファイル索引。</summary>
+    /// <summary>隣グループの先頭（↓／↑とも）へ。非 extend のジャンプ用。</summary>
     private static int FindPlaylistGroupEdgeIndex(
         IReadOnlyList<LibraryFileRow> files,
         int index,
@@ -3015,6 +3018,91 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// 範囲選択用。現グループの端（↓＝末尾／↑＝先頭）へ。
+    /// 既に端なら隣グループの同じ側の端へ伸ばす（次グループ先頭は含めない）。
+    /// </summary>
+    private static int FindPlaylistGroupExtendIndex(
+        IReadOnlyList<LibraryFileRow> files,
+        int index,
+        int direction)
+    {
+        index = Math.Clamp(index, 0, files.Count - 1);
+        var key = files[index].GroupKey ?? string.Empty;
+        if (direction > 0)
+        {
+            var last = index;
+            for (var i = index + 1; i < files.Count; i++)
+            {
+                if (!string.Equals(files[i].GroupKey ?? string.Empty, key, StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                last = i;
+            }
+
+            if (last > index)
+            {
+                return last;
+            }
+
+            if (index >= files.Count - 1)
+            {
+                return index;
+            }
+
+            var nextKey = files[index + 1].GroupKey ?? string.Empty;
+            var nextLast = index + 1;
+            for (var i = index + 2; i < files.Count; i++)
+            {
+                if (!string.Equals(files[i].GroupKey ?? string.Empty, nextKey, StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                nextLast = i;
+            }
+
+            return nextLast;
+        }
+
+        var first = index;
+        for (var i = index - 1; i >= 0; i--)
+        {
+            if (!string.Equals(files[i].GroupKey ?? string.Empty, key, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            first = i;
+        }
+
+        if (first < index)
+        {
+            return first;
+        }
+
+        if (index <= 0)
+        {
+            return index;
+        }
+
+        var prevKey = files[index - 1].GroupKey ?? string.Empty;
+        var prevFirst = index - 1;
+        for (var i = index - 2; i >= 0; i--)
+        {
+            if (!string.Equals(files[i].GroupKey ?? string.Empty, prevKey, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            prevFirst = i;
+        }
+
+        return prevFirst;
     }
 
     private void ApplyMoveSelectionFile(
