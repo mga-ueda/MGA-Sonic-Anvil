@@ -887,21 +887,24 @@ internal sealed partial class PlaybackSampleProvider : ISampleProvider
 
     public bool HasGaplessAdvancePending => _gaplessAdvancePending != 0;
 
-    /// <summary>描画用。カーソル・フェード・Exit・速度を 1 ロックで取る。</summary>
+    /// <summary>描画用。カーソル・フェード・Exit・速度・再生終端を 1 ロックで取る。</summary>
     internal void ReadPlaybackVisuals(
         out long cursor,
         out bool seekFading,
         out long exitFrame,
         out double speed,
-        out int sourceRate)
+        out int sourceRate,
+        out long playEndFrame)
     {
         lock (_gate)
         {
-            cursor = _channels <= 0 ? 0 : (long)Math.Floor(_sourceFrame);
+            var ch = _channels;
+            cursor = ch <= 0 ? 0 : (long)Math.Floor(_sourceFrame);
             seekFading = _seekFadePhase == 1;
             exitFrame = _exitPlaying ? (long)Math.Floor(_exitFrame) : -1;
             speed = _playbackSpeed;
             sourceRate = _sourceRate;
+            playEndFrame = ch <= 0 ? 0 : _playEnd / ch;
         }
     }
 
