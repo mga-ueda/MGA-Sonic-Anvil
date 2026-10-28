@@ -1465,13 +1465,18 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.Up && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        // プレイヤーでは Ctrl+Shift+↑↓ をグループ選択に使う（上のプレイリスト分岐）。
+        if (!IsLibraryMaximized
+            && key == Key.Up
+            && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             Waveform.ZoomAmpToMax();
             return true;
         }
 
-        if (key == Key.Down && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        if (!IsLibraryMaximized
+            && key == Key.Down
+            && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             Waveform.ResetAmpZoom();
             return true;
@@ -2249,6 +2254,17 @@ public partial class MainWindow
                     LibraryBrowser.ToggleCheckSelectMode();
                 }
 
+                return true;
+            }
+
+            // Ctrl+Shift+↑↓: グループ単位の範囲選択（エディタの振幅ズームより先）。
+            if ((key is Key.Up or Key.Down)
+                && modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
+                && !IsLibraryExplorerFocused
+                && !IsLibraryFavoritesFocused)
+            {
+                LibraryBrowser.MoveSelectionByGroup(key == Key.Up ? -1 : 1, extend: true);
+                _libraryPlayOnArrowRelease = false;
                 return true;
             }
 
