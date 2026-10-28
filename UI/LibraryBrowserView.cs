@@ -3037,11 +3037,6 @@ internal sealed partial class LibraryBrowserView : UserControl
         return files;
     }
 
-    private int CountPlaylistFiles() => SnapshotPlaylistFiles().Count;
-
-    private int PlaylistFileIndexOfSelected() =>
-        PlaylistFileIndexOfSelected(SnapshotPlaylistFiles());
-
     private int PlaylistFileIndexOfSelected(IReadOnlyList<LibraryFileRow> files)
     {
         // 範囲選択中は SelectedItem を動かさない（代入すると Extended で全選択が潰れる）。
@@ -3072,12 +3067,6 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         return -1;
-    }
-
-    private LibraryFileRow? PlaylistFileAt(int index)
-    {
-        var files = SnapshotPlaylistFiles();
-        return (uint)index < (uint)files.Count ? files[index] : null;
     }
 
     /// <summary>隣グループの先頭（↓／↑とも）へ。非 extend のジャンプ用。</summary>

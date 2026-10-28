@@ -463,14 +463,7 @@ internal sealed partial class LibraryVisualStage : Grid
             }
 
             _path = path;
-            try
-            {
-                SetMediaSource(new Uri(path, UriKind.Absolute));
-            }
-            catch (UriFormatException)
-            {
-                SetMediaSource(new Uri(path));
-            }
+            OpenDxgiSource(path);
         }
         else
         {
@@ -480,9 +473,6 @@ internal sealed partial class LibraryVisualStage : Grid
         if (!play)
         {
             SyncPreviewFx(active: true);
-            // 前クリップの Position が残ると、新しいファイルが途中から開く。
-            SetMediaPosition(TimeSpan.Zero);
-
             // SnapMediaBlack の Opacity=0 をここで戻す。Opened 待ちだと暗いまま残る。
             StartPreviewLoop(fadeIn: true);
             return;
@@ -587,7 +577,6 @@ internal sealed partial class LibraryVisualStage : Grid
             {
                 // 新しいクリップの本再生は真っ黒から。
                 SnapMediaBlack();
-                SetMediaPosition(TimeSpan.Zero);
                 PlayRealtime(TimeSpan.Zero, restartClock: true);
                 BeginVideoFadeIn();
             }
@@ -617,7 +606,6 @@ internal sealed partial class LibraryVisualStage : Grid
         CancelVideoFadeIn(restoreOpaque: true);
         var pos = CurrentVisualPosition();
         StopVisualClock(pos);
-        PauseMedia();
         _playing = false;
         _framePaused = true;
         ApplyVideoDim(instant: true, playing: true);
@@ -653,7 +641,6 @@ internal sealed partial class LibraryVisualStage : Grid
         CancelPreviewSpeedRamp();
         if (_playing)
         {
-            PauseMedia();
             _playing = false;
             _framePaused = true;
             ApplyVideoDim(instant: true, playing: true);
@@ -668,7 +655,6 @@ internal sealed partial class LibraryVisualStage : Grid
 
         // DXGI: 粗い／正確の切り替えを先に伝えてから位置を確定する（次の tick の RequestPosition がそのモードで読む）。
         SetDxgiScrubPreview(scrubPreview);
-        SetMediaPosition(position);
         StopVisualClock(position);
     }
 
@@ -752,8 +738,6 @@ internal sealed partial class LibraryVisualStage : Grid
         CancelVideoFadeIn(restoreOpaque: true);
         _dxgiHost.BeginAnimation(OpacityProperty, null);
         _dxgiHost.Opacity = 1;
-        // 本再生からの引き継ぎでは現在位置付近にいるので、無駄なシークで一発カクつかせない。
-        SeekMediaIfNeeded(position);
         FadeDimOpacity(StoppedDimOpacity, instant: false, PreviewDimFadeSeconds);
         SyncPreviewFx(active: true);
         // 本再生から戻るときはいきなり 1/3 にせず、1 秒かけて落とす。
@@ -917,25 +901,20 @@ internal sealed partial class LibraryVisualStage : Grid
             if (progress >= 1)
             {
                 CancelPreviewSpeedRamp();
-                // 最終速度だけ Play で確定（SpeedRatio 単体の遅延対策）。
-                ApplyPreviewSpeed(PreviewLoopSpeed, restartPlayback: true);
+                ApplyPreviewSpeed(PreviewLoopSpeed);
                 return;
             }
 
             ApplyPreviewSpeed(
-                LibraryPlayerMode.PreviewSpeedAtRampProgress(progress, from: 1, to: PreviewLoopSpeed),
-                restartPlayback: false);
+                LibraryPlayerMode.PreviewSpeedAtRampProgress(progress, from: 1, to: PreviewLoopSpeed));
         };
         _previewSpeedRampTimer = timer;
         timer.Start();
     }
 
     /// <summary>プレビュー速度を映像クロックへ反映する。</summary>
-    private void ApplyPreviewSpeed(double speed, bool restartPlayback)
-    {
-        _ = restartPlayback;
+    private void ApplyPreviewSpeed(double speed) =>
         BeginVisualClock(CurrentVisualPosition(), speed);
-    }
 
     /// <summary>ホバーは常に 0 秒から。暗転の自動スキップはしない。</summary>
     private void RestartHoverPreviewAtStart()
@@ -946,7 +925,6 @@ internal sealed partial class LibraryVisualStage : Grid
         }
 
         _previewLoopStart = TimeSpan.Zero;
-        SetMediaPosition(TimeSpan.Zero);
         StartPreviewLoop(fadeIn: false);
     }
 
@@ -1059,7 +1037,6 @@ internal sealed partial class LibraryVisualStage : Grid
 
             // 通常の Seek は正確な絵（スクラブ プレビューが残っていれば解除）。
             SetDxgiScrubPreview(false);
-            SetMediaPosition(position);
             if (_playing)
             {
                 CancelPreviewSpeedRamp();
@@ -1345,7 +1322,7 @@ internal sealed partial class LibraryVisualStage : Grid
 
     private void StopMedia()
     {
-        ClearMediaSource();
+        HideHudFrost();
         StopDxgiPresenter();
     }
 
@@ -1483,23 +1460,6 @@ internal sealed partial class LibraryVisualStage : Grid
             Margin = new Thickness(bounds.X - origin.X, bounds.Y - origin.Y, 0, 0),
             IsHitTestVisible = false,
         });
-    }
-
-    private void SetMediaSource(Uri uri) =>
-        OpenDxgiSource(uri.IsFile ? uri.LocalPath : uri.OriginalString);
-
-    private void ClearMediaSource() => HideHudFrost();
-
-    private void SetMediaPosition(TimeSpan position) =>
-        _ = position;
-
-    /// <summary>DXGI では常にクロック位置へ追従するので、近接シークの特別扱いは不要。</summary>
-    private void SeekMediaIfNeeded(TimeSpan position) => SetMediaPosition(position);
-
-    private void PlayMedia(double speedRatio) => _ = speedRatio;
-
-    private void PauseMedia()
-    {
     }
 
     /// <summary>
