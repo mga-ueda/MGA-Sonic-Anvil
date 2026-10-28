@@ -1094,8 +1094,8 @@
         <li><span class="ui">EXPORT</span> または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。WAAPI 接続中だけ有効です。</li>
       </ol>
       <ul>
-        <li><span class="ui">Play -E</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。WAAPI オン時）…… 出口のあとも鳴らします。アプリ内ではループの折り返しでその部分を二重に再生し、再生位置が 2 本になります。EXPORT すると、つなぎのときも出口のあとを鳴らします。</li>
-        <li><span class="ui">Auto Active</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>。WAAPI オン時）…… EXPORT 後に Wwise を前面へ出します。</li>
+        <li><span class="ui">Play -E</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>。WAAPI バー表示時のみトグル可）…… 出口のあとも鳴らします。アプリ内ではループの折り返しでその部分を二重に再生し、再生位置が 2 本になります。EXPORT すると、つなぎのときも出口のあとを鳴らします。バーが隠れていればショートカットは無視します。</li>
+        <li><span class="ui">Auto Active</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>。WAAPI バー表示時のみトグル可）…… EXPORT 後に Wwise を前面へ出します。バーが隠れていればショートカットは無視します。</li>
         <li>プロジェクト名 …… エディタ時のみ。クリック、波形の右クリック → Wwise → プロジェクトを起動、または <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面に出します（プレイヤー最大化中は無効）。WAAPI がオフでもバーを出してから起動します。覚えたプロジェクトが無ければ起動せず、その旨を出します。</li>
       </ul>
 
@@ -1227,8 +1227,8 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span>（クリアして追加したとき先頭から再生。ラベルに下線なし。<strong>プレイヤーのみ</strong>）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>／<kbd>M</kbd>／<kbd>D</kbd>／<kbd>C</kbd></td><td>モニター BPM／MONO／DIM／LC（いずれも Alt+Shift。ボタン文言に下線なし。ツールチップには Alt+Shift 表記あり。エディタ／プレイヤー共通）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>WAAPI バーの表示切替（<strong>エディタのみ</strong>。プレイヤー中は無効）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E（WAAPI オン時。<strong>エディタのみ</strong>）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active（WAAPI オン時。ラベルに下線なし。<strong>エディタのみ</strong>）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E（WAAPI バー表示時のみ。<strong>エディタのみ</strong>）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active（WAAPI バー表示時のみ。ラベルに下線なし。<strong>エディタのみ</strong>）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し（タイル検索フォーカス中はヒット以外を閉じる）</td></tr>
         </tbody>
       </table>
@@ -1406,8 +1406,8 @@
         <tbody>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>WAAPI バーの表示切替（エディタのみ。プレイヤー中は無効）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Wwise プロジェクトを起動／前面に出す（エディタ時のみ。プレイヤー最大化中は無効。波形の右クリック → Wwise → プロジェクトを起動。WAAPI がオフでもバーを表示。覚えたプロジェクトが無ければ起動せず通知）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E の切替（WAAPI オン時。エディタのみ）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active の切替（WAAPI オン時。EXPORT 後に Wwise を前面へ。エディタのみ）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E の切替（WAAPI バー表示時のみ。エディタのみ）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active の切替（WAAPI バー表示時のみ。EXPORT 後に Wwise を前面へ。エディタのみ）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Wwise EXPORT（Wave 単体。エディタのみ）</td></tr>
         </tbody>
       </table>

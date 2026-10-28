@@ -1024,8 +1024,8 @@
         <li><span class="ui">EXPORT</span> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>. Enabled only while WAAPI is connected.</li>
       </ol>
       <ul>
-        <li><span class="ui">Play -E</span> (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>, while WAAPI is on) — keep playing after the exit. Preview in this app plays that tail twice on a loop wrap, so two playheads appear. EXPORT keeps playing after the exit on a transition.</li>
-        <li><span class="ui">Auto Active</span> (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, while WAAPI is on) — bring Wwise to the front after EXPORT.</li>
+        <li><span class="ui">Play -E</span> (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>; toggles only while the WAAPI bar is visible) — keep playing after the exit. Preview in this app plays that tail twice on a loop wrap, so two playheads appear. EXPORT keeps playing after the exit on a transition. The shortcut is ignored while the bar is hidden.</li>
+        <li><span class="ui">Auto Active</span> (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>; toggles only while the WAAPI bar is visible) — bring Wwise to the front after EXPORT. The shortcut is ignored while the bar is hidden.</li>
         <li>Project name — editor only. Click, use waveform right-click → Wwise → Launch Project, or press <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>, to open or bring Wwise to the front (disabled while the player is maximized). Works with WAAPI off: the bar is shown, then the project launches. If no project is remembered, it stays on the bar and reports that it cannot launch.</li>
       </ul>
 
@@ -1157,8 +1157,8 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td><span class="ui">Auto Play</span> (play from the first track after a clear-and-add; no underline on the label; <strong>player only</strong>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> / <kbd>M</kbd> / <kbd>D</kbd> / <kbd>C</kbd></td><td>Monitor BPM / MONO / DIM / LC (each is Alt+Shift; no underline on the button text; tooltips include Alt+Shift; editor and player)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Show / hide the WAAPI bar (<strong>editor only</strong>; off in the player)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E (when WAAPI is on; <strong>editor only</strong>)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active (when WAAPI is on; no underline on the label; <strong>editor only</strong>)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E (only while the WAAPI bar is visible; <strong>editor only</strong>)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active (only while the WAAPI bar is visible; no underline on the label; <strong>editor only</strong>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start (while tile search has focus, closes non-matching tiles instead)</td></tr>
         </tbody>
       </table>
@@ -1336,8 +1336,8 @@
         <tbody>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Toggle the WAAPI bar (editor only; off in the player)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Launch or bring the Wwise project to the front (editor only; disabled while the player is maximized; waveform right-click → Wwise → Launch Project; shows the WAAPI bar even if it was off; if no project is remembered, notify and do not launch)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Toggle Play -E (while WAAPI is on; editor only)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Toggle Auto Active (while WAAPI is on; bring Wwise to the front after EXPORT; editor only)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Toggle Play -E (only while the WAAPI bar is visible; editor only)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Toggle Auto Active (only while the WAAPI bar is visible; bring Wwise to the front after EXPORT; editor only)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Wwise EXPORT (Wave-only; editor only)</td></tr>
         </tbody>
       </table>

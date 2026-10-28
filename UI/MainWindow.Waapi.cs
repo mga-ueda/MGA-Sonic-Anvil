@@ -76,10 +76,19 @@ public partial class MainWindow
         ApplyWaapiPanelVisible();
     }
 
-    /// <summary>Play -E チェックを切り替える（Alt+Shift+E）。WAAPI オフ時は何もしない。</summary>
+    /// <summary>
+    /// WAAPI バーが画面に出ているか。パネル ON でも F11／プレイヤーで隠れているときは false。
+    /// Play -E／Auto Active のショートカットはこれが true のときだけトグルする。
+    /// </summary>
+    private bool IsWaapiBarShown =>
+        _waapiPanelVisible
+        && _waveformMaximizeMode is not WaveformMaximizeMode.Waveform
+            and not WaveformMaximizeMode.Library;
+
+    /// <summary>Play -E チェックを切り替える（Alt+Shift+E）。バー非表示時は何もしない。</summary>
     private void TogglePlayPostExit()
     {
-        if (!_waapiPanelVisible)
+        if (!IsWaapiBarShown)
         {
             return;
         }
@@ -87,6 +96,18 @@ public partial class MainWindow
         // PlayPostExitChecked の setter はイベントを抑制するため、反映を明示的に呼ぶ。
         WaapiBar.PlayPostExitChecked = !WaapiBar.PlayPostExitChecked;
         ApplyPlayPostExit();
+    }
+
+    /// <summary>Auto Active チェックを切り替える（Alt+Shift+A）。バー非表示時は何もしない。</summary>
+    private void ToggleAutoActive()
+    {
+        if (!IsWaapiBarShown)
+        {
+            return;
+        }
+
+        WaapiBar.AutoActiveChecked = !WaapiBar.AutoActiveChecked;
+        PersistWaapiSettings();
     }
 
     /// <summary>Play -E の現在値を再生プレビューへ即反映し、設定を保存する。</summary>
@@ -142,9 +163,7 @@ public partial class MainWindow
 
     private void ApplyWaapiPanelVisible()
     {
-        WaapiBar.Visibility = _waveformMaximizeMode is not WaveformMaximizeMode.Waveform
-            and not WaveformMaximizeMode.Library
-            && _waapiPanelVisible
+        WaapiBar.Visibility = IsWaapiBarShown
             ? System.Windows.Visibility.Visible
             : System.Windows.Visibility.Collapsed;
         if (_waapiToggle is not null)
