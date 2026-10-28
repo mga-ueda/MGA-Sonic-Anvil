@@ -180,7 +180,7 @@ public partial class MainWindow : Window
             AppStorage.Settings.ResolvedWallpaperPath(),
             AppStorage.Settings.ResolvedWallpaperOpacity());
         LibraryBrowser.SessionActivated += LibraryBrowser_SessionActivated;
-        LibraryBrowser.PlaylistSelectionChanged += (_, _) => SyncPlaylistSelectionLoudness();
+        LibraryBrowser.PlaylistSelectionChanged += (_, _) => OnLibraryPlaylistSelectionChanged();
         LibraryBrowser.SessionPlayRequested += LibraryBrowser_SessionPlayRequested;
         LibraryBrowser.PlaylistVisualEnded += LibraryBrowser_PlaylistVisualEnded;
         LibraryBrowser.PlaylistVisualOpened += LibraryBrowser_PlaylistVisualOpened;

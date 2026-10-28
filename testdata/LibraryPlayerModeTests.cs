@@ -1729,6 +1729,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.PlaybackVisualMinIntervalMs <= 20);
         Assert.Equal(DispatcherPriority.Background, LibraryPlayerMode.AnalyzerTickPriority);
         Assert.True(LibraryPlayerMode.AnalyzerTickPriority < DispatcherPriority.Input);
+        Assert.True(LibraryPlayerMode.PlaylistExtendMaxRowsPerFrame >= 1);
+        Assert.True(LibraryPlayerMode.PlaylistExtendMaxGroupsPerFrame >= 1);
         Assert.Equal(16, LibraryPlayerMode.PlaylistLoadUiFlushCount);
         Assert.Equal(33, LibraryPlayerMode.PlaylistLoadUiFlushMs);
         Assert.Equal(50, LibraryPlayerMode.PlayheadIdleInvalidateMs);

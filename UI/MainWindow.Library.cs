@@ -37,6 +37,16 @@ public partial class MainWindow
     private bool? _pendingLibraryWashHadArt;
     private bool _libraryPlayOnArrowRelease;
     private bool _libraryPlayOnTrackKeyRelease;
+    /// <summary>Shift+↑↓ 連打中はメーター平均を毎打で再計算せず、離したときにまとめる。</summary>
+    private bool _playlistSelectionLoudnessDeferred;
+    private int _playlistSelectionLoudnessDeferTicket;
+    /// <summary>
+    /// Shift 範囲のキーリピートを Render へ溜める。
+    /// Input で毎打処理すると Background のスペアナ／レベルが止まる。
+    /// </summary>
+    private int _playlistExtendPendingDelta;
+    private int _playlistExtendPendingGroupSteps;
+    private bool _playlistExtendFlushQueued;
     /// <summary>Space 再生。true のあいだは曲末で次へ進まず停止する。</summary>
     private bool _libraryStopAfterTrack;
     /// <summary>F9（および F8 動画ミニ）。サイド／トランスポート／ステータスを隠す。F8 はアナライザを残す。再生は止めない。</summary>
@@ -3235,6 +3245,144 @@ public partial class MainWindow
 
     private void SyncPlaylistSelectionLoudness() =>
         SyncSelectionLoudness(measureMissing: true);
+
+    private void OnLibraryPlaylistSelectionChanged()
+    {
+        // Shift+矢印の範囲伸ばし中は毎キーの平均計算を避ける（キーリピート滞留の一因）。
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0
+            && (Keyboard.IsKeyDown(Key.Up)
+                || Keyboard.IsKeyDown(Key.Down)
+                || Keyboard.IsKeyDown(Key.PageUp)
+                || Keyboard.IsKeyDown(Key.PageDown)
+                || Keyboard.IsKeyDown(Key.Home)
+                || Keyboard.IsKeyDown(Key.End)))
+        {
+            ScheduleDeferredPlaylistSelectionLoudness();
+            return;
+        }
+
+        _playlistSelectionLoudnessDeferred = false;
+        _playlistSelectionLoudnessDeferTicket++;
+        SyncPlaylistSelectionLoudness();
+    }
+
+    private void ScheduleDeferredPlaylistSelectionLoudness()
+    {
+        _playlistSelectionLoudnessDeferred = true;
+        var ticket = ++_playlistSelectionLoudnessDeferTicket;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _playlistSelectionLoudnessDeferTicket
+                    || !_playlistSelectionLoudnessDeferred)
+                {
+                    return;
+                }
+
+                if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0
+                    && (Keyboard.IsKeyDown(Key.Up)
+                        || Keyboard.IsKeyDown(Key.Down)
+                        || Keyboard.IsKeyDown(Key.PageUp)
+                        || Keyboard.IsKeyDown(Key.PageDown)
+                        || Keyboard.IsKeyDown(Key.Home)
+                        || Keyboard.IsKeyDown(Key.End)))
+                {
+                    return;
+                }
+
+                FlushDeferredPlaylistSelectionLoudness();
+            },
+            DispatcherPriority.Background);
+    }
+
+    private void FlushDeferredPlaylistSelectionLoudness()
+    {
+        if (!_playlistSelectionLoudnessDeferred)
+        {
+            return;
+        }
+
+        _playlistSelectionLoudnessDeferred = false;
+        _playlistSelectionLoudnessDeferTicket++;
+        SyncPlaylistSelectionLoudness();
+    }
+
+    private void QueuePlaylistExtendStep(int delta, bool byGroup)
+    {
+        if (delta == 0)
+        {
+            return;
+        }
+
+        if (byGroup)
+        {
+            _playlistExtendPendingGroupSteps += delta;
+        }
+        else
+        {
+            _playlistExtendPendingDelta += delta;
+        }
+
+        if (_playlistExtendFlushQueued)
+        {
+            return;
+        }
+
+        _playlistExtendFlushQueued = true;
+        // Input より下げ、同一フレームのメーター描画（Background）の前にまとめて進める。
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, FlushPlaylistExtendPending);
+    }
+
+    private void FlushPlaylistExtendPending()
+    {
+        _playlistExtendFlushQueued = false;
+        var delta = _playlistExtendPendingDelta;
+        var groups = _playlistExtendPendingGroupSteps;
+        _playlistExtendPendingDelta = 0;
+        _playlistExtendPendingGroupSteps = 0;
+        if (delta == 0 && groups == 0)
+        {
+            return;
+        }
+
+        // 溜まりすぎた分は次フレームへ。1フレームの大量 Add でメーターも選択も止まるのを防ぐ。
+        var maxRows = LibraryPlayerMode.PlaylistExtendMaxRowsPerFrame;
+        var maxGroups = LibraryPlayerMode.PlaylistExtendMaxGroupsPerFrame;
+        var applyGroups = groups;
+        if (Math.Abs(groups) > maxGroups)
+        {
+            applyGroups = Math.Sign(groups) * maxGroups;
+            _playlistExtendPendingGroupSteps = groups - applyGroups;
+        }
+
+        var applyDelta = delta;
+        if (Math.Abs(delta) > maxRows)
+        {
+            applyDelta = Math.Sign(delta) * maxRows;
+            _playlistExtendPendingDelta = delta - applyDelta;
+        }
+
+        if (applyGroups != 0)
+        {
+            var direction = applyGroups > 0 ? 1 : -1;
+            for (var i = 0; i < Math.Abs(applyGroups); i++)
+            {
+                LibraryBrowser.MoveSelectionByGroup(direction, extend: true);
+            }
+        }
+
+        if (applyDelta != 0)
+        {
+            LibraryBrowser.MoveSelection(applyDelta, extend: true, wrap: false);
+        }
+
+        ScheduleDeferredPlaylistSelectionLoudness();
+        if (_playlistExtendPendingDelta != 0 || _playlistExtendPendingGroupSteps != 0)
+        {
+            _playlistExtendFlushQueued = true;
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, FlushPlaylistExtendPending);
+        }
+    }
 
     /// <summary>
     /// プレイヤーはプレイリスト、エディタはタブの複数選択。停止中は5項目の平均をメーターへ出す。
