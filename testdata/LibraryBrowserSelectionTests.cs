@@ -1046,6 +1046,10 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal(MenuGestures.NextTrack, ((MenuItem)listPlaylist.Items[1]).InputGestureText);
             Assert.Equal(MenuGestures.RestartTrack, ((MenuItem)listPlaylist.Items[2]).InputGestureText);
             Assert.Equal("Alt+Shift+P", ((MenuItem)listPlaylist.Items[4]).InputGestureText);
+            Assert.Equal(MenuGestures.SelectByGroupUp, ((MenuItem)listPlaylist.Items[^2]).InputGestureText);
+            Assert.Equal(MenuGestures.SelectByGroupDown, ((MenuItem)listPlaylist.Items[^1]).InputGestureText);
+            Assert.Equal(UiStrings.WaveMenuSelectByGroupUp, (string)((MenuItem)listPlaylist.Items[^2]).Header);
+            Assert.Equal(UiStrings.WaveMenuSelectByGroupDown, (string)((MenuItem)listPlaylist.Items[^1]).Header);
             Assert.Equal(MenuGestures.PitchUp, listPlayback.Items.OfType<MenuItem>()
                 .First(item => item.InputGestureText == MenuGestures.PitchUp).InputGestureText);
             // 編集末尾はシェル操作＋プレイリストからクリア。
@@ -2231,11 +2235,19 @@ public sealed class LibraryBrowserSelectionTests
 
             view.MoveSelectionByGroup(1, extend: true);
             Flush();
-            Assert.Same(zebraA, view.SelectedSession);
-            Assert.Equal(3, view.SelectedSessions.Length);
+            // 次グループ先頭は含めず、現グループ末尾まで。
+            Assert.Same(alphaB, view.SelectedSession);
+            Assert.Equal(2, view.SelectedSessions.Length);
             Assert.Contains(alphaA, view.SelectedSessions);
             Assert.Contains(alphaB, view.SelectedSessions);
+
+            view.MoveSelectionByGroup(1, extend: true);
+            Flush();
+            // 既に端なので隣グループ末尾まで伸ばす。
+            Assert.Same(zebraB, view.SelectedSession);
+            Assert.Equal(4, view.SelectedSessions.Length);
             Assert.Contains(zebraA, view.SelectedSessions);
+            Assert.Contains(zebraB, view.SelectedSessions);
 
             view.MoveSelectionByGroup(-1, extend: false);
             Flush();

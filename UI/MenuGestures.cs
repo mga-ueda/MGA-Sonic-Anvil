@@ -17,6 +17,8 @@ internal static class MenuGestures
     public const string PreviousTrack = "P / Num4";
     public const string NextTrack = "N / Num6";
     public const string RestartTrack = "R / Num5";
+    public const string SelectByGroupUp = "Ctrl+Shift+Up";
+    public const string SelectByGroupDown = "Ctrl+Shift+Down";
     public const string CenterPlayhead = "Z / Num.";
     public const string VideoZoomIn = "+ / Num+";
     public const string VideoZoomOut = "- / Num-";

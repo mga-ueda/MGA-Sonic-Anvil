@@ -92,6 +92,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Shuffle));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoPlayNext));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoPlay));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectByGroupUp));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectByGroupDown));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.VideoMini));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ForceVideoProxy));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Undo));
