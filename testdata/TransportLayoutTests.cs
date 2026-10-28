@@ -10,24 +10,19 @@ namespace MgaSonicAnvil.Tests;
 public sealed class TransportLayoutTests
 {
     [Fact]
-    public void WindowMinWidth_FitsTopRowWithoutWrapping()
+    public void WindowMinSize_IsSharedAcrossModes()
     {
-        var needed = DesignMetrics.TransportFixedRowWidth
-            + DesignMetrics.TransportSideChromeWidth
-            + DesignMetrics.WindowFramePad;
-        Assert.True(DesignMetrics.WindowMinWidth >= needed);
+        Assert.Equal(960, DesignMetrics.WindowMinWidth);
+        Assert.Equal(540, DesignMetrics.WindowMinHeight);
         Assert.Equal(DesignMetrics.WindowMinWidth, DesignMetrics.WindowDefaultWidth);
         Assert.True(DesignMetrics.TransportChromeHeight
             >= DesignMetrics.TransportHostMinHeight);
         Assert.True(DesignMetrics.TransportChromeHeight >= DesignMetrics.VectorScopeHeight);
-        Assert.True(DesignMetrics.MinimalPlayerWindowMinWidth < DesignMetrics.WindowMinWidth);
-        Assert.True(DesignMetrics.MinimalPlayerWindowMinWidth >= DesignMetrics.From96(280));
-        Assert.True(DesignMetrics.MinimalPlayerWindowMinHeight < DesignMetrics.WindowMinHeight);
-        Assert.True(DesignMetrics.MinimalPlayerWindowMinHeight
-            >= DesignMetrics.LibraryPaneMinHeight + DesignMetrics.LibraryWaveformHeight);
-        Assert.True(DesignMetrics.VideoMiniWindowMinWidth < DesignMetrics.MinimalPlayerWindowMinWidth);
-        Assert.True(DesignMetrics.VideoMiniWindowMinHeight < DesignMetrics.MinimalPlayerWindowMinHeight);
-        Assert.True(DesignMetrics.VideoMiniWindowMinWidth >= DesignMetrics.From96(120));
+        // F8／F9 も通常と同じ下限。
+        Assert.Equal(DesignMetrics.WindowMinWidth, DesignMetrics.MinimalPlayerWindowMinWidth);
+        Assert.Equal(DesignMetrics.WindowMinHeight, DesignMetrics.MinimalPlayerWindowMinHeight);
+        Assert.Equal(DesignMetrics.WindowMinWidth, DesignMetrics.VideoMiniWindowMinWidth);
+        Assert.Equal(DesignMetrics.WindowMinHeight, DesignMetrics.VideoMiniWindowMinHeight);
     }
 
     [Fact]

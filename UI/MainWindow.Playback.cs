@@ -3486,7 +3486,7 @@ public partial class MainWindow
         {
             LibraryBrowser.SetSidePanesVisible(true);
             RestoreMinimalChromeMeterHosts();
-            SyncWindowMinSizeForMode(minimal: false);
+            SyncWindowMinSizeForMode();
             return;
         }
 
@@ -3495,8 +3495,7 @@ public partial class MainWindow
         if (!_videoLaunchPlacement)
         {
             RestoreMinimalChromeMeterHosts();
-            // F9 は以前のミニマムプレイヤーと同じ下限（通常 WindowMinWidth より狭い）。
-            SyncWindowMinSizeForMode(minimal: _activeLayoutSlot == WindowLayoutSlot.F9);
+            SyncWindowMinSizeForMode();
             return;
         }
 
@@ -3516,7 +3515,7 @@ public partial class MainWindow
         MeterTopSlot.Visibility = Visibility.Visible;
         ApplyAnalyzerMaximizeScale();
         ApplyVideoMiniOverlayLayout(VideoMiniOverlayLayoutScale);
-        SyncWindowMinSizeForMode(videoMini: true);
+        SyncWindowMinSizeForMode();
     }
 
     /// <summary>
@@ -3575,29 +3574,11 @@ public partial class MainWindow
         ClearLevelMeterHeightCap();
     }
 
-    private void SyncWindowMinSizeForMode(bool minimal = false, bool videoMini = false)
+    /// <summary>モードに関わらず WindowMinWidth×WindowMinHeight を下限にする。</summary>
+    private void SyncWindowMinSizeForMode()
     {
-        double unscaledWidth;
-        double unscaledHeight;
-        if (videoMini)
-        {
-            // F8: 原寸 25% まで縮める（F9 の 280 下限だと 47% 前後で止まる）。
-            unscaledWidth = DesignMetrics.VideoMiniWindowMinWidth;
-            unscaledHeight = DesignMetrics.VideoMiniWindowMinHeight;
-        }
-        else if (minimal)
-        {
-            unscaledWidth = DesignMetrics.MinimalPlayerWindowMinWidth;
-            unscaledHeight = DesignMetrics.MinimalPlayerWindowMinHeight;
-        }
-        else
-        {
-            unscaledWidth = DesignMetrics.WindowMinWidth;
-            unscaledHeight = DesignMetrics.WindowMinHeight;
-        }
-
-        UiScaleService.SetUnscaledMinWidth(this, unscaledWidth);
-        UiScaleService.SetUnscaledMinHeight(this, unscaledHeight);
+        UiScaleService.SetUnscaledMinWidth(this, DesignMetrics.WindowMinWidth);
+        UiScaleService.SetUnscaledMinHeight(this, DesignMetrics.WindowMinHeight);
         if (WindowState == WindowState.Normal)
         {
             if (Width < MinWidth)

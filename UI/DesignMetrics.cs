@@ -14,32 +14,25 @@ internal static class DesignMetrics
     public static double From96(double value96) => value96;
 
     /// <summary>
-    /// 固定2行（上段 TRANS/EDIT/FILE、下段 MARK/VIEW/OTHER）と右の履歴・ラウドネス・スペアナ・メーターが
-    /// 折り返さず並ぶ下限。枠のぶんを足す。
+    /// メイン窓の幅下限（F8／F9 含む全モード共通）。
+    /// 固定2行トランスポート＋サイドクロームが折り返さない実測幅より十分広い。
     /// </summary>
-    public static double WindowMinWidth =>
-        Math.Ceiling(TransportFixedRowWidth + TransportSideChromeWidth + WindowFramePad);
+    public static double WindowMinWidth => From96(960);
 
-    /// <summary>
-    /// F9 ミニマム。プレイリスト列だけなのでトランスポート／メーター幅は不要。
-    /// 検索欄・グループコンボが破綻しない程度の下限。
-    /// </summary>
-    public static double MinimalPlayerWindowMinWidth => From96(280) + WindowFramePad;
+    /// <summary>F9 も通常と同じ下限（互換用エイリアス）。</summary>
+    public static double MinimalPlayerWindowMinWidth => WindowMinWidth;
 
-    /// <summary>F9 ミニマム。プレイリスト＋波形（ステータスバーなし）。</summary>
-    public static double MinimalPlayerWindowMinHeight =>
-        LibraryPaneMinHeight + LibraryWaveformHeight + WindowFramePad;
+    /// <summary>F9 も通常と同じ下限（互換用エイリアス）。</summary>
+    public static double MinimalPlayerWindowMinHeight => WindowMinHeight;
 
-    /// <summary>
-    /// F8 動画／PDF ミニ。原寸の 25% まで縮められるよう F9 より低い下限
-    /// （通常の WindowMinWidth だと 50% 前後で頭打ちになる）。
-    /// </summary>
-    public static double VideoMiniWindowMinWidth => From96(120) + WindowFramePad;
+    /// <summary>F8 も通常と同じ下限（互換用エイリアス）。</summary>
+    public static double VideoMiniWindowMinWidth => WindowMinWidth;
 
-    /// <summary>F8 動画／PDF ミニの高さ下限。</summary>
-    public static double VideoMiniWindowMinHeight => From96(90) + WindowFramePad;
+    /// <summary>F8 も通常と同じ下限（互換用エイリアス）。</summary>
+    public static double VideoMiniWindowMinHeight => WindowMinHeight;
 
-    public static double WindowMinHeight => From96(420);
+    /// <summary>メイン窓の高さ下限（F8／F9 含む全モード共通）。</summary>
+    public static double WindowMinHeight => From96(540);
 
     public static double WindowDefaultWidth => WindowMinWidth;
 
