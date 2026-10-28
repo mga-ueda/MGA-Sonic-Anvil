@@ -43,6 +43,47 @@ internal readonly record struct WaveSelection(long StartFrame, long EndFrame)
 
     public long Length => Math.Max(0, EndFrame - StartFrame);
 
+    /// <summary>
+    /// 描画用ヘッドを半開区間の終端未満に収める。外挿や折り返し直前の
+    /// 生カーソルが End 以上になっても、聞こえる最終フレーム（End-1）へ止める。
+    /// 開始より前はそのまま（Single Loop のイントロ許容）。空なら負値だけ 0 へ。
+    /// </summary>
+    public long ClampVisualPlayhead(long frame)
+    {
+        if (frame < 0)
+        {
+            frame = 0;
+        }
+
+        if (IsEmpty)
+        {
+            return frame;
+        }
+
+        if (frame >= EndFrame)
+        {
+            return Math.Max(StartFrame, EndFrame - 1);
+        }
+
+        return frame;
+    }
+
+    /// <summary>再生窓の終端だけ分かるときの描画用クランプ（開始は 0 扱い）。</summary>
+    public static long ClampVisualPlayhead(long frame, long exclusiveEndFrame)
+    {
+        if (frame < 0)
+        {
+            return 0;
+        }
+
+        if (exclusiveEndFrame > 0 && frame >= exclusiveEndFrame)
+        {
+            return exclusiveEndFrame - 1;
+        }
+
+        return frame;
+    }
+
     public WaveSelection Clamp(long frameCount)
     {
         if (frameCount <= 0 || IsEmpty)

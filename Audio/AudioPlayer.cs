@@ -66,37 +66,43 @@ internal sealed class AudioPlayer : IDisposable
     {
         get
         {
-            _provider.ReadPlaybackVisuals(out var raw, out _, out _, out var speed, out var sourceRate);
-            return SmoothFrom(raw, speed, sourceRate);
+            _provider.ReadPlaybackVisuals(
+                out var raw, out _, out _, out var speed, out var sourceRate, out var playEnd);
+            return SmoothFrom(raw, speed, sourceRate, playEnd);
         }
     }
 
     public void ReadPlayheadVisuals(out long playhead, out long exitFrame)
     {
-        _provider.ReadPlaybackVisuals(out var raw, out var fading, out exitFrame, out var speed, out var sourceRate);
-        playhead = fading ? raw : SmoothFrom(raw, speed, sourceRate);
+        _provider.ReadPlaybackVisuals(
+            out var raw, out var fading, out exitFrame, out var speed, out var sourceRate, out var playEnd);
+        playhead = fading
+            ? WaveSelection.ClampVisualPlayhead(raw, playEnd)
+            : SmoothFrom(raw, speed, sourceRate, playEnd);
     }
 
-    private long SmoothFrom(long raw, double speed, int sourceRate)
+    private long SmoothFrom(long raw, double speed, int sourceRate, long playEndFrame)
     {
         var now = System.Diagnostics.Stopwatch.GetTimestamp();
         if (!_playing || _scrubbing)
         {
+            var shown = WaveSelection.ClampVisualPlayhead(raw, playEndFrame);
             _smoothRawFrame = raw;
-            _smoothShownFrame = raw;
+            _smoothShownFrame = shown;
             _smoothStampTicks = now;
             _smoothSpeed = speed;
-            return raw;
+            return shown;
         }
 
         if (Math.Abs(speed - _smoothSpeed) > 1e-9)
         {
             // 早戻しへ切り替えた瞬間に、直前の外挿を逆方向へ伸ばさない。
             _smoothSpeed = speed;
+            var shown = WaveSelection.ClampVisualPlayhead(raw, playEndFrame);
             _smoothRawFrame = raw;
-            _smoothShownFrame = raw;
+            _smoothShownFrame = shown;
             _smoothStampTicks = now;
-            return raw;
+            return shown;
         }
 
         if (raw != _smoothRawFrame)
@@ -114,8 +120,9 @@ internal sealed class AudioPlayer : IDisposable
             if (discontinuity)
             {
                 // ループ折り返し・大きなシークは追いかけず即座に反映する。
-                _smoothShownFrame = raw;
-                return raw;
+                var shown = WaveSelection.ClampVisualPlayhead(raw, playEndFrame);
+                _smoothShownFrame = shown;
+                return shown;
             }
         }
 
@@ -143,11 +150,8 @@ internal sealed class AudioPlayer : IDisposable
             }
         }
 
-        if (value < 0)
-        {
-            value = 0;
-        }
-
+        // 再生窓終端への外挿はみ出しを止め、次フレームの単調クランプにも残さない。
+        value = WaveSelection.ClampVisualPlayhead(value, playEndFrame);
         _smoothShownFrame = value;
         return value;
     }
