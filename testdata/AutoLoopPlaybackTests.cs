@@ -44,6 +44,66 @@ public sealed class AutoLoopPlaybackTests
     }
 
     [Fact]
+    public void IsSelectionOneShotPlayWindow_OnlyWhenSelectThenPlay()
+    {
+        Assert.False(AutoLoopPlayback.IsSelectionOneShotPlayWindow(
+            hasSelection: true,
+            crossfadeSampleLoopWindow: false,
+            transportSelectionExtend: false,
+            hasPlayerAbLoop: false));
+        Assert.True(AutoLoopPlayback.IsSelectionOneShotPlayWindow(
+            hasSelection: true,
+            crossfadeSampleLoopWindow: false,
+            transportSelectionExtend: false,
+            hasPlayerAbLoop: false,
+            selectionOneShot: true));
+        Assert.False(AutoLoopPlayback.IsSelectionOneShotPlayWindow(
+            hasSelection: false,
+            crossfadeSampleLoopWindow: false,
+            transportSelectionExtend: false,
+            hasPlayerAbLoop: false,
+            selectionOneShot: true));
+        Assert.False(AutoLoopPlayback.IsSelectionOneShotPlayWindow(
+            hasSelection: true,
+            crossfadeSampleLoopWindow: true,
+            transportSelectionExtend: false,
+            hasPlayerAbLoop: false,
+            selectionOneShot: true));
+        Assert.False(AutoLoopPlayback.IsSelectionOneShotPlayWindow(
+            hasSelection: true,
+            crossfadeSampleLoopWindow: false,
+            transportSelectionExtend: true,
+            hasPlayerAbLoop: false,
+            selectionOneShot: true));
+        Assert.False(AutoLoopPlayback.IsSelectionOneShotPlayWindow(
+            hasSelection: true,
+            crossfadeSampleLoopWindow: false,
+            transportSelectionExtend: false,
+            hasPlayerAbLoop: true,
+            selectionOneShot: true));
+    }
+
+    [Fact]
+    public void ShouldLoopPlayWindow_SelectionLoopsUnlessSelectThenPlay()
+    {
+        // 選択窓は既定ループ。
+        Assert.True(AutoLoopPlayback.ShouldLoopPlayWindow(
+            hasPlayWindow: true,
+            selectionIsPlayWindow: true));
+        Assert.True(AutoLoopPlayback.ShouldLoopPlayWindow(
+            hasPlayWindow: true,
+            selectionIsPlayWindow: false));
+        Assert.False(AutoLoopPlayback.ShouldLoopPlayWindow(
+            hasPlayWindow: false,
+            selectionIsPlayWindow: false));
+        // 選んでから再生したときだけ一通。
+        Assert.False(AutoLoopPlayback.ShouldLoopPlayWindow(
+            hasPlayWindow: true,
+            selectionIsPlayWindow: true,
+            selectionOneShot: true));
+    }
+
+    [Fact]
     public void ClampStartFrame_AllowBeforeStart_KeepsIntro_SnapsPastEnd()
     {
         var loop = new WaveSelection(100, 400);

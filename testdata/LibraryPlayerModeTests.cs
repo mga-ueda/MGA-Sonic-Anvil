@@ -178,7 +178,7 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
-    public void WrapLoopFrame_RestartsAtSelectionStart()
+    public void WrapLoopFrame_RestartsAtWindowStart()
     {
         Assert.True(LibraryPlayerMode.DrivesPlayheadWhileVideoPlays(
             playerMode: true, isVideoFile: true, videoClockRunning: true));

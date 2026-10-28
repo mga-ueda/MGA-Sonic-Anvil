@@ -383,7 +383,7 @@
           <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> toggles shuffle (playlist <span class="ui">Random</span>). No repeats until the playlist has played once. Works on an empty list. Off by default. The last state is saved and kept when switching between the editor and the player. <kbd>R</kbd> restarts the current track from the beginning.</li>
           <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> toggles <span class="ui">Auto Play</span>. When on, clearing and adding (Enter / drop) plays the first track. When off, it only adds (does not start or stop playback). Shift-add never plays. On by default. Remembers the last state in settings.</li>
           <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> toggles auto next (playlist <span class="ui">Auto Next</span>). When on, advances to the next track at the end and gapless-prefetches. When off, stops on that track. Works on an empty list. Off by default. The last state is saved and kept when switching between the editor and the player. Plain <kbd>N</kbd> still steps to the next track manually.</li>
-          <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> toggles <span class="ui">Single Loop</span> (status bar; same toggle in the editor). In the player the sample loop is ignored and playback restarts at the end (a selection or A-B becomes the play window when present). For the editor’s sample-loop intro passthrough, see <a href="#layout-single-loop">Single Loop</a>. Works on an empty list. Remembers the last state in settings. Plain <kbd>L</kbd> still loops from 3 seconds before the end of the selection / sample loop.</li>
+          <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> toggles <span class="ui">Single Loop</span> (status bar; same toggle in the editor). In the player the sample loop is ignored and playback restarts at the end (a selection or A-B becomes the play window when present). One-shot selection play, <kbd>L</kbd>, and mid-playback double-click loop audition are under <a href="#layout-single-loop">Single Loop</a>. Works on an empty list. Remembers the last state in settings.</li>
           <li>Playback starts as soon as sound can play. It does not wait for the waveform to finish drawing.</li>
           <li>With auto next on, continuous playback prepares the next track and joins without stopping. Tiny extra silence at the start and end of MP3 / M4A is reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
           <li>
@@ -699,8 +699,9 @@
         <ul>
           <li><strong>Editor</strong> — when on, with a sample loop it plays from the head (or playhead) through the intro, then loops S–E forever. Without a sample loop, it restarts from the start at the end. A selection becomes the play window instead (no intro passthrough).</li>
           <li><strong>Player</strong> — the sample loop is ignored (so percent jumps are not pulled into an S–E window). When on, it restarts from the start at the end. Only a selection or A-B becomes the play window.</li>
+          <li><strong>Selection playback</strong> (editor and player) — if you select a range and then start playback, that range plays once and stops at the end (regardless of Single Loop on/off; in the player it also does not advance to the next track). Double-clicking a span while playing jumps to 3 seconds before the end and loops that range forever. <kbd>L</kbd> likewise jumps to 3 seconds before the end of the selection (or the sample loop / <code>-L</code>) and loops forever (while stopped or while playing). Player A-B loops its range.</li>
           <li>Works on an empty playlist. Remembers the last state in settings.</li>
-          <li>Plain <kbd>L</kbd> still loops from 3 seconds before the end (a separate command).</li>
+          <li><kbd>L</kbd> is for loop audition; it is separate from the <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> Single Loop toggle.</li>
         </ul>
       </article>
 
@@ -791,7 +792,7 @@
         <li><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> — playback pitch up / down by one semitone (main keyboard or numpad; Shift may be held on the main <kbd>+</kbd> key). <kbd>Ctrl</kbd>+<kbd>0</kbd> (main keyboard or numpad) returns it to zero. A toast in the center shows the semitones. Heard on the audio that is playing, in the editor and the player. Length and the playhead stay put. Range is ±2 octaves. Starting another track forgets the shift.</li>
         <li><kbd>,</kbd> — rewind, <kbd>.</kbd> — fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</li>
         <li><kbd>Z</kbd> or numpad <kbd>.</kbd> — center. Toggles center-lock while playing; clears it when stopped (the <kbd>.</kbd> key is fast-forward).</li>
-        <li><kbd>L</kbd> — loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
+        <li><kbd>L</kbd> — jump to 3 seconds before the end of the selection (or the sample loop / <code>-L</code>) and loop forever (while stopped or while playing).</li>
         <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> — toggle <span class="ui">Single Loop</span> (status bar; same toggle in the editor; in the player the sample loop is ignored and playback restarts at the end; selection / A-B take priority; see <a href="#layout-single-loop">Single Loop</a>).</li>
         <li><kbd>Q</kbd> — in the editor, marker click. Plays clicks at marker / region edges (selection when present, otherwise the whole file). Toggle with the button or <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player it is a Back key (real video playback, frame pause, bright PDF view → dim preview; F8 / argument mini → playlist).</li>
         <li><kbd>Tab</kbd> — solo a channel. Other lanes go gray and stay muted. Again moves to the next channel; <kbd>Shift</kbd>+<kbd>Tab</kbd> goes backward. Past the last clears solo. Click a channel name on the left to solo (click the same name again to clear; <kbd>Ctrl</kbd>+click adds; <kbd>Shift</kbd>+click mutes / unmutes). The time selection does not change. Waveform edits apply only to that channel. Works while playing or stopped.</li>
@@ -802,6 +803,7 @@
 
       <h2 id="edit">5. Selection and editing</h2>
       <p>Drag to select. Double-click selects a span (between markers). Triple-click always selects all. <kbd>Esc</kbd> or a move without Shift clears it. Fade / volume / pitch / normalize / reverse / time stretch with nothing selected uses the whole file in time. While a channel is soloed, those edits apply only to the audible lanes. You can also type the selection start / length / end in the status bar. After a selection edit (fade, normalize, delete, and so on), the playhead returns to the start of the selection. When a selection edge coincides with a sample-loop / region / marker boundary, moving that boundary moves the matching selection edge by the same amount.</p>
+      <p>Selection and playback (editor and player) — if you select a range and then start playback, that range plays once and stops at the end. Double-clicking a span while playing jumps to 3 seconds before the end and loops forever. <kbd>L</kbd> likewise jumps to 3 seconds before the end and loops forever (also while playing). See <a href="#layout-single-loop">Single Loop</a>.</p>
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear). For sample-loop seam fades, use <kbd>Shift</kbd>+<kbd>X</kbd> (<a href="#fade-adjust">Fade Adjust Tool</a>).</li>
@@ -1104,7 +1106,7 @@
         <li><kbd>V</kbd> shows the loudness analysis (Short Term curve) and opens volume.</li>
         <li><kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>A</kbd>, or <kbd>Shift</kbd>+<kbd>V</kbd> returns to the normal waveform from any of these views. <kbd>Esc</kbd> clears open prompts, the selection, and the pen cursor first. Closing the volume popup alone leaves the curve up.</li>
         <li>The VIEW loudness button toggles the view only.</li>
-        <li><kbd>L</kbd> loops from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>).</li>
+        <li><kbd>L</kbd> jumps to 3 seconds before the end of the selection (or the sample loop / <code>-L</code>) and loops forever (while stopped or while playing).</li>
       </ul>
       <h3>Loudness curve</h3>
       <ul>
@@ -1203,8 +1205,8 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Monitor <span class="ui">MONO</span> (sum L+R)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Monitor <span class="ui">DIM</span> (attenuation; amount on Settings → Audio)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>Monitor <span class="ui">LC</span> (low-shelf −20 dB fixed; frequency on Settings → Audio)</td></tr>
-          <tr><td><kbd>L</kbd></td><td>Loop from 3 seconds before the end of the selection (or the sample loop / <code>-L</code>)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> (toggle in both modes; editor = sample-loop intro passthrough, or restart at end with none; player = ignores the sample loop and restarts at end; selection / A-B take priority; separate from plain <kbd>L</kbd>; see <a href="#layout-single-loop">Single Loop</a>)</td></tr>
+          <tr><td><kbd>L</kbd></td><td>Jump to 3 seconds before the end of the selection (or the sample loop / <code>-L</code>) and loop forever (while stopped or while playing)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td><span class="ui">Single Loop</span> (toggle in both modes; editor = sample-loop intro passthrough, or restart at end with none; player = ignores the sample loop and restarts at end; selection / A-B take priority; separate from <kbd>L</kbd>; one-shot selection play and loop audition under <a href="#layout-single-loop">Single Loop</a>)</td></tr>
           <tr><td><kbd>P</kbd> / <kbd>N</kbd> / <kbd>R</kbd></td><td>Player: previous / next track / restart the current track (numpad <kbd>4</kbd> / <kbd>6</kbd> / <kbd>5</kbd> match; in the editor, numpad <kbd>4</kbd> / <kbd>6</kbd> switch tabs; details under Per screen)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td>Player: force-build a video proxy (ignores settings and F8 suppression; details under Per screen)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Player playlist: toggle check mode (details under Per screen)</td></tr>
@@ -1347,7 +1349,7 @@
           <tr><td>Drag</td><td>Select</td></tr>
           <tr><td><kbd>Ctrl</kbd>+drag</td><td>Scrub (downmix to L/R)</td></tr>
           <tr><td><kbd>Shift</kbd>+drag / move</td><td>Extend the selection</td></tr>
-          <tr><td>Double-click (waveform)</td><td>Select a span (between markers)</td></tr>
+          <tr><td>Double-click (waveform)</td><td>Select a span (between markers). While playing, jumps to 3 seconds before the end and loops that range forever</td></tr>
           <tr><td>Triple-click (waveform)</td><td>Select all</td></tr>
           <tr><td>Click a channel name on the left</td><td>Solo (click the same name again to clear)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click a channel name</td><td>Add / remove from the solo</td></tr>
@@ -1531,7 +1533,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>Toggle shuffle (<span class="ui">Random</span>; works on an empty playlist; off by default; does not repeat a track until the playlist has played once; the last state is saved across mode switches and the next launch)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td>Toggle <span class="ui">Auto Play</span> (on by default; whether clear-and-add plays the first track; remembers the last state in settings; plain <kbd>P</kbd> is previous track)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>Toggle auto next (<span class="ui">Auto Next</span>; works on an empty playlist; off by default; when on, advances at the end and gapless-prefetches; the last state is saved across mode switches and the next launch; plain <kbd>N</kbd> still steps to the next track)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td>Toggle <span class="ui">Single Loop</span> (works on an empty playlist; in the player the sample loop is ignored and playback restarts at the end; selection / A-B take priority; plain <kbd>L</kbd> still loops from 3 seconds before the end; editor sample-loop behavior under <a href="#layout-single-loop">Single Loop</a>)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td>Toggle <span class="ui">Single Loop</span> (works on an empty playlist; in the player the sample loop is ignored and playback restarts at the end; selection / A-B take priority; <kbd>L</kbd> jumps to 3 seconds before the end and loops forever; one-shot selection play and loop audition under <a href="#layout-single-loop">Single Loop</a>)</td></tr>
           <tr><td>← / →</td><td>During real video playback (or frame pause), pause and step one frame back / forward (hold repeats after an initial wait; <kbd>F10</kbd> during real playback or frame pause drops to the dim background preview, restores the front UI = playlist, and stays in the player). On the tree, expand / collapse folders. Otherwise do not shuttle</td></tr>
           <tr><td>Tree <kbd>*</kbd></td><td>Expand all folders under the selection (same as Explorer; numpad <kbd>*</kbd> or Shift+8; expansion is remembered)</td></tr>
           <tr><td>Tree <kbd>/</kbd></td><td>Collapse the selection and everything under it (numpad <kbd>/</kbd> or the <kbd>/</kbd> key)</td></tr>

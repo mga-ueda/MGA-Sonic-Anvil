@@ -23,6 +23,9 @@ namespace MgaSonicAnvil.UI;
 /// <description>
 /// 選択範囲やプレイヤー A-B があるときはそちらが再生窓になり、このイントロ許容は使わない
 /// （窓の外からの開始は窓の始点へスナップする）。
+/// 選択範囲は既定でループ。範囲を選んでから再生を開始したときだけ一通で終端停止
+/// （selectionOneShot）。L キーや再生中ダブルクリックは末尾付近へジャンプしてループ確認。
+/// A-B は従来どおりループ。
 /// </description>
 /// </item>
 /// </list>
@@ -43,6 +46,31 @@ internal static class AutoLoopPlayback
         && autoLoopEnabled
         && !sampleLoopEmpty
         && !hasSelection
+        && !hasPlayerAbLoop;
+
+    /// <summary>
+    /// 再生窓をループするか。選択は既定でループ。選んでから再生した一通指定
+    /// （selectionOneShot）のときだけ false。再生窓が無いときは false。
+    /// </summary>
+    public static bool ShouldLoopPlayWindow(
+        bool hasPlayWindow,
+        bool selectionIsPlayWindow,
+        bool selectionOneShot = false) =>
+        hasPlayWindow && !(selectionIsPlayWindow && selectionOneShot);
+
+    /// <summary>
+    /// 選んでから再生した選択窓で、終端到達で停止する一通再生か。
+    /// </summary>
+    public static bool IsSelectionOneShotPlayWindow(
+        bool hasSelection,
+        bool crossfadeSampleLoopWindow,
+        bool transportSelectionExtend,
+        bool hasPlayerAbLoop,
+        bool selectionOneShot = false) =>
+        hasSelection
+        && selectionOneShot
+        && !crossfadeSampleLoopWindow
+        && !transportSelectionExtend
         && !hasPlayerAbLoop;
 
     /// <summary>
