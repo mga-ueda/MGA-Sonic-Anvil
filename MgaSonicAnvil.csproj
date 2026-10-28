@@ -81,16 +81,6 @@
       <Link>EffeTuneRhythm.dll</Link>
       <Visible>false</Visible>
     </None>
-    <None Include="THIRD_PARTY_NOTICES.md">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>THIRD_PARTY_NOTICES.md</Link>
-      <Visible>false</Visible>
-    </None>
-    <None Include="native\effetune-rhythm\LICENSE-EffeTune.txt" Condition="Exists('native\effetune-rhythm\LICENSE-EffeTune.txt')">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>LICENSE-EffeTune.txt</Link>
-      <Visible>false</Visible>
-    </None>
   </ItemGroup>
 
 </Project>
