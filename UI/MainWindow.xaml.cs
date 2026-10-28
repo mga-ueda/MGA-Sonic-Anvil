@@ -423,6 +423,8 @@ public partial class MainWindow : Window
             StopSeekNudge();
             StopVideoFrameStep();
             CloseEditHistory(commit: true);
+            // 全画面の Topmost／シェル全画面を外し、他アプリを前面に出せるようにする。
+            SyncShellFullscreen();
         };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         // クラスハンドラが先に Handled にしても、Alt 解放直後のテンキーを見る。
