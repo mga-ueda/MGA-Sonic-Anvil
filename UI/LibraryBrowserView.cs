@@ -11026,14 +11026,15 @@ internal sealed class LibraryGroupJacketImage : StackPanel
     internal double StickyOffsetY => _stick.Y;
 
     /// <summary>
-    /// ジャケット＋反射は曲行の上に重ねるだけで、グループ高さには入れない。
-    /// （曲数が少ないと反射分がグループ間ギャップになっていた。）
+    /// レイアウト高はジャケット本体だけ。反射（影落とし）は曲行の上へ重ね、見切れ可。
+    /// （反射まで入れると曲数が少ないときグループ間ギャップが広がる。）
     /// </summary>
     protected override Size MeasureOverride(Size constraint)
     {
         var measured = base.MeasureOverride(constraint);
         _contentHeight = measured.Height;
-        return new Size(measured.Width, 0);
+        var faceHeight = _face.DesiredSize.Height;
+        return new Size(measured.Width, faceHeight);
     }
 
     protected override Size ArrangeOverride(Size arrangeSize)

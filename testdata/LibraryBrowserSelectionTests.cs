@@ -169,6 +169,40 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void GroupJacket_MeasureHeight_IsFaceOnly_NotReflection()
+    {
+        RunSta(() =>
+        {
+            var size = DesignMetrics.LibraryGroupJacketSize;
+            var bmp = System.Windows.Media.Imaging.BitmapSource.Create(
+                1,
+                1,
+                96,
+                96,
+                PixelFormats.Bgra32,
+                null,
+                new byte[] { 32, 32, 255, 255 },
+                4);
+            bmp.Freeze();
+
+            var jacket = new LibraryGroupJacketImage();
+            // Reload 経由だと Owner が要るので、子 Image に直接載せて測る。
+            var face = FindDescendants<Image>(jacket).First();
+            face.Source = bmp;
+            var reflection = FindDescendants<LibraryJacketReflectionView>(jacket).First();
+            reflection.Source = bmp;
+            reflection.SyncFaceSize(size, size);
+
+            jacket.Measure(new Size(size + 16, double.PositiveInfinity));
+            Assert.Equal(size, jacket.DesiredSize.Height, 1);
+            Assert.True(
+                jacket.DesiredSize.Height + 1 < size + LibraryJacketReflection.GapDip
+                    + (size * LibraryJacketReflection.HeightFactor),
+                "layout height must exclude the reflection (shadow) band");
+        });
+    }
+
+    [Fact]
     public void Layout_HasExplorerThenList()
     {
         RunSta(() =>
