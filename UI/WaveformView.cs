@@ -3995,6 +3995,31 @@ internal sealed partial class WaveformView : Grid
 
         if (!usePolyline)
         {
+            // ピーク未準備でも中心線は先に全幅へ描く（部分クリア後に半分だけ残るのを防ぐ）。
+            if (!monoWave)
+            {
+                for (var ch = 0; ch < drawChannels; ch++)
+                {
+                    var guideTop = laneOrigin + ch * (laneHeight + laneGap);
+                    var guideMid = guideTop + laneHeight * 0.5;
+                    if (!TryLaneClip(guideTop, laneHeight, height, out _, out _))
+                    {
+                        continue;
+                    }
+
+                    DrawLaneGuides(
+                        buffer,
+                        stride,
+                        width,
+                        height,
+                        guideTop,
+                        guideMid,
+                        drawLaneTop: true,
+                        0,
+                        width);
+                }
+            }
+
             var f0 = startFrame + (long)x0 * rangeFrames / width;
             var f1 = startFrame + (long)x1 * rangeFrames / width;
             if (f1 <= f0)
@@ -4035,11 +4060,6 @@ internal sealed partial class WaveformView : Grid
                 if (!TryLaneClip(top, laneHeight, height, out var clipTop, out var clipBottom))
                 {
                     continue;
-                }
-
-                if (!monoWave)
-                {
-                    DrawLaneGuides(buffer, stride, width, height, top, mid, drawLaneTop: true, x0, x1);
                 }
 
                 RasterPeakEnvelope(
