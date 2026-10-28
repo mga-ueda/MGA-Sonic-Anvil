@@ -88,7 +88,7 @@ internal static class Mp3Gapless
     /// 再生開始フレームを窓に合わせる。
     /// <paramref name="allowBeforeWindowStart"/> が true のとき（Single Loop＋サンプルループ／フェード調整）は
     /// 窓の始点より前をイントロとして残し、終端以降だけ始点へ戻す。
-    /// false（既定）はギャップレス遅延や選択ループどおり、始点より前を始点へ吸い寄せる。
+    /// false（既定）はギャップレス遅延や再生窓どおり、始点より前を始点へ吸い寄せる。
     /// </summary>
     public static long ClampStart(
         long startFrame,

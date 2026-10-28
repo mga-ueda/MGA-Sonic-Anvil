@@ -1280,7 +1280,7 @@ internal static class LibraryPlayerMode
         return from + ((to - from) * eased);
     }
 
-    /// <summary>選択範囲ループ。範囲が無ければそのまま。</summary>
+    /// <summary>再生窓の折り返し。範囲が無ければそのまま。</summary>
     public static long WrapLoopFrame(long frame, long start, long end)
     {
         var length = end - start;

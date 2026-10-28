@@ -460,7 +460,10 @@ public partial class MainWindow
         StartPlayback(_lastPlaybackStart, prerollSeconds: 0);
     }
 
-    private void StartPlayback(long startFrame, double prerollSeconds)
+    /// <param name="selectionOneShot">
+    /// null なら選択窓のとき一通停止。false で L／再生中ダブルクリックなどのループ確認。
+    /// </param>
+    private void StartPlayback(long startFrame, double prerollSeconds, bool? selectionOneShot = null)
     {
         if (_document is null)
         {
@@ -504,7 +507,7 @@ public partial class MainWindow
             && _activeSession is { } session
             && LibraryPlayerMode.NeedsEditorPcmUpgrade(session.Document))
         {
-            _ = StartPlaybackAfterEditorPcmAsync(session, startFrame, prerollSeconds);
+            _ = StartPlaybackAfterEditorPcmAsync(session, startFrame, prerollSeconds, selectionOneShot);
             return;
         }
 
@@ -514,18 +517,21 @@ public partial class MainWindow
             && AudioCodec.IsUncompressedPcm(playerSession.Document.SourceKind)
             && (playerSession.Document.IsDeferredLoad || playerSession.Document.IsStreamPlayback))
         {
-            _ = StartPlaybackAfterPlayerPcmAsync(playerSession, startFrame, prerollSeconds);
+            _ = StartPlaybackAfterPlayerPcmAsync(playerSession, startFrame, prerollSeconds, selectionOneShot);
             return;
         }
 
         WaveSelection? playRange = ResolvePlayLoopRange();
+        // 範囲を選んでから再生したときだけ一通停止（L などは selectionOneShot: false）。
+        _selectionPlayOneShot = selectionOneShot ?? IsSelectionPlayWindow();
+        var loopPlayWindow = ShouldLoopResolvedPlayWindow(playRange);
         // Single Loop＋サンプルループ（フェード調整中も含む）: イントロ（S より前）は通し、E 以降だけ S へ。
         // Bind/Mp3Gapless 側にも同じフラグを渡し、再生窓始点への再吸い寄せを防ぐ。
         // フェード調整中でも Single Loop オフならループせず、ポストクロスを通しで確認できる。
         var allowBeforePlayWindowStart = AllowsIntroThroughSampleLoopStart();
         if (playRange is { } range)
         {
-            // 選択／A-B ループは窓外開始を始点へスナップする。
+            // 選択／A-B は窓外開始を始点へスナップする。
             startFrame = AutoLoopPlayback.ClampStartFrame(
                 startFrame,
                 range,
@@ -551,7 +557,7 @@ public partial class MainWindow
                 _document,
                 startFrame,
                 playRange,
-                loop: playRange is not null,
+                loop: loopPlayWindow,
                 preferStream: IsLibraryMaximized,
                 allowBeforePlayWindowStart: allowBeforePlayWindowStart);
             ApplyFadeToolPlaybackLayers(playRange);
@@ -582,7 +588,8 @@ public partial class MainWindow
     private async Task StartPlaybackAfterEditorPcmAsync(
         DocumentSession session,
         long startFrame,
-        double prerollSeconds)
+        double prerollSeconds,
+        bool? selectionOneShot = null)
     {
         var ticket = ++_editorPlayAfterPcmTicket;
         await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
@@ -595,13 +602,14 @@ public partial class MainWindow
             return;
         }
 
-        StartPlayback(startFrame, prerollSeconds);
+        StartPlayback(startFrame, prerollSeconds, selectionOneShot);
     }
 
     private async Task StartPlaybackAfterPlayerPcmAsync(
         DocumentSession session,
         long startFrame,
-        double prerollSeconds)
+        double prerollSeconds,
+        bool? selectionOneShot = null)
     {
         var ticket = ++_editorPlayAfterPcmTicket;
         await EnsureLibrarySessionLoadedAsync(session).ConfigureAwait(true);
@@ -615,7 +623,7 @@ public partial class MainWindow
             return;
         }
 
-        StartPlayback(startFrame, prerollSeconds);
+        StartPlayback(startFrame, prerollSeconds, selectionOneShot);
     }
 
     /// <summary>
@@ -642,7 +650,7 @@ public partial class MainWindow
                 _document,
                 frame,
                 playRange,
-                loop: playRange is not null,
+                loop: ShouldLoopResolvedPlayWindow(playRange),
                 preferStream: true);
             ApplyFadeToolPlaybackLayers(playRange);
             _player.Play();
@@ -680,6 +688,7 @@ public partial class MainWindow
     {
         StopPlaybackShuttle();
         ReleaseStuckScrub();
+        _selectionPlayOneShot = false;
         _player.Pause();
         if (IsLibraryMaximized)
         {
@@ -963,14 +972,16 @@ public partial class MainWindow
             return;
         }
 
-        _player.SetPlayWindow(playRange, loop: true);
+        _player.SetPlayWindow(playRange, loop: ShouldLoopResolvedPlayWindow(playRange));
         ApplyFadeToolPlaybackLayers(playRange);
     }
 
     /// <summary>
-    /// 再生のループ窓（半開区間）。null ならループなし（一通）。
+    /// 再生の窓（半開区間）。null なら窓なし（ファイル全体を一通）。
     /// 優先順位: フェード調整＋Single Loop のサンプルループ → プレイヤー A-B → 選択 →
     /// （エディタ）Single Loop のサンプルループ →（プレイヤー）Single Loop 全長。
+    /// 選択は再生窓（選んでから再生したときだけ一通停止。ほかはループ）。
+    /// A-B／サンプルループ／全長 Single Loop はループ。
     /// フェード調整中でも Single Loop オフならループしない（ポストクロス確認用）。
     /// プレイヤーではサンプルループを無視する。エディタの Single Loop＋サンプルループ時の
     /// 開始位置は <see cref="AutoLoopPlayback"/> を参照（頭〜S は通し、E で S へ無限ループ）。
@@ -987,7 +998,7 @@ public partial class MainWindow
             return _document.SampleLoop.Clamp(_document.FrameCount);
         }
 
-        // Shift＋テンキーで選択を伸ばしているあいだは選択ループを止める。
+        // Shift＋テンキーで選択を伸ばしているあいだは選択窓を外す。
         if (_transportSelectionExtend)
         {
             return null;
@@ -1018,6 +1029,31 @@ public partial class MainWindow
 
         return null;
     }
+
+    /// <summary>解決済み再生窓をループするか。選んでから再生した選択のみ一通。</summary>
+    private bool ShouldLoopResolvedPlayWindow(WaveSelection? playRange) =>
+        AutoLoopPlayback.ShouldLoopPlayWindow(
+            hasPlayWindow: playRange is not null,
+            selectionIsPlayWindow: IsSelectionPlayWindow(),
+            selectionOneShot: _selectionPlayOneShot);
+
+    /// <summary>ドキュメント選択が再生窓か（フェード調整サンプルループ／A-B より下位）。</summary>
+    private bool IsSelectionPlayWindow() =>
+        _document is not null
+        && !_document.Selection.IsEmpty
+        && !IsCrossfadeAutoLoopSampleLoopWindow()
+        && !_transportSelectionExtend
+        && !(IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out _));
+
+    /// <summary>選んでから再生した選択窓で、終端到達で停止する一通再生か。</summary>
+    private bool IsSelectionOneShotPlayWindow() =>
+        _document is not null
+        && AutoLoopPlayback.IsSelectionOneShotPlayWindow(
+            hasSelection: !_document.Selection.IsEmpty,
+            crossfadeSampleLoopWindow: IsCrossfadeAutoLoopSampleLoopWindow(),
+            transportSelectionExtend: _transportSelectionExtend,
+            hasPlayerAbLoop: IsLibraryMaximized && Waveform.TryGetPlayerAbLoop(out _),
+            selectionOneShot: _selectionPlayOneShot);
 
     /// <summary>
     /// エディタで Single Loop がサンプルループを再生窓にしているか（選択／A-B より下位）。
@@ -1143,6 +1179,7 @@ public partial class MainWindow
         var selection = _document.Selection;
         if (selection.IsEmpty)
         {
+            _selectionPlayOneShot = false;
             if (!Waveform.IsInteracting)
             {
                 SyncPlayWindowFromDocument();
@@ -1162,6 +1199,8 @@ public partial class MainWindow
 
         if (Waveform.TakePendingSelectionPrerollJump())
         {
+            // 再生中ダブルクリック: 一通指定を外し、末尾付近へジャンプして選択をループ。
+            _selectionPlayOneShot = false;
             JumpPlaybackToSelectionPreroll(selection);
             return;
         }
@@ -1194,6 +1233,8 @@ public partial class MainWindow
         var preroll = _document.SampleRate * 3L;
         var start = selection.Length < preroll ? selection.StartFrame : selection.EndFrame - preroll;
         _lastPlaybackStart = start;
+        // シーク前にループ窓を適用（CommitCursor が IsInteracting 中で同期を飛ばす場合がある）。
+        SyncPlayWindowFromDocument();
         Waveform.SeekKeepingSelection(start);
     }
 
@@ -1381,7 +1422,7 @@ public partial class MainWindow
 
     /// <summary>
     /// 動画の本再生：シークバーは映像の再生位置。音声出力の有無には依存しない。
-    /// 選択範囲があればその範囲でループする。
+    /// A-B／Single Loop 窓は折り返し。選択範囲は終端で停止。
     /// </summary>
     private void ApplyPlaylistVideoLoopAndClock(ref long frame)
     {
@@ -1390,12 +1431,29 @@ public partial class MainWindow
             return;
         }
 
-        var loop = ResolvePlayLoopRange() ?? WaveSelection.Empty;
+        var playRange = ResolvePlayLoopRange() ?? WaveSelection.Empty;
         var rate = Math.Max(1, _document.SampleRate);
-        if (!loop.IsEmpty && LibraryPlayerMode.NeedsLoopSeek(frame, loop.StartFrame, loop.EndFrame))
+        if (!playRange.IsEmpty
+            && LibraryPlayerMode.NeedsLoopSeek(frame, playRange.StartFrame, playRange.EndFrame))
         {
-            frame = LibraryPlayerMode.WrapLoopFrame(frame, loop.StartFrame, loop.EndFrame);
-            LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(frame / (double)rate));
+            if (ShouldLoopResolvedPlayWindow(playRange))
+            {
+                frame = LibraryPlayerMode.WrapLoopFrame(frame, playRange.StartFrame, playRange.EndFrame);
+                LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(frame / (double)rate));
+            }
+            else if (frame >= playRange.EndFrame)
+            {
+                // 選択一通: 終端で本再生を止める（次曲へ進まない）。
+                frame = Math.Max(playRange.StartFrame, playRange.EndFrame - 1);
+                LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(frame / (double)rate));
+                OnPlaybackEnded(_playbackGeneration);
+                return;
+            }
+            else if (frame < playRange.StartFrame)
+            {
+                frame = playRange.StartFrame;
+                LibraryBrowser.SeekPlaylistVisual(TimeSpan.FromSeconds(frame / (double)rate));
+            }
         }
 
         if (_playbackShuttleDirection != 0 && _player.IsPlaying)
@@ -1874,8 +1932,8 @@ public partial class MainWindow
                 LibraryBrowser.PlaylistVisualShown,
                 LibraryBrowser.PlaylistVisualIsVideo,
                 LibraryBrowser.PlaylistVisualIsPdf);
-            // 一曲再生、または映像本再生／ミニ／PDF 本表示（プレイリスト非表示）では次へ進まない。
-            if (_libraryStopAfterTrack || haltVisual)
+            // 選択一通の終端、一曲再生、または映像本再生／ミニ／PDF 本表示では次へ進まない。
+            if (IsSelectionOneShotPlayWindow() || _libraryStopAfterTrack || haltVisual)
             {
                 _libraryStopAfterTrack = false;
                 HaltPlaybackToStart(keepVideoChromeHidden: haltVisual);
@@ -1912,7 +1970,7 @@ public partial class MainWindow
             return false;
         }
 
-        // A-B／選択があるときは ResolvePlayLoopRange 側のループに任せる。
+        // A-B は再生窓ループ。選択は一通停止なのでここでは再開しない。
         if (Waveform.TryGetPlayerAbLoop(out _) || !_document.Selection.IsEmpty)
         {
             return false;
@@ -1985,6 +2043,10 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// L: 選択（なければサンプルループ／Loop リージョン）の末尾付近へジャンプして無限ループ確認。
+    /// 再生中でも一通停止にはせず、同じジャンプ＋ループにする。
+    /// </summary>
     private void JumpToLoopPrerollAndPlay()
     {
         if (_document is null)
@@ -2009,8 +2071,18 @@ public partial class MainWindow
 
         var preroll = _document.SampleRate * 3L;
         var start = range.Length < preroll ? range.StartFrame : range.EndFrame - preroll;
+        _lastPlaybackStart = start;
+        _selectionPlayOneShot = false;
+
+        if (_player.IsPlaying || IsLibraryVideoPlayheadClock())
+        {
+            SyncPlayWindowFromDocument();
+            Waveform.SeekKeepingSelection(start);
+            return;
+        }
+
         Waveform.SeekKeepingSelection(start);
-        StartPlayback(start, prerollSeconds: 0);
+        StartPlayback(start, prerollSeconds: 0, selectionOneShot: false);
     }
 
     private void SetSampleLoopFromSelection()
