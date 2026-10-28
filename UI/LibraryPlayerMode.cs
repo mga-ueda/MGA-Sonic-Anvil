@@ -1850,7 +1850,7 @@ internal static class LibraryPlayerMode
         return false;
     }
 
-    /// <summary>Ctrl＋上段 0 または Ctrl＋テンキー 0。再生ピッチを 0 に戻す。</summary>
+    /// <summary>Ctrl＋上段 0 または Ctrl＋テンキー 0。再生ピッチを 0 に戻す（マーカー番号の入力途中は二桁目）。</summary>
     public static bool IsPlaybackPitchReset(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Control && key is Key.D0 or Key.NumPad0;
 
@@ -2283,18 +2283,11 @@ internal static class LibraryPlayerMode
         modifiers == ModifierKeys.None && key is Key.I or Key.O or Key.M or Key.Insert;
 
     /// <summary>
-    /// プレイヤーで一時マーカーがあるとき、Shift＋上段数字でマーカー番号ジャンプ（二桁可）。
+    /// プレイヤーで一時マーカーがあるとき、Ctrl＋上段／Ctrl＋テンキー数字でマーカー番号ジャンプ（二桁可）。
     /// 無修飾の上段は常に割合ジャンプ。無修飾テンキーは再生操作。
-    /// Shift／Ctrl＋テンキーは上段と同じ番号ジャンプ（表示モードに限らない）。
     /// </summary>
     public static bool CanPlayerMarkerDigitJump(bool playerMarkerContext, bool hasScratchMarkers) =>
         playerMarkerContext && hasScratchMarkers;
-
-    /// <summary>
-    /// ドキュメントのリージョン番号ジャンプ（Ctrl＋上段／テンキー）を許すか。
-    /// プレイヤーではリージョンを波形に出さないため常に false。
-    /// </summary>
-    public static bool AllowsDocumentRegionDigitJump(bool playerMode) => !playerMode;
 
     /// <summary>テンキー再生操作を使う（プレイヤー／エディタ共通。上段は割合ジャンプのまま）。</summary>
     public static bool UsesTransportNumpad() => true;
@@ -2304,8 +2297,8 @@ internal static class LibraryPlayerMode
         key is >= Key.D0 and <= Key.D9;
 
     /// <summary>
-    /// 無修飾＝割合、Shift＝マーカー、Ctrl＝リージョン（いずれも上段のみ）。テンキー再生は別。
-    /// プレイヤーでのリージョンは <see cref="AllowsDocumentRegionDigitJump"/> で拒否する。
+    /// 無修飾＝割合、Ctrl＝マーカー、Shift＝リージョン（いずれも上段のみ）。テンキー再生は別。
+    /// プレイヤーでのリージョンは呼び出し側で消費のみ（ジャンプしない）。
     /// </summary>
     public static bool IsDigitJumpChord(Key key, ModifierKeys modifiers) =>
         IsPercentDigitJump(key, modifiers)
@@ -2315,41 +2308,39 @@ internal static class LibraryPlayerMode
     public static bool IsPercentDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.None && IsTopRowDigitKey(key);
 
+    /// <summary>Ctrl＋上段数字でマーカー番号へ（Ctrl＋テンキー数字と同じ）。</summary>
     public static bool IsMarkerDigitJump(Key key, ModifierKeys modifiers) =>
-        modifiers == ModifierKeys.Shift && IsTopRowDigitKey(key);
-
-    /// <summary>Ctrl＋上段数字でリージョン番号へ。Ctrl＋テンキーは <see cref="IsNumpadRegionDigitJump"/>。</summary>
-    public static bool IsRegionDigitJump(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Control && IsTopRowDigitKey(key);
+
+    /// <summary>Shift＋上段数字でリージョン番号へ（エディタのみ）。</summary>
+    public static bool IsRegionDigitJump(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Shift && IsTopRowDigitKey(key);
 
     /// <summary>テンキー 0–9。</summary>
     public static bool IsNumpadDigitKey(Key key) =>
         key is >= Key.NumPad0 and <= Key.NumPad9;
 
-    /// <summary>Shift＋テンキー数字。一時マーカーまたはドキュメントのマーカーがあるとき番号へ。</summary>
+    /// <summary>
+    /// Ctrl＋テンキー数字でマーカー番号へ（二桁可）。Ctrl は NumLock オンでも移動キーに化けない。
+    /// エディタはドキュメントのマーカー、プレイヤーは一時マーカー。
+    /// </summary>
     public static bool IsNumpadMarkerDigitJump(Key key, ModifierKeys modifiers) =>
-        modifiers == ModifierKeys.Shift && IsNumpadDigitKey(key);
+        modifiers == ModifierKeys.Control && IsNumpadDigitKey(key);
 
     /// <summary>
-    /// Shift＋テンキー 1／3／7／9 と Shift＋J／K。
-    /// 選択を伸ばしながらのシャトル／±5 秒シーク（エディタ／プレイヤーのシーク＆選択コンテキスト）。
+    /// Shift＋J／K。選択を伸ばしながらの ±5 秒シーク（エディタ／プレイヤーのシーク＆選択コンテキスト）。
+    /// Shift＋テンキーは NumLock オンで Windows が Home／End 等に化かすため割り当てない。
     /// </summary>
-    public static bool IsNumpadSelectionTransportDigit(int digit) =>
-        digit is 1 or 3 or 7 or 9;
+    public static bool IsSelectionTransportKey(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Shift && key is Key.J or Key.K;
 
-    public static bool IsNumpadSelectionTransport(Key key, ModifierKeys modifiers) =>
-        modifiers == ModifierKeys.Shift
-        && key is Key.NumPad1 or Key.NumPad3 or Key.NumPad7 or Key.NumPad9 or Key.J or Key.K;
-
-    /// <summary>J→7、K→9。テンキーはそのまま。</summary>
+    /// <summary>J→7、K→9（テンキー 7／9 の ±5 秒シークと同じ向き）。</summary>
     public static bool TrySelectionTransportDigit(Key key, out int digit)
     {
         digit = key switch
         {
-            Key.NumPad1 => 1,
-            Key.NumPad3 => 3,
-            Key.NumPad7 or Key.J => 7,
-            Key.NumPad9 or Key.K => 9,
+            Key.J => 7,
+            Key.K => 9,
             _ => -1,
         };
         return digit >= 0;
@@ -2358,16 +2349,10 @@ internal static class LibraryPlayerMode
     public static LibraryNumpadCommand NumpadSelectionTransportCommand(int digit) =>
         digit switch
         {
-            1 => LibraryNumpadCommand.Rewind,
-            3 => LibraryNumpadCommand.FastForward,
             7 => LibraryNumpadCommand.SeekBack,
             9 => LibraryNumpadCommand.SeekForward,
             _ => LibraryNumpadCommand.None,
         };
-
-    /// <summary>Ctrl＋テンキー数字。リージョンがあるとき番号の先頭へ。</summary>
-    public static bool IsNumpadRegionDigitJump(Key key, ModifierKeys modifiers) =>
-        modifiers == ModifierKeys.Control && IsNumpadDigitKey(key);
 
     /// <summary>Alt＋テンキー数字。上段の無修飾と同じ表示範囲の割合（0＝先頭、9＝90%）。</summary>
     public static bool IsNumpadPercentDigitJump(Key key, ModifierKeys modifiers) =>
@@ -2410,7 +2395,7 @@ internal static class LibraryPlayerMode
         && virtualKey is >= 0x60 and <= 0x69;
 
     /// <summary>
-    /// マーカー番号の桁送り（Shift＋上段）。
+    /// マーカー番号の桁送り（Ctrl＋上段／Ctrl＋テンキー）。
     /// seekId があればその番号へ。無効な桁は percentFallback（呼び出し側で無視可）。
     /// </summary>
     public static bool TryResolveMarkerDigitJump(
@@ -2449,7 +2434,7 @@ internal static class LibraryPlayerMode
     }
 
     /// <summary>
-    /// リージョン番号の桁送り（Ctrl＋上段。1 始まり。マーカー番号とは別）。
+    /// リージョン番号の桁送り（Shift＋上段。1 始まり。マーカー番号とは別）。
     /// seekId があればその番号の先頭へ。どの番号にもならない桁は seek せず消費する。
     /// </summary>
     public static bool TryResolveRegionDigitJump(
@@ -2585,134 +2570,12 @@ internal static class LibraryPlayerMode
             or Key.LWin or Key.RWin
             or Key.CapsLock or Key.NumLock or Key.Scroll;
 
+    public static bool IsKeyRepeat(long lParam) => (lParam & 0x40000000) != 0;
+
     /// <summary>
     /// IME が上段／テンキーの数字を ImeProcessed にした場合、割合ジャンプとテンキー操作へ戻す。
     /// かな入力の文字キーはそのまま（A などのショートカットにしない）。
     /// </summary>
-    /// <summary>
-    /// NumLock オンの Shift＋テンキーは、届く時点で Home／End／矢印になっている。
-    /// そのとき Shift 自体は下りとして報告されないことがある。
-    /// 拡張ビットが無く、仮想キーが対応する移動キーであるスキャンだけ数字に戻す。
-    /// 専用の Home／End は拡張ビットが立つ。NumLock オフのテンキーと、無修飾のテンキー数字は対象外。
-    /// Alt＋テンキーも同じ移動キーに化けることがあり、そのときは
-    /// <see cref="IsTranslatedNumpadAltPercent"/> で割合へ振り分ける（Shift 番号ジャンプにしない）。
-    /// </summary>
-    public static bool TryNumpadScanDigit(int scanCode, out int digit)
-    {
-        digit = (scanCode & 0xFF) switch
-        {
-            0x52 => 0,
-            0x4F => 1,
-            0x50 => 2,
-            0x51 => 3,
-            0x4B => 4,
-            0x4C => 5,
-            0x4D => 6,
-            0x47 => 7,
-            0x48 => 8,
-            0x49 => 9,
-            _ => -1,
-        };
-        return digit >= 0;
-    }
-
-    public static bool TryTranslatedNumpadDigit(int virtualKey, int scanCode, bool extended, bool numLockOn, out int digit)
-    {
-        digit = -1;
-        if (!numLockOn || extended)
-        {
-            return false;
-        }
-
-        if (!TryNumpadScanDigit(scanCode, out var expectedDigit))
-        {
-            return false;
-        }
-
-        var navigationKey = expectedDigit switch
-        {
-            0 => 0x2D,
-            1 => 0x23,
-            2 => 0x28,
-            3 => 0x22,
-            4 => 0x25,
-            5 => 0x0C,
-            6 => 0x27,
-            7 => 0x24,
-            8 => 0x26,
-            9 => 0x21,
-            _ => 0,
-        };
-        if (virtualKey != navigationKey)
-        {
-            return false;
-        }
-
-        digit = expectedDigit;
-        return true;
-    }
-
-    /// <summary>
-    /// 移動キーに化けたテンキーを Alt＋割合として扱うか。
-    /// Shift／Ctrl／Win が付いているときは Alt 単独の割合ではない。
-    /// </summary>
-    public static bool IsTranslatedNumpadAltPercent(
-        bool altDown,
-        bool shiftDown,
-        bool ctrlDown,
-        bool winDown = false) =>
-        altDown && !shiftDown && !ctrlDown && !winDown;
-
-    /// <summary>
-    /// 移動キーに化けたテンキーを Shift＋番号ジャンプとして扱うか。
-    /// Alt／Ctrl／Win 付きは対象外（Alt は割合、Ctrl はリージョン側、Win は他アプリへ残す）。
-    /// </summary>
-    public static bool IsTranslatedNumpadShiftJump(bool altDown, bool ctrlDown, bool winDown = false) =>
-        !altDown && !ctrlDown && !winDown;
-
-    /// <summary>
-    /// NumLock オンの Shift＋テンキーは、WM_KEYDOWN の時点で Home／End／矢印になる。
-    /// 拡張ビットの無いテンキーのスキャンコードだけ数字へ戻す。専用キーは拡張ビットが立つ。
-    /// Ctrl／Alt／Win が付いているときは触らない。
-    /// </summary>
-    public static bool TryShiftedNumpadDigit(
-        long lParam,
-        bool shiftDown,
-        bool ctrlDown,
-        bool altDown,
-        out int digit,
-        bool winDown = false)
-    {
-        digit = -1;
-        if (!shiftDown || ctrlDown || altDown || winDown)
-        {
-            return false;
-        }
-
-        if ((lParam & 0x01000000) != 0)
-        {
-            return false;
-        }
-
-        digit = ((int)(lParam >> 16) & 0xFF) switch
-        {
-            0x52 => 0,
-            0x4F => 1,
-            0x50 => 2,
-            0x51 => 3,
-            0x4B => 4,
-            0x4C => 5,
-            0x4D => 6,
-            0x47 => 7,
-            0x48 => 8,
-            0x49 => 9,
-            _ => -1,
-        };
-        return digit >= 0;
-    }
-
-    public static bool IsKeyRepeat(long lParam) => (lParam & 0x40000000) != 0;
-
     public static Key ResolveDigitKey(Key key, Key imeProcessedKey) =>
         key == Key.ImeProcessed && IsDigitKey(imeProcessedKey) ? imeProcessedKey : key;
 

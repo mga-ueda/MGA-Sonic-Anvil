@@ -2044,7 +2044,7 @@ internal sealed partial class WaveformView : Grid
     }
 
     /// <summary>
-    /// Shift＋テンキー選択の起点。シーク／シャトルでヘッドが動く前に呼ぶ。
+    /// Shift＋J／K 選択の起点。シークでヘッドが動く前に呼ぶ。
     /// </summary>
     public void SetKeyboardSelectAnchor(long frame)
     {

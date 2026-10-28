@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using MgaSonicAnvil.Domain;
 
@@ -64,9 +66,10 @@ internal sealed class AboutWindow : Window
             FontSize = 12,
             HorizontalAlignment = HorizontalAlignment.Center,
             TextAlignment = TextAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 14),
+            Margin = new Thickness(0, 0, 0, 6),
             Foreground = (Brush)FindResource("MutedForeBrush"),
         };
+        var releases = CreateReleasesLink();
 
         var license = new BrandLicenseLabel
         {
@@ -105,6 +108,7 @@ internal sealed class AboutWindow : Window
         root.Children.Add(icon);
         root.Children.Add(name);
         root.Children.Add(version);
+        root.Children.Add(releases);
         root.Children.Add(license);
         root.Children.Add(ok);
         Content = new Border
@@ -117,10 +121,8 @@ internal sealed class AboutWindow : Window
         // バージョンはキャプション無し。余白ドラッグのみ（ボタン／リンクは対象外）。
         MouseLeftButtonDown += (_, e) =>
         {
-            if (e.ChangedButton != System.Windows.Input.MouseButton.Left
-                || e.OriginalSource is DependencyObject source
-                    && (FindAncestor<RoundedButton>(source) is not null
-                        || FindAncestor<BrandLicenseLabel>(source) is not null))
+            if (e.ChangedButton != MouseButton.Left
+                || e.OriginalSource is DependencyObject source && IsInteractiveChrome(source))
             {
                 return;
             }
@@ -137,20 +139,46 @@ internal sealed class AboutWindow : Window
         AppDialogKeys.Attach(this, Close);
     }
 
-    private static T? FindAncestor<T>(DependencyObject start)
-        where T : DependencyObject
+    private TextBlock CreateReleasesLink()
     {
-        for (DependencyObject? current = start;
-            current is not null;
-            current = VisualTreeHelper.GetParent(current))
+        var link = new Hyperlink(new Run(UiStrings.AboutReleasesLink))
         {
-            if (current is T match)
+            TextDecorations = null,
+            Cursor = Cursors.Hand,
+            Focusable = false,
+            Foreground = (Brush)FindResource("ActionLinkForeBrush"),
+        };
+        link.Click += (_, _) => TryOpenUrl(AppVersion.ReleasesUrl);
+        link.MouseEnter += (_, _) =>
+            link.Foreground = (Brush)FindResource("ActionLinkHoverForeBrush");
+        link.MouseLeave += (_, _) =>
+            link.Foreground = (Brush)FindResource("ActionLinkForeBrush");
+
+        return new TextBlock
+        {
+            FontSize = 12,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 14),
+            Inlines = { link },
+        };
+    }
+
+    private static bool IsInteractiveChrome(DependencyObject start)
+    {
+        for (DependencyObject? current = start; current is not null;)
+        {
+            if (current is RoundedButton or BrandLicenseLabel or Hyperlink)
             {
-                return match;
+                return true;
             }
+
+            current = current is Visual
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
         }
 
-        return null;
+        return false;
     }
 
     private void OnLicenseLinkClick(object? sender, BrandLicenseLinkClickEventArgs e)

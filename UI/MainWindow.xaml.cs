@@ -56,14 +56,14 @@ public partial class MainWindow : Window
     private WaveRegion[] _placeRegionsBefore = [];
     private int _markerNudgeDirection;
     private int _playbackShuttleDirection;
-    /// <summary>エディタで Shift＋テンキー 1／3／7／9 の選択伸長付きシーク／シャトル中。</summary>
+    /// <summary>Shift＋J／K の選択伸長付きシーク中。</summary>
     private bool _transportSelectionExtend;
     /// <summary>
     /// 範囲を選んでから再生を開始したときだけ true。選択終端で停止する。
     /// 再生中の選択変更／ダブルクリックでは false（選択はループ）。
     /// </summary>
     private bool _selectionPlayOneShot;
-    /// <summary>押し中のテンキー数字（1／3／7／9）。離すか他キーで -1。</summary>
+    /// <summary>押し中の選択付きシーク（J＝7、K＝9）。離すか他キーで -1。</summary>
     private int _transportSelectionDigit = -1;
     /// <summary>停止中に早送り／早戻しを始めたとき。キーを離したらその位置で停止のままにする。</summary>
     private bool _shuttleStartedWhileStopped;
@@ -429,7 +429,7 @@ public partial class MainWindow : Window
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         // クラスハンドラが先に Handled にしても、Alt 解放直後のテンキーを見る。
         AddHandler(PreviewKeyUpEvent, new KeyEventHandler(MainWindow_PreviewKeyUp), handledEventsToo: true);
-        AttachNumpadShiftHook();
+        AttachNumpadMessageFilter();
         PreviewMouseDown += MainWindow_PreviewMouseDown;
         PreviewMouseDoubleClick += MainWindow_PreviewMouseDoubleClick;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
