@@ -248,9 +248,6 @@ internal static partial class UiStrings
     public static string LabelVideoProxyDisableAutoEncode => Get(
         "プロキシを自動生成しない(_D)",
         "_Do not auto-build proxies");
-    public static string LabelUseDxgiVideoPresenter => Get(
-        "D3D11+DXGI で動画を描画（試作）(_3)",
-        "Draw video with D3D11+DXGI (prototype) (_3)");
     public static string LabelVideoProxyUsage(long bytes) =>
         Format("現在の容量: {0}", "Current size: {0}", FormatFileBytesCompact(bytes));
     public static string ButtonVideoProxyClearAll => Get("すべて削除", "Delete all");
@@ -864,6 +861,14 @@ internal static partial class UiStrings
     public static string OverlayVideoProxy => Get(
         "動画プロキシを生成しています（Esc で中断）",
         "Creating video proxy (Esc to stop)");
+    public static string OverlayVideoProxyBatch(int current, int total) => Format(
+        "動画プロキシを生成しています {0} / {1}（Esc で中断）",
+        "Creating video proxy {0} / {1} (Esc to stop)",
+        current,
+        total);
+    public static string InfoVideoProxyAlreadyReady => Get(
+        "再生成の必要はありません。現行のプロキシがあります。",
+        "Regeneration is not needed. A current proxy already exists.");
     public static string ErrorVideoProxyFailed => Get(
         "動画プロキシを生成できませんでした。",
         "Could not create the video proxy.");

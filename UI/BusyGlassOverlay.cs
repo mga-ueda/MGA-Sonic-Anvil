@@ -105,6 +105,25 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         InvalidateVisual();
     }
 
+    /// <summary>表示中の見出しだけ差し替える（フロスト再キャプチャはしない）。</summary>
+    public void SetMessage(string baseText)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => SetMessage(baseText));
+            return;
+        }
+
+        var text = NormalizeMessage(baseText);
+        if (text == _baseText)
+        {
+            return;
+        }
+
+        _baseText = text;
+        InvalidateVisual();
+    }
+
     public void SetExportView(double overall, string status, IReadOnlyList<ExportJobProgress> running)
     {
         if (!Dispatcher.CheckAccess())

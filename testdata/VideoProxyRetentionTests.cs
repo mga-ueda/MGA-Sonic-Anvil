@@ -458,6 +458,53 @@ public sealed class VideoProxyRetentionTests
     }
 
     [Fact]
+    public async Task EnsurePlayable_ForceEncode_SkipsWhenCurrentProxyExists()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "mga-proxy-force-skip-" + Guid.NewGuid().ToString("N"));
+        var cache = Path.Combine(root, "cache");
+        Directory.CreateDirectory(cache);
+        VideoProxy.UseCacheDirectoryForTests(cache);
+        var previousFfmpeg = AppStorage.Settings.FfmpegExePath;
+        try
+        {
+            // ffmpeg 無しでも、現行キャッシュがあれば force でも再生成しない。
+            AppStorage.Settings.FfmpegExePath = string.Empty;
+            var source = Path.Combine(root, "clip.mov");
+            File.WriteAllBytes(source, VideoCodecProbeTests.BuildMovie("apcn"));
+            Assert.False(VideoCodecProbe.CanPlayWithoutProxy(source));
+
+            var proxy = VideoProxy.CachePath(source);
+            File.WriteAllBytes(proxy, [9, 8, 7]);
+            Assert.Equal(
+                proxy,
+                await VideoProxy.EnsurePlayableAsync(source, null, CancellationToken.None, forceEncode: true));
+            Assert.True(VideoProxy.TryGetCached(source, out var cached));
+            Assert.Equal(proxy, cached);
+        }
+        finally
+        {
+            AppStorage.Settings.FfmpegExePath = previousFfmpeg;
+            VideoProxy.ResetCacheDirectoryForTests();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void OverlayVideoProxyBatch_ShowsCurrentOfTotal()
+    {
+        var text = UiStrings.OverlayVideoProxyBatch(2, 5);
+        Assert.Contains("2", text);
+        Assert.Contains("5", text);
+        Assert.Contains("Esc", text);
+    }
+
+    [Fact]
+    public void InfoVideoProxyAlreadyReady_IsNonEmpty()
+    {
+        Assert.False(string.IsNullOrWhiteSpace(UiStrings.InfoVideoProxyAlreadyReady));
+    }
+
+    [Fact]
     public void IsProxyPath_OnlyMatchesCacheDirectory()
     {
         var root = Path.Combine(Path.GetTempPath(), "mga-proxy-path-" + Guid.NewGuid().ToString("N"));

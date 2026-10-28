@@ -263,9 +263,9 @@ internal static class VideoProxy
             return sourcePath;
         }
 
-        // forceEncode は既存キャッシュも捨てて作り直す（同名同サイズの誤共有の直し用）。
-        // 自動生成時だけヒットを返す。
-        if (!forceEncode && TryGetCached(sourcePath, out var cached))
+        // 現行 EncodeVersion のキャッシュがあれば使う（force でも再生成しない）。
+        // パスにバージョンが入るので旧レシピはヒットしない＝再生成する。
+        if (TryGetCached(sourcePath, out var cached))
         {
             progress?.Report(1);
             return cached;
@@ -283,20 +283,13 @@ internal static class VideoProxy
         Task<string> pending;
         lock (Gate)
         {
-            if (!forceEncode && TryGetCachedCore(sourcePath, out cached))
+            if (TryGetCachedCore(sourcePath, out cached))
             {
                 pending = Task.FromResult(cached);
             }
             else if (InFlight.TryGetValue(key, out var running))
             {
-                // 強制時は先行完了を待ってからこのソースで上書き生成する。
-                pending = forceEncode
-                    ? EncodeAfterAsync(running, sourcePath, progress, cancellationToken)
-                    : running;
-                if (forceEncode)
-                {
-                    InFlight[key] = pending;
-                }
+                pending = running;
             }
             else
             {
@@ -321,24 +314,6 @@ internal static class VideoProxy
                 }
             }
         }
-    }
-
-    private static async Task<string> EncodeAfterAsync(
-        Task<string> previous,
-        string sourcePath,
-        IProgress<double>? progress,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await previous.ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-            // 先行失敗でもこのソースで作り直す。
-        }
-
-        return await EncodeProxyAsync(sourcePath, progress, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<string> EncodeProxyAsync(
