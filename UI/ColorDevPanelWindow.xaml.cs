@@ -63,15 +63,9 @@ internal partial class ColorDevPanelWindow : Window
     /// <summary>初回は一覧とピッカーの描画後に表示する。既に出ている場合は前面へ。</summary>
     public void Present()
     {
-        if (IsVisible)
-        {
-            Show();
-            Activate();
-            FocusSearchBox();
-            return;
-        }
-
+        // 常に共通 Show 経由（クローク残留時の IsVisible 救済も含む）。
         AcrylicDialogChrome.Show(this);
+        Activate();
         FocusSearchBox();
     }
 

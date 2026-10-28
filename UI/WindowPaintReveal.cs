@@ -69,6 +69,32 @@ internal static class WindowPaintReveal
         Prepare(window);
     }
 
+    /// <summary>
+    /// Hide→再 Show の前に呼ぶ。描画待ちフラグと ContentRendered を組み直す。
+    /// <see cref="Attach"/> 済みの窓では AutoReveal / OnPainted を維持する。
+    /// </summary>
+    public static void RearmForReshow(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        if (!States.TryGetValue(window, out _))
+        {
+            Attach(window);
+            return;
+        }
+
+        ResetPending(window);
+        RearmContentRendered(window);
+    }
+
+    /// <summary>
+    /// 既に Loaded の窓向け。Hide→再 Show では Loaded が再発火しないので描画完了を手動で待つ。
+    /// </summary>
+    public static void NotifyWhenPainted(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        SchedulePaintNotify(window);
+    }
+
     public static void ShowWhenPainted(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
