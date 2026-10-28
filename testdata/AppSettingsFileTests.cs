@@ -1,5 +1,7 @@
 using System.IO;
 using System.Text.Json;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
@@ -21,6 +23,28 @@ public sealed class AppSettingsFileTests
             File.WriteAllText(path, "x");
             Assert.True(WallpaperBitmap.TryPreviewPath("\"" + path + "\"", out var found));
             Assert.Equal(path, found);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void WallpaperTryLoad_DownscalesWideImagesWithoutThrowing()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "mga-wallpaper-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            // 幅 2400 の小さな PNG。DecodeWidth 以下へ落とせることを確認する。
+            WriteSolidPng(path, width: 2400, height: 8);
+            var bitmap = WallpaperBitmap.TryLoad(path);
+            Assert.NotNull(bitmap);
+            Assert.True(bitmap!.PixelWidth <= WallpaperBitmap.DecodeWidth);
+            Assert.True(bitmap.PixelWidth >= 1);
         }
         finally
         {
@@ -291,6 +315,33 @@ public sealed class AppSettingsFileTests
         var path = Path.Combine(Path.GetTempPath(), $"mga-settings-{suffix}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static void WriteSolidPng(string path, int width, int height)
+    {
+        var stride = width * 4;
+        var pixels = new byte[stride * height];
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            pixels[i] = 40;
+            pixels[i + 1] = 80;
+            pixels[i + 2] = 140;
+            pixels[i + 3] = 255;
+        }
+
+        var bmp = BitmapSource.Create(
+            width,
+            height,
+            96,
+            96,
+            PixelFormats.Bgra32,
+            null,
+            pixels,
+            stride);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bmp));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
     }
 
     private static void TryDeleteDir(string path)

@@ -27,35 +27,58 @@ internal static class WallpaperBitmap
 
         try
         {
-            var bytes = File.ReadAllBytes(path);
-            using var probe = new MemoryStream(bytes, writable: false);
-            var frame = BitmapDecoder.Create(
-                probe,
-                BitmapCreateOptions.IgnoreColorProfile,
-                BitmapCacheOption.OnLoad).Frames[0];
-            BitmapSource result = frame;
-            if (frame.PixelWidth > DecodeWidth)
+            // メタデータだけ先に見て、巨大画像のフルデコードを避ける。
+            var pixelWidth = ProbePixelWidth(path);
+            using var stream = File.OpenRead(path);
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.StreamSource = stream;
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            if (pixelWidth > DecodeWidth)
             {
-                using var scaled = new MemoryStream(bytes, writable: false);
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.StreamSource = scaled;
-                image.CacheOption = BitmapCacheOption.OnLoad;
                 image.DecodePixelWidth = DecodeWidth;
-                image.EndInit();
-                result = image;
             }
 
-            if (result.CanFreeze)
+            image.EndInit();
+            if (image.CanFreeze)
             {
-                result.Freeze();
+                image.Freeze();
             }
 
-            return result;
+            return image;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException)
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or NotSupportedException
+            or FileFormatException
+            or ArgumentException
+            or OutOfMemoryException)
         {
             return null;
+        }
+    }
+
+    /// <summary>DelayCreation で寸法だけ取る。失敗したら上限超え扱いで縮小デコードへ。</summary>
+    private static int ProbePixelWidth(string path)
+    {
+        try
+        {
+            using var probe = File.OpenRead(path);
+            var frame = BitmapDecoder.Create(
+                probe,
+                BitmapCreateOptions.DelayCreation,
+                BitmapCacheOption.None).Frames[0];
+            return frame.PixelWidth;
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or NotSupportedException
+            or FileFormatException
+            or ArgumentException
+            or OutOfMemoryException)
+        {
+            return DecodeWidth + 1;
         }
     }
 }
