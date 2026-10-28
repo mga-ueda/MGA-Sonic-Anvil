@@ -310,9 +310,10 @@ internal sealed class VectorScopeView : FrameworkElement
         }
 
         var trackHeight = 5d;
+        // 位相ゲージを 1dip 上げる。数値行は track 基準だと釣られるので下で打ち消す。
         var track = new Rect(
             area.X + CorrelationSidePad,
-            area.Y + LayoutPad,
+            area.Y + LayoutPad - 1,
             Math.Max(8d, area.Width - CorrelationSidePad * 2),
             trackHeight);
         var muted = LabelColor();
@@ -341,7 +342,8 @@ internal sealed class VectorScopeView : FrameworkElement
         var left = Measure("-1", 8, dim, dpi);
         var right = Measure("+1", 8, dim, dpi);
         var value = Measure(VectorScopeEngine.FormatCorrelation(_correlation), 8, dim, dpi);
-        var labelY = track.Bottom + 1;
+        // ゲージ上昇分を打ち消し、スペアナ Hz とのボトム揃えを維持。
+        var labelY = track.Bottom;
         dc.DrawText(left, new Point(track.X, labelY));
         dc.DrawText(right, new Point(track.Right - right.Width, labelY));
         dc.DrawText(value, new Point(track.X + (track.Width - value.Width) * 0.5, labelY));
