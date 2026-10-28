@@ -14,6 +14,9 @@ internal sealed class ProjectSpectrumView : FrameworkElement
     /// <summary>Courier で読める下限。メーター目盛の 8 より一段小さい。</summary>
     private const double ChromeFontSize = 7;
 
+    /// <summary>Hz 2 行ラベルの行送り（FormattedText.Height に対する比率）。</summary>
+    private const double FreqLabelRowStride = 0.72;
+
     private readonly SpectrumAnalyzer _analyzer = new();
     private readonly DispatcherTimer _timer;
     private readonly float[] _samples = new float[SpectrumAnalyzer.FftSize];
@@ -322,8 +325,11 @@ internal sealed class ProjectSpectrumView : FrameworkElement
         var padL = MeasureDbPadDevicePx();
         var padR = 0;
         var padT = 0;
+        // 2 行 Hz ラベルは行間を詰めた実寸で予約（FormattedText.Height はフォントより大きい）。
+        var lineH = _cacheZeroHeight?.Height ?? (ChromeFontSize * 1.25);
+        var rowStride = Math.Max(ChromeFontSize, lineH * FreqLabelRowStride);
         var minLabelH = Math.Max(
-            (int)Math.Ceiling(ChromeFontSize * 2 + 2),
+            (int)Math.Ceiling(1 + rowStride + lineH),
             (int)Math.Round(SpectrumAnalyzer.OrigFreqLabelPx * s));
         var insetL = Math.Max(1, (int)Math.Round(SpectrumAnalyzer.OrigInsetLeftPx * s));
         var insetR = 0;
@@ -376,7 +382,7 @@ internal sealed class ProjectSpectrumView : FrameworkElement
 
         var maxF = bands.Count == 0 ? 0 : bands.Centers[^1] * 1.001;
         var row1y = (g.PlotY + g.PlotH + 1) * px;
-        var row2y = row1y + _cacheZeroHeight.Height + 2;
+        var row2y = row1y + Math.Max(ChromeFontSize, _cacheZeroHeight.Height * FreqLabelRowStride);
         DrawFreqRow(dc, SpectrumAnalyzer.LabelTopRow, _cacheHzTop, bands, rects, maxF, row1y, px, g);
         DrawFreqRow(dc, SpectrumAnalyzer.LabelBotRow, _cacheHzBot, bands, rects, maxF, row2y, px, g);
     }
