@@ -252,13 +252,7 @@ internal sealed class CrossfadeEditWindow : Window
     public void Present()
     {
         RefreshUiStrings();
-        if (IsVisible)
-        {
-            Activate();
-            return;
-        }
-
-        if (!_placementApplied)
+        if (!IsVisible && !_placementApplied)
         {
             if (!WindowPlacement.TryApplyFadeTool(this, AppStorage.Settings))
             {
@@ -268,7 +262,9 @@ internal sealed class CrossfadeEditWindow : Window
             _placementApplied = true;
         }
 
+        // 常に共通 Show 経由（クローク残留時の IsVisible 救済も含む）。
         AcrylicDialogChrome.Show(this);
+        Activate();
     }
 
     /// <summary>ホスト側から隠す（Close しないので再表示可能）。</summary>

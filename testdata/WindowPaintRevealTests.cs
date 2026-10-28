@@ -81,6 +81,46 @@ public sealed class WindowPaintRevealTests
         });
     }
 
+    [Fact]
+    public void RearmForReshow_PreservesAutoRevealFalseAndAllowsSecondReveal()
+    {
+        RunSta(() =>
+        {
+            var window = new Window { Opacity = 0 };
+            var painted = 0;
+            WindowPaintReveal.Attach(window, () => painted++, autoReveal: false);
+            WindowPaintReveal.Reveal(window);
+            Assert.False(WindowPaintReveal.IsPending(window));
+            Assert.Equal(1, painted);
+
+            // Hide→再 Show 相当: Pending を戻し、再び Reveal できるようにする。
+            WindowPaintReveal.RearmForReshow(window);
+            Assert.True(WindowPaintReveal.IsPending(window));
+            WindowPaintReveal.Reveal(window);
+            Assert.False(WindowPaintReveal.IsPending(window));
+            Assert.Equal(2, painted);
+        });
+    }
+
+    [Fact]
+    public void RearmForReshow_Twice_KeepsSinglePendingCycle()
+    {
+        RunSta(() =>
+        {
+            var window = new Window { Opacity = 0 };
+            var painted = 0;
+            WindowPaintReveal.Attach(window, () => painted++, autoReveal: false);
+            WindowPaintReveal.Reveal(window);
+
+            WindowPaintReveal.RearmForReshow(window);
+            WindowPaintReveal.RearmForReshow(window);
+            Assert.True(WindowPaintReveal.IsPending(window));
+            WindowPaintReveal.Reveal(window);
+            Assert.Equal(2, painted);
+            Assert.False(WindowPaintReveal.IsPending(window));
+        });
+    }
+
     private static void EnsureThemeResources()
     {
         if (Application.Current is null)

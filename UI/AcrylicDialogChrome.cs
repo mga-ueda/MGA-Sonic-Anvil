@@ -115,7 +115,8 @@ internal static class AcrylicDialogChrome
     public static bool? ShowDialog(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
-        CloakForAcrylic(window);
+        // 通常は毎回 new だが、Loaded 済みの再利用でもクローク解除が再走するようにする。
+        BeginAcrylicShow(window);
         return window.ShowDialog();
     }
 
@@ -124,13 +125,40 @@ internal static class AcrylicDialogChrome
         ArgumentNullException.ThrowIfNull(window);
         if (window.IsVisible)
         {
+            // クロークしたまま IsVisible になった残骸の救済（再オープン時に前面化だけして見えない）。
+            EnsureUncloaked(window);
             window.Show();
             AcrylicBackdrop.Apply(window);
             return;
         }
 
-        CloakForAcrylic(window);
+        BeginAcrylicShow(window);
         window.Show();
+    }
+
+    /// <summary>
+    /// Hide→再 Show / 再利用時。Loaded が再発火しないので描画待ちを組み直し、表示前にクロークする。
+    /// </summary>
+    private static void BeginAcrylicShow(Window window)
+    {
+        var alreadyLoaded = window.IsLoaded;
+        WindowPaintReveal.RearmForReshow(window);
+        CloakForAcrylic(window);
+        if (alreadyLoaded)
+        {
+            WindowPaintReveal.NotifyWhenPainted(window);
+        }
+    }
+
+    private static void EnsureUncloaked(Window window)
+    {
+        if (WindowPaintReveal.IsPending(window))
+        {
+            WindowPaintReveal.NotifyWhenPainted(window);
+            return;
+        }
+
+        DarkWindowChrome.TrySetCloaked(window, false);
     }
 
     private static void ArmReveal(Window window, Action? onPainted = null, bool activateOnReveal = false)
