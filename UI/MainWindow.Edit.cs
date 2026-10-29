@@ -2254,6 +2254,12 @@ public partial class MainWindow
             return;
         }
 
+        // ダイアログ表示中もホスト再生が続くと波形／プレビューとずれるので、開く前に止める。
+        if (_player.IsPlaying)
+        {
+            PausePlaybackSoft();
+        }
+
         var dialog = SilenceDetectDialog.Show(
             this,
             _document,
