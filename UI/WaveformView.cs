@@ -20,7 +20,10 @@ internal sealed partial class WaveformView : Grid
     public const double TimeZoomStep = 1.5422108254079407;
     public const double TimeZoomMax = 81920d;
     public const double TimeZoomStepMax = 32d;
-    public const double AmpZoomMax = 128d;
+    /// <summary>
+    /// 振幅ズーム上限。2^16 でレーン端 ≈ -96 dB（16-bit フロア付近）まで寄せられる。
+    /// </summary>
+    public const double AmpZoomMax = 65536d;
     // 旧 2^(1/4) の 5 段階分 = 2^(5/4)。ホイール時間ズーム。
     public const double WheelTimeStep = 2.378414230005442;
     /// <summary>
@@ -45,9 +48,12 @@ internal sealed partial class WaveformView : Grid
     /// <summary>タイム／マーカー系ラベルキャッシュの件数上限。満杯なら丸ごと捨てる。</summary>
     private const int TimeLabelCacheMax = 512;
     internal const double SamplePointRadius = 8d / 3d;
-    private static readonly double[] DbRequiredMarks = [-3, -6, -12];
-    private static readonly double[] DbOptionalMarks = [-9, -18, -24, -36, -48, -60];
+    /// <summary>隙間が許す限り必ず出す目盛（0 dBFS 近傍の 1 dB 刻みを含む）。</summary>
+    private static readonly double[] DbRequiredMarks = [-1, -3, -6, -12];
+    /// <summary>拡大時に 1 dB 刻みまで埋める候補（深い静寂は高 AmpZoom 用）。</summary>
+    private static readonly double[] DbOptionalMarks = BuildDbOptionalMarks();
     private const double DbOptionalMinGapPx = 11;
+    private const int DbOptionalMarkFloor = -120;
     private static double DbScaleLaneWidth => DesignMetrics.DbScaleWidth;
     private const int DragThresholdPx = 3;
     private const double LoopHandleMinPx = 5;
@@ -4640,6 +4646,24 @@ internal sealed partial class WaveformView : Grid
             dc.DrawText(text, new Point(x, y));
             dc.Pop();
         }
+    }
+
+    private static double[] BuildDbOptionalMarks()
+    {
+        // Required 以外を 1 dB 刻みで列挙（隙間は描画側で間引く）。
+        var marks = new double[-DbOptionalMarkFloor];
+        var n = 0;
+        for (var db = -2; db >= DbOptionalMarkFloor; db--)
+        {
+            if (db is -3 or -6 or -12)
+            {
+                continue;
+            }
+
+            marks[n++] = db;
+        }
+
+        return n == marks.Length ? marks : marks.AsSpan(0, n).ToArray();
     }
 
     private void DrawDbScaleTicks(
