@@ -50,6 +50,27 @@ public sealed class DocumentTabLayoutTests
     }
 
     [Fact]
+    public void WidthFor_UsesFullTitleWidthWithoutCap()
+    {
+        Assert.Equal(DocumentTabLayout.ChromeWidth + 300, DocumentTabLayout.WidthFor(300));
+        Assert.True(DocumentTabLayout.WidthFor(300) > 220);
+    }
+
+    [Fact]
+    public void Allocate_KeepsFullPreferredWhenSpaceAllows()
+    {
+        DocumentTabSlot[] tabs =
+        [
+            new(300, 80, KeepWide: true),
+            new(250, 80, KeepWide: false),
+        ];
+        var widths = new double[2];
+        DocumentTabLayout.Allocate(tabs, available: 600, widths);
+        Assert.Equal(300, widths[0], 3);
+        Assert.Equal(250, widths[1], 3);
+    }
+
+    [Fact]
     public void Allocate_KeepsActivePreferredAndShrinksOthersEqually()
     {
         DocumentTabSlot[] tabs =

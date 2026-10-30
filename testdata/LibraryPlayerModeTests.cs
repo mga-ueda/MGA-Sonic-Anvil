@@ -423,6 +423,24 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.L, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.R, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.A, ModifierKeys.None));
+        // Shift＋文字は大文字入力と同じ。テキスト入力中はショートカットへ回さない。
+        Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.X, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.A, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.L, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.R, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.V, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsShiftLetterChord(Key.X, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsShiftLetterChord(Key.X, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsShiftLetterChord(Key.X, LibraryPlayerMode.AltShift));
+        Assert.False(LibraryPlayerMode.IsShiftLetterChord(Key.D1, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.DefersShortcutToTextInput(
+            editingFileName: true, editingMarkerComment: false, focusedEditableText: false));
+        Assert.True(LibraryPlayerMode.DefersShortcutToTextInput(
+            editingFileName: false, editingMarkerComment: true, focusedEditableText: false));
+        Assert.True(LibraryPlayerMode.DefersShortcutToTextInput(
+            editingFileName: false, editingMarkerComment: false, focusedEditableText: true));
+        Assert.False(LibraryPlayerMode.DefersShortcutToTextInput(
+            editingFileName: false, editingMarkerComment: false, focusedEditableText: false));
         Assert.False(LibraryPlayerMode.IsMonitorMonoToggle(Key.M, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsMonitorBpmCycle(Key.B, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.None));

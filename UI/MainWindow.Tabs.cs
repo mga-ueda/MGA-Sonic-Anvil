@@ -954,7 +954,7 @@ public partial class MainWindow
                 var border = tabs[i];
                 var width = widths[i];
                 border.MinWidth = 0;
-                border.MaxWidth = DocumentTabLayout.MaxTabWidth;
+                border.MaxWidth = double.PositiveInfinity;
                 if (double.IsNaN(border.Width) || Math.Abs(border.Width - width) > 0.5)
                 {
                     border.Width = width;
@@ -1256,7 +1256,6 @@ public partial class MainWindow
             BorderThickness = new Thickness(0, 0, 1, 0),
             Cursor = Cursors.Hand,
             MinWidth = 0,
-            MaxWidth = DocumentTabLayout.MaxTabWidth,
         };
 
         var title = new TextBlock
