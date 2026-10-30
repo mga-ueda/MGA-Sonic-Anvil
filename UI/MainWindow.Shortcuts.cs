@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -3332,34 +3333,23 @@ public partial class MainWindow
     /// <summary>ショートカットでピッチが変わったとき、中央に現在の半音を出してフェードアウト。</summary>
     private void ShowPlaybackPitchToast(bool returnedToOriginal)
     {
-        PlaybackPitchToastText.Text = returnedToOriginal
+        ShowCenterStatusToast(returnedToOriginal
             ? "Pitch Reset"
-            : FormatPlaybackPitchToast(_player.PlaybackSemitones);
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaybackPitchToast,
-            to: 1,
-            instant: true,
-            hitTestVisible: false);
-        _playbackPitchToastTimer ??= new DispatcherTimer
-        {
-            Interval = LibraryExplorerTypeahead.ToastIdleClear,
-        };
-        _playbackPitchToastTimer.Tick -= OnPlaybackPitchToastTick;
-        _playbackPitchToastTimer.Tick += OnPlaybackPitchToastTick;
-        _playbackPitchToastTimer.Stop();
-        _playbackPitchToastTimer.Start();
+            : FormatPlaybackPitchToast(_player.PlaybackSemitones));
     }
 
-    private void OnPlaybackPitchToastTick(object? sender, EventArgs e)
+    /// <summary>オプション系チェックのトグル時、中央に ON／OFF を出してフェードアウト。</summary>
+    private void ShowOptionToggleToast(string label, bool enabled)
     {
-        _playbackPitchToastTimer?.Stop();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaybackPitchToast,
-            to: 0,
-            instant: false,
-            hitTestVisible: false,
-            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        ShowCenterStatusToast(FormatOptionToggleToast(label, enabled));
     }
+
+    private void ShowCenterStatusToast(string text) => _centerStatusToast.Show(text);
 
     private static string FormatPlaybackPitchToast(int semitones)
     {
@@ -3367,6 +3357,26 @@ public partial class MainWindow
         var number = value.ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture);
         var unit = Math.Abs(value) == 1 ? "Semitone" : "Semitones";
         return number + " " + unit;
+    }
+
+    internal static string FormatOptionToggleToast(string label, bool enabled) =>
+        label + (enabled ? ": ON" : ": OFF");
+
+    /// <summary>F9–F12 モード名（キー接頭辞なし）。</summary>
+    internal static string FormatLayoutModeToast(WindowLayoutSlot slot)
+    {
+        var label = slot switch
+        {
+            WindowLayoutSlot.F9 => UiStrings.LabelLayoutPresetF9,
+            WindowLayoutSlot.F10 => UiStrings.LabelLayoutPresetF10,
+            WindowLayoutSlot.F11 => UiStrings.LabelLayoutPresetF11,
+            WindowLayoutSlot.F12 => UiStrings.LabelLayoutPresetF12,
+            _ => string.Empty,
+        };
+        var half = label.IndexOf('：');
+        var ascii = label.IndexOf(':');
+        var cut = half >= 0 && (ascii < 0 || half < ascii) ? half : ascii;
+        return cut >= 0 ? label[(cut + 1)..].Trim() : label;
     }
 
     private bool TryHandleVideoLaunchScaleKey(Key key, ModifierKeys modifiers, bool isRepeat)

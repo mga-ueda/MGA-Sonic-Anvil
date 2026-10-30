@@ -2440,6 +2440,56 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void FormatOptionToggleToast_ShowsOnOff()
+    {
+        Assert.Equal("Silent Skip: ON", MainWindow.FormatOptionToggleToast("Silent Skip", enabled: true));
+        Assert.Equal("Random: OFF", MainWindow.FormatOptionToggleToast("Random", enabled: false));
+    }
+
+    [Fact]
+    public void FormatLayoutModeToast_StripsKeyPrefix()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("Player mode 1", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F9));
+            Assert.Equal("Editor mode 2", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F12));
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("プレイヤーモード１", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F9));
+            Assert.Equal("エディタモード２", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F12));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
+    public void CheckSelectModeChanged_RaisesOnToggle_NotOnSilentSet()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            var raised = 0;
+            view.CheckSelectModeChanged += (_, _) => raised++;
+
+            view.ToggleCheckSelectMode();
+            Assert.True(view.CheckSelectMode);
+            Assert.Equal(1, raised);
+
+            view.SetCheckSelectMode(false, raise: false);
+            Assert.False(view.CheckSelectMode);
+            Assert.Equal(1, raised);
+
+            view.SetCheckSelectMode(true);
+            Assert.True(view.CheckSelectMode);
+            Assert.Equal(2, raised);
+        });
+    }
+
+    [Fact]
     public void ShuffleEnabled_ToggleWorksWhenPlaylistEmpty()
     {
         RunSta(() =>

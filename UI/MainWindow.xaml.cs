@@ -154,18 +154,19 @@ public partial class MainWindow : Window
     /// <summary>動画ミニ窓の原寸に対する倍率（F8／引数起動中）。</summary>
     private double _videoLaunchScale = LibraryVideoWindowScale.Native;
     private bool _videoLaunchScaleLatched;
-    private DispatcherTimer? _videoLaunchScaleToastTimer;
-    private DispatcherTimer? _playbackPitchToastTimer;
+    private readonly AcrylicToastHost _videoLaunchScaleToast = new();
+    private readonly AcrylicToastHost _centerStatusToast = new();
+    private readonly AcrylicToastHost _playlistPdfPageNumberToast = new();
+    private readonly AcrylicToastHost _playlistTrackIndexToast = new();
+    private readonly AcrylicGlassPopup _playlistVideoTimecodeHost = AcrylicGlassPopup.CreateTimecode();
+    private readonly TextBlock PlaylistVideoNowEndText = new();
+    private readonly TextBlock PlaylistVideoSelText = new();
     private bool _videoLaunchScaleApplying;
     /// <summary>動画起動で映像が開くまでウィンドウを出さないための待ち。</summary>
     private TaskCompletionSource<bool>? _videoLaunchShowReady;
     private DispatcherTimer? _videoLaunchPlacementSaveTimer;
     /// <summary>T でファイル名を出したあと、フェード完了後にラウドネス回避をやり直す。</summary>
     private DispatcherTimer? _playlistVideoFileNamePlaceTimer;
-    /// <summary>PDF ページ切替時のページ番号トースト（表示→フェードアウト）。</summary>
-    private DispatcherTimer? _playlistPdfPageNumberToastTimer;
-    /// <summary>動画／PDF 複数再生時のプレイリスト位置トースト（表示→フェードアウト）。</summary>
-    private DispatcherTimer? _playlistTrackIndexToastTimer;
     /// <summary>直前にトーストした位置キー（同じ曲では再フラッシュしない）。</summary>
     private string? _playlistTrackIndexToastKey;
     private int _autoSpeakerSeenChannels = int.MinValue;
@@ -175,6 +176,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        BindAcrylicToasts();
         ApplyRememberedVideoChrome();
         EditHistory.CommandApplying += ResetPlaybackPitchForEdit;
         LibraryBrowser.BindWaveformGlow(PlayerWaveGlowHost);
@@ -211,6 +213,7 @@ public partial class MainWindow : Window
         LibraryBrowser.AutoPlayChanged += LibraryBrowser_AutoPlayChanged;
         LibraryBrowser.AutoPlayNextChanged += LibraryBrowser_AutoPlayNextChanged;
         LibraryBrowser.AutoLoopChanged += LibraryBrowser_AutoLoopChanged;
+        LibraryBrowser.CheckSelectModeChanged += LibraryBrowser_CheckSelectModeChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;
         LibraryBrowser.PlaylistWaveMenuRequested += (_, command) => ExecuteWaveMenu(command);
@@ -1204,8 +1207,9 @@ public partial class MainWindow : Window
             PersistCurrentWindowPlacement();
         }
 
-        // Hide の前に子ツール窓を閉じる（本体だけ先に消えると調整窓が残る）。
+        // Hide の前に子ツール窓と Acrylic トーストを閉じる（Popup が本体より残らないように）。
         CloseToolWindowsForExit();
+        HideAllAcrylicOverlays();
         HideFromTaskAndFocus();
         StopMeterRendering();
         VectorScope.StopTicks();
@@ -1219,6 +1223,17 @@ public partial class MainWindow : Window
         StopSeekNudge();
         StopVideoFrameStep();
         _ = FinishExitAfterFlushAsync();
+    }
+
+    /// <summary>終了時に DWM Acrylic のトースト／タイムコード Popup を即閉じる。</summary>
+    private void HideAllAcrylicOverlays()
+    {
+        _centerStatusToast.Hide(instant: true);
+        _videoLaunchScaleToast.Hide(instant: true);
+        _playlistPdfPageNumberToast.Hide(instant: true);
+        _playlistTrackIndexToast.Hide(instant: true);
+        _playlistVideoTimecodeHost.IsOpen = false;
+        LibraryBrowser.HideAcrylicToasts();
     }
 
     /// <summary>
@@ -1676,6 +1691,126 @@ public partial class MainWindow : Window
         AppStorage.Save();
     }
 
+    /// <summary>メニューと同じ DWM Acrylic オーバーレイを PlaybackScene 基準で配置する。</summary>
+    private void BindAcrylicToasts()
+    {
+        _centerStatusToast.PlacementTarget = PlaybackScene;
+        _centerStatusToast.CustomPopupPlacementCallback = PlaceCenterToast;
+
+        _videoLaunchScaleToast.PlacementTarget = PlaybackScene;
+        _videoLaunchScaleToast.CustomPopupPlacementCallback = PlaceCenterToast;
+
+        _playlistPdfPageNumberToast.PlacementTarget = PlaybackScene;
+        _playlistPdfPageNumberToast.CustomPopupPlacementCallback = PlacePdfPageNumberToast;
+
+        _playlistTrackIndexToast.PlacementTarget = PlaybackScene;
+        _playlistTrackIndexToast.CustomPopupPlacementCallback = PlaceTrackIndexToast;
+
+        BindPlaylistVideoTimecodeHost();
+    }
+
+    private void BindPlaylistVideoTimecodeHost()
+    {
+        PlaylistVideoNowEndText.Height = DesignMetrics.PlaylistVideoTimecodeLineHeight;
+        PlaylistVideoNowEndText.FontFamily = new System.Windows.Media.FontFamily("Consolas");
+        PlaylistVideoNowEndText.FontSize = DesignMetrics.PlaylistVideoTimecodeFontSize;
+        PlaylistVideoNowEndText.FontWeight = FontWeights.Normal;
+        PlaylistVideoNowEndText.TextAlignment = TextAlignment.Center;
+        PlaylistVideoNowEndText.TextWrapping = TextWrapping.NoWrap;
+        PlaylistVideoNowEndText.SetResourceReference(
+            System.Windows.Controls.TextBlock.ForegroundProperty,
+            "PrimaryForeBrush");
+        PlaylistVideoNowEndText.Text = "00:00.00 / 00:00.00";
+
+        PlaylistVideoSelText.Height = DesignMetrics.PlaylistVideoTimecodeLineHeight;
+        PlaylistVideoSelText.Margin = new Thickness(0, DesignMetrics.PlaylistVideoTimecodeLineGap, 0, 0);
+        PlaylistVideoSelText.FontFamily = new System.Windows.Media.FontFamily("Consolas");
+        PlaylistVideoSelText.FontSize = DesignMetrics.PlaylistVideoTimecodeFontSize;
+        PlaylistVideoSelText.FontWeight = FontWeights.Normal;
+        PlaylistVideoSelText.TextAlignment = TextAlignment.Center;
+        PlaylistVideoSelText.TextWrapping = TextWrapping.NoWrap;
+        PlaylistVideoSelText.Visibility = Visibility.Collapsed;
+        PlaylistVideoSelText.SetResourceReference(
+            System.Windows.Controls.TextBlock.ForegroundProperty,
+            "PrimaryForeBrush");
+        PlaylistVideoSelText.Text = "00:00.00 / 00:00.00";
+
+        _playlistVideoTimecodeHost.Padding = DesignMetrics.PlaylistVideoTimecodePadding;
+        _playlistVideoTimecodeHost.Content = new StackPanel
+        {
+            Children =
+            {
+                PlaylistVideoNowEndText,
+                PlaylistVideoSelText,
+            },
+        };
+        _playlistVideoTimecodeHost.PlacementTarget = PlaybackScene;
+        _playlistVideoTimecodeHost.CustomPopupPlacementCallback = PlaceVideoTimecode;
+    }
+
+    private static System.Windows.Controls.Primitives.CustomPopupPlacement[] PlaceCenterToast(
+        Size popupSize,
+        Size targetSize,
+        Point offset)
+    {
+        var x = (targetSize.Width - popupSize.Width) / 2;
+        var y = (targetSize.Height - popupSize.Height) / 2;
+        return
+        [
+            new System.Windows.Controls.Primitives.CustomPopupPlacement(
+                new Point(x, y),
+                System.Windows.Controls.Primitives.PopupPrimaryAxis.None),
+        ];
+    }
+
+    private static System.Windows.Controls.Primitives.CustomPopupPlacement[] PlaceVideoTimecode(
+        Size popupSize,
+        Size targetSize,
+        Point offset)
+    {
+        var margin = DesignMetrics.PlaylistVideoTimecodeMargin;
+        var x = (targetSize.Width - popupSize.Width) / 2;
+        var y = margin.Top;
+        return
+        [
+            new System.Windows.Controls.Primitives.CustomPopupPlacement(
+                new Point(x, y),
+                System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal),
+        ];
+    }
+
+    private static System.Windows.Controls.Primitives.CustomPopupPlacement[] PlacePdfPageNumberToast(
+        Size popupSize,
+        Size targetSize,
+        Point offset)
+    {
+        var margin = DesignMetrics.PlaylistPdfPageNumberMargin;
+        var x = (targetSize.Width - popupSize.Width) / 2;
+        var y = targetSize.Height - popupSize.Height - margin.Bottom;
+        return
+        [
+            new System.Windows.Controls.Primitives.CustomPopupPlacement(
+                new Point(x, y),
+                System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal),
+        ];
+    }
+
+    private static System.Windows.Controls.Primitives.CustomPopupPlacement[] PlaceTrackIndexToast(
+        Size popupSize,
+        Size targetSize,
+        Point offset)
+    {
+        var margin = DesignMetrics.PlaylistTrackIndexMargin;
+        var x = margin.Left;
+        var y = targetSize.Height - popupSize.Height - margin.Bottom;
+        return
+        [
+            new System.Windows.Controls.Primitives.CustomPopupPlacement(
+                new Point(x, y),
+                System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal),
+        ];
+    }
+
     private void AlwaysOnTopCheck_Changed(object sender, RoutedEventArgs e)
     {
         var enabled = AlwaysOnTopCheck.IsChecked == true;
@@ -1687,6 +1822,7 @@ public partial class MainWindow : Window
 
         AppStorage.Settings.AlwaysOnTop = enabled;
         AppStorage.Save();
+        ShowOptionToggleToast(UiStrings.LabelAlwaysOnTop, enabled);
     }
 
     private void SilentSkipCheck_Changed(object sender, RoutedEventArgs e)
@@ -1697,8 +1833,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        AppStorage.Settings.SilentSkip = SilentSkipCheck.IsChecked == true;
+        var enabled = SilentSkipCheck.IsChecked == true;
+        AppStorage.Settings.SilentSkip = enabled;
         AppStorage.Save();
+        ShowOptionToggleToast(UiStrings.LabelSilentSkip, enabled);
     }
 
     private void AutoLoopCheck_Changed(object sender, RoutedEventArgs e)

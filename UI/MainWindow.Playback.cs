@@ -2259,10 +2259,12 @@ public partial class MainWindow
             {
                 _activeLayoutSlot = WindowLayoutSlot.F10;
                 _layoutFullscreenOn = false;
+                // F8 動画ミニからの復帰ではモード切替トーストを出さない。
                 return;
             }
 
-            ApplyLayoutPreset(WindowLayoutSlot.F9, forceReapply: true, fromUserShortcut: fromUserShortcut);
+            // F8 からの F9 もトーストなし（fromUserShortcut を落として再入）。
+            ApplyLayoutPreset(WindowLayoutSlot.F9, forceReapply: true, fromUserShortcut: false);
             return;
         }
 
@@ -2390,11 +2392,26 @@ public partial class MainWindow
             {
                 Waveform.Focus();
             }
+
+            if (fromUserShortcut)
+            {
+                ShowLayoutModeToast(slot);
+            }
         }
         finally
         {
             _suppressLayoutPlacementPersist = false;
         }
+    }
+
+    private void ShowLayoutModeToast(WindowLayoutSlot slot)
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        ShowCenterStatusToast(FormatLayoutModeToast(slot));
     }
 
     /// <summary>
@@ -2873,6 +2890,8 @@ public partial class MainWindow
             WindowPlacement.CaptureVideoLaunchPosition(this, AppStorage.Settings);
             _videoLaunchScale = next;
             TryApplyVideoLaunchPlacement();
+            // タイムコード等の Acrylic Popup は窓寸法確定後に中央／上辺へ載せ直す。
+            RefreshVideoMiniAcrylicPlacementAfterLayout();
         }
 
         if (showKeyToast)
@@ -2882,6 +2901,44 @@ public partial class MainWindow
 
         return true;
     }
+
+    /// <summary>F8 窓拡縮後、開いているタイムコードの Placement をレイアウト後にやり直す。</summary>
+    private void RefreshVideoMiniAcrylicPlacementAfterLayout()
+    {
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (!IsVideoMiniPlayerActive())
+                {
+                    return;
+                }
+
+                ApplyPlaylistVideoTimecodeOverlayScale(VideoMiniOverlayLayoutScale);
+                _playlistVideoTimecodeHost.RefreshPlacement();
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    /// <summary>+／- キー拡縮時だけ中央に拡大率を 1 秒出す（枠ドラッグでは出さない）。</summary>
+    private void ShowVideoLaunchScaleToast()
+    {
+        var text = LibraryVideoWindowScale.FormatPercent(_videoLaunchScale)
+            .ToString(CultureInfo.InvariantCulture) + "%";
+        // 窓サイズ／PlaybackScene のレイアウト確定後に出す（直後だと中央からずれる）。
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (!IsVideoMiniPlayerActive())
+                {
+                    return;
+                }
+
+                _videoLaunchScaleToast.Show(text);
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    private void HideVideoLaunchScaleToast() => _videoLaunchScaleToast.Hide();
 
     /// <summary>枠ドラッグ後の実寸を倍率へ反映（+／- の 25% 着地の基準）。</summary>
     private void SyncVideoLaunchScaleAfterUserResize()
@@ -2895,6 +2952,7 @@ public partial class MainWindow
         }
 
         SyncVideoLaunchScaleFromWindow(naturalW, naturalH);
+        RefreshVideoMiniAcrylicPlacementAfterLayout();
     }
 
     private VideoLaunchAspectResize.Constraints? TryGetVideoLaunchAspectConstraints()
@@ -2936,48 +2994,6 @@ public partial class MainWindow
             minClientHeightPx: minClientH,
             maxClientWidthPx: Math.Max(minClientW, maxClientW),
             maxClientHeightPx: Math.Max(minClientH, maxClientH));
-    }
-
-    /// <summary>+／- キー拡縮時だけ中央に拡大率を 1 秒出してフェードアウト。</summary>
-    private void ShowVideoLaunchScaleToast()
-    {
-        PlaylistVideoScaleToastText.Text =
-            LibraryVideoWindowScale.FormatPercent(_videoLaunchScale)
-                .ToString(CultureInfo.InvariantCulture) + "%";
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistVideoScaleToast,
-            to: 1,
-            instant: true,
-            hitTestVisible: false);
-        _videoLaunchScaleToastTimer ??= new DispatcherTimer
-        {
-            Interval = LibraryExplorerTypeahead.ToastIdleClear,
-        };
-        _videoLaunchScaleToastTimer.Tick -= OnVideoLaunchScaleToastTick;
-        _videoLaunchScaleToastTimer.Tick += OnVideoLaunchScaleToastTick;
-        _videoLaunchScaleToastTimer.Stop();
-        _videoLaunchScaleToastTimer.Start();
-    }
-
-    private void OnVideoLaunchScaleToastTick(object? sender, EventArgs e)
-    {
-        _videoLaunchScaleToastTimer?.Stop();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistVideoScaleToast,
-            to: 0,
-            instant: false,
-            hitTestVisible: false,
-            seconds: LibraryPlayerMode.ChromeFadeSeconds);
-    }
-
-    private void HideVideoLaunchScaleToast()
-    {
-        _videoLaunchScaleToastTimer?.Stop();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistVideoScaleToast,
-            to: 0,
-            instant: true,
-            hitTestVisible: false);
     }
 
     private void SyncVideoLaunchScaleFromWindow(
@@ -3219,44 +3235,24 @@ public partial class MainWindow
         PlaylistVideoSimpleSeek.LayoutTransform = Transform.Identity;
         PlaylistVideoSimpleSeek.Height = DesignMetrics.PlaylistVideoSimpleSeekHitHeight * overlayScale;
         PlaylistVideoSimpleSeek.Margin = DesignMetrics.PlaylistVideoSimpleSeekMargin(overlayScale);
-        PlaylistVideoScaleToast.LayoutTransform = overlayTransform;
-        PlaybackPitchToast.LayoutTransform = overlayTransform;
+        _videoLaunchScaleToast.SetOverlayScale(overlayScale);
+        _centerStatusToast.SetOverlayScale(overlayScale);
         ApplyPlaylistVideoTimecodeOverlayScale(overlayScale);
-        ApplyPlaylistPdfPageNumberOverlayScale(overlayScale);
-        ApplyPlaylistTrackIndexOverlayScale(overlayScale);
+        _playlistPdfPageNumberToast.SetOverlayScale(overlayScale);
+        _playlistTrackIndexToast.SetOverlayScale(overlayScale);
         SchedulePlaylistVideoFileNamePlacement();
     }
 
-    /// <summary>動画ミニのタイムコードを窓比例で拡縮（高さ・余白）。F10／全画面は等倍。</summary>
+    /// <summary>動画ミニのタイムコードを窓比例で拡縮。F10／全画面は等倍。</summary>
     private void ApplyPlaylistVideoTimecodeOverlayScale(double scale)
     {
-        var designHeight = DesignMetrics.PlaylistVideoTimecodeHostHeight;
-        var designMargin = DesignMetrics.PlaylistVideoTimecodeMargin;
         if (!IsVideoMiniPlayerActive() || _playlistVideoFullscreen)
         {
-            PlaylistVideoTimecode.LayoutTransform = Transform.Identity;
-            PlaylistVideoTimecode.Height = designHeight;
-            PlaylistVideoTimecode.Margin = designMargin;
+            _playlistVideoTimecodeHost.SetOverlayScale(1);
             return;
         }
 
-        var s = Math.Clamp(
-            scale,
-            DesignMetrics.OverlayScaleMin,
-            DesignMetrics.OverlayScaleMax);
-        if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0)
-        {
-            s = 1;
-        }
-
-        // Viewbox の外寸だけ変える（中のデザイン寸法はそのまま → 確実に拡縮される）。
-        PlaylistVideoTimecode.LayoutTransform = Transform.Identity;
-        PlaylistVideoTimecode.Height = designHeight * s;
-        PlaylistVideoTimecode.Margin = new Thickness(
-            designMargin.Left * s,
-            designMargin.Top * s,
-            designMargin.Right * s,
-            designMargin.Bottom * s);
+        _playlistVideoTimecodeHost.SetOverlayScale(scale);
     }
 
     /// <summary>動画ミニのリサイズ／F 全画面に合わせてアナライザ倍率と列幅・行高を更新する。</summary>

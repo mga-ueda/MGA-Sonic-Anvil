@@ -106,18 +106,8 @@ internal sealed partial class LibraryBrowserView
         explorerPane.Children.Add(explorerHeader);
         var treeBody = new Grid { Background = Brushes.Transparent };
         treeBody.Children.Add(_folderTree);
-        var treeOverlay = new Grid
-        {
-            Background = Brushes.Transparent,
-            IsHitTestVisible = false,
-        };
         BuildExplorerTypeaheadToast(treeBody);
-        treeOverlay.Children.Add(_explorerTypeaheadToast);
-        Panel.SetZIndex(_explorerTypeaheadToast, 20);
-        var treeStack = new Grid { Background = Brushes.Transparent };
-        treeStack.Children.Add(treeBody);
-        treeStack.Children.Add(treeOverlay);
-        explorerPane.Children.Add(treeStack);
+        explorerPane.Children.Add(treeBody);
         var treeHost = new Grid { Background = Brushes.Transparent };
         // 見出し上へのドロップもルート登録として受け取る。
         treeHost.AllowDrop = true;
@@ -283,7 +273,6 @@ internal sealed partial class LibraryBrowserView
         Grid.SetColumn(splitter, 1);
         Panel.SetZIndex(splitter, 8);
         _root.Children.Add(splitter);
-        BuildTransferToast();
 
         Grid.SetColumnSpan(_glowHost, _root.ColumnDefinitions.Count);
         Grid.SetColumnSpan(_veil, _root.ColumnDefinitions.Count);
