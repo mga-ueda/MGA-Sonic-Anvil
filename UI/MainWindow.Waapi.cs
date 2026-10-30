@@ -64,8 +64,16 @@ public partial class MainWindow
         _player.PlayExitLayer = settings.WaapiPlayPostExit;
         WaapiBar.OutputDirectory = settings.WaapiOutputDirectory ?? string.Empty;
         WaapiBar.KeepTargetChanged += WaapiBar_KeepTargetChanged;
-        WaapiBar.AutoActiveChanged += (_, _) => PersistWaapiSettings();
-        WaapiBar.PlayPostExitChanged += (_, _) => ApplyPlayPostExit();
+        WaapiBar.AutoActiveChanged += (_, _) =>
+        {
+            PersistWaapiSettings();
+            ShowOptionToggleToast(UiStrings.LabelAutoActive, WaapiBar.AutoActiveChecked);
+        };
+        WaapiBar.PlayPostExitChanged += (_, _) =>
+        {
+            ApplyPlayPostExit();
+            ShowOptionToggleToast(UiStrings.LabelPlayMinusE, WaapiBar.PlayPostExitChecked);
+        };
         WaapiBar.ProjectNameClick += (_, _) => RequestOpenOrFocusWwiseProject();
         WaapiBar.ExportClick += (_, _) => _ = ExportToWwiseAsync();
         WaapiBar.OutputFolderBrowse += (_, _) => BrowseExportOutputFolder();
@@ -96,6 +104,7 @@ public partial class MainWindow
         // PlayPostExitChecked の setter はイベントを抑制するため、反映を明示的に呼ぶ。
         WaapiBar.PlayPostExitChecked = !WaapiBar.PlayPostExitChecked;
         ApplyPlayPostExit();
+        ShowOptionToggleToast(UiStrings.LabelPlayMinusE, WaapiBar.PlayPostExitChecked);
     }
 
     /// <summary>Auto Active チェックを切り替える（Alt+Shift+A）。バー非表示時は何もしない。</summary>
@@ -108,6 +117,7 @@ public partial class MainWindow
 
         WaapiBar.AutoActiveChecked = !WaapiBar.AutoActiveChecked;
         PersistWaapiSettings();
+        ShowOptionToggleToast(UiStrings.LabelAutoActive, WaapiBar.AutoActiveChecked);
     }
 
     /// <summary>Play -E の現在値を再生プレビューへ即反映し、設定を保存する。</summary>

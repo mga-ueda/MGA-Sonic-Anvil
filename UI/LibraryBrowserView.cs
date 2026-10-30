@@ -200,27 +200,8 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>黄背景と ↑↓ 渡り歩き用。Esc まで残す。</summary>
     private string _explorerTypeaheadWalk = "";
     private string _explorerTypeaheadIgnoreText = "";
-    private readonly Grid _transferToast = new()
-    {
-        IsHitTestVisible = false,
-        Opacity = 0,
-        Visibility = Visibility.Collapsed,
-        HorizontalAlignment = HorizontalAlignment.Stretch,
-        VerticalAlignment = VerticalAlignment.Stretch,
-    };
-
-    private readonly TextBlock _transferToastText = new();
-    private readonly FrostedPlate _transferToastPlate = new();
-    private DispatcherTimer? _transferToastTimer;
-
-    private readonly Grid _explorerTypeaheadToast = new()
-    {
-        Opacity = 0,
-        IsHitTestVisible = false,
-        HorizontalAlignment = HorizontalAlignment.Center,
-        VerticalAlignment = VerticalAlignment.Center,
-    };
-    private readonly TextBlock _explorerTypeaheadToastText = new();
+    private readonly AcrylicToastHost _transferToast = new();
+    private readonly AcrylicToastHost _explorerTypeaheadToast = new();
     private readonly HashSet<TreeViewItem> _explorerTypeaheadHighlighted = [];
     private DispatcherTimer? _explorerTypeaheadToastIdleTimer;
     private static readonly SolidColorBrush ExplorerTypeaheadHitBack = CreateExplorerTypeaheadHitBack();
@@ -822,6 +803,8 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>チェック選択モード。初期オフ。設定には記憶せず、プレイヤー退出でオフへ戻す。</summary>
     public bool CheckSelectMode => _checkSelectMode;
 
+    public event EventHandler? CheckSelectModeChanged;
+
     public DocumentSession[] SelectedSessions
     {
         get
@@ -905,7 +888,11 @@ internal sealed partial class LibraryBrowserView : UserControl
         SetCheckSelectMode(!_checkSelectMode);
     }
 
-    public void SetCheckSelectMode(bool on)
+    /// <param name="raise">
+    /// false なら変更しても <see cref="CheckSelectModeChanged"/> を出さない
+    /// （プレイヤー退出時の自動オフなど）。
+    /// </param>
+    public void SetCheckSelectMode(bool on, bool raise = true)
     {
         if (_checkSelectMode == on)
         {
@@ -927,6 +914,11 @@ internal sealed partial class LibraryBrowserView : UserControl
             // オンに戻したときは空のチェックから始まる。ツリーは対象外。
             ApplyPlaylistSelectionFromChecks();
             ClearAllPlaylistChecks();
+        }
+
+        if (raise)
+        {
+            CheckSelectModeChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -2129,7 +2121,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// 打ち込みセッションを終わらせる（Esc・プレイリスト登録／再生・他 UI へのフォーカス）。
     /// 黄背景・渡り歩き・トーストをすべて消す。入力アイドルでのトースト消しとは別。
     /// </summary>
-    public bool ClearExplorerTypeahead(bool hideToastInstant = true)
+    public bool ClearExplorerTypeahead()
     {
         StopExplorerTypeaheadToastIdleTimer();
         ClearExplorerTypeaheadHighlights();
@@ -2137,7 +2129,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         var had = _explorerTypeahead.Length > 0 || _explorerTypeaheadWalk.Length > 0;
         _explorerTypeahead = "";
         _explorerTypeaheadWalk = "";
-        HideExplorerTypeaheadToast(hideToastInstant);
+        HideExplorerTypeaheadToast();
         return had;
     }
 
@@ -2182,16 +2174,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     {
         if (_explorerTypeahead.Length == 0)
         {
-            HideExplorerTypeaheadToast(instant: true);
+            HideExplorerTypeaheadToast();
             return;
         }
 
-        _explorerTypeaheadToastText.Text = _explorerTypeahead;
-        LibraryPlayerMode.FadeElementOpacity(
-            _explorerTypeaheadToast,
-            to: 1,
-            instant: true,
-            hitTestVisible: false);
+        _explorerTypeaheadToast.ShowSticky(_explorerTypeahead);
         _explorerTypeaheadToastIdleTimer ??= new DispatcherTimer
         {
             Interval = LibraryExplorerTypeahead.ToastIdleClear,
@@ -2211,7 +2198,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         StopExplorerTypeaheadToastIdleTimer();
         _explorerTypeahead = "";
         _explorerTypeaheadIgnoreText = "";
-        HideExplorerTypeaheadToast(instant: false);
+        HideExplorerTypeaheadToast();
     }
 
     private void StopExplorerTypeaheadToastIdleTimer()
@@ -2219,15 +2206,10 @@ internal sealed partial class LibraryBrowserView : UserControl
         _explorerTypeaheadToastIdleTimer?.Stop();
     }
 
-    private void HideExplorerTypeaheadToast(bool instant)
+    private void HideExplorerTypeaheadToast()
     {
         StopExplorerTypeaheadToastIdleTimer();
-        LibraryPlayerMode.FadeElementOpacity(
-            _explorerTypeaheadToast,
-            to: 0,
-            instant,
-            hitTestVisible: false,
-            seconds: instant ? null : LibraryPlayerMode.ChromeFadeSeconds);
+        _explorerTypeaheadToast.Hide();
     }
 
     private void ActivateExplorerTypeaheadMatch()
@@ -2636,6 +2618,13 @@ internal sealed partial class LibraryBrowserView : UserControl
         ShowTransferToast("Cut", paths);
     }
 
+    /// <summary>アプリ終了時など、開いている Acrylic トーストを即閉じる。</summary>
+    public void HideAcrylicToasts()
+    {
+        _transferToast.Hide(instant: true);
+        HideExplorerTypeaheadToast();
+    }
+
     /// <summary>10件までは表示名を1行ずつ、11件以上は件数だけ。</summary>
     public void ShowTransferToast(string action, IReadOnlyList<string> paths)
     {
@@ -2644,87 +2633,31 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        EnsureTransferToastHost();
         var detail = paths.Count <= 10
             ? string.Join(Environment.NewLine, paths.Select(TransferDisplayName))
             : $"{paths.Count} items";
-        _transferToastText.Text = paths.Count is > 1 and <= 10
+        var text = paths.Count is > 1 and <= 10
             ? action + Environment.NewLine + detail
             : $"{action}: {detail}";
-        _transferToast.Visibility = Visibility.Visible;
-        AlignTransferToastToWindowCenter();
-        LibraryPlayerMode.FadeElementOpacity(_transferToast, to: 1, instant: true, hitTestVisible: false);
-        Dispatcher.BeginInvoke(AlignTransferToastToWindowCenter, DispatcherPriority.Loaded);
-        _transferToastTimer ??= new DispatcherTimer { Interval = LibraryExplorerTypeahead.ToastIdleClear };
-        _transferToastTimer.Stop();
-        _transferToastTimer.Tick -= OnTransferToastTick;
-        _transferToastTimer.Tick += OnTransferToastTick;
-        _transferToastTimer.Start();
+        _transferToast.Show(text);
     }
 
-    private void OnTransferToastTick(object? sender, EventArgs e)
+    private void EnsureTransferToastHost()
     {
-        _transferToastTimer?.Stop();
-        LibraryPlayerMode.FadeElementOpacity(
-            _transferToast,
-            to: 0,
-            instant: false,
-            hitTestVisible: false,
-            seconds: LibraryPlayerMode.ChromeFadeSeconds);
-    }
-
-    private void BuildTransferToast()
-    {
-        _transferToastText.FontFamily = new FontFamily("Consolas");
-        _transferToastText.FontSize = DesignMetrics.From96(22);
-        _transferToastText.FontWeight = FontWeights.Normal;
-        _transferToastText.TextWrapping = TextWrapping.NoWrap;
-        // コピー／切り取り等のファイル一覧は左寄せ（他トーストは別 TextBlock）。
-        _transferToastText.TextAlignment = TextAlignment.Left;
-        _transferToastText.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
-        _transferToastPlate.HorizontalAlignment = HorizontalAlignment.Center;
-        _transferToastPlate.VerticalAlignment = VerticalAlignment.Center;
-        _transferToastPlate.Margin = new Thickness(16);
-        _transferToastPlate.Source = _root;
-        _transferToastPlate.CornerRadius = DesignMetrics.ControlCorner;
-        _transferToastPlate.Children.Add(new Border
+        if (_transferToast.PlacementTarget is not null)
         {
-            Padding = DesignMetrics.PlaylistVideoTimecodePadding,
-            Background = Brushes.Transparent,
-            Child = _transferToastText,
-        });
-        _transferToast.Children.Add(_transferToastPlate);
-        SizeChanged += (_, _) =>
-        {
-            if (_transferToast.Visibility == Visibility.Visible)
-            {
-                AlignTransferToastToWindowCenter();
-            }
-        };
-        Grid.SetColumnSpan(_transferToast, _root.ColumnDefinitions.Count);
-        Panel.SetZIndex(_transferToast, 40);
-        _root.Children.Add(_transferToast);
-    }
-
-    /// <summary>
-    /// トーストの親はライブラリ領域なので、その中央はウィンドウ中央より上になる。
-    /// ウィンドウ内容の縦中央へずらす。
-    /// </summary>
-    private void AlignTransferToastToWindowCenter()
-    {
-        var window = Window.GetWindow(this);
-        if (window?.Content is not FrameworkElement root
-            || _transferToast.ActualHeight <= 0
-            || root.ActualHeight <= 0)
-        {
-            _transferToastPlate.RenderTransform = Transform.Identity;
             return;
         }
 
-        var origin = _transferToast.TranslatePoint(new Point(0, 0), root);
-        var dy = root.ActualHeight / 2 - (origin.Y + _transferToast.ActualHeight / 2);
-        _transferToastPlate.RenderTransform = Math.Abs(dy) < 0.5
-            ? Transform.Identity
-            : new TranslateTransform(0, dy);
+        // コピー／切り取り等のファイル一覧は左寄せ。
+        _transferToast.TextAlignment = TextAlignment.Left;
+        _transferToast.Padding = DesignMetrics.PlaylistVideoTimecodePadding;
+        _transferToast.FontSize = DesignMetrics.From96(22);
+        // ウィンドウ中央（ライブラリ領域中央だと上寄りになる）。
+        var window = Window.GetWindow(this);
+        _transferToast.PlacementTarget = window?.Content as UIElement ?? _root;
+        _transferToast.Placement = PlacementMode.Center;
     }
 
     private static string TransferDisplayName(string path)
@@ -5123,28 +5056,13 @@ internal sealed partial class LibraryBrowserView : UserControl
         return false;
     }
 
-    private void BuildExplorerTypeaheadToast(FrameworkElement captureSource)
+    private void BuildExplorerTypeaheadToast(FrameworkElement placementTarget)
     {
-        _explorerTypeaheadToastText.FontFamily = new FontFamily("Consolas");
-        _explorerTypeaheadToastText.FontSize = DesignMetrics.From96(22);
-        _explorerTypeaheadToastText.FontWeight = FontWeights.Normal;
-        _explorerTypeaheadToastText.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
-        _explorerTypeaheadToastText.TextAlignment = TextAlignment.Center;
-        _explorerTypeaheadToastText.TextWrapping = TextWrapping.NoWrap;
-        var plate = new FrostedPlate
-        {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Source = captureSource,
-            CornerRadius = DesignMetrics.ControlCorner,
-        };
-        plate.Children.Add(new Border
-        {
-            Padding = DesignMetrics.PlaylistVideoTimecodePadding,
-            Background = Brushes.Transparent,
-            Child = _explorerTypeaheadToastText,
-        });
-        _explorerTypeaheadToast.Children.Add(plate);
+        _explorerTypeaheadToast.FontSize = DesignMetrics.From96(22);
+        _explorerTypeaheadToast.Padding = DesignMetrics.PlaylistVideoTimecodePadding;
+        _explorerTypeaheadToast.TextAlignment = TextAlignment.Center;
+        _explorerTypeaheadToast.PlacementTarget = placementTarget;
+        _explorerTypeaheadToast.Placement = PlacementMode.Center;
     }
 
     private static void ApplyPaneTitleStyle(TextBlock label, Thickness? margin = null)

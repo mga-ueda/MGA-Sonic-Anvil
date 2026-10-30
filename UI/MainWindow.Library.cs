@@ -678,8 +678,8 @@ public partial class MainWindow
             _libraryPlayOnTrackKeyRelease = false;
             _libraryStopAfterTrack = false;
             _libraryHoldJacketWash = false;
-            // チェック選択はプレイヤー専用。設定には覚えず、退出でオフへ戻す。
-            LibraryBrowser.SetCheckSelectMode(false);
+            // チェック選択はプレイヤー専用。設定には覚えず、退出でオフへ戻す（トーストは出さない）。
+            LibraryBrowser.SetCheckSelectMode(false, raise: false);
             _ = LeaveLibraryMaximizeAsync();
             if (_videoLaunchPlacement)
             {
@@ -809,12 +809,11 @@ public partial class MainWindow
             LibraryPlayerMode.ShowsPlaylistTrackIndex(
                 hide,
                 LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf,
-                _sessions.Count),
-            instant);
+                _sessions.Count));
         // PDF ページ番号は常時出さない。本表示を抜けたら隠し、切替時だけトーストする。
         if (!LibraryPlayerMode.ShowsPlaylistPdfPageNumber(hide, LibraryBrowser.PlaylistVisualIsPdf))
         {
-            HidePlaylistPdfPageNumber(instant);
+            HidePlaylistPdfPageNumber();
         }
         if (!hide)
         {
@@ -1153,8 +1152,7 @@ public partial class MainWindow
             LibraryPlayerMode.ShowsPlaylistVideoTimecode(
                 chromeHidden,
                 _playlistVideoTimecode,
-                video),
-            instant);
+                video));
         ApplyPlaylistVideoFileNameFade(
             LibraryPlayerMode.ShowsPlaylistVideoFileName(
                 chromeHidden,
@@ -1675,7 +1673,7 @@ public partial class MainWindow
         _playlistVideoScrubPreviewFrame = -1;
     }
 
-    private void ApplyPlaylistVideoTimecodeFade(bool show, bool instant)
+    private void ApplyPlaylistVideoTimecodeFade(bool show)
     {
         if (show)
         {
@@ -1683,12 +1681,11 @@ public partial class MainWindow
             ApplyPlaylistVideoTimecodeOverlayScale(VideoMiniOverlayLayoutScale);
         }
 
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistVideoTimecode,
-            show ? 1 : 0,
-            instant,
-            hitTestVisible: false,
-            seconds: LibraryPlayerMode.ChromeFadeSeconds);
+        _playlistVideoTimecodeHost.IsOpen = show;
+        if (show)
+        {
+            _playlistVideoTimecodeHost.RefreshPlacementAfterLayout();
+        }
     }
 
     private void ApplyPlaylistVideoFileNameFade(bool show, bool instant)
@@ -1717,12 +1714,12 @@ public partial class MainWindow
     /// <summary>
     /// 複数再生の位置トースト。許可時は曲／件数が変わったときだけ出し、少ししたらフェードアウト。
     /// </summary>
-    private void SyncPlaylistTrackIndexToast(bool allow, bool instant)
+    private void SyncPlaylistTrackIndexToast(bool allow)
     {
         if (!allow)
         {
             _playlistTrackIndexToastKey = null;
-            HidePlaylistTrackIndex(instant);
+            HidePlaylistTrackIndex();
             return;
         }
 
@@ -1745,86 +1742,31 @@ public partial class MainWindow
             $"{index}/{count}");
     }
 
-    /// <summary>曲切替・本再生／ミニ突入時。番号を出してから一定時間でフェードアウト。</summary>
+    /// <summary>曲切替・本再生／ミニ突入時。番号を出して一定時間で閉じる。</summary>
     private void FlashPlaylistTrackIndex()
     {
-        ApplyPlaylistTrackIndexOverlayScale(VideoMiniOverlayLayoutScale);
-        RefreshPlaylistTrackIndex();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistTrackIndex,
-            to: 1,
-            instant: true,
-            hitTestVisible: false);
-        _playlistTrackIndexToastTimer ??= new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(LibraryPlayerMode.PlaylistTrackIndexToastHoldSeconds),
-        };
-        _playlistTrackIndexToastTimer.Tick -= OnPlaylistTrackIndexToastTick;
-        _playlistTrackIndexToastTimer.Tick += OnPlaylistTrackIndexToastTick;
-        _playlistTrackIndexToastTimer.Stop();
-        _playlistTrackIndexToastTimer.Start();
+        _playlistTrackIndexToast.SetOverlayScale(
+            IsVideoMiniPlayerActive() && !_playlistVideoFullscreen
+                ? VideoMiniOverlayLayoutScale
+                : 1);
+        var index = DisplayedPlaylistIndex(_activeSession);
+        var count = DisplayedPlaylistCount();
+        _playlistTrackIndexToast.Show(
+            LibraryPlayerMode.FormatPlaylistTrackLabel(index, count),
+            TimeSpan.FromSeconds(LibraryPlayerMode.PlaylistTrackIndexToastHoldSeconds));
     }
 
-    private void OnPlaylistTrackIndexToastTick(object? sender, EventArgs e)
-    {
-        _playlistTrackIndexToastTimer?.Stop();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistTrackIndex,
-            to: 0,
-            instant: false,
-            hitTestVisible: false,
-            seconds: LibraryPlayerMode.ChromeFadeSeconds);
-    }
+    private void HidePlaylistTrackIndex() => _playlistTrackIndexToast.Hide();
 
-    private void HidePlaylistTrackIndex(bool instant)
-    {
-        _playlistTrackIndexToastTimer?.Stop();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistTrackIndex,
-            to: 0,
-            instant,
-            hitTestVisible: false,
-            seconds: instant ? null : LibraryPlayerMode.ChromeFadeSeconds);
-    }
 
     private void RefreshPlaylistTrackIndex()
     {
         var index = DisplayedPlaylistIndex(_activeSession);
         var count = DisplayedPlaylistCount();
-        PlaylistTrackIndexText.Text = LibraryPlayerMode.FormatPlaylistTrackLabel(index, count);
+        _playlistTrackIndexToast.Text = LibraryPlayerMode.FormatPlaylistTrackLabel(index, count);
     }
 
-    private void ApplyPlaylistTrackIndexOverlayScale(double scale)
-    {
-        var designHeight = DesignMetrics.PlaylistTrackIndexHostHeight;
-        var designMargin = DesignMetrics.PlaylistTrackIndexMargin;
-        if (!IsVideoMiniPlayerActive() || _playlistVideoFullscreen)
-        {
-            PlaylistTrackIndex.LayoutTransform = Transform.Identity;
-            PlaylistTrackIndex.Height = designHeight;
-            PlaylistTrackIndex.Margin = designMargin;
-            return;
-        }
-
-        var s = Math.Clamp(
-            scale,
-            DesignMetrics.OverlayScaleMin,
-            DesignMetrics.OverlayScaleMax);
-        if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0)
-        {
-            s = 1;
-        }
-
-        PlaylistTrackIndex.LayoutTransform = Transform.Identity;
-        PlaylistTrackIndex.Height = designHeight * s;
-        PlaylistTrackIndex.Margin = new Thickness(
-            designMargin.Left * s,
-            designMargin.Top * s,
-            designMargin.Right * s,
-            designMargin.Bottom * s);
-    }
-
-    /// <summary>ページ切替成功時。番号を出してから一定時間でフェードアウト。</summary>
+    /// <summary>ページ切替成功時。番号を出して一定時間で閉じる。</summary>
     private void FlashPlaylistPdfPageNumber()
     {
         if (!LibraryPlayerMode.ShowsPlaylistPdfPageNumber(
@@ -1834,80 +1776,25 @@ public partial class MainWindow
             return;
         }
 
-        ApplyPlaylistPdfPageNumberOverlayScale(VideoMiniOverlayLayoutScale);
-        RefreshPlaylistPdfPageNumber();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistPdfPageNumber,
-            to: 1,
-            instant: true,
-            hitTestVisible: false);
-        _playlistPdfPageNumberToastTimer ??= new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(LibraryPlayerMode.PdfPageNumberToastHoldSeconds),
-        };
-        _playlistPdfPageNumberToastTimer.Tick -= OnPlaylistPdfPageNumberToastTick;
-        _playlistPdfPageNumberToastTimer.Tick += OnPlaylistPdfPageNumberToastTick;
-        _playlistPdfPageNumberToastTimer.Stop();
-        _playlistPdfPageNumberToastTimer.Start();
+        _playlistPdfPageNumberToast.SetOverlayScale(
+            IsVideoMiniPlayerActive() && !_playlistVideoFullscreen
+                ? VideoMiniOverlayLayoutScale
+                : 1);
+        _playlistPdfPageNumberToast.Show(
+            LibraryPlayerMode.FormatPdfPageLabel(
+                LibraryBrowser.PlaylistPdfPageIndex,
+                LibraryBrowser.PlaylistPdfPageCount),
+            TimeSpan.FromSeconds(LibraryPlayerMode.PdfPageNumberToastHoldSeconds));
     }
 
-    private void OnPlaylistPdfPageNumberToastTick(object? sender, EventArgs e)
-    {
-        _playlistPdfPageNumberToastTimer?.Stop();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistPdfPageNumber,
-            to: 0,
-            instant: false,
-            hitTestVisible: false,
-            seconds: LibraryPlayerMode.ChromeFadeSeconds);
-    }
+    private void HidePlaylistPdfPageNumber() => _playlistPdfPageNumberToast.Hide();
 
-    private void HidePlaylistPdfPageNumber(bool instant)
-    {
-        _playlistPdfPageNumberToastTimer?.Stop();
-        LibraryPlayerMode.FadeElementOpacity(
-            PlaylistPdfPageNumber,
-            to: 0,
-            instant,
-            hitTestVisible: false,
-            seconds: instant ? null : LibraryPlayerMode.ChromeFadeSeconds);
-    }
 
     private void RefreshPlaylistPdfPageNumber()
     {
-        PlaylistPdfPageNumberText.Text = LibraryPlayerMode.FormatPdfPageLabel(
+        _playlistPdfPageNumberToast.Text = LibraryPlayerMode.FormatPdfPageLabel(
             LibraryBrowser.PlaylistPdfPageIndex,
             LibraryBrowser.PlaylistPdfPageCount);
-    }
-
-    private void ApplyPlaylistPdfPageNumberOverlayScale(double scale)
-    {
-        var designHeight = DesignMetrics.PlaylistPdfPageNumberHostHeight;
-        var designMargin = DesignMetrics.PlaylistPdfPageNumberMargin;
-        if (!IsVideoMiniPlayerActive() || _playlistVideoFullscreen)
-        {
-            PlaylistPdfPageNumber.LayoutTransform = Transform.Identity;
-            PlaylistPdfPageNumber.Height = designHeight;
-            PlaylistPdfPageNumber.Margin = designMargin;
-            return;
-        }
-
-        var s = Math.Clamp(
-            scale,
-            DesignMetrics.OverlayScaleMin,
-            DesignMetrics.OverlayScaleMax);
-        if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0)
-        {
-            s = 1;
-        }
-
-        PlaylistPdfPageNumber.LayoutTransform = Transform.Identity;
-        PlaylistPdfPageNumber.Height = designHeight * s;
-        PlaylistPdfPageNumber.Margin = new Thickness(
-            designMargin.Left * s,
-            designMargin.Top * s,
-            designMargin.Right * s,
-            designMargin.Bottom * s);
     }
 
     private void RefreshPlaylistVideoFileName()
@@ -2270,14 +2157,7 @@ public partial class MainWindow
                 !_playlistVideoChromeVisible,
                 _playlistVideoTimecode,
                 isVideo: true));
-        // タイムコードは T の表示中だけ影（A の HUD とは独立）。
-        LibraryPlayerMode.SetVideoUiShadow(
-            PlaylistVideoTimecode,
-            video
-            && LibraryPlayerMode.ShowsPlaylistVideoTimecode(
-                !_playlistVideoChromeVisible,
-                _playlistVideoTimecode,
-                isVideo: true));
+        // タイムコードは AcrylicOverlayKind.Timecode（DWM 影なし）。Effect も付けない。
         SyncPlaylistVideoHudLabelColors();
     }
 
@@ -5992,6 +5872,7 @@ public partial class MainWindow
     {
         AppStorage.Settings.LibraryShuffle = LibraryBrowser.ShuffleEnabled;
         AppStorage.Save();
+        ShowOptionToggleToast(UiStrings.LabelLibraryShuffle, LibraryBrowser.ShuffleEnabled);
         if (IsLibraryMaximized && IsPlaybackActive())
         {
             ScheduleLibraryGaplessPrefetch();
@@ -6002,6 +5883,12 @@ public partial class MainWindow
     {
         AppStorage.Settings.LibraryAutoPlay = LibraryBrowser.AutoPlayEnabled;
         AppStorage.Save();
+        ShowOptionToggleToast(UiStrings.LabelLibraryAutoPlay, LibraryBrowser.AutoPlayEnabled);
+    }
+
+    private void LibraryBrowser_CheckSelectModeChanged(object? sender, EventArgs e)
+    {
+        ShowOptionToggleToast(UiStrings.LabelLibraryCheckSelect, LibraryBrowser.CheckSelectMode);
     }
 
     private void LibraryBrowser_AutoPlayNextChanged(object? sender, EventArgs e)
@@ -6027,6 +5914,7 @@ public partial class MainWindow
     {
         AppStorage.Settings.LibraryAutoLoop = LibraryBrowser.AutoLoopEnabled;
         AppStorage.Save();
+        ShowOptionToggleToast(UiStrings.LabelLibraryAutoLoop, LibraryBrowser.AutoLoopEnabled);
         if (AutoLoopCheck.IsChecked != LibraryBrowser.AutoLoopEnabled)
         {
             AutoLoopCheck.IsChecked = LibraryBrowser.AutoLoopEnabled;

@@ -221,13 +221,6 @@ internal static class DesignMetrics
 
     public static Thickness PlaylistVideoTimecodePadding => new(From96(14), From96(8), From96(14), From96(8));
 
-    public static double PlaylistVideoTimecodeHostHeight =>
-        PlaylistVideoTimecodePadding.Top
-        + PlaylistVideoTimecodeLineHeight
-        + PlaylistVideoTimecodeLineGap
-        + PlaylistVideoTimecodeLineHeight
-        + PlaylistVideoTimecodePadding.Bottom;
-
     /// <summary>動画本再生中、下中央に出すファイル名。</summary>
     public static double PlaylistVideoFileNameFontSize => From96(18);
 
@@ -241,27 +234,12 @@ internal static class DesignMetrics
     /// <summary>PDF 本表示中、下中央に出すページ番号（例: 1 / 3）。</summary>
     public static double PlaylistPdfPageNumberFontSize => From96(22);
 
-    public static double PlaylistPdfPageNumberLineHeight => From96(28);
-
     public static Thickness PlaylistPdfPageNumberMargin => new(0, 0, 0, From96(24));
 
     public static Thickness PlaylistPdfPageNumberPadding => PlaylistVideoTimecodePadding;
 
-    public static double PlaylistPdfPageNumberHostHeight =>
-        PlaylistPdfPageNumberPadding.Top
-        + PlaylistPdfPageNumberLineHeight
-        + PlaylistPdfPageNumberPadding.Bottom;
-
     /// <summary>動画／PDF 本再生・ミニで、左下に出すプレイリスト位置（例: 2 / 5）。</summary>
-    public static double PlaylistTrackIndexFontSize => PlaylistPdfPageNumberFontSize;
-
-    public static double PlaylistTrackIndexLineHeight => PlaylistPdfPageNumberLineHeight;
-
     public static Thickness PlaylistTrackIndexMargin => new(From96(24), 0, 0, From96(24));
-
-    public static Thickness PlaylistTrackIndexPadding => PlaylistPdfPageNumberPadding;
-
-    public static double PlaylistTrackIndexHostHeight => PlaylistPdfPageNumberHostHeight;
 
     /// <summary>ファイル名とラウドネスのあいだに残す隙間。</summary>
     public static double PlaylistVideoFileNameLoudnessGap => From96(8);
