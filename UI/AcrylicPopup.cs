@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -104,7 +105,7 @@ internal static class AcrylicPopup
 
         PrepareContextMenuHost(menu);
         ClearOpaqueFill(menu);
-        ScheduleFrost(menu);
+        ScheduleFrost(menu, AcrylicBackdrop.TintBrushKey, roundCorners: true);
     }
 
     private static void OnMenuItemSubmenuOpened(object sender, RoutedEventArgs e)
@@ -120,7 +121,7 @@ internal static class AcrylicPopup
             return;
         }
 
-        FrostPopupSurface(popup);
+        FrostPopupSurface(popup, AcrylicBackdrop.TintBrushKey, roundCorners: true);
     }
 
     private static void OnMenuItemMouseEnter(object sender, MouseEventArgs e)
@@ -152,23 +153,61 @@ internal static class AcrylicPopup
             return;
         }
 
-        FrostPopupSurface(popup);
+        FrostPopupSurface(popup, AcrylicBackdrop.TintBrushKey, roundCorners: true);
+    }
+
+    private static readonly ConditionalWeakTable<Popup, AttachOptions> AttachedOptions = new();
+
+    private sealed class AttachOptions
+    {
+        public string TintBrushKey = AcrylicBackdrop.TintBrushKey;
+        public bool RoundCorners = true;
     }
 
     /// <summary>色パレットなど、クラスハンドラ外の Popup 向け。</summary>
-    public static void Attach(Popup popup)
+    public static void Attach(Popup popup) =>
+        Attach(popup, tintBrushKey: null, roundCorners: true);
+
+    /// <summary>
+    /// <paramref name="tintBrushKey"/> を指定すると、そのブラシで Acrylic を載せる
+    /// （トーストは <see cref="AcrylicBackdrop.ToastTintBrushKey"/>）。
+    /// null／空はダイアログ／メニューと同じ <see cref="AcrylicBackdrop.TintBrushKey"/>。
+    /// </summary>
+    public static void Attach(Popup popup, string? tintBrushKey) =>
+        Attach(popup, tintBrushKey, roundCorners: true);
+
+    /// <param name="roundCorners">
+    /// false はタイムコード専用（DWM 角丸／システム影なし）。
+    /// </param>
+    public static void Attach(Popup popup, string? tintBrushKey, bool roundCorners)
     {
         ArgumentNullException.ThrowIfNull(popup);
+        AttachedOptions.Remove(popup);
+        AttachedOptions.Add(
+            popup,
+            new AttachOptions
+            {
+                TintBrushKey = string.IsNullOrEmpty(tintBrushKey)
+                    ? AcrylicBackdrop.TintBrushKey
+                    : tintBrushKey,
+                RoundCorners = roundCorners,
+            });
+
         popup.Opened -= OnAttachedPopupOpened;
         popup.Opened += OnAttachedPopupOpened;
     }
 
     private static void OnAttachedPopupOpened(object? sender, EventArgs e)
     {
-        if (sender is Popup popup)
+        if (sender is not Popup popup)
         {
-            FrostPopupSurface(popup);
+            return;
         }
+
+        var options = AttachedOptions.TryGetValue(popup, out var stored)
+            ? stored
+            : new AttachOptions();
+        FrostPopupSurface(popup, options.TintBrushKey, options.RoundCorners);
     }
 
     private static void PrepareContextMenuHost(ContextMenu menu)
@@ -199,11 +238,11 @@ internal static class AcrylicPopup
         }
     }
 
-    private static void FrostPopupSurface(Popup popup)
+    private static void FrostPopupSurface(Popup popup, string tintBrushKey, bool roundCorners)
     {
         TryDisableTransparency(popup);
         ClearOpaqueFill(popup.Child);
-        ScheduleFrost(popup.Child as Visual ?? popup);
+        ScheduleFrost(popup.Child as Visual ?? popup, tintBrushKey, roundCorners);
     }
 
     private static void ClearOpaqueFill(UIElement? child)
@@ -245,7 +284,7 @@ internal static class AcrylicPopup
         }
     }
 
-    private static void ScheduleFrost(Visual? visual)
+    private static void ScheduleFrost(Visual? visual, string tintBrushKey, bool roundCorners)
     {
         if (visual is null)
         {
@@ -254,7 +293,7 @@ internal static class AcrylicPopup
 
         // 開いた直後に Loaded/Render で何度も DWM を叩くと、メニューの
         // IsHighlighted 更新が遅れたり欠けることがある。HWND 成立後に1回だけ。
-        if (AcrylicBackdrop.TryApplyToVisual(visual))
+        if (AcrylicBackdrop.TryApplyToVisual(visual, tintBrushKey, roundCorners))
         {
             return;
         }
@@ -262,7 +301,7 @@ internal static class AcrylicPopup
         if (visual is DispatcherObject dispatcherObject)
         {
             dispatcherObject.Dispatcher.BeginInvoke(
-                () => AcrylicBackdrop.TryApplyToVisual(visual),
+                () => AcrylicBackdrop.TryApplyToVisual(visual, tintBrushKey, roundCorners),
                 DispatcherPriority.Loaded);
         }
     }

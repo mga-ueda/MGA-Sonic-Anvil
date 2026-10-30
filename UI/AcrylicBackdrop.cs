@@ -8,14 +8,20 @@ namespace MgaSonicAnvil.UI;
 /// <summary>
 /// ウィンドウへすりガラスを適用する（MGA After Drive と同じ ACCENT Acrylic。
 /// DWM 呼び出し方針は WinBlur 由来 — THIRD_PARTY_NOTICES.md の WinBlur 項を参照）。
-/// ティントは色設定の <c>AcrylicDialogTintBrush</c>（#AARRGGBB）。DwmExtendFrameIntoClientArea は呼ばないこと。
+/// ティントは色設定のブラシ（#AARRGGBB）。ダイアログ／メニューは <c>AcrylicDialogTintBrush</c>、
+/// トーストは <c>AcrylicToastTintBrush</c>。DwmExtendFrameIntoClientArea は呼ばないこと。
 /// </summary>
 internal static class AcrylicBackdrop
 {
     internal const string TintBrushKey = "AcrylicDialogTintBrush";
 
-    /// <summary>XAML 既定と同じ黒ティント 0xC0。</summary>
+    internal const string ToastTintBrushKey = "AcrylicToastTintBrush";
+
+    /// <summary>ダイアログ用 XAML 既定と同じ黒ティント 0xC0。</summary>
     internal const byte DefaultTintAlpha = 0xC0;
+
+    /// <summary>トースト用 XAML 既定と同じ黒ティント 0x80。</summary>
+    internal const byte DefaultToastTintAlpha = 0x80;
 
     private static readonly object TrackGate = new();
     private static readonly List<WeakReference<Window>> Tracked = [];
@@ -27,6 +33,7 @@ internal static class AcrylicBackdrop
     private const int DwmwaWindowCornerPreference = 33;
     private const int DwmwaSystemBackdropType = 38;
     private const int DwmsbtNone = 1;
+    private const int DwmwcpDonotround = 1;
     private const int DwmwcpRound = 2;
 
     private enum AccentState
@@ -83,14 +90,16 @@ internal static class AcrylicBackdrop
                 continue;
             }
 
-            Apply(hwnd);
+            Apply(hwnd, TintBrushKey);
         }
     }
 
     /// <summary>
     /// WPF Window へ Acrylic を適用する。背景ブラシは呼び出し側で Transparent にしておくこと。
     /// </summary>
-    public static void Apply(Window window)
+    public static void Apply(Window window) => Apply(window, TintBrushKey);
+
+    public static void Apply(Window window, string tintBrushKey)
     {
         ArgumentNullException.ThrowIfNull(window);
 
@@ -111,11 +120,18 @@ internal static class AcrylicBackdrop
             source.CompositionTarget.BackgroundColor = Colors.Transparent;
         }
 
-        Apply(hwnd);
+        Apply(hwnd, tintBrushKey);
     }
 
     /// <summary>ContextMenu / Popup 子など、Visual の HWND へ Acrylic を載せる。</summary>
-    public static bool TryApplyToVisual(Visual? visual)
+    public static bool TryApplyToVisual(Visual? visual) =>
+        TryApplyToVisual(visual, TintBrushKey, roundCorners: true);
+
+    public static bool TryApplyToVisual(Visual? visual, string tintBrushKey, bool roundCorners) =>
+        TryApplyTintToVisual(visual, ResolveTintColor(tintBrushKey), roundCorners);
+
+    /// <summary>任意色ティントで Visual の HWND へ Acrylic を載せる（トーストのαフェード用）。</summary>
+    public static bool TryApplyTintToVisual(Visual? visual, Color tint, bool roundCorners)
     {
         if (visual is null)
         {
@@ -133,11 +149,20 @@ internal static class AcrylicBackdrop
             source.CompositionTarget.BackgroundColor = Colors.Transparent;
         }
 
-        Apply(source.Handle);
+        ApplyTint(source.Handle, tint, roundCorners);
         return true;
     }
 
-    public static void Apply(IntPtr hwnd)
+    public static void Apply(IntPtr hwnd) => Apply(hwnd, TintBrushKey);
+
+    public static void Apply(IntPtr hwnd, string tintBrushKey) =>
+        ApplyTint(hwnd, ResolveTintColor(tintBrushKey), roundCorners: true);
+
+    /// <param name="roundCorners">
+    /// false なら DWM 角丸を付けない（タイムコード専用。システム影が下に伸びるのを避ける）。
+    /// Border の CornerRadius は呼び出し側で維持する。
+    /// </param>
+    public static void ApplyTint(IntPtr hwnd, Color tint, bool roundCorners)
     {
         if (hwnd == IntPtr.Zero)
         {
@@ -146,14 +171,13 @@ internal static class AcrylicBackdrop
 
         try
         {
-            var tint = ResolveTintColor();
             var darkMode = TintLuma(tint) < 0.55 ? 1 : 0;
             _ = DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref darkMode, sizeof(int));
 
             var backdrop = DwmsbtNone;
             _ = DwmSetWindowAttribute(hwnd, DwmwaSystemBackdropType, ref backdrop, sizeof(int));
 
-            var corner = DwmwcpRound;
+            var corner = roundCorners ? DwmwcpRound : DwmwcpDonotround;
             _ = DwmSetWindowAttribute(hwnd, DwmwaWindowCornerPreference, ref corner, sizeof(int));
 
             ClearLayeredStyle(hwnd);
@@ -167,15 +191,20 @@ internal static class AcrylicBackdrop
         }
     }
 
-    internal static Color ResolveTintColor()
+    internal static Color ResolveTintColor() => ResolveTintColor(TintBrushKey);
+
+    internal static Color ResolveTintColor(string tintBrushKey)
     {
         try
         {
-            return Theme.Get(TintBrushKey);
+            return Theme.Get(string.IsNullOrEmpty(tintBrushKey) ? TintBrushKey : tintBrushKey);
         }
         catch (InvalidOperationException)
         {
-            return Color.FromArgb(DefaultTintAlpha, 0, 0, 0);
+            var alpha = string.Equals(tintBrushKey, ToastTintBrushKey, StringComparison.Ordinal)
+                ? DefaultToastTintAlpha
+                : DefaultTintAlpha;
+            return Color.FromArgb(alpha, 0, 0, 0);
         }
     }
 

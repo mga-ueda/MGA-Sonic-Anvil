@@ -18,6 +18,8 @@ public sealed class AcrylicBackdropTests
     public void DefaultTintAlpha_MatchesUiColorsXaml()
     {
         Assert.Equal(0xC0, AcrylicBackdrop.DefaultTintAlpha);
+        Assert.Equal(0x80, AcrylicBackdrop.DefaultToastTintAlpha);
         Assert.Equal("AcrylicDialogTintBrush", AcrylicBackdrop.TintBrushKey);
+        Assert.Equal("AcrylicToastTintBrush", AcrylicBackdrop.ToastTintBrushKey);
     }
 }

@@ -210,6 +210,7 @@ internal static class ColorDevCatalog
             ("WindowBackBrush", ColorDevGroup.Dialog),
             ("ColorPanelBackBrush", ColorDevGroup.Dialog),
             ("AcrylicDialogTintBrush", ColorDevGroup.Dialog),
+            ("AcrylicToastTintBrush", ColorDevGroup.Dialog),
             ("DialogInputBackBrush", ColorDevGroup.Dialog),
             ("ExportButtonFillBrush", ColorDevGroup.Dialog),
             ("ExportButtonFocusFillBrush", ColorDevGroup.Dialog),

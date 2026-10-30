@@ -107,6 +107,7 @@ internal static class UiThemePalette
         "KeepTargetUnlockHoverForeBrush",
         "ColorPanelBackBrush",
         "AcrylicDialogTintBrush",
+        "AcrylicToastTintBrush",
         "ExportButtonFillBrush",
         "ExportButtonFocusFillBrush",
         "ExportButtonHoverFillBrush",
