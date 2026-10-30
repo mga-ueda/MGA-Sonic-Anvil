@@ -218,6 +218,9 @@ internal static partial class UiStrings
             "AcrylicDialogTint" => Get(
                 "すりガラスのティント（ダイアログ／メニュー・明暗・濃さ）",
                 "Frosted-glass tint (dialogs · menus · brightness · strength)"),
+            "AcrylicToastTint" => Get(
+                "トーストのすりガラス（ピッチ・拡縮・ON／OFF・ページ番号など）",
+                "Toast frosted glass (pitch · zoom · ON/OFF · page number, etc.)"),
             "ExportButtonFill" => Get("OK・塗り", "OK · fill"),
             "ExportButtonFocusFill" => Get("OK・フォーカス塗り", "OK · focus fill"),
             "ExportButtonHoverFill" => Get("OK・ホバー塗り", "OK · hover fill"),

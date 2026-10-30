@@ -14,6 +14,7 @@ public sealed class AcrylicPopupTests
         {
             var popup = new Popup();
             AcrylicPopup.Attach(popup);
+            AcrylicPopup.Attach(popup, AcrylicBackdrop.ToastTintBrushKey);
             AcrylicPopup.Attach(popup);
             Assert.False(popup.IsOpen);
         });
