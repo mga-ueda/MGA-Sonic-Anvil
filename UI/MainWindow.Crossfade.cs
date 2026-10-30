@@ -479,7 +479,11 @@ public partial class MainWindow
 
     private bool TryProcessCrossfadeShortcut(Key key, ModifierKeys modifiers)
     {
-        if (key == Key.X && modifiers == ModifierKeys.Shift && !IsLibraryMaximized)
+        // Shift+X は大文字 X 入力と同じ。文字入力中は TryProcessShortcut 側で先に返す。
+        if (key == Key.X
+            && modifiers == ModifierKeys.Shift
+            && !IsLibraryMaximized
+            && !ShouldDeferShortcutToTextInput())
         {
             return TryEnterCrossfadeEditMode();
         }

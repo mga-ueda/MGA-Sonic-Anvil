@@ -398,6 +398,32 @@ public partial class MainWindow
     private bool NumpadShiftPassesToText() =>
         IsNumpadTextInputFocused() || IsMenuTakingNumpadKeys();
 
+    /// <summary>
+    /// ファイル名／マーカー名編集、または読み取り専用でない TextBox 等への入力中。
+    /// ライブラリ／タイル検索は <see cref="TryProcessSearchFocusShortcut"/> が先に扱う。
+    /// </summary>
+    private bool IsFocusedEditableTextInput() =>
+        Keyboard.FocusedElement is TextBox { IsReadOnly: false }
+            or RichTextBox { IsReadOnly: false }
+            or PasswordBox;
+
+    /// <summary>
+    /// 文字入力へキーを渡す（Shift+X のフェード調整などを握らない）。
+    /// 検索フォーカス中は Bypass 付きトグルを通すため除外する。
+    /// </summary>
+    private bool ShouldDeferShortcutToTextInput()
+    {
+        if (IsTileSearchFocused || (IsLibraryMaximized && LibraryBrowser.IsSearchFocused))
+        {
+            return false;
+        }
+
+        return LibraryPlayerMode.DefersShortcutToTextInput(
+            IsEditingFileName,
+            Waveform.IsEditingMarkerComment,
+            IsFocusedEditableTextInput());
+    }
+
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
@@ -746,6 +772,13 @@ public partial class MainWindow
             return searchHandled.Value;
         }
 
+        // リネーム等の文字入力中は Shift+X（フェード調整）など文字キーショートカットを握らない。
+        // Escape だけキャンセル用に通す。検索欄は上で Bypass 付きトグルを通している。
+        if (ShouldDeferShortcutToTextInput())
+        {
+            return TryProcessEscapeShortcut(key, modifiers);
+        }
+
         var librarySession = TryProcessLibrarySessionShortcut(key, modifiers, isRepeat);
         if (librarySession is not null)
         {
@@ -793,16 +826,6 @@ public partial class MainWindow
             return true;
         }
 
-        if (IsEditingFileName)
-        {
-            return false;
-        }
-
-        if (Waveform.IsEditingMarkerComment || StatusTimes.IsTimeFocused)
-        {
-            return false;
-        }
-
         if (TryHandleFormatMenuShortcut(key, modifiers))
         {
             return true;
@@ -813,7 +836,8 @@ public partial class MainWindow
             return TryProcessFadeMenuShortcut(fadeMenu, key, modifiers);
         }
 
-        if (modifiers == ModifierKeys.Shift && key is Key.A or Key.V)
+        // Shift+A／V も大文字入力と同じ修飾。文字入力中は上の ShouldDeferShortcutToTextInput で既に返している。
+        if (LibraryPlayerMode.IsShiftLetterChord(key, modifiers) && key is Key.A or Key.V)
         {
             CloseVolumeGainPicker();
             Waveform.ExitAnalysisView();
@@ -1020,13 +1044,14 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.L && modifiers == ModifierKeys.Shift)
+        // Shift+L／R も大文字入力と同じ修飾。文字入力中は ShouldDeferShortcutToTextInput で既に返している。
+        if (LibraryPlayerMode.IsShiftLetterChord(key, modifiers) && key == Key.L)
         {
             SetSampleLoopFromSelection();
             return true;
         }
 
-        if (key == Key.R && modifiers == ModifierKeys.Shift)
+        if (LibraryPlayerMode.IsShiftLetterChord(key, modifiers) && key == Key.R)
         {
             return BeginOrContinuePlaceRepeat(PlaceRepeatKind.Region);
         }

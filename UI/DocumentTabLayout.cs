@@ -13,7 +13,6 @@ internal readonly record struct DocumentTabSlot(double Preferred, double Min, bo
 internal static class DocumentTabLayout
 {
     public const int MinVisibleChars = 6;
-    public const double MaxTabWidth = 220;
     public const double TitleFontSize = 11;
     public const double CloseWidth = 14;
     public const double GridPadLeft = 10;
@@ -47,7 +46,7 @@ internal static class DocumentTabLayout
     }
 
     public static double WidthFor(double titleWidth) =>
-        Math.Clamp(ChromeWidth + Math.Max(0, titleWidth), ChromeWidth, MaxTabWidth);
+        ChromeWidth + Math.Max(0, titleWidth);
 
     public static double PreferredWidth(string? title, double pixelsPerDip, double extra = 0) =>
         WidthFor(MeasureTitle(title ?? "", pixelsPerDip) + Math.Max(0, extra));
@@ -82,7 +81,7 @@ internal static class DocumentTabLayout
         for (var i = 0; i < tabs.Length; i++)
         {
             var min = Math.Max(0, tabs[i].Min);
-            var preferred = Math.Clamp(tabs[i].Preferred, min, MaxTabWidth);
+            var preferred = Math.Max(min, tabs[i].Preferred);
             widths[i] = preferred;
             sum += preferred;
         }

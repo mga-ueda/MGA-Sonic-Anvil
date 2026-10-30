@@ -509,6 +509,23 @@ internal static class LibraryPlayerMode
         || IsForceVideoProxyEncode(key, modifiers);
 
     /// <summary>
+    /// Shift＋A–Z。大文字入力と同じ修飾なので、テキスト入力中はアプリショートカットへ回さない。
+    /// （Shift+X＝フェード調整、Shift+A／V＝解析解除、Shift+L／R＝ループ／リージョン など）
+    /// </summary>
+    public static bool IsShiftLetterChord(Key key, ModifierKeys modifiers) =>
+        modifiers == ModifierKeys.Shift && key is >= Key.A and <= Key.Z;
+
+    /// <summary>
+    /// インライン名編集など、検索以外の文字入力中はアプリショートカットを握らない。
+    /// 検索欄は <see cref="BypassesSearchFocus"/> 側で通すキーがあるため別扱い。
+    /// </summary>
+    public static bool DefersShortcutToTextInput(
+        bool editingFileName,
+        bool editingMarkerComment,
+        bool focusedEditableText) =>
+        editingFileName || editingMarkerComment || focusedEditableText;
+
+    /// <summary>
     /// ツリー／お気に入りの Enter 追加コード。
     /// Enter／Ctrl+Enter／Shift+Enter／Ctrl+Shift+Enter（Alt なし）。
     /// </summary>

@@ -3292,11 +3292,12 @@ internal sealed partial class WaveformView : Grid
         if (_showScaleLane && !SpectrogramVisible && !loudness)
         {
             // SeekAndSelectOnly（F10）はモノラル包絡線表示なので、L/R ラベルと二重 dB は出さない。
+            // エディタのモノラルも名前は出さない（dB 列・名前欄の幅は確保したまま）。
             var channels = SeekAndSelectOnly ? 1 : Math.Max(1, _document.Channels);
             var laneGap = channels > 1 ? 4d : 0d;
             var laneHeight = (wave.Height - laneGap * (channels - 1)) / channels;
             DrawDbScaleTicks(dc, bounds, wave, channels, laneGap, laneHeight);
-            if (!SeekAndSelectOnly)
+            if (!SeekAndSelectOnly && channels > 1)
             {
                 DrawChannelLabels(dc, bounds, wave, channels, laneGap, laneHeight);
             }
@@ -4573,7 +4574,8 @@ internal sealed partial class WaveformView : Grid
         double laneGap,
         double laneHeight)
     {
-        if (laneHeight < 10)
+        // モノラルは名前不要。呼び出し側で幅は確保済み。
+        if (channels <= 1 || laneHeight < 10)
         {
             return;
         }
@@ -4923,6 +4925,12 @@ internal sealed partial class WaveformView : Grid
         }
 
         var channels = Math.Max(1, _document.Channels);
+        // モノラルはチャンネル名を出さないのでヒット対象外。
+        if (channels <= 1)
+        {
+            return false;
+        }
+
         var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
         var wave = WaveformBounds(bounds);
         var well = DbScaleBounds(bounds);
