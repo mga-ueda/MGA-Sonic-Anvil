@@ -2447,22 +2447,47 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
-    public void FormatLayoutModeToast_StripsKeyPrefix()
+    public void FormatLayoutModeToast_IsAlwaysEnglish()
     {
         var previous = UiStrings.Language;
         try
         {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("Player mode 1", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F9));
+            Assert.Equal("Player mode 2", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F10));
+            Assert.Equal("Editor mode 1", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F11));
+            Assert.Equal("Editor mode 2", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F12));
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Equal("Player mode 1", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F9));
             Assert.Equal("Editor mode 2", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F12));
-            UiStrings.SetLanguage(UiLanguage.Japanese);
-            Assert.Equal("プレイヤーモード１", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F9));
-            Assert.Equal("エディタモード２", MainWindow.FormatLayoutModeToast(WindowLayoutSlot.F12));
         }
         finally
         {
             UiStrings.SetLanguage(previous);
         }
+    }
+
+    [Fact]
+    public void FormatLayoutModeToast_ToggleFullscreen_AddsSecondLine()
+    {
+        Assert.Equal(
+            "Player mode 1",
+            MainWindow.FormatLayoutModeToast(
+                WindowLayoutSlot.F9,
+                LayoutFullscreenMode.On,
+                fullscreenOn: true));
+        Assert.Equal(
+            "Editor mode 1\nFullscreen: ON",
+            MainWindow.FormatLayoutModeToast(
+                WindowLayoutSlot.F11,
+                LayoutFullscreenMode.Toggle,
+                fullscreenOn: true));
+        Assert.Equal(
+            "Editor mode 2\nFullscreen: OFF",
+            MainWindow.FormatLayoutModeToast(
+                WindowLayoutSlot.F12,
+                LayoutFullscreenMode.Toggle,
+                fullscreenOn: false));
     }
 
     [Fact]
