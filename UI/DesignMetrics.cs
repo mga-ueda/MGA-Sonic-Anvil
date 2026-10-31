@@ -15,21 +15,9 @@ internal static class DesignMetrics
 
     /// <summary>
     /// メイン窓の幅下限（F8／F9 含む全モード共通）。
-    /// 固定2行トランスポート＋サイドクロームが折り返さない実測幅より十分広い。
+    /// メニュー下ツールバーは狭幅で折り返すため、下限はアナライザ側クローム基準。
     /// </summary>
     public static double WindowMinWidth => From96(960);
-
-    /// <summary>F9 も通常と同じ下限（互換用エイリアス）。</summary>
-    public static double MinimalPlayerWindowMinWidth => WindowMinWidth;
-
-    /// <summary>F9 も通常と同じ下限（互換用エイリアス）。</summary>
-    public static double MinimalPlayerWindowMinHeight => WindowMinHeight;
-
-    /// <summary>F8 も通常と同じ下限（互換用エイリアス）。</summary>
-    public static double VideoMiniWindowMinWidth => WindowMinWidth;
-
-    /// <summary>F8 も通常と同じ下限（互換用エイリアス）。</summary>
-    public static double VideoMiniWindowMinHeight => WindowMinHeight;
 
     /// <summary>メイン窓の高さ下限（F8／F9 含む全モード共通）。</summary>
     public static double WindowMinHeight => From96(540);
@@ -128,56 +116,12 @@ internal static class DesignMetrics
             ? Math.Max(0, (DbScaleWidth - SpectrogramBoostLabelReserve(width) - SpectrogramBoostThumbSize) * 0.5)
             : Math.Max(0, (DbScaleWidth - SpectrogramBoostThumbSize) * 0.5);
 
-    /// <summary>上段＋下段 MARK。ホスト上余白 2 + 各行ボタン。行間は 0。</summary>
-    public static double TransportBarHeight =>
-        From96(2) + TransportButtonSide * 2 + TransportRowGap;
-
-    /// <summary>上段と下段（MARK / VIEW / OTHER）のあいだ。</summary>
-    public static double TransportRowGap => 0;
-
-    public static Thickness TransportBottomRowMargin => new(0, TransportRowGap, 0, 0);
-
-    /// <summary>TransportBar 左右マージン（8+8）。</summary>
-    public static double TransportHostPaddingX => From96(16);
-
-    /// <summary>グループ見出し（9pt Bold）の余裕込み。いちばん長い TRANS でも足りる。</summary>
-    public static double TransportGroupLabelReserve => From96(40);
-
-    public static double TransportGroupWidth(int buttonCount) =>
-        TransportGroupLabelReserve
-        + TransportGroupLabelGap
-        + buttonCount * (TransportButtonSide + TransportButtonGap)
-        + TransportGroupGap;
-
-    /// <summary>上段: TRANS(2) EDIT(9) FILE(4)。VIEW は下段へ折り返す。</summary>
-    public static double TransportTopRowWidth =>
-        TransportHostPaddingX
-        + TransportGroupWidth(2)
-        + TransportGroupWidth(9)
-        + TransportGroupWidth(4);
-
-    /// <summary>下段: MARK(3) VIEW(8) OTHER(3)。</summary>
-    public static double TransportBottomRowWidth =>
-        TransportHostPaddingX
-        + TransportGroupWidth(3)
-        + TransportGroupWidth(8)
-        + TransportGroupWidth(3);
-
-    public static double TransportFixedRowWidth =>
-        Math.Max(TransportTopRowWidth, TransportBottomRowWidth);
+    /// <summary>ツールバー1行分（上下余白 2+2 + ボタン）。折り返しで行が増える。</summary>
+    public static double TransportRowHeight =>
+        From96(4) + TransportButtonSide;
 
     /// <summary>バージョン情報ダイアログなどの権利表記フォント。</summary>
     public static double BrandLicenseFontSize => From96(8);
-
-    public static double TransportHostMinHeight => TransportBarHeight;
-
-    /// <summary>トランスポート右の履歴・ラウドネス・モニター列・スペアナと、右端メーター列。</summary>
-    public static double TransportSideChromeWidth =>
-        HistoryStripWidth + From96(6)
-        + LoudnessMeterWidth + From96(6)
-        + MonitorToggleWidth + From96(6)
-        + SpectrumWidth + From96(1)
-        + LevelMeterWidth;
 
     /// <summary>モニター列ボタンの高さ（一回り大きめ）。</summary>
     public static double MonitorButtonHeight => Dip(26);
@@ -221,14 +165,15 @@ internal static class DesignMetrics
 
     public static Thickness PlaylistVideoTimecodePadding => new(From96(14), From96(8), From96(14), From96(8));
 
-    /// <summary>動画本再生中、下中央に出すファイル名。</summary>
+    /// <summary>動画本再生中、波形／アナライザ帯の直上（中央）に出すファイル名。</summary>
     public static double PlaylistVideoFileNameFontSize => From96(18);
 
     public static double PlaylistVideoFileNameLineHeight => From96(24);
 
+    /// <summary>帯が無いときの既定下余白。帯があるときは配置側で底上げする。</summary>
     public static Thickness PlaylistVideoFileNameMargin => new(From96(24), 0, From96(24), From96(24));
 
-    /// <summary>下中央に出すときの最大幅。</summary>
+    /// <summary>中央に出すときの最大幅。</summary>
     public static double PlaylistVideoFileNameMaxWidth => From96(640);
 
     /// <summary>PDF 本表示中、下中央に出すページ番号（例: 1 / 3）。</summary>
@@ -406,10 +351,10 @@ internal static class DesignMetrics
     public static GridLength VectorScopeHeightGrid => new(VectorScopeHeight);
 
     /// <summary>
-    /// アナライザ帯の高さ。タブは波形側（マーカーレーン上）へ出したので含めない。
+    /// アナライザ帯（履歴／ラウドネス／モニター／スペアナ）。ツールバーはメニュー下。
+    /// タブは波形側（マーカーレーン上）へ出したので含めない。
     /// </summary>
-    public static double TransportChromeHeight =>
-        Math.Max(VectorScopeHeight, TransportHostMinHeight);
+    public static double TransportChromeHeight => VectorScopeHeight;
 
     public static GridLength TransportChromeHeightGrid => new(TransportChromeHeight);
 

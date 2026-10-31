@@ -15,31 +15,23 @@ public sealed class TransportLayoutTests
         Assert.Equal(960, DesignMetrics.WindowMinWidth);
         Assert.Equal(540, DesignMetrics.WindowMinHeight);
         Assert.Equal(DesignMetrics.WindowMinWidth, DesignMetrics.WindowDefaultWidth);
-        Assert.True(DesignMetrics.TransportChromeHeight
-            >= DesignMetrics.TransportHostMinHeight);
         Assert.True(DesignMetrics.TransportChromeHeight >= DesignMetrics.VectorScopeHeight);
-        // F8／F9 も通常と同じ下限。
-        Assert.Equal(DesignMetrics.WindowMinWidth, DesignMetrics.MinimalPlayerWindowMinWidth);
-        Assert.Equal(DesignMetrics.WindowMinHeight, DesignMetrics.MinimalPlayerWindowMinHeight);
-        Assert.Equal(DesignMetrics.WindowMinWidth, DesignMetrics.VideoMiniWindowMinWidth);
-        Assert.Equal(DesignMetrics.WindowMinHeight, DesignMetrics.VideoMiniWindowMinHeight);
+        // F8 動画ミニの実効下限は映像原寸×LibraryVideoWindowScale.Min。
+        Assert.Equal(0.25, LibraryVideoWindowScale.Min, 6);
     }
 
     [Fact]
-    public void TransportBarHeight_CoversTwoRows()
+    public void TransportRowHeight_CoversOneButtonRow()
     {
-        var twoRows = DesignMetrics.From96(2)
-            + DesignMetrics.TransportButtonSide * 2
-            + DesignMetrics.TransportRowGap;
-        Assert.Equal(0, DesignMetrics.TransportRowGap);
-        Assert.Equal(twoRows, DesignMetrics.TransportBarHeight);
+        var oneRow = DesignMetrics.From96(4) + DesignMetrics.TransportButtonSide;
+        Assert.Equal(oneRow, DesignMetrics.TransportRowHeight);
     }
 
     [Fact]
-    public void TransportTopRow_IsWiderThanBottomRow()
+    public void TransportChromeHeight_MatchesAnalyzerBand()
     {
-        Assert.True(DesignMetrics.TransportTopRowWidth >= DesignMetrics.TransportBottomRowWidth);
-        Assert.Equal(DesignMetrics.TransportTopRowWidth, DesignMetrics.TransportFixedRowWidth);
+        Assert.Equal(DesignMetrics.VectorScopeHeight, DesignMetrics.TransportChromeHeight);
+        Assert.Equal(DesignMetrics.SpectrumHeight, DesignMetrics.TransportChromeHeight);
     }
 
     [Fact]

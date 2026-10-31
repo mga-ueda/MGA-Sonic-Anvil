@@ -1067,10 +1067,50 @@ public sealed class LibraryPlayerModeTests
             1280, 400, videoMini: true, fullscreen: false);
         Assert.True(shortWindow < 1);
         Assert.True(shortWindow >= DesignMetrics.OverlayScaleMin);
-        Assert.Equal(
-            DesignMetrics.LibraryWaveformHeight * 0.5,
-            LibraryPlayerMode.VideoMiniWaveformHeight(0.5),
-            3);
+        Assert.True(LibraryPlayerMode.DocksPlayerWaveformBesideLoudness(
+            libraryMaximized: true,
+            waveformHostVisible: true,
+            analyzerAreaVisible: true));
+        Assert.False(LibraryPlayerMode.DocksPlayerWaveformBesideLoudness(
+            libraryMaximized: true,
+            waveformHostVisible: true,
+            analyzerAreaVisible: false));
+        Assert.False(LibraryPlayerMode.DocksPlayerWaveformBesideLoudness(
+            libraryMaximized: false,
+            waveformHostVisible: true,
+            analyzerAreaVisible: true));
+        Assert.False(LibraryPlayerMode.DocksPlayerWaveformBesideLoudness(
+            libraryMaximized: true,
+            waveformHostVisible: false,
+            analyzerAreaVisible: true));
+        Assert.True(LibraryPlayerMode.FlushesAnalyzersToWindowBottom(
+            libraryMaximized: true,
+            videoMini: true,
+            playlistVideoFullscreen: false,
+            visualShown: true,
+            isVideo: true,
+            chromeHidden: true));
+        Assert.True(LibraryPlayerMode.FlushesAnalyzersToWindowBottom(
+            libraryMaximized: true,
+            videoMini: false,
+            playlistVideoFullscreen: true,
+            visualShown: true,
+            isVideo: true,
+            chromeHidden: false));
+        Assert.True(LibraryPlayerMode.FlushesAnalyzersToWindowBottom(
+            libraryMaximized: true,
+            videoMini: false,
+            playlistVideoFullscreen: false,
+            visualShown: true,
+            isVideo: true,
+            chromeHidden: true));
+        Assert.False(LibraryPlayerMode.FlushesAnalyzersToWindowBottom(
+            libraryMaximized: true,
+            videoMini: false,
+            playlistVideoFullscreen: false,
+            visualShown: true,
+            isVideo: true,
+            chromeHidden: false));
         Assert.Equal(
             DesignMetrics.SpectrumHeight * 0.5,
             LibraryPlayerMode.VideoMiniTransportRowHeight(0.5),
@@ -1211,6 +1251,15 @@ public sealed class LibraryPlayerModeTests
         Assert.Equal(3, LibraryPlayerMode.PlaylistVideoSimpleSeekKeyboardHoldSeconds);
         Assert.Equal(1, LibraryPlayerMode.PlaylistVideoSimpleSeekFadeOutSeconds);
         Assert.Equal(3, LibraryPlayerMode.PlaylistVisualCursorHideIdleSeconds);
+        Assert.True(LibraryPlayerMode.AllowsPlaylistVisualCursorHide(
+            visualCursorContext: true,
+            blockingDialogOpen: false));
+        Assert.False(LibraryPlayerMode.AllowsPlaylistVisualCursorHide(
+            visualCursorContext: true,
+            blockingDialogOpen: true));
+        Assert.False(LibraryPlayerMode.AllowsPlaylistVisualCursorHide(
+            visualCursorContext: false,
+            blockingDialogOpen: false));
         Assert.True(LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
             chromeHidden: true, isVideo: true, isPdf: false));
         Assert.True(LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
@@ -1225,47 +1274,59 @@ public sealed class LibraryPlayerModeTests
             LibraryPlayerMode.FormatPlaylistVideoFileName("clip.mov", usingProxy: true));
         Assert.Equal(string.Empty, LibraryPlayerMode.FormatPlaylistVideoFileName(null, usingProxy: true));
         Assert.Equal(string.Empty, LibraryPlayerMode.FormatPlaylistVideoFileName("", usingProxy: true));
-        // ラウドネスに被る分だけ左へ（左端ははみ出さない）。
         Assert.Equal(
-            40,
-            LibraryPlayerMode.PlaylistVideoFileNameLoudnessDodge(
-                new Rect(100, 200, 200, 24),
-                new Rect(260, 180, 100, 80),
-                minNameLeft: 24,
-                gap: 0),
-            3);
-        Assert.Equal(
-            0,
-            LibraryPlayerMode.PlaylistVideoFileNameLoudnessDodge(
-                new Rect(100, 200, 100, 24),
-                new Rect(260, 180, 100, 80),
-                minNameLeft: 24,
-                gap: 0),
-            3);
-        Assert.Equal(
-            76,
-            LibraryPlayerMode.PlaylistVideoFileNameLoudnessDodge(
-                new Rect(100, 200, 200, 24),
-                new Rect(200, 180, 100, 80),
-                minNameLeft: 24,
-                gap: 0),
-            3);
-        Assert.Equal(
-            0,
-            LibraryPlayerMode.PlaylistVideoFileNameLoudnessDodge(
-                new Rect(100, 100, 200, 24),
-                new Rect(260, 200, 100, 80),
-                minNameLeft: 24,
-                gap: 0),
-            3);
-        Assert.Equal(
-            48,
-            LibraryPlayerMode.PlaylistVideoFileNameLoudnessDodge(
-                new Rect(100, 200, 200, 24),
-                new Rect(260, 180, 100, 80),
-                minNameLeft: 24,
+            108,
+            LibraryPlayerMode.PlaylistVideoFileNameBottomAboveBand(
+                baseBottom: 24,
+                parentHeight: 800,
+                bandTop: 700,
                 gap: 8),
             3);
+        Assert.Equal(
+            24,
+            LibraryPlayerMode.PlaylistVideoFileNameBottomAboveBand(
+                baseBottom: 24,
+                parentHeight: 800,
+                bandTop: 790,
+                gap: 0),
+            3);
+        Assert.Equal(
+            24,
+            LibraryPlayerMode.PlaylistVideoFileNameBottomAboveBand(
+                baseBottom: 24,
+                parentHeight: 800,
+                bandTop: 900,
+                gap: 8),
+            3);
+        // 帯とのあいだに空きがあれば下へ寄せる。
+        Assert.Equal(
+            108,
+            LibraryPlayerMode.PlaylistVideoFileNameSnugBottomTowardBand(
+                currentBottom: 120,
+                nameBottomFromTop: 680,
+                bandTopFromTop: 700,
+                gap: 8),
+            3);
+        Assert.Equal(
+            120,
+            LibraryPlayerMode.PlaylistVideoFileNameSnugBottomTowardBand(
+                currentBottom: 120,
+                nameBottomFromTop: 692,
+                bandTopFromTop: 700,
+                gap: 8),
+            3);
+        // 広い窓：中央ファイル名と右端ラウドネスは横に重ならない → 下のまま。
+        Assert.False(LibraryPlayerMode.PlaylistVideoFileNameBandOverlapsName(
+            new Rect(300, 700, 200, 24),
+            new Rect(600, 680, 120, 100)));
+        // 狭い窓：ラウドネスと重なる → 上へ（左へはずらさない）。
+        Assert.True(LibraryPlayerMode.PlaylistVideoFileNameBandOverlapsName(
+            new Rect(200, 700, 280, 24),
+            new Rect(360, 680, 120, 100)));
+        // 波形帯（中央〜左）とは重なる → 波形の上へ。
+        Assert.True(LibraryPlayerMode.PlaylistVideoFileNameBandOverlapsName(
+            new Rect(300, 700, 200, 24),
+            new Rect(0, 680, 500, 100)));
         Assert.True(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.W, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.W, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsPdfBackgroundPinToggle(Key.B, ModifierKeys.None));

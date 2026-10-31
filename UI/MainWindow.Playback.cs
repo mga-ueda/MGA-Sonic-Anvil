@@ -2411,7 +2411,8 @@ public partial class MainWindow
             return;
         }
 
-        ShowCenterStatusToast(FormatLayoutModeToast(slot));
+        var fullscreenMode = AppStorage.Settings.ResolvedLayoutPreset(slot).ResolvedFullscreenMode();
+        ShowCenterStatusToast(FormatLayoutModeToast(slot, fullscreenMode, _layoutFullscreenOn));
     }
 
     /// <summary>
@@ -2832,6 +2833,8 @@ public partial class MainWindow
         // ここで Capture すると、F10 プレイリスト寸法のまま F8 へ入った瞬間に
         // プレイリスト側の位置で動画ミニ枠を上書きしてしまう。
         _videoLaunchPlacementDeferred = false;
+        // 通常の WindowMinWidth(960) だと 1080p で約 50% までしか縮められないので、先に 25% 下限へ。
+        SyncWindowMinSizeForMode();
         var scale = LibraryVideoWindowScale.Clamp(_videoLaunchScale);
         // 幅・高さとも同じ倍率。Fit も縦横比を保つのでアスペクトは変わらない。
         var scaledWidth = Math.Max(1, (int)Math.Round(width * scale));
@@ -3235,7 +3238,8 @@ public partial class MainWindow
         PlaylistVideoSimpleSeek.LayoutTransform = Transform.Identity;
         PlaylistVideoSimpleSeek.Height = DesignMetrics.PlaylistVideoSimpleSeekHitHeight * overlayScale;
         PlaylistVideoSimpleSeek.Margin = DesignMetrics.PlaylistVideoSimpleSeekMargin(overlayScale);
-        _videoLaunchScaleToast.SetOverlayScale(overlayScale);
+        // 拡大率トーストは窓比例で縮めない（小さくすると読めなくなる）。
+        _videoLaunchScaleToast.SetOverlayScale(1);
         _centerStatusToast.SetOverlayScale(overlayScale);
         ApplyPlaylistVideoTimecodeOverlayScale(overlayScale);
         _playlistPdfPageNumberToast.SetOverlayScale(overlayScale);
@@ -3274,33 +3278,36 @@ public partial class MainWindow
     private void ApplyVideoMiniOverlayLayout(double scale)
     {
         PrimaryWaveform.OverlayChromeScale = scale;
-        var waveH = LibraryPlayerMode.VideoMiniWaveformHeight(scale);
         LibraryRowDef.MinHeight = 0;
         LibraryRowDef.Height = new GridLength(1, GridUnitType.Star);
-        LibraryWaveformRowDef.MinHeight = waveH;
-        LibraryWaveformRowDef.MaxHeight = waveH;
-        LibraryWaveformRowDef.Height = new GridLength(waveH);
-        WaveformHostBorder.MinHeight = waveH;
+        // 波形はラウドネス左へドックするため、下段帯だけ確保する。
+        LibraryWaveformRowDef.MinHeight = 0;
+        LibraryWaveformRowDef.MaxHeight = 0;
+        LibraryWaveformRowDef.Height = new GridLength(0);
+        WaveformHostBorder.MinHeight = 0;
 
         WorkGrid.RowDefinitions[1].Height = new GridLength(
             LibraryPlayerMode.VideoMiniTransportRowHeight(scale));
-        // 下段スペアナ／ラウドネスを揃える（ゴニオは右列・ピーク下）。
-        Spectrum.VerticalAlignment = VerticalAlignment.Bottom;
-        LoudnessMeter.VerticalAlignment = VerticalAlignment.Bottom;
-        MonitorToggles.VerticalAlignment = VerticalAlignment.Bottom;
         ApplyMeterColumnWidth(_meterColumnPreferred);
-        ApplyLevelMeterHeightCap(scale);
+        ApplyAnalyzerBottomFlush(scale);
         ScheduleLibraryWaveformPaint();
     }
 
     /// <summary>
-    /// 動画ミニ専用：レベルメーターの縦伸び上限（列実高・16:9・上段／下段アナライザ帯を考慮）。
-    /// F10 など通常プレイヤーは Stretch のまま。
-    /// 縦長ミニでは MeterPeakHost（WAAPI＋ピーク）を Bottom 揃えし、下段帯の直上に載せる。
+    /// 動画オーバーレイ（ミニ／本再生／F 全画面）用：レベルメーターの縦伸び上限。
+    /// 通常プレイヤーは Stretch のまま。
+    /// MeterPeakHost（WAAPI＋ピーク）を Bottom 揃えし、下段帯の直上に載せる。
     /// </summary>
     private void ApplyLevelMeterHeightCap(double layoutScale)
     {
-        if (!IsVideoMiniPlayerActive())
+        var flush = LibraryPlayerMode.FlushesAnalyzersToWindowBottom(
+            libraryMaximized: IsLibraryMaximized,
+            videoMini: IsVideoMiniPlayerActive(),
+            playlistVideoFullscreen: _playlistVideoFullscreen,
+            visualShown: LibraryBrowser.PlaylistVisualShown,
+            isVideo: LibraryBrowser.PlaylistVisualIsVideo,
+            chromeHidden: !_playlistVideoChromeVisible);
+        if (!flush)
         {
             ClearLevelMeterHeightCap();
             return;
@@ -3309,9 +3316,9 @@ public partial class MainWindow
         var columnH = MeterColumn.ActualHeight;
         if (columnH <= 1)
         {
-            // 未レイアウト時は窓高からステータス分を引いた概算。
+            // 未レイアウト時は窓高から概算（ステータスはオーバーレイ中 Collapse 済み）。
             var windowH = ActualHeight > 1 ? ActualHeight : SystemParameters.WorkArea.Height;
-            columnH = Math.Max(0, windowH - DesignMetrics.StatusBarHeight);
+            columnH = Math.Max(0, windowH);
         }
 
         var width = ActualWidth > 1 ? ActualWidth : SystemParameters.WorkArea.Width;
@@ -3413,6 +3420,9 @@ public partial class MainWindow
         }
 
         ApplyLibraryMinimalChrome();
+        // ミニの行高設定のあとにドック判定（ラウドネス表示中は波形を帯へ移す）。
+        ApplyPlayerWaveformDockBesideLoudness();
+        ApplyVideoOverlayBottomFlush(chromeHidden: !_playlistVideoChromeVisible);
     }
 
     private void CollapseMeterColumnWidth()
@@ -3471,21 +3481,7 @@ public partial class MainWindow
             DockPanel.SetDock(VectorScope, gonioDock);
         }
 
-        // 上下ドックともトランスポートを一塊のまま帯の垂直中央へ（F12 拡大時も分解しない）。
-        TransportBrandStack.VerticalAlignment = VerticalAlignment.Center;
-        ApplyTransportBrandLeftInset();
         // アナライザ行の高さは ApplyWaveformMaximizeChrome 側で設定。
-    }
-
-    /// <summary>トランスポート左を波形描画開始（dB 目盛り列）に揃える。</summary>
-    private void ApplyTransportBrandLeftInset()
-    {
-        var left = ShowWaveformScaleLane ? DesignMetrics.DbScaleWidth : 0;
-        var margin = TransportBrandStack.Margin;
-        if (Math.Abs(margin.Left - left) > 0.5)
-        {
-            TransportBrandStack.Margin = new Thickness(left, margin.Top, margin.Right, margin.Bottom);
-        }
     }
 
     private void ApplyLayoutWaveformVisibility(WindowLayoutPreset? preset)
@@ -3516,6 +3512,7 @@ public partial class MainWindow
                 LibraryWaveformRowDef.Height = new GridLength(0);
             }
 
+            // 動画本再生ドックは ApplyPlayerWaveformDockBesideLoudness が行高を上書きする。
             return;
         }
 
@@ -3558,7 +3555,7 @@ public partial class MainWindow
         MeterColumnSplitter.Visibility = Visibility.Collapsed;
         DocumentTabHost.Visibility = Visibility.Collapsed;
         HistoryStrip.Visibility = Visibility.Collapsed;
-        TransportBarHost.Visibility = Visibility.Collapsed;
+        TransportToolbarHost.Visibility = Visibility.Collapsed;
         MeterColumn.ClipToBounds = false;
         TransportChromeHost.ClipToBounds = false;
         WorkGrid.ClipToBounds = false;
@@ -3605,10 +3602,7 @@ public partial class MainWindow
             }
         }
 
-        if (TransportBarHost.Visibility != Visibility.Visible)
-        {
-            TransportBarHost.Visibility = Visibility.Visible;
-        }
+        ApplyTransportToolbarVisibility();
 
         if (MeterTopSlot.Visibility != Visibility.Visible)
         {
@@ -3619,17 +3613,28 @@ public partial class MainWindow
         MeterColumn.ClearValue(UIElement.ClipToBoundsProperty);
         TransportChromeHost.ClearValue(UIElement.ClipToBoundsProperty);
         WorkGrid.ClearValue(UIElement.ClipToBoundsProperty);
-        Spectrum.VerticalAlignment = VerticalAlignment.Top;
-        LoudnessMeter.VerticalAlignment = VerticalAlignment.Stretch;
-        MonitorToggles.VerticalAlignment = VerticalAlignment.Center;
-        ClearLevelMeterHeightCap();
+        ClearAnalyzerBottomFlush();
     }
 
-    /// <summary>モードに関わらず WindowMinWidth×WindowMinHeight を下限にする。</summary>
+    /// <summary>
+    /// 通常は WindowMinWidth×WindowMinHeight。
+    /// 動画ミニは映像原寸×LibraryVideoWindowScale.Min（25%）まで縮められるようにする。
+    /// </summary>
     private void SyncWindowMinSizeForMode()
     {
-        UiScaleService.SetUnscaledMinWidth(this, DesignMetrics.WindowMinWidth);
-        UiScaleService.SetUnscaledMinHeight(this, DesignMetrics.WindowMinHeight);
+        if (TryGetVideoMiniMinOuterDip(out var minOuterW, out var minOuterH))
+        {
+            // ApplyVideoLaunch の外寸は DIP。表示倍率を掛け戻して実効 Min が原寸×25% になるようにする。
+            var factor = Math.Max(1e-6, UiScaleService.Factor);
+            UiScaleService.SetUnscaledMinWidth(this, minOuterW / factor);
+            UiScaleService.SetUnscaledMinHeight(this, minOuterH / factor);
+        }
+        else
+        {
+            UiScaleService.SetUnscaledMinWidth(this, DesignMetrics.WindowMinWidth);
+            UiScaleService.SetUnscaledMinHeight(this, DesignMetrics.WindowMinHeight);
+        }
+
         if (WindowState == WindowState.Normal)
         {
             if (Width < MinWidth)
@@ -3642,6 +3647,32 @@ public partial class MainWindow
                 Height = MinHeight;
             }
         }
+    }
+
+    /// <summary>動画ミニ（非全画面）で原寸×Min の外寸下限を返す。</summary>
+    private bool TryGetVideoMiniMinOuterDip(out double minOuterWidth, out double minOuterHeight)
+    {
+        minOuterWidth = 0;
+        minOuterHeight = 0;
+        if (!_videoLaunchPlacement
+            || _playlistVideoFullscreen
+            || !LibraryBrowser.TryGetPlaylistVideoNaturalPixels(out var naturalW, out var naturalH)
+            || naturalW < 1
+            || naturalH < 1)
+        {
+            return false;
+        }
+
+        var dip = WindowPlacement.DipScale(this);
+        if (dip <= 0)
+        {
+            return false;
+        }
+
+        WindowPlacement.TryGetNonClientDipSize(this, out var nonClientDipW, out var nonClientDipH);
+        minOuterWidth = LibraryVideoWindowScale.MinOuterDip(naturalW / dip, nonClientDipW);
+        minOuterHeight = LibraryVideoWindowScale.MinOuterDip(naturalH / dip, nonClientDipH);
+        return true;
     }
 }
 

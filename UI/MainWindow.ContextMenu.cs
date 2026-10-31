@@ -64,6 +64,45 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// メニュー直下ツールバーの表示。設定オフ／アイコン全非表示／動画ミニは畳む。
+    /// 本再生クローム隠れは Opacity 側（PlaylistVideoChromeTargets）。
+    /// </summary>
+    internal void ApplyTransportToolbarVisibility()
+    {
+        var settings = AppStorage.Settings;
+        Transport.ApplyVisibilityFromSettings(settings);
+        var show = settings.ShowTransportToolbar
+            && Transport.HasVisibleCommands
+            && !IsVideoMiniPlayerActive();
+        if (!show)
+        {
+            TransportToolbarHost.BeginAnimation(UIElement.OpacityProperty, null);
+            TransportToolbarHost.Opacity = 1;
+            TransportToolbarHost.IsHitTestVisible = true;
+            TransportToolbarHost.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        TransportToolbarHost.Visibility = Visibility.Visible;
+        if (!_playlistVideoChromeVisible)
+        {
+            LibraryPlayerMode.FadeElementOpacity(
+                TransportToolbarHost,
+                0,
+                instant: true,
+                hitTestVisible: false);
+        }
+        else if (LibraryPlayerMode.NeedsForcedOpaque(TransportToolbarHost))
+        {
+            LibraryPlayerMode.FadeElementOpacity(
+                TransportToolbarHost,
+                1,
+                instant: true,
+                hitTestVisible: true);
+        }
+    }
+
+    /// <summary>
     /// Popup 内 KeyDown は別 Hwnd のため MainWindow.Preview に届かない。
     /// 論理ツリーでは MenuItem → Menu へバブルする（WPF MenuItem.OnKeyDown → MenuItemNavigate →
     /// 失敗時に親階層や Menu.NavigateByLine へ）。
@@ -115,6 +154,7 @@ public partial class MainWindow
             MainMenuBar.Opacity = 1;
             MainMenuBar.IsHitTestVisible = true;
             MainMenuBar.Visibility = Visibility.Collapsed;
+            ApplyTransportToolbarVisibility();
             return;
         }
 
@@ -130,6 +170,8 @@ public partial class MainWindow
             // フェードイン中は触らず、不透明なのに固まったときだけ直す。
             LibraryPlayerMode.FadeElementOpacity(MainMenuBar, 1, instant: true, hitTestVisible: true);
         }
+
+        ApplyTransportToolbarVisibility();
     }
 
     /// <summary>

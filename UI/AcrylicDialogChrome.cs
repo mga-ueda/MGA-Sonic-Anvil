@@ -115,9 +115,19 @@ internal static class AcrylicDialogChrome
     public static bool? ShowDialog(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
-        // 通常は毎回 new だが、Loaded 済みの再利用でもクローク解除が再走するようにする。
-        BeginAcrylicShow(window);
-        return window.ShowDialog();
+        // 本再生の Mouse.OverrideCursor=None が子ダイアログにも効くので、表示中は解除する。
+        var main = window.Owner as MainWindow;
+        main?.SuspendPlaylistVisualCursorHideForDialog();
+        try
+        {
+            // 通常は毎回 new だが、Loaded 済みの再利用でもクローク解除が再走するようにする。
+            BeginAcrylicShow(window);
+            return window.ShowDialog();
+        }
+        finally
+        {
+            main?.ResumePlaylistVisualCursorHideAfterDialog();
+        }
     }
 
     public static void Show(Window window)
