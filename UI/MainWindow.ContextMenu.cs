@@ -64,11 +64,12 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// メニュー直下ツールバーの表示。設定オフ／アイコン全非表示／動画ミニは畳む。
+    /// ツールバーの表示。設定オフ／アイコン全非表示／動画ミニは畳む。
     /// 本再生クローム隠れは Opacity 側（PlaylistVideoChromeTargets）。
     /// </summary>
     internal void ApplyTransportToolbarVisibility()
     {
+        ApplyTransportToolbarDock();
         var settings = AppStorage.Settings;
         Transport.ApplyVisibilityFromSettings(settings);
         var show = settings.ShowTransportToolbar
@@ -100,6 +101,54 @@ public partial class MainWindow
                 instant: true,
                 hitTestVisible: true);
         }
+    }
+
+    /// <summary>
+    /// ツールバーをメニュー直下（Top）かステータスバー上（Bottom）へ置く。
+    /// 位置はアクティブな F9–F12 プリセットごと。DockPanel は子の宣言順で外側から積むため、
+    /// Bottom 時は Waapi のあとに差し込む。
+    /// </summary>
+    internal void ApplyTransportToolbarDock()
+    {
+        var slot = _activeLayoutSlot ?? WindowLayoutSlot.F12;
+        var dockBottom = AppStorage.Settings.ResolvedLayoutPreset(slot).ResolvedTransportToolbarDock()
+            == LayoutTransportToolbarDock.Bottom;
+        DockPanel.SetDock(TransportToolbarHost, dockBottom ? Dock.Bottom : Dock.Top);
+
+        var children = RootDock.Children;
+        var current = children.IndexOf(TransportToolbarHost);
+        if (current < 0)
+        {
+            return;
+        }
+
+        int target;
+        if (dockBottom)
+        {
+            // Status → Waapi → Toolbar → Work。Work の直前へ。
+            var workIndex = children.IndexOf(WorkGrid);
+            target = workIndex >= 0 ? workIndex : children.Count;
+        }
+        else
+        {
+            // Menu → Toolbar → …。メニューの直後へ。
+            var menuIndex = children.IndexOf(MainMenuBar);
+            target = menuIndex >= 0 ? menuIndex + 1 : 0;
+        }
+
+        // Remove すると後ろの index が 1 つ前へずれる。
+        if (current < target)
+        {
+            target--;
+        }
+
+        if (current == target)
+        {
+            return;
+        }
+
+        children.RemoveAt(current);
+        children.Insert(target, TransportToolbarHost);
     }
 
     /// <summary>

@@ -26,7 +26,7 @@
     <Menu x:Name="MainMenuBar"
           DockPanel.Dock="Top"
           Style="{StaticResource DarkMenuStyle}" />
-    <!-- 旧アナライザ左のトランスポート。メニュー直下へ移し、狭幅では折り返して全表示。 -->
+    <!-- 旧アナライザ左のトランスポート。既定はメニュー直下。設定でステータスバー上にも置ける。狭幅では折り返して全表示。 -->
     <Border x:Name="TransportToolbarHost"
             DockPanel.Dock="Top"
             Background="{DynamicResource TransportBackBrush}">

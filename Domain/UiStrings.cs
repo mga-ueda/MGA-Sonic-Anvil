@@ -199,6 +199,8 @@ internal static partial class UiStrings
     public static string LabelShowTransportToolbar => Get(
         "ツールバーを表示(_T)",
         "Show _toolbar");
+    /// <summary>設定・レイアウトプリセット。ツールバー位置コンボの見出し。</summary>
+    public static string LabelTransportToolbarDock => Get("ツールバー", "Toolbar");
     public static string LabelTransportToolbarIcons => Get(
         "ツールバーに表示するアイコン",
         "Toolbar icons");
