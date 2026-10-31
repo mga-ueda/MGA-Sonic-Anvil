@@ -146,4 +146,17 @@ public sealed class LibraryVideoWindowScaleTests
             LibraryVideoWindowScale.StepKey(0.5, direction: -1, isRepeat: false, ref latched),
             6);
     }
+
+    [Fact]
+    public void MinOuterDip_AddsNonClientToScaledClient()
+    {
+        Assert.Equal(
+            480 + 16,
+            LibraryVideoWindowScale.MinOuterDip(naturalClientDip: 1920, nonClientDip: 16),
+            6);
+        Assert.Equal(
+            270,
+            LibraryVideoWindowScale.MinOuterDip(naturalClientDip: 1080, nonClientDip: 0),
+            6);
+    }
 }

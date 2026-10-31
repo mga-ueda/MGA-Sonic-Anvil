@@ -86,6 +86,12 @@ internal static class LibraryVideoWindowScale
 
     public static double Clamp(double scale) => Math.Clamp(scale, Min, Max);
 
+    /// <summary>
+    /// 動画ミニ窓の外寸下限（DIP）。クライアントが原寸×Min になるよう枠を足す。
+    /// </summary>
+    public static double MinOuterDip(double naturalClientDip, double nonClientDip) =>
+        Math.Max(1, naturalClientDip * Min + Math.Max(0, nonClientDip));
+
     /// <summary>25% 刻みか。</summary>
     public static bool IsKeyStep(double scale)
     {
