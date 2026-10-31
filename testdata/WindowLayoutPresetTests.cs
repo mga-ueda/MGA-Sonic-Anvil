@@ -16,6 +16,7 @@ public sealed class WindowLayoutPresetTests
         Assert.True(f9.ShowWaveform);
         Assert.False(f9.ShowAnalyzerArea);
         Assert.Equal(LayoutAnalyzerDock.Bottom, f9.ResolvedAnalyzerDock());
+        Assert.Equal(LayoutTransportToolbarDock.Top, f9.ResolvedTransportToolbarDock());
         Assert.False(f9.ShowLevelMeter);
         Assert.False(f9.ResolvedShowStatusBar(WindowLayoutSlot.F9));
 
@@ -24,6 +25,7 @@ public sealed class WindowLayoutPresetTests
         Assert.True(f10.ShowLibraryAndFavorites);
         Assert.True(f10.ShowWaveform);
         Assert.True(f10.ShowAnalyzerArea);
+        Assert.Equal(LayoutTransportToolbarDock.Top, f10.ResolvedTransportToolbarDock());
         Assert.True(f10.ShowLevelMeter);
         Assert.True(f10.ResolvedShowStatusBar(WindowLayoutSlot.F10));
 
@@ -33,6 +35,7 @@ public sealed class WindowLayoutPresetTests
         Assert.False(f11.ShowLibraryAndFavorites);
         Assert.True(f11.ShowWaveform);
         Assert.False(f11.ShowAnalyzerArea);
+        Assert.Equal(LayoutTransportToolbarDock.Top, f11.ResolvedTransportToolbarDock());
         Assert.True(f11.ShowLevelMeter);
         Assert.True(f11.ResolvedShowStatusBar(WindowLayoutSlot.F11));
 
@@ -42,6 +45,7 @@ public sealed class WindowLayoutPresetTests
         Assert.False(f12.ShowLibraryAndFavorites);
         Assert.True(f12.ShowWaveform);
         Assert.True(f12.ShowAnalyzerArea);
+        Assert.Equal(LayoutTransportToolbarDock.Top, f12.ResolvedTransportToolbarDock());
         Assert.True(f12.ShowLevelMeter);
         Assert.True(f12.ResolvedShowStatusBar(WindowLayoutSlot.F12));
     }
@@ -58,6 +62,7 @@ public sealed class WindowLayoutPresetTests
         Assert.Equal(f10Default.ShowWaveform, f10Resolved.ShowWaveform);
         Assert.Equal(f10Default.ShowAnalyzerArea, f10Resolved.ShowAnalyzerArea);
         Assert.Equal(f10Default.ResolvedAnalyzerDock(), f10Resolved.ResolvedAnalyzerDock());
+        Assert.Equal(f10Default.ResolvedTransportToolbarDock(), f10Resolved.ResolvedTransportToolbarDock());
         Assert.Equal(f10Default.ShowLevelMeter, f10Resolved.ShowLevelMeter);
         Assert.Equal(f10Default.ShowStatusBar, f10Resolved.ShowStatusBar);
 
@@ -71,6 +76,7 @@ public sealed class WindowLayoutPresetTests
                 ShowWaveform = false,
                 ShowAnalyzerArea = true,
                 AnalyzerDock = "Top",
+                TransportToolbarDock = "Bottom",
                 ShowLevelMeter = false,
                 ShowStatusBar = false,
             });
@@ -86,6 +92,7 @@ public sealed class WindowLayoutPresetTests
         Assert.False(f9.ShowWaveform);
         Assert.True(f9.ShowAnalyzerArea);
         Assert.Equal(LayoutAnalyzerDock.Top, f9.ResolvedAnalyzerDock());
+        Assert.Equal(LayoutTransportToolbarDock.Bottom, f9.ResolvedTransportToolbarDock());
         Assert.False(f9.ShowLevelMeter);
         Assert.False(f9.ResolvedShowStatusBar(WindowLayoutSlot.F9));
 
@@ -100,13 +107,47 @@ public sealed class WindowLayoutPresetTests
         Assert.True(WindowLayoutPreset.IsPlayerLayoutSlot(WindowLayoutSlot.F10));
         Assert.False(WindowLayoutPreset.IsPlayerLayoutSlot(WindowLayoutSlot.F11));
 
-        // 旧プリセット JSON に ShowStatusBar が無くてもスロット既定へ。
+        // 旧プリセット JSON に ShowStatusBar / TransportToolbarDock が無くてもスロット既定へ。
         var legacy = JsonSerializer.Deserialize(
             """{"SettingsGeneration":1,"LayoutPresetF10":{"FullscreenMode":"Off","ShowLibraryAndFavorites":true,"ShowWaveform":true,"ShowAnalyzerArea":true,"AnalyzerDock":"Bottom","ShowLevelMeter":true}}""",
             AppSettingsJsonContext.Default.AppSettings);
         Assert.True(legacy!.ResolvedLayoutPreset(WindowLayoutSlot.F10).ResolvedShowStatusBar(WindowLayoutSlot.F10));
+        Assert.Equal(
+            LayoutTransportToolbarDock.Top,
+            legacy.ResolvedLayoutPreset(WindowLayoutSlot.F10).ResolvedTransportToolbarDock());
         Assert.False(
             WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F9).ResolvedShowStatusBar(WindowLayoutSlot.F9));
+    }
+
+    [Fact]
+    public void TransportToolbarDock_PerSlotIndependent()
+    {
+        var settings = AppSettings.CreateDefault();
+        settings.ApplyLayoutPreset(
+            WindowLayoutSlot.F11,
+            new WindowLayoutPreset
+            {
+                FullscreenMode = "Toggle",
+                FullscreenToggleStartsOn = true,
+                TransportToolbarDock = "Bottom",
+            });
+        settings.ApplyLayoutPreset(
+            WindowLayoutSlot.F12,
+            new WindowLayoutPreset
+            {
+                FullscreenMode = "Toggle",
+                TransportToolbarDock = "Top",
+            });
+
+        Assert.Equal(
+            LayoutTransportToolbarDock.Bottom,
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F11).ResolvedTransportToolbarDock());
+        Assert.Equal(
+            LayoutTransportToolbarDock.Top,
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F12).ResolvedTransportToolbarDock());
+        Assert.Equal(
+            LayoutTransportToolbarDock.Top,
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F9).ResolvedTransportToolbarDock());
     }
 
     [Theory]

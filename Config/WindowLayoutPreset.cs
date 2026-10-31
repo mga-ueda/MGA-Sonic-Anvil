@@ -24,6 +24,13 @@ internal enum LayoutAnalyzerDock
     Top,
 }
 
+/// <summary>メニュー下ツールバーの上下。Top はメニュー直下、Bottom はステータスバー上。</summary>
+internal enum LayoutTransportToolbarDock
+{
+    Top,
+    Bottom,
+}
+
 /// <summary>F9–F12 各スロットの表示内容。ワークスペース項目は持たない。</summary>
 internal sealed class WindowLayoutPreset
 {
@@ -58,6 +65,11 @@ internal sealed class WindowLayoutPreset
     /// </summary>
     public string AnalyzerDock { get; set; } = nameof(LayoutAnalyzerDock.Bottom);
 
+    /// <summary>
+    /// Top＝メニュー直下、Bottom＝ステータスバー上。スロット（F9–F12）ごとに独立。
+    /// </summary>
+    public string TransportToolbarDock { get; set; } = nameof(LayoutTransportToolbarDock.Top);
+
     /// <summary>右列ピークレベルメーター。ゴニオの表示は ShowAnalyzerArea。</summary>
     public bool ShowLevelMeter { get; set; } = true;
 
@@ -90,6 +102,14 @@ internal sealed class WindowLayoutPreset
     public void ApplyAnalyzerDock(LayoutAnalyzerDock dock) =>
         AnalyzerDock = dock == LayoutAnalyzerDock.Top ? "Top" : "Bottom";
 
+    public LayoutTransportToolbarDock ResolvedTransportToolbarDock() =>
+        string.Equals(TransportToolbarDock?.Trim(), "Bottom", StringComparison.OrdinalIgnoreCase)
+            ? LayoutTransportToolbarDock.Bottom
+            : LayoutTransportToolbarDock.Top;
+
+    public void ApplyTransportToolbarDock(LayoutTransportToolbarDock dock) =>
+        TransportToolbarDock = dock == LayoutTransportToolbarDock.Bottom ? "Bottom" : "Top";
+
     /// <summary>
     /// 別スロットへ切替えたときの全画面初期値。
     /// Toggle はセッション初回のみ（呼び出し側が記憶を持たないとき）。
@@ -111,6 +131,7 @@ internal sealed class WindowLayoutPreset
             ShowWaveform = ShowWaveform,
             ShowAnalyzerArea = ShowAnalyzerArea,
             AnalyzerDock = AnalyzerDock,
+            TransportToolbarDock = TransportToolbarDock,
             ShowLevelMeter = ShowLevelMeter,
             ShowStatusBar = ShowStatusBar,
         };
@@ -139,6 +160,7 @@ internal sealed class WindowLayoutPreset
                 ShowWaveform = true,
                 ShowAnalyzerArea = false,
                 AnalyzerDock = "Bottom",
+                TransportToolbarDock = "Top",
                 ShowLevelMeter = false,
                 ShowStatusBar = false,
             },
@@ -149,6 +171,7 @@ internal sealed class WindowLayoutPreset
                 ShowWaveform = true,
                 ShowAnalyzerArea = true,
                 AnalyzerDock = "Bottom",
+                TransportToolbarDock = "Top",
                 ShowLevelMeter = true,
                 ShowStatusBar = true,
             },
@@ -160,6 +183,7 @@ internal sealed class WindowLayoutPreset
                 ShowWaveform = true,
                 ShowAnalyzerArea = false,
                 AnalyzerDock = "Bottom",
+                TransportToolbarDock = "Top",
                 ShowLevelMeter = true,
                 ShowStatusBar = true,
             },
@@ -171,6 +195,7 @@ internal sealed class WindowLayoutPreset
                 ShowWaveform = true,
                 ShowAnalyzerArea = true,
                 AnalyzerDock = "Bottom",
+                TransportToolbarDock = "Top",
                 ShowLevelMeter = true,
                 ShowStatusBar = true,
             },

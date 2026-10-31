@@ -773,6 +773,11 @@ internal sealed class AppSettings
             copy.AnalyzerDock = "Bottom";
         }
 
+        if (string.IsNullOrWhiteSpace(copy.TransportToolbarDock))
+        {
+            copy.TransportToolbarDock = defaults.TransportToolbarDock;
+        }
+
         copy.ShowStatusBar ??= defaults.ShowStatusBar;
         // ライブラリ列は設定に出さないため、常にスロット既定へ寄せる。
         copy.ShowLibraryAndFavorites = defaults.ShowLibraryAndFavorites;
