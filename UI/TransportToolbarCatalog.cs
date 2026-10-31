@@ -4,7 +4,7 @@ using MgaSonicAnvil.Domain;
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// メニュー下ツールバーに載るトランスポートコマンドの一覧と、設定からの表示判定。
+/// ツールバーに載るトランスポートコマンドの一覧と、設定からの表示判定。
 /// </summary>
 internal static class TransportToolbarCatalog
 {

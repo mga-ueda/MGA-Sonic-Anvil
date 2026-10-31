@@ -2755,12 +2755,17 @@ internal partial class AudioSettingsWindow : Window
             + 8 + 100 + 12
             + ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutPresetReset, 11.333)
             + 24;
+        // チェック行＋ツールバー位置（各モード共通幅）。
+        var checksWithToolbar = checksRow
+            + 12
+            + ComboBoxFit.MeasureText(this, UiStrings.LabelTransportToolbarDock, 11.333)
+            + 8 + 140;
         return Max(
             MeasureCheckBoxContentWidth(ShowMainMenuBarBox),
             MeasureCheckBoxContentWidth(ShowTransportToolbarBox),
             ComboBoxFit.MeasureText(this, UiStrings.LabelTransportToolbarIcons, 11.333),
             fullscreenRow,
-            checksRow) + gutter;
+            checksWithToolbar) + gutter;
     }
 
     private double SettingsTabBarWidth()
@@ -3329,6 +3334,7 @@ internal partial class AudioSettingsWindow : Window
         private readonly CheckBox? _waveform;
         private readonly CheckBox _analyzer;
         private readonly ComboBox _analyzerDock;
+        private readonly ComboBox _transportToolbarDock;
         private readonly CheckBox _levelMeter;
         private readonly CheckBox _statusBar;
         private readonly Action<WindowLayoutSlot>? _onChanged;
@@ -3341,6 +3347,7 @@ internal partial class AudioSettingsWindow : Window
             CheckBox? waveform,
             CheckBox analyzer,
             ComboBox analyzerDock,
+            ComboBox transportToolbarDock,
             CheckBox levelMeter,
             CheckBox statusBar,
             Action<WindowLayoutSlot>? onChanged)
@@ -3351,6 +3358,7 @@ internal partial class AudioSettingsWindow : Window
             _waveform = waveform;
             _analyzer = analyzer;
             _analyzerDock = analyzerDock;
+            _transportToolbarDock = transportToolbarDock;
             _levelMeter = levelMeter;
             _statusBar = statusBar;
             _onChanged = onChanged;
@@ -3423,6 +3431,19 @@ internal partial class AudioSettingsWindow : Window
             analyzerDock.SelectedIndex = preset.ResolvedAnalyzerDock() == LayoutAnalyzerDock.Top ? 1 : 0;
             ComboBoxFit.Apply(analyzerDock);
 
+            var transportToolbarDock = CreateLayoutCombo(new Thickness(8, 0, 0, 0));
+            transportToolbarDock.Items.Add(
+                new NamedTransportToolbarDockItem(
+                    LayoutTransportToolbarDock.Top,
+                    UiStrings.LabelLayoutAnalyzerDockTop));
+            transportToolbarDock.Items.Add(
+                new NamedTransportToolbarDockItem(
+                    LayoutTransportToolbarDock.Bottom,
+                    UiStrings.LabelLayoutAnalyzerDockBottom));
+            transportToolbarDock.SelectedIndex =
+                preset.ResolvedTransportToolbarDock() == LayoutTransportToolbarDock.Bottom ? 1 : 0;
+            ComboBoxFit.Apply(transportToolbarDock);
+
             var editor = new LayoutPresetEditor(
                 slot,
                 fullscreen,
@@ -3430,6 +3451,7 @@ internal partial class AudioSettingsWindow : Window
                 waveform,
                 analyzer,
                 analyzerDock,
+                transportToolbarDock,
                 levelMeter,
                 statusBar,
                 onChanged);
@@ -3456,6 +3478,8 @@ internal partial class AudioSettingsWindow : Window
             // DropDownClosed も拾う（位置上下の即時反映漏れ防止）。
             analyzerDock.SelectionChanged += (_, _) => Notify();
             analyzerDock.DropDownClosed += (_, _) => Notify();
+            transportToolbarDock.SelectionChanged += (_, _) => Notify();
+            transportToolbarDock.DropDownClosed += (_, _) => Notify();
             levelMeter.Checked += (_, _) => Notify();
             levelMeter.Unchecked += (_, _) => Notify();
             statusBar.Checked += (_, _) => Notify();
@@ -3526,6 +3550,13 @@ internal partial class AudioSettingsWindow : Window
                 Margin = new Thickness(12, 0, 0, 0),
             });
             checksRow.Children.Add(analyzerDock);
+            checksRow.Children.Add(new TextBlock
+            {
+                Text = UiStrings.LabelTransportToolbarDock,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0),
+            });
+            checksRow.Children.Add(transportToolbarDock);
             checksRow.Children.Add(resetButton);
             root.Children.Add(checksRow);
             editor.Root = root;
@@ -3554,6 +3585,10 @@ internal partial class AudioSettingsWindow : Window
                 _analyzerDock.SelectedItem is NamedDockItem dock
                     ? dock.Dock
                     : LayoutAnalyzerDock.Bottom);
+            preset.ApplyTransportToolbarDock(
+                _transportToolbarDock.SelectedItem is NamedTransportToolbarDockItem toolbarDock
+                    ? toolbarDock.Dock
+                    : LayoutTransportToolbarDock.Top);
             return preset;
         }
 
@@ -3588,6 +3623,8 @@ internal partial class AudioSettingsWindow : Window
                 _analyzer.IsChecked = preset.ShowAnalyzerArea;
                 _analyzerDock.SelectedIndex =
                     preset.ResolvedAnalyzerDock() == LayoutAnalyzerDock.Top ? 1 : 0;
+                _transportToolbarDock.SelectedIndex =
+                    preset.ResolvedTransportToolbarDock() == LayoutTransportToolbarDock.Bottom ? 1 : 0;
                 _levelMeter.IsChecked = preset.ShowLevelMeter;
                 _statusBar.IsChecked = preset.ResolvedShowStatusBar(Slot);
                 SyncDependent();
@@ -3645,6 +3682,11 @@ internal partial class AudioSettingsWindow : Window
         }
 
         private sealed record NamedDockItem(LayoutAnalyzerDock Dock, string Label)
+        {
+            public override string ToString() => Label;
+        }
+
+        private sealed record NamedTransportToolbarDockItem(LayoutTransportToolbarDock Dock, string Label)
         {
             public override string ToString() => Label;
         }

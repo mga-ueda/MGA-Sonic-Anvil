@@ -15,7 +15,7 @@ internal static class DesignMetrics
 
     /// <summary>
     /// メイン窓の幅下限（F8／F9 含む全モード共通）。
-    /// メニュー下ツールバーは狭幅で折り返すため、下限はアナライザ側クローム基準。
+    /// ツールバー（メニュー下／画面下部）は狭幅で折り返すため、下限はアナライザ側クローム基準。
     /// </summary>
     public static double WindowMinWidth => From96(960);
 
