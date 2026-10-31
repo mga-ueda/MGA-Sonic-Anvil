@@ -5,16 +5,12 @@
              xmlns:ui="clr-namespace:MgaSonicAnvil.UI"
              Focusable="False"
              ToolTipService.IsEnabled="True"
-             MinWidth="{x:Static ui:DesignMetrics.TransportFixedRowWidth}"
-             MinHeight="{x:Static ui:DesignMetrics.TransportBarHeight}"
+             MinHeight="{x:Static ui:DesignMetrics.TransportRowHeight}"
              Background="Transparent">
-  <StackPanel HorizontalAlignment="Left"
-              VerticalAlignment="Center"
-              Margin="8,2,8,0">
-    <StackPanel x:Name="TopRow"
-                Orientation="Horizontal" />
-    <StackPanel x:Name="BottomRow"
-                Orientation="Horizontal"
-                Margin="{x:Static ui:DesignMetrics.TransportBottomRowMargin}" />
-  </StackPanel>
+  <!-- 幅が足りないときはグループ単位で折り返し、行を増やして全ボタンを見せる。 -->
+  <WrapPanel x:Name="ItemsHost"
+             Orientation="Horizontal"
+             HorizontalAlignment="Left"
+             VerticalAlignment="Top"
+             Margin="8,2,8,2" />
 </UserControl>

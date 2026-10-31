@@ -93,6 +93,10 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedShowMainMenuBar { get; private set; } = true;
 
+    public bool SelectedShowTransportToolbar { get; private set; } = true;
+
+    public string[] SelectedHiddenTransportToolbarCommands { get; private set; } = [];
+
     public WindowLayoutPreset SelectedLayoutPresetF9 { get; private set; } =
         WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F9);
 
@@ -170,6 +174,10 @@ internal partial class AudioSettingsWindow : Window
     private float[] _meterPeaks = [];
     private readonly int _uiScaleOpenedAt;
     private readonly bool _showMainMenuBarOpenedAt;
+    private readonly bool _showTransportToolbarOpenedAt;
+    private readonly string[] _hiddenTransportToolbarCommandsOpenedAt;
+    private readonly List<(TransportCommand Command, CheckBox Box)> _transportToolbarChecks = [];
+    private bool _transportToolbarPreviewReady;
     private readonly string _wallpaperPathOpenedAt;
     private readonly double _wallpaperOpacityOpenedAt;
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksWave = [];
@@ -210,6 +218,8 @@ internal partial class AudioSettingsWindow : Window
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSize.L,
         bool gaplessPlayback = true,
         bool showMainMenuBar = true,
+        bool showTransportToolbar = true,
+        IEnumerable<string>? hiddenTransportToolbarCommands = null,
         bool libraryShowPlaylistPdf = true,
         bool libraryShowPlaylistMov = false,
         bool libraryShowPlaylistMp4 = false,
@@ -270,6 +280,11 @@ internal partial class AudioSettingsWindow : Window
         SelectedGaplessPlayback = gaplessPlayback;
         SelectedShowMainMenuBar = showMainMenuBar;
         _showMainMenuBarOpenedAt = SelectedShowMainMenuBar;
+        SelectedShowTransportToolbar = showTransportToolbar;
+        _showTransportToolbarOpenedAt = SelectedShowTransportToolbar;
+        SelectedHiddenTransportToolbarCommands =
+            TransportToolbarCatalog.NormalizeHidden(hiddenTransportToolbarCommands);
+        _hiddenTransportToolbarCommandsOpenedAt = SelectedHiddenTransportToolbarCommands.ToArray();
         SelectedLayoutPresetF9 = (layoutPresetF9 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F9)).Clone();
         SelectedLayoutPresetF10 = (layoutPresetF10 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F10)).Clone();
         SelectedLayoutPresetF11 = (layoutPresetF11 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F11)).Clone();
@@ -548,9 +563,140 @@ internal partial class AudioSettingsWindow : Window
         ShowMainMenuBarBox.IsChecked = SelectedShowMainMenuBar;
         ShowMainMenuBarBox.Checked += (_, _) => PreviewShowMainMenuBar(true);
         ShowMainMenuBarBox.Unchecked += (_, _) => PreviewShowMainMenuBar(false);
+        ShowTransportToolbarBox.IsChecked = SelectedShowTransportToolbar;
+        ShowTransportToolbarBox.Checked += (_, _) => PreviewShowTransportToolbar(true);
+        ShowTransportToolbarBox.Unchecked += (_, _) => PreviewShowTransportToolbar(false);
+        FillTransportToolbarIcons();
+        _transportToolbarPreviewReady = true;
         FillLayoutPresets();
         _layoutPreviewReady = true;
         RefreshLibraryExplorerRootButtons();
+    }
+
+    private void FillTransportToolbarIcons()
+    {
+        TransportToolbarIconsHost.Children.Clear();
+        _transportToolbarChecks.Clear();
+        string? currentGroup = null;
+        foreach (var item in TransportToolbarCatalog.All)
+        {
+            var group = item.GroupTitle();
+            if (!string.Equals(currentGroup, group, StringComparison.Ordinal))
+            {
+                currentGroup = group;
+                TransportToolbarIconsHost.Children.Add(new TextBlock
+                {
+                    Text = group,
+                    FontWeight = FontWeights.Bold,
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 4, 10, 4),
+                    Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")),
+                });
+            }
+
+            var visible = TransportToolbarCatalog.IsCommandVisible(
+                SelectedHiddenTransportToolbarCommands,
+                item.Command);
+            var box = new CheckBox
+            {
+                Style = (Style)FindResource("DarkCheckBoxStyle"),
+                Content = item.Label(),
+                IsChecked = visible,
+                Margin = new Thickness(0, 2, 12, 2),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = item.Tooltip(),
+            };
+            box.Checked += (_, _) => PreviewTransportToolbarIcons();
+            box.Unchecked += (_, _) => PreviewTransportToolbarIcons();
+            _transportToolbarChecks.Add((item.Command, box));
+            TransportToolbarIconsHost.Children.Add(box);
+        }
+
+        SyncTransportToolbarIconsEnabled();
+    }
+
+    private void TransportToolbarAllOnButton_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var (_, box) in _transportToolbarChecks)
+        {
+            box.IsChecked = true;
+        }
+    }
+
+    private void TransportToolbarAllOffButton_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var (_, box) in _transportToolbarChecks)
+        {
+            box.IsChecked = false;
+        }
+    }
+
+    private void SyncTransportToolbarIconsEnabled()
+    {
+        var on = ShowTransportToolbarBox.IsChecked != false;
+        TransportToolbarIconsHeader.IsEnabled = on;
+        TransportToolbarAllOnButton.IsEnabled = on;
+        TransportToolbarAllOffButton.IsEnabled = on;
+        TransportToolbarIconsHost.IsEnabled = on;
+    }
+
+    private string[] ReadHiddenTransportToolbarCommands()
+    {
+        var visible = _transportToolbarChecks
+            .Where(entry => entry.Box.IsChecked != false)
+            .Select(entry => entry.Command);
+        return TransportToolbarCatalog.HiddenFromVisible(visible);
+    }
+
+    private void PreviewShowTransportToolbar(bool show)
+    {
+        SelectedShowTransportToolbar = show;
+        SyncTransportToolbarIconsEnabled();
+        ApplyTransportToolbarPreview();
+    }
+
+    private void PreviewTransportToolbarIcons()
+    {
+        if (!_transportToolbarPreviewReady)
+        {
+            return;
+        }
+
+        SelectedHiddenTransportToolbarCommands = ReadHiddenTransportToolbarCommands();
+        ApplyTransportToolbarPreview();
+    }
+
+    private void ApplyTransportToolbarPreview()
+    {
+        AppStorage.Settings.ShowTransportToolbar = SelectedShowTransportToolbar;
+        AppStorage.Settings.HiddenTransportToolbarCommands = SelectedHiddenTransportToolbarCommands;
+        if (Owner is MainWindow window)
+        {
+            window.ApplyTransportToolbarVisibility();
+        }
+    }
+
+    private void RevertTransportToolbarPreview()
+    {
+        var sameShow = AppStorage.Settings.ShowTransportToolbar == _showTransportToolbarOpenedAt;
+        var currentHidden = AppStorage.Settings.HiddenTransportToolbarCommands ?? [];
+        var sameHidden = currentHidden.SequenceEqual(
+            _hiddenTransportToolbarCommandsOpenedAt,
+            StringComparer.OrdinalIgnoreCase);
+        if (sameShow && sameHidden)
+        {
+            return;
+        }
+
+        AppStorage.Settings.ShowTransportToolbar = _showTransportToolbarOpenedAt;
+        AppStorage.Settings.HiddenTransportToolbarCommands = _hiddenTransportToolbarCommandsOpenedAt.ToArray();
+        SelectedShowTransportToolbar = _showTransportToolbarOpenedAt;
+        SelectedHiddenTransportToolbarCommands = _hiddenTransportToolbarCommandsOpenedAt.ToArray();
+        if (Owner is MainWindow window)
+        {
+            window.ApplyTransportToolbarVisibility();
+        }
     }
 
     private void FillLayoutPresets()
@@ -1498,6 +1644,8 @@ internal partial class AudioSettingsWindow : Window
             LibraryPlaylistWaveformSize.L);
         SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
         SelectedShowMainMenuBar = ShowMainMenuBarBox.IsChecked != false;
+        SelectedShowTransportToolbar = ShowTransportToolbarBox.IsChecked != false;
+        SelectedHiddenTransportToolbarCommands = ReadHiddenTransportToolbarCommands();
         ReadLayoutPresets();
         SelectedLibraryShowPlaylistPdf = LibraryShowPlaylistPdfBox.IsChecked != false;
         SelectedLibraryShowPlaylistMov = LibraryShowPlaylistMovBox.IsChecked != false;
@@ -2609,6 +2757,8 @@ internal partial class AudioSettingsWindow : Window
             + 24;
         return Max(
             MeasureCheckBoxContentWidth(ShowMainMenuBarBox),
+            MeasureCheckBoxContentWidth(ShowTransportToolbarBox),
+            ComboBoxFit.MeasureText(this, UiStrings.LabelTransportToolbarIcons, 11.333),
             fullscreenRow,
             checksRow) + gutter;
     }
@@ -3035,6 +3185,7 @@ internal partial class AudioSettingsWindow : Window
             RevertUiScalePreview();
             RevertWallpaperPreview();
             RevertShowMainMenuBarPreview();
+            RevertTransportToolbarPreview();
             RevertLayoutPresetPreviews();
         }
 

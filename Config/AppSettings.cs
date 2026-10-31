@@ -109,6 +109,14 @@ internal sealed class AppSettings
     /// <summary>ウィンドウ上部のメニューバーを出す。既定オン。波形右クリックと同じ内容。</summary>
     public bool ShowMainMenuBar { get; set; } = true;
 
+    /// <summary>メニュー直下のトランスポートツールバー領域を出す。既定オン。</summary>
+    public bool ShowTransportToolbar { get; set; } = true;
+
+    /// <summary>
+    /// ツールバーで隠すコマンド名（<c>TransportCommand</c> の名前）。空は全表示。
+    /// </summary>
+    public string[] HiddenTransportToolbarCommands { get; set; } = [];
+
     /// <summary>F9 レイアウトプリセット。欠落時は <see cref="WindowLayoutPreset.CreateDefault"/>。</summary>
     public WindowLayoutPreset? LayoutPresetF9 { get; set; }
 
