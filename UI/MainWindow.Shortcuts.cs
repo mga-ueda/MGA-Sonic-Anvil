@@ -3362,21 +3362,27 @@ public partial class MainWindow
     internal static string FormatOptionToggleToast(string label, bool enabled) =>
         label + (enabled ? ": ON" : ": OFF");
 
-    /// <summary>F9–F12 モード名（キー接頭辞なし）。</summary>
-    internal static string FormatLayoutModeToast(WindowLayoutSlot slot)
+    /// <summary>F9–F12 モード名。UI 言語に関わらず英語（ピッチ／ON・OFF トーストと同じ）。</summary>
+    internal static string FormatLayoutModeToast(
+        WindowLayoutSlot slot,
+        LayoutFullscreenMode fullscreenMode = LayoutFullscreenMode.Off,
+        bool fullscreenOn = false)
     {
-        var label = slot switch
+        var title = slot switch
         {
-            WindowLayoutSlot.F9 => UiStrings.LabelLayoutPresetF9,
-            WindowLayoutSlot.F10 => UiStrings.LabelLayoutPresetF10,
-            WindowLayoutSlot.F11 => UiStrings.LabelLayoutPresetF11,
-            WindowLayoutSlot.F12 => UiStrings.LabelLayoutPresetF12,
+            WindowLayoutSlot.F9 => "Player mode 1",
+            WindowLayoutSlot.F10 => "Player mode 2",
+            WindowLayoutSlot.F11 => "Editor mode 1",
+            WindowLayoutSlot.F12 => "Editor mode 2",
             _ => string.Empty,
         };
-        var half = label.IndexOf('：');
-        var ascii = label.IndexOf(':');
-        var cut = half >= 0 && (ascii < 0 || half < ascii) ? half : ascii;
-        return cut >= 0 ? label[(cut + 1)..].Trim() : label;
+        if (fullscreenMode != LayoutFullscreenMode.Toggle || string.IsNullOrEmpty(title))
+        {
+            return title;
+        }
+
+        // トグル全画面のときだけ 2 行目に現在のオン／オフを出す。
+        return title + "\n" + FormatOptionToggleToast("Fullscreen", fullscreenOn);
     }
 
     private bool TryHandleVideoLaunchScaleKey(Key key, ModifierKeys modifiers, bool isRepeat)
