@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -9,101 +10,26 @@ internal partial class TransportBar : UserControl
 {
     private readonly TransportIconButton _play;
     private readonly Dictionary<TransportCommand, TransportIconButton> _buttons = new();
-    private readonly List<(TextBlock Label, Func<string> Title)> _groupLabels = [];
+    private readonly List<(TextBlock Label, Func<string> Title, List<TransportIconButton> Buttons)> _groups = [];
 
     public event EventHandler<TransportCommand>? CommandInvoked;
 
     public TransportBar()
     {
         InitializeComponent();
-        _play = AddGroup(
-            bottomRow: false,
-            () => UiStrings.LabelTransportGroup,
-            (TransportCommand.TogglePlayback, TransportIcon.PlayPause, UiStrings.TooltipPlay),
-            (TransportCommand.Record, TransportIcon.Record, UiStrings.TooltipRecord));
-
-        AddGroup(
-            bottomRow: false,
-            () => UiStrings.LabelEditGroup,
-            (TransportCommand.FadeIn, TransportIcon.FadeIn, UiStrings.TooltipFadeIn),
-            (TransportCommand.FadeOut, TransportIcon.FadeOut, UiStrings.TooltipFadeOut),
-            (TransportCommand.FadeAround, TransportIcon.FadeAround, UiStrings.TooltipFadeAround),
-            (TransportCommand.Normalize, TransportIcon.Normalize, UiStrings.TooltipNormalize),
-            (TransportCommand.Volume, TransportIcon.Volume, UiStrings.TooltipVolume),
-            (TransportCommand.Pitch, TransportIcon.Pitch, UiStrings.TooltipPitch),
-            (TransportCommand.TimeStretch, TransportIcon.TimeStretch, UiStrings.TooltipTimeStretch),
-            (TransportCommand.Reverse, TransportIcon.Reverse, UiStrings.TooltipReverse),
-            (TransportCommand.Delete, TransportIcon.Delete, UiStrings.TooltipDelete));
-
-        AddGroup(
-            bottomRow: false,
-            () => UiStrings.LabelFileGroup,
-            (TransportCommand.NewDocument, TransportIcon.NewDocument, UiStrings.TooltipNew),
-            (TransportCommand.Open, TransportIcon.Folder, UiStrings.TooltipOpen),
-            (TransportCommand.Save, TransportIcon.Save, UiStrings.TooltipSave),
-            (TransportCommand.SaveAs, TransportIcon.SaveAs, UiStrings.TooltipSaveAs),
-            (TransportCommand.SaveMp3, TransportIcon.SaveMp3, UiStrings.TooltipSaveMp3));
-
-        AddGroup(
-            bottomRow: true,
-            () => UiStrings.LabelMarkerGroup,
-            (TransportCommand.AddMarker, TransportIcon.AddMarker, UiStrings.TooltipAddMarker),
-            (TransportCommand.SetLoop, TransportIcon.SetLoop, UiStrings.TooltipSetLoop),
-            (TransportCommand.SetRegion, TransportIcon.SetRegion, UiStrings.TooltipSetRegion),
-            (TransportCommand.ToggleRangeClick, TransportIcon.RangeClick, UiStrings.TooltipRangeClick));
-
-        AddGroup(
-            bottomRow: true,
-            () => UiStrings.LabelViewGroup,
-            (TransportCommand.ToggleSpectrogram, TransportIcon.Analysis, UiStrings.TooltipSpectrogramView),
-            (TransportCommand.ToggleLoudnessView, TransportIcon.Loudness, UiStrings.TooltipLoudnessView),
-            (TransportCommand.CenterPlayhead, TransportIcon.Center, UiStrings.TooltipCenterPlayhead),
-            (TransportCommand.History, TransportIcon.History, UiStrings.TooltipHistory),
-            (TransportCommand.ToggleLibraryMaximize, TransportIcon.PlayerMode, UiStrings.TooltipLibraryMaximize),
-            (TransportCommand.ToggleAnalyzerMaximize, TransportIcon.AnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize),
-            (TransportCommand.OpenColorPanel, TransportIcon.ColorPalette, UiStrings.TooltipColorPanel));
-
-        AddGroup(
-            bottomRow: true,
-            () => UiStrings.LabelOtherGroup,
-            (TransportCommand.OpenSettings, TransportIcon.Settings, UiStrings.TooltipSettings),
-            (TransportCommand.OpenManual, TransportIcon.Help, UiStrings.TooltipManualHelp));
-
+        _play = BuildFromCatalog();
         ApplyLocalizedText();
+        ApplyVisibilityFromSettings(AppStorage.Settings);
     }
 
     public void ApplyLocalizedText()
     {
-        SetTooltip(TransportCommand.TogglePlayback, UiStrings.TooltipPlay);
-        SetTooltip(TransportCommand.Record, UiStrings.TooltipRecord);
-        SetTooltip(TransportCommand.FadeIn, UiStrings.TooltipFadeIn);
-        SetTooltip(TransportCommand.FadeOut, UiStrings.TooltipFadeOut);
-        SetTooltip(TransportCommand.FadeAround, UiStrings.TooltipFadeAround);
-        SetTooltip(TransportCommand.Normalize, UiStrings.TooltipNormalize);
-        SetTooltip(TransportCommand.Volume, UiStrings.TooltipVolume);
-        SetTooltip(TransportCommand.Pitch, UiStrings.TooltipPitch);
-        SetTooltip(TransportCommand.TimeStretch, UiStrings.TooltipTimeStretch);
-        SetTooltip(TransportCommand.Reverse, UiStrings.TooltipReverse);
-        SetTooltip(TransportCommand.Delete, UiStrings.TooltipDelete);
-        SetTooltip(TransportCommand.AddMarker, UiStrings.TooltipAddMarker);
-        SetTooltip(TransportCommand.SetLoop, UiStrings.TooltipSetLoop);
-        SetTooltip(TransportCommand.SetRegion, UiStrings.TooltipSetRegion);
-        SetTooltip(TransportCommand.ToggleRangeClick, UiStrings.TooltipRangeClick);
-        SetTooltip(TransportCommand.NewDocument, UiStrings.TooltipNew);
-        SetTooltip(TransportCommand.Open, UiStrings.TooltipOpen);
-        SetTooltip(TransportCommand.Save, UiStrings.TooltipSave);
-        SetTooltip(TransportCommand.SaveAs, UiStrings.TooltipSaveAs);
-        SetTooltip(TransportCommand.SaveMp3, UiStrings.TooltipSaveMp3);
-        SetTooltip(TransportCommand.ToggleSpectrogram, UiStrings.TooltipSpectrogramView);
-        SetTooltip(TransportCommand.ToggleLoudnessView, UiStrings.TooltipLoudnessView);
-        SetTooltip(TransportCommand.CenterPlayhead, UiStrings.TooltipCenterPlayhead);
-        SetTooltip(TransportCommand.History, UiStrings.TooltipHistory);
-        SetTooltip(TransportCommand.ToggleLibraryMaximize, UiStrings.TooltipLibraryMaximize);
-        SetTooltip(TransportCommand.ToggleAnalyzerMaximize, UiStrings.TooltipAnalyzerMaximize);
-        SetTooltip(TransportCommand.OpenColorPanel, UiStrings.TooltipColorPanel);
-        SetTooltip(TransportCommand.OpenSettings, UiStrings.TooltipSettings);
-        SetTooltip(TransportCommand.OpenManual, UiStrings.TooltipManualHelp);
-        foreach (var (label, title) in _groupLabels)
+        foreach (var item in TransportToolbarCatalog.All)
+        {
+            SetTooltip(item.Command, item.Tooltip());
+        }
+
+        foreach (var (label, title, _) in _groups)
         {
             label.Text = title();
         }
@@ -205,7 +131,7 @@ internal partial class TransportBar : UserControl
             button.InvalidateVisual();
         }
 
-        foreach (var (label, _) in _groupLabels)
+        foreach (var (label, _, _) in _groups)
         {
             label.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
         }
@@ -236,41 +162,77 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    private TransportIconButton AddGroup(
-        bool bottomRow,
-        Func<string> title,
-        params (TransportCommand Command, TransportIcon Icon, string Tooltip)[] items)
+    /// <summary>設定の非表示リストに従い、グループ見出し／ボタンを畳む。</summary>
+    public void ApplyVisibilityFromSettings(AppSettings settings)
     {
-        var created = CreateGroupPanel(title);
-        TransportIconButton? first = null;
-        foreach (var item in items)
+        var anyVisible = false;
+        foreach (var (label, _, buttons) in _groups)
         {
+            var visibleCount = 0;
+            foreach (var button in buttons)
+            {
+                var show = TransportToolbarCatalog.IsCommandVisible(settings, button.CommandKind);
+                button.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                if (show)
+                {
+                    visibleCount++;
+                }
+            }
+
+            label.Visibility = visibleCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+            anyVisible |= visibleCount > 0;
+        }
+
+        Visibility = anyVisible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>いま表示中のコマンドがあるか（領域自体の表示判定用）。</summary>
+    public bool HasVisibleCommands =>
+        _groups.Any(group => group.Buttons.Any(button => button.Visibility == Visibility.Visible));
+
+    private TransportIconButton BuildFromCatalog()
+    {
+        TransportIconButton? play = null;
+        string? currentGroupKey = null;
+        TextBlock? groupLabel = null;
+        List<TransportIconButton>? groupButtons = null;
+        var firstGroup = true;
+
+        foreach (var item in TransportToolbarCatalog.All)
+        {
+            var groupKey = item.GroupTitle();
+            if (!string.Equals(currentGroupKey, groupKey, StringComparison.Ordinal))
+            {
+                currentGroupKey = groupKey;
+                groupLabel = CreateGroupLabel(item.GroupTitle, firstGroup);
+                firstGroup = false;
+                groupButtons = [];
+                _groups.Add((groupLabel, item.GroupTitle, groupButtons));
+                ItemsHost.Children.Add(groupLabel);
+            }
+
             var button = new TransportIconButton
             {
                 CommandKind = item.Command,
                 Icon = item.Icon,
                 Margin = new Thickness(0, 0, DesignMetrics.TransportButtonGap, 0),
             };
-            TransportToolTip.Attach(button, item.Tooltip);
+            TransportToolTip.Attach(button, item.Tooltip());
             button.Click += (_, _) => CommandInvoked?.Invoke(this, item.Command);
             _buttons[item.Command] = button;
-            created.Buttons.Children.Add(button);
-            first ??= button;
+            ItemsHost.Children.Add(button);
+            groupButtons!.Add(button);
+            if (item.Command == TransportCommand.TogglePlayback)
+            {
+                play = button;
+            }
         }
 
-        (bottomRow ? BottomRow : TopRow).Children.Add(created.Group);
-        return first!;
+        return play!;
     }
 
-    private (StackPanel Group, StackPanel Buttons) CreateGroupPanel(Func<string> title)
-    {
-        var group = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Margin = new Thickness(0, 0, DesignMetrics.TransportGroupGap, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        var label = new TextBlock
+    private static TextBlock CreateGroupLabel(Func<string> title, bool firstGroup) =>
+        new()
         {
             Text = title(),
             Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")),
@@ -278,16 +240,10 @@ internal partial class TransportBar : UserControl
             FontSize = DesignMetrics.TransportGroupLabelFontSize,
             VerticalAlignment = VerticalAlignment.Center,
             TextAlignment = TextAlignment.Right,
-            Margin = new Thickness(0, 0, DesignMetrics.TransportGroupLabelGap, 0),
+            Margin = new Thickness(
+                firstGroup ? 0 : DesignMetrics.TransportGroupGap,
+                0,
+                DesignMetrics.TransportGroupLabelGap,
+                0),
         };
-        _groupLabels.Add((label, title));
-        group.Children.Add(label);
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        group.Children.Add(buttons);
-        return (group, buttons);
-    }
 }

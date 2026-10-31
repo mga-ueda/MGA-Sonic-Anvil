@@ -239,7 +239,35 @@
                         Style="{StaticResource DarkCheckBoxStyle}"
                         Content="{x:Static domain:UiStrings.LabelShowMainMenuBar}"
                         HorizontalAlignment="Left"
-                        Margin="0,0,0,12" />
+                        Margin="0,0,0,8" />
+              <CheckBox x:Name="ShowTransportToolbarBox"
+                        Style="{StaticResource DarkCheckBoxStyle}"
+                        Content="{x:Static domain:UiStrings.LabelShowTransportToolbar}"
+                        HorizontalAlignment="Left"
+                        Margin="0,0,0,8" />
+              <TextBlock x:Name="TransportToolbarIconsHeader"
+                         Text="{x:Static domain:UiStrings.LabelTransportToolbarIcons}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,4,0,6" />
+              <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <ui:RoundedButton x:Name="TransportToolbarAllOnButton"
+                                  Content="{x:Static domain:UiStrings.ButtonTransportToolbarAllOn}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="72"
+                                  Padding="12,0"
+                                  Margin="0,0,8,0"
+                                  Click="TransportToolbarAllOnButton_Click" />
+                <ui:RoundedButton x:Name="TransportToolbarAllOffButton"
+                                  Content="{x:Static domain:UiStrings.ButtonTransportToolbarAllOff}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="72"
+                                  Padding="12,0"
+                                  Click="TransportToolbarAllOffButton_Click" />
+              </StackPanel>
+              <WrapPanel x:Name="TransportToolbarIconsHost"
+                         Orientation="Horizontal"
+                         Margin="0,0,0,16" />
               <StackPanel x:Name="LayoutPresetsHost" />
             </StackPanel>
           </ScrollViewer>

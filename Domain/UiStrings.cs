@@ -195,6 +195,44 @@ internal static partial class UiStrings
     public static string LabelShowMainMenuBar => Get(
         "メニューバーを表示(_M)",
         "Show _menu bar");
+    /// <summary>設定・レイアウト。メニュー直下ツールバー領域の表示。</summary>
+    public static string LabelShowTransportToolbar => Get(
+        "ツールバーを表示(_T)",
+        "Show _toolbar");
+    public static string LabelTransportToolbarIcons => Get(
+        "ツールバーに表示するアイコン",
+        "Toolbar icons");
+    public static string ButtonTransportToolbarAllOn => Get("すべて表示", "Show all");
+    public static string ButtonTransportToolbarAllOff => Get("すべて非表示", "Hide all");
+    public static string LabelToolbarPlay => Get("再生", "Play");
+    public static string LabelToolbarRecord => Get("録音", "Record");
+    public static string LabelToolbarFadeIn => Get("フェードイン", "Fade in");
+    public static string LabelToolbarFadeOut => Get("フェードアウト", "Fade out");
+    public static string LabelToolbarFadeAround => Get("前後フェード", "Fade around");
+    public static string LabelToolbarNormalize => Get("ノーマライズ", "Normalize");
+    public static string LabelToolbarVolume => Get("音量", "Volume");
+    public static string LabelToolbarPitch => Get("ピッチ", "Pitch");
+    public static string LabelToolbarTimeStretch => Get("タイムストレッチ", "Time stretch");
+    public static string LabelToolbarReverse => Get("リバース", "Reverse");
+    public static string LabelToolbarDelete => Get("削除", "Delete");
+    public static string LabelToolbarNew => Get("新規", "New");
+    public static string LabelToolbarOpen => Get("開く", "Open");
+    public static string LabelToolbarSave => Get("保存", "Save");
+    public static string LabelToolbarSaveAs => Get("別名で保存", "Save as");
+    public static string LabelToolbarSaveMp3 => Get("MP3 保存", "Save MP3");
+    public static string LabelToolbarAddMarker => Get("マーカー", "Marker");
+    public static string LabelToolbarSetLoop => Get("ループ", "Loop");
+    public static string LabelToolbarSetRegion => Get("リージョン", "Region");
+    public static string LabelToolbarRangeClick => Get("マーカークリック", "Marker click");
+    public static string LabelToolbarSpectrogram => Get("スペクトログラム", "Spectrogram");
+    public static string LabelToolbarLoudness => Get("ラウドネス表示", "Loudness view");
+    public static string LabelToolbarCenter => Get("再生ヘッド中央", "Center playhead");
+    public static string LabelToolbarHistory => Get("履歴", "History");
+    public static string LabelToolbarLibraryMaximize => Get("プレイヤー", "Player");
+    public static string LabelToolbarAnalyzerMaximize => Get("アナライザ拡大", "Analyzer maximize");
+    public static string LabelToolbarColorPanel => Get("色", "Colors");
+    public static string LabelToolbarSettings => Get("設定", "Settings");
+    public static string LabelToolbarManual => Get("マニュアル", "Manual");
     public static string LabelLayoutPresetF9 => Get(
         "F09：プレイヤーモード１",
         "F09: Player mode 1");
