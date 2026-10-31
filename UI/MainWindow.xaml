@@ -26,6 +26,14 @@
     <Menu x:Name="MainMenuBar"
           DockPanel.Dock="Top"
           Style="{StaticResource DarkMenuStyle}" />
+    <!-- 旧アナライザ左のトランスポート。メニュー直下へ移し、狭幅では折り返して全表示。 -->
+    <Border x:Name="TransportToolbarHost"
+            DockPanel.Dock="Top"
+            Background="{DynamicResource TransportBackBrush}">
+      <ui:TransportBar x:Name="Transport"
+                       HorizontalAlignment="Stretch"
+                       VerticalAlignment="Top" />
+    </Border>
     <Border x:Name="StatusBarHost"
             DockPanel.Dock="Bottom"
             Height="{x:Static ui:DesignMetrics.StatusBarHeight}"
@@ -204,8 +212,10 @@
                           Background="{DynamicResource ChromeBorderBrush}"
                           Cursor="SizeNS"
                           Visibility="Collapsed" />
-            <Grid Grid.Row="2" Panel.ZIndex="2" ClipToBounds="True">
-            <DockPanel ClipToBounds="True">
+            <Grid Grid.Row="2"
+                  Panel.ZIndex="2"
+                  ClipToBounds="True">
+            <DockPanel x:Name="LibraryWaveformDock" ClipToBounds="True">
               <ui:WaveformScrollStrip x:Name="TimeScrollStrip"
                                       DockPanel.Dock="Bottom"
                                       Panel.ZIndex="1"
@@ -309,18 +319,13 @@
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <DockPanel x:Name="TransportBarHost"
-                   Grid.Column="0"
-                   MinHeight="{x:Static ui:DesignMetrics.TransportHostMinHeight}"
-                   Background="Transparent">
-          <!-- トランスポートを一塊にし帯の垂直中央へ（最大化で帯が伸びても隙間で分解しない）。 -->
-          <StackPanel x:Name="TransportBrandStack"
-                      VerticalAlignment="Center"
-                      HorizontalAlignment="Left">
-            <ui:TransportBar x:Name="Transport"
-                             HorizontalAlignment="Left" />
-          </StackPanel>
-        </DockPanel>
+        <!-- プレイヤーでラウドネス表示中: 波形帯をここ（ラウドネス左）へドックする。 -->
+        <Border x:Name="PlayerWaveformSlot"
+                Grid.Column="0"
+                Margin="0,0,6,0"
+                Background="Transparent"
+                Visibility="Collapsed"
+                ClipToBounds="True" />
         <ui:HistoryStripView x:Name="HistoryStrip"
                              Grid.Column="1"
                              Margin="0,0,6,0"
@@ -364,7 +369,7 @@
                              Opacity="0"
                              IsHitTestVisible="False"
                              RatioSeeked="PlaylistVideoSimpleSeek_RatioSeeked" />
-    <!-- 影は下層の文字シルエットだけ。要素 Effect だと帯状のラベル影になる。 -->
+    <!-- 影は下層の文字シルエットだけ。要素 Effect だと帯状のラベル影になる。配置は波形帯の上へ。 -->
     <Grid x:Name="PlaylistVideoFileName"
           HorizontalAlignment="Center"
           VerticalAlignment="Bottom"

@@ -1426,14 +1426,12 @@ internal static class LibraryPlayerMode
         var refH = referenceHeight > 1 ? referenceHeight : DesignMetrics.OverlayScaleReferenceHeight;
         // 最大化相当を 1 とし、F8 の原寸窓（例: 1280×720）はそれより小さくする。
         var byReference = Math.Min(windowWidth / refW, windowHeight / refH);
-        // 波形帯＋下段ゴニオ／スペアナ＋右メーター列が同時に拡縮して収まる上限。
+        // 波形はラウドネス左へドック済みなので、下段帯＋右メーター列が収まる上限。
         var meterWidth = Math.Max(1, DesignMetrics.LevelMeterWidth);
         var sideWidth = Math.Max(
             1,
             DesignMetrics.LoudnessMeterWidth + DesignMetrics.SpectrumWidth + meterWidth);
-        var stackHeight = Math.Max(
-            1,
-            DesignMetrics.LibraryWaveformHeight + DesignMetrics.VectorScopeHeight);
+        var stackHeight = Math.Max(1, DesignMetrics.VectorScopeHeight);
         var contentHeight = Math.Max(1, windowHeight - DesignMetrics.WindowFramePad);
         var fitWidth = Math.Min((windowWidth * 0.30) / meterWidth, windowWidth / sideWidth);
         var fitHeight = contentHeight / stackHeight;
@@ -1446,9 +1444,30 @@ internal static class LibraryPlayerMode
         return Math.Clamp(scale, DesignMetrics.OverlayScaleMin, DesignMetrics.OverlayScaleMax);
     }
 
-    /// <summary>動画ミニの波形帯高さ（基準高 × 窓比例倍率）。</summary>
-    public static double VideoMiniWaveformHeight(double scale) =>
-        DesignMetrics.LibraryWaveformHeight * SanitizeOverlayScale(scale);
+    /// <summary>
+    /// プレイヤーで波形とアナライザ（ラウドネス）が両方出ているとき、
+    /// 波形をラウドネス左へドックするか。アナライザ非表示時は下段帯のまま。
+    /// </summary>
+    public static bool DocksPlayerWaveformBesideLoudness(
+        bool libraryMaximized,
+        bool waveformHostVisible,
+        bool analyzerAreaVisible) =>
+        libraryMaximized && waveformHostVisible && analyzerAreaVisible;
+
+    /// <summary>
+    /// 動画ミニ／本再生クローム隠れ／F 全画面で、アナライザとピークを窓下端へピタッと付けるか。
+    /// </summary>
+    public static bool FlushesAnalyzersToWindowBottom(
+        bool libraryMaximized,
+        bool videoMini,
+        bool playlistVideoFullscreen,
+        bool visualShown,
+        bool isVideo,
+        bool chromeHidden) =>
+        libraryMaximized
+        && (videoMini
+            || playlistVideoFullscreen
+            || (visualShown && isVideo && chromeHidden));
 
     /// <summary>動画ミニの下段行高（スペアナ／ゴニオ帯）。未スケールの TransportChromeHeight は使わない。</summary>
     public static double VideoMiniTransportRowHeight(double scale) =>
@@ -1664,6 +1683,14 @@ internal static class LibraryPlayerMode
         chromeHidden && (isVideo || isPdf);
 
     /// <summary>
+    /// 設定など所有ダイアログ表示中は OverrideCursor を掛けない（ダイアログ上で消えるのを防ぐ）。
+    /// </summary>
+    public static bool AllowsPlaylistVisualCursorHide(
+        bool visualCursorContext,
+        bool blockingDialogOpen) =>
+        visualCursorContext && !blockingDialogOpen;
+
+    /// <summary>
     /// 前面クロームが消えている動画本再生で、A がアナライザを隠しているとき簡易シークバーを使える。
     /// T は無関係。A で隠した瞬間に出し、その後はマウスが動いたときとキーボードの時間移動のときに出す。
     /// 波形は描かない。A がオンのときは波形側がシークを受け持つ。
@@ -1713,34 +1740,71 @@ internal static class LibraryPlayerMode
     }
 
     /// <summary>
-    /// 中央のファイル名がラウドネスと重なる（または隙間未満）とき、左へずらす量。
-    /// 左端は <paramref name="minNameLeft"/> より左へ出さない。
+    /// ファイル名を波形／アナライザ帯の上に置くための Bottom 余白。
+    /// 帯の上端より <paramref name="gap"/> だけ空け、既定下余白より小さくはしない。
     /// </summary>
-    public static double PlaylistVideoFileNameLoudnessDodge(
-        Rect fileName,
-        Rect loudness,
-        double minNameLeft,
+    public static double PlaylistVideoFileNameBottomAboveBand(
+        double baseBottom,
+        double parentHeight,
+        double bandTop,
         double gap = 0)
     {
-        if (fileName.Width <= 0 || loudness.Width <= 0)
+        if (parentHeight < 8 || double.IsNaN(parentHeight) || double.IsInfinity(parentHeight))
         {
-            return 0;
+            return Math.Max(0, baseBottom);
         }
 
-        // 縦に重ならなければ横の回避は不要。
-        if (fileName.Bottom <= loudness.Top || fileName.Top >= loudness.Bottom)
+        if (double.IsNaN(bandTop) || double.IsInfinity(bandTop) || bandTop >= parentHeight)
         {
-            return 0;
+            return Math.Max(0, baseBottom);
         }
 
-        var needed = fileName.Right + Math.Max(0, gap) - loudness.Left;
-        if (needed <= 0)
+        var lifted = parentHeight - bandTop + Math.Max(0, gap);
+        return Math.Max(Math.Max(0, baseBottom), lifted);
+    }
+
+    /// <summary>
+    /// ファイル名下端と帯上端のあいだに <paramref name="gap"/> 超の空きがあれば、
+    /// その分 Bottom 余白を減らして下へ寄せる。
+    /// </summary>
+    public static double PlaylistVideoFileNameSnugBottomTowardBand(
+        double currentBottom,
+        double nameBottomFromTop,
+        double bandTopFromTop,
+        double gap = 0)
+    {
+        if (double.IsNaN(currentBottom)
+            || double.IsNaN(nameBottomFromTop)
+            || double.IsNaN(bandTopFromTop)
+            || double.IsInfinity(currentBottom)
+            || double.IsInfinity(nameBottomFromTop)
+            || double.IsInfinity(bandTopFromTop))
         {
-            return 0;
+            return currentBottom;
         }
 
-        var maxDodge = Math.Max(0, fileName.Left - minNameLeft);
-        return Math.Min(needed, maxDodge);
+        var clearGap = Math.Max(0, gap);
+        var slack = bandTopFromTop - nameBottomFromTop - clearGap;
+        if (slack <= 0.5)
+        {
+            return Math.Max(0, currentBottom);
+        }
+
+        return Math.Max(0, currentBottom - slack);
+    }
+
+    /// <summary>
+    /// 下段帯要素がファイル名（中央）と横に重なり、上げる対象になるか。
+    /// 空のホスト全体や右端メーターだけなら false（下へ寄せたまま）。
+    /// </summary>
+    public static bool PlaylistVideoFileNameBandOverlapsName(Rect name, Rect band)
+    {
+        if (name.Width < 1 || name.Height < 1 || band.Width < 1 || band.Height < 1)
+        {
+            return false;
+        }
+
+        return band.Right >= name.Left - 1 && band.Left <= name.Right + 1;
     }
 
     /// <summary>PDF ページを静止背景レイヤーへ固定／解除（固定時は表示を閉じる）。</summary>

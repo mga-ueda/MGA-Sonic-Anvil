@@ -87,6 +87,9 @@ public partial class MainWindow
 
     /// <summary>本再生からの一時停止（テンキー 0）中はクロームを出さない。</summary>
     private bool _playlistVideoImmersivePause;
+
+    /// <summary>プレイヤーで波形をアナライザ行（ラウドネス左）へドックしているか。</summary>
+    private bool _playerWaveformDockedBesideLoudness;
     /// <summary>
     /// リスト右クリック表示中。
     /// </summary>
@@ -119,7 +122,6 @@ public partial class MainWindow
         PrimaryWaveform.ShowScaleLane = ShowWaveformScaleLane;
         ForEachWaveform(view => view.ShowScaleLane = ShowWaveformScaleLane);
         ApplyDocumentTabScaleColumn();
-        ApplyTransportBrandLeftInset();
     }
 
     /// <summary>
@@ -778,6 +780,12 @@ public partial class MainWindow
             LibraryPlayerMode.FadeElementOpacity(RootDock, 1, instant: true, hitTestVisible: true);
             foreach (var target in PlaylistVideoChromeTargets())
             {
+                // ステータスは下余白になるので Opacity ではなく Collapse で消す（動画ミニと同じ）。
+                if (ReferenceEquals(target, StatusBarHost))
+                {
+                    continue;
+                }
+
                 LibraryPlayerMode.FadeElementOpacity(
                     target,
                     visible ? 1 : 0,
@@ -796,7 +804,9 @@ public partial class MainWindow
             EnsurePlaylistVideoChromeOpaque();
         }
 
+        ApplyVideoOverlayBottomFlush(hide);
         ApplyPlaylistVideoHudFade(hideAtOverlays, instant);
+        ApplyPlayerWaveformDockBesideLoudness();
         if (IsLibraryMaximized
             && LibraryBrowser.PlaylistVisualShown
             && LibraryBrowser.PlaylistVisualIsVideo)
@@ -946,11 +956,62 @@ public partial class MainWindow
         LibraryPlayerMode.FadeElementOpacity(RootDock, 1, instant: true, hitTestVisible: true);
         foreach (var target in PlaylistVideoChromeTargets())
         {
+            if (ReferenceEquals(target, StatusBarHost))
+            {
+                continue;
+            }
+
             // フェードイン中は NeedsForcedOpaque が false（本再生→暗いプレビュー復帰の 0.2s を守る）。
             if (LibraryPlayerMode.NeedsForcedOpaque(target))
             {
                 LibraryPlayerMode.FadeElementOpacity(target, 1, instant: true, hitTestVisible: true);
             }
+        }
+
+        RestoreStatusBarAfterVideoOverlay();
+        ApplyMainMenuBarVisibility();
+    }
+
+    /// <summary>
+    /// 動画オーバーレイ中はステータスを畳み、アナライザ／ピークを窓下端へ揃える。
+    /// 動画ミニと同じく、透明のまま高さが残る余白を作らない。
+    /// </summary>
+    private void ApplyVideoOverlayBottomFlush(bool chromeHidden)
+    {
+        var flush = LibraryPlayerMode.FlushesAnalyzersToWindowBottom(
+            libraryMaximized: IsLibraryMaximized,
+            videoMini: IsVideoMiniPlayerActive(),
+            playlistVideoFullscreen: _playlistVideoFullscreen,
+            visualShown: LibraryBrowser.PlaylistVisualShown,
+            isVideo: LibraryBrowser.PlaylistVisualIsVideo,
+            chromeHidden: chromeHidden);
+
+        if (flush)
+        {
+            StatusBarHost.BeginAnimation(UIElement.OpacityProperty, null);
+            StatusBarHost.Opacity = 1;
+            StatusBarHost.IsHitTestVisible = false;
+            StatusBarHost.Visibility = Visibility.Collapsed;
+            ApplyAnalyzerBottomFlush(AnalyzerLayoutScale);
+            SchedulePlaylistVideoFileNamePlacement();
+            return;
+        }
+
+        RestoreStatusBarAfterVideoOverlay();
+        if (!IsVideoMiniPlayerActive())
+        {
+            ClearAnalyzerBottomFlush();
+        }
+
+        SchedulePlaylistVideoFileNamePlacement();
+    }
+
+    private void RestoreStatusBarAfterVideoOverlay()
+    {
+        if (IsVideoMiniPlayerActive() || _playlistVideoFullscreen)
+        {
+            StatusBarHost.Visibility = Visibility.Collapsed;
+            return;
         }
 
         var wantStatusBar = _activeLayoutSlot is { } statusSlot
@@ -960,14 +1021,32 @@ public partial class MainWindow
             && StatusBarHost.Visibility != Visibility.Visible
             && !_libraryMinimalChrome)
         {
+            StatusBarHost.BeginAnimation(UIElement.OpacityProperty, null);
+            StatusBarHost.Opacity = 1;
+            StatusBarHost.IsHitTestVisible = true;
             StatusBarHost.Visibility = Visibility.Visible;
         }
         else if (!wantStatusBar)
         {
             StatusBarHost.Visibility = Visibility.Collapsed;
         }
+    }
 
-        ApplyMainMenuBarVisibility();
+    /// <summary>スペアナ／ラウドネス／モニター／ピークを下段帯の下端へ揃える。</summary>
+    private void ApplyAnalyzerBottomFlush(double layoutScale)
+    {
+        Spectrum.VerticalAlignment = VerticalAlignment.Bottom;
+        LoudnessMeter.VerticalAlignment = VerticalAlignment.Bottom;
+        MonitorToggles.VerticalAlignment = VerticalAlignment.Bottom;
+        ApplyLevelMeterHeightCap(layoutScale);
+    }
+
+    private void ClearAnalyzerBottomFlush()
+    {
+        Spectrum.VerticalAlignment = VerticalAlignment.Top;
+        LoudnessMeter.VerticalAlignment = VerticalAlignment.Stretch;
+        MonitorToggles.VerticalAlignment = VerticalAlignment.Center;
+        ClearLevelMeterHeightCap();
     }
 
     private void EnsurePlaylistVideoHudOpaque()
@@ -975,7 +1054,7 @@ public partial class MainWindow
         foreach (var target in PlaylistVideoHudTargets())
         {
             // 波形はメーター非表示条件でも HUD オンなら出す。WAAPI／アナライザは空リストでは出さない。
-            if (ReferenceEquals(target, WaveformHostBorder)
+            if (ReferenceEquals(target, WaveformTileHost)
                 || LibraryPlayerMode.ShowsPlayerMeters(_sessions.Count))
             {
                 if (LibraryPlayerMode.NeedsForcedOpaque(target))
@@ -1342,10 +1421,42 @@ public partial class MainWindow
     private DispatcherTimer? _playlistVisualCursorHideTimer;
 
     private bool IsPlaylistVisualCursorHideArmed() =>
-        LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
-            !_playlistVideoChromeVisible,
-            LibraryBrowser.PlaylistVisualIsVideo,
-            LibraryBrowser.PlaylistVisualIsPdf);
+        LibraryPlayerMode.AllowsPlaylistVisualCursorHide(
+            LibraryPlayerMode.HidesMouseCursorForPlaylistVisual(
+                !_playlistVideoChromeVisible,
+                LibraryBrowser.PlaylistVisualIsVideo,
+                LibraryBrowser.PlaylistVisualIsPdf),
+            blockingDialogOpen: HasBlockingOwnedDialog());
+
+    /// <summary>設定など、所有して表示中の子ウィンドウがあるか。</summary>
+    private bool HasBlockingOwnedDialog()
+    {
+        try
+        {
+            foreach (Window child in OwnedWindows)
+            {
+                if (!ReferenceEquals(child, this) && child.IsVisible)
+                {
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    /// <summary>ダイアログ表示中はカーソルを出し、閉じたあとに本再生の消す挙動へ戻す。</summary>
+    internal void SuspendPlaylistVisualCursorHideForDialog()
+    {
+        _playlistVisualCursorHideTimer?.Stop();
+        SetPlaylistVisualCursorHidden(false);
+    }
+
+    internal void ResumePlaylistVisualCursorHideAfterDialog() =>
+        SyncPlaylistVisualCursorHide();
 
     /// <summary>
     /// 動画／PDF 本再生中はカーソルを消し、マウス移動で一時表示してからまた消す。
@@ -1816,7 +1927,9 @@ public partial class MainWindow
 
     private void SchedulePlaylistVideoFileNamePlacement()
     {
+        // リサイズ直後は Render 前に測ると帯位置が古いので、複数優先度で当てる。
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, SyncPlaylistVideoFileNamePlacement);
+        Dispatcher.BeginInvoke(DispatcherPriority.Render, SyncPlaylistVideoFileNamePlacement);
         Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, SyncPlaylistVideoFileNamePlacement);
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, SyncPlaylistVideoFileNamePlacement);
         // A で HUD／ファイル名をフェードインした直後は Idle 時点でレイアウトが未確定なことがある。
@@ -1827,6 +1940,8 @@ public partial class MainWindow
         _playlistVideoFileNamePlaceTimer.Tick -= OnPlaylistVideoFileNamePlaceTimerTick;
         _playlistVideoFileNamePlaceTimer.Tick += OnPlaylistVideoFileNamePlaceTimerTick;
         _playlistVideoFileNamePlaceTimer.Stop();
+        _playlistVideoFileNamePlaceTimer.Interval = TimeSpan.FromSeconds(
+            LibraryPlayerMode.ChromeFadeSeconds + 0.05);
         _playlistVideoFileNamePlaceTimer.Start();
     }
 
@@ -1836,59 +1951,155 @@ public partial class MainWindow
         SyncPlaylistVideoFileNamePlacement();
     }
 
-    /// <summary>中央配置のファイル名がラウドネスに被る分だけ左へずらす。</summary>
+    /// <summary>
+    /// ファイル名は常に中央。波形や狭幅で重なる帯があればその直上へ（左へはずらさない）。
+    /// リサイズ後も Schedule 経由で再計算する。
+    /// </summary>
     private void SyncPlaylistVideoFileNamePlacement()
     {
-        var margin = DesignMetrics.PlaylistVideoFileNameMargin;
-        PlaylistVideoFileName.Margin = margin;
-        // 前回のずらしを外してから測らないと二重に避ける。
+        var baseMargin = DesignMetrics.PlaylistVideoFileNameMargin;
+        var gap = DesignMetrics.PlaylistVideoFileNameLoudnessGap;
+        // 横ずらしは使わない（狭幅では上へ逃す）。前回分をクリア。
         PlaylistVideoFileName.RenderTransform = Transform.Identity;
-        // Opacity は見ない。A でフェードイン中は両方とも 0 近傍のまま測れず、初回だけ被る。
-        // 簡易シーク（A オフ）のあいだはラウドネスへ避けず、画面中央に置く。
-        if (!LibraryPlayerMode.ShowsPlaylistVideoFileName(
-                !_playlistVideoChromeVisible,
-                _playlistVideoTimecode,
-                LibraryBrowser.PlaylistVisualIsVideo)
-            || IsPlaylistVideoSimpleSeekArmed()
-            || LoudnessMeter.Visibility != Visibility.Visible
-            || RootChrome.ActualWidth < 8)
+
+        // まず最下段（既定余白）に置き、重なる帯があれば上げ、空きがあれば下へ戻す。
+        var bottom = baseMargin.Bottom;
+        PlaylistVideoFileName.Margin = new Thickness(
+            baseMargin.Left,
+            0,
+            baseMargin.Right,
+            bottom);
+
+        var showName = LibraryPlayerMode.ShowsPlaylistVideoFileName(
+            !_playlistVideoChromeVisible,
+            _playlistVideoTimecode,
+            LibraryBrowser.PlaylistVisualIsVideo);
+        // 簡易シーク（A オフ）のあいだは帯の上へ上げず、画面下中央に置く。
+        if (showName
+            && !IsPlaylistVideoSimpleSeekArmed()
+            && RootChrome.ActualHeight >= 8
+            && RootChrome.ActualWidth >= 8)
         {
-            return;
+            PlaylistVideoFileName.UpdateLayout();
+            LoudnessMeter.UpdateLayout();
+            Spectrum.UpdateLayout();
+            MonitorToggles.UpdateLayout();
+            if (TryGetPlaylistVideoHudBandTop(out var bandTop))
+            {
+                bottom = LibraryPlayerMode.PlaylistVideoFileNameBottomAboveBand(
+                    baseMargin.Bottom,
+                    RootChrome.ActualHeight,
+                    bandTop,
+                    gap);
+                PlaylistVideoFileName.Margin = new Thickness(
+                    baseMargin.Left,
+                    0,
+                    baseMargin.Right,
+                    bottom);
+                PlaylistVideoFileName.UpdateLayout();
+
+                // 上げすぎで帯とのあいだに空きがあれば、隙間が gap になるまで下へ寄せる。
+                if (TryGetPlaylistVideoFileNameBox(out var nameLifted)
+                    && TryGetPlaylistVideoHudBandTop(out bandTop))
+                {
+                    var snug = LibraryPlayerMode.PlaylistVideoFileNameSnugBottomTowardBand(
+                        bottom,
+                        nameLifted.Bottom,
+                        bandTop,
+                        gap);
+                    if (Math.Abs(snug - bottom) > 0.5)
+                    {
+                        bottom = snug;
+                        PlaylistVideoFileName.Margin = new Thickness(
+                            baseMargin.Left,
+                            0,
+                            baseMargin.Right,
+                            bottom);
+                    }
+                }
+            }
         }
 
-        PlaylistVideoFileName.UpdateLayout();
-        LoudnessMeter.UpdateLayout();
-        if (PlaylistVideoFileName.RenderSize.Width < 1
-            || LoudnessMeter.RenderSize.Width < 1)
+        QueueVideoHudFrostLayout();
+    }
+
+    private bool TryGetPlaylistVideoFileNameBox(out Rect nameBox)
+    {
+        nameBox = default;
+        if (PlaylistVideoFileName.RenderSize.Width < 1 || PlaylistVideoFileName.RenderSize.Height < 1)
         {
-            return;
+            return false;
         }
 
-        Rect nameBox;
-        Rect loudBox;
         try
         {
             nameBox = PlaylistVideoFileName.TransformToVisual(RootChrome)
                 .TransformBounds(new Rect(PlaylistVideoFileName.RenderSize));
-            loudBox = LoudnessMeter.TransformToVisual(RootChrome)
-                .TransformBounds(new Rect(LoudnessMeter.RenderSize));
+            return nameBox.Width >= 1 && nameBox.Height >= 1;
         }
         catch (InvalidOperationException)
         {
-            return;
+            return false;
         }
+    }
 
-        var dodge = LibraryPlayerMode.PlaylistVideoFileNameLoudnessDodge(
-            nameBox,
-            loudBox,
-            minNameLeft: margin.Left,
-            gap: DesignMetrics.PlaylistVideoFileNameLoudnessGap);
-        if (dodge > 0.5)
+    /// <summary>
+    /// ファイル名と横に重なる下段コンテンツの上端（RootChrome 座標）。
+    /// 波形ドック時の波形、または狭幅で重なったラウドネス／スペアナ／モニター。
+    /// </summary>
+    private bool TryGetPlaylistVideoHudBandTop(out double bandTop)
+    {
+        bandTop = double.PositiveInfinity;
+        var parentH = RootChrome.ActualHeight;
+        if (parentH < 8 || !TryGetPlaylistVideoFileNameBox(out var nameBox))
         {
-            PlaylistVideoFileName.RenderTransform = new TranslateTransform(-dodge, 0);
+            return false;
         }
 
-        QueueVideoHudFrostLayout();
+        var found = false;
+        FrameworkElement[] band =
+        [
+            WaveformTileHost,
+            LoudnessMeter,
+            Spectrum,
+            MonitorToggles,
+        ];
+        foreach (var element in band)
+        {
+            if (!IsVideoHudFrostElementShown(element) || element.ActualHeight < 2)
+            {
+                continue;
+            }
+
+            // 波形はドック中だけ。オフ／下段帯のときは上げない。
+            if (ReferenceEquals(element, WaveformTileHost)
+                && (!_playerWaveformDockedBesideLoudness
+                    || PlayerWaveformSlot.Visibility != Visibility.Visible))
+            {
+                continue;
+            }
+
+            try
+            {
+                var box = element.TransformToVisual(RootChrome)
+                    .TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
+                if (box.Height < 1
+                    || box.Width < 1
+                    || box.Bottom < parentH * 0.45
+                    || !LibraryPlayerMode.PlaylistVideoFileNameBandOverlapsName(nameBox, box))
+                {
+                    continue;
+                }
+
+                bandTop = Math.Min(bandTop, box.Top);
+                found = true;
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        return found && !double.IsInfinity(bandTop);
     }
 
     private bool TryTogglePdfBackgroundPin()
@@ -2083,6 +2294,7 @@ public partial class MainWindow
             // 全画面寸法＋倍率 1 に列幅／行高を合わせ直す（縮小レイアウトのままだと見切れる）。
             ApplyLibraryMinimalChrome();
             SyncWindowProportionalOverlayScale();
+            ApplyVideoOverlayBottomFlush(chromeHidden: !_playlistVideoChromeVisible);
             return;
         }
 
@@ -2114,6 +2326,7 @@ public partial class MainWindow
 
         RestorePlaylistVideoWindowBounds();
         SyncWindowProportionalOverlayScale();
+        ApplyVideoOverlayBottomFlush(chromeHidden: !_playlistVideoChromeVisible);
     }
 
     /// <summary>動画再生中に隠す前面 UI。波形・レベル／スペアナ／ゴニオ／サラウンド／ラウドネスは残す。</summary>
@@ -2124,14 +2337,14 @@ public partial class MainWindow
             LibraryBrowser,
             LibrarySplitter,
             MeterColumnSplitter,
-            TransportBarHost,
+            TransportToolbarHost,
             DocumentTabHost,
             HistoryStrip,
         ];
 
     /// <summary>A トグルで出す／消す HUD。波形・アナライザに加え WAAPI 表記（MeterTopSlot）も含む。</summary>
     private UIElement[] PlaylistVideoHudTargets() =>
-        [WaveformHostBorder, MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter, MonitorToggles];
+        [WaveformTileHost, MeterTopSlot, LevelMeter, VectorScope, Spectrum, LoudnessMeter, MonitorToggles];
 
     private void SyncPlaylistVideoUiShadows(bool chromeVisible, bool hideHud)
     {
@@ -2274,7 +2487,10 @@ public partial class MainWindow
     /// </summary>
     private void TryAddLoudnessMonitorSpectrumFrost(GeometryGroup group, Visual stage)
     {
-        FrameworkElement[] band = [LoudnessMeter, MonitorToggles, Spectrum];
+        // ドック中は波形も同じ帯に含め、隙間を残さない。
+        FrameworkElement[] band = _playerWaveformDockedBesideLoudness
+            ? [WaveformTileHost, LoudnessMeter, MonitorToggles, Spectrum]
+            : [LoudnessMeter, MonitorToggles, Spectrum];
         var has = false;
         var left = 0d;
         var top = 0d;
@@ -2430,7 +2646,7 @@ public partial class MainWindow
             DocumentTabHost.Background = Brushes.Transparent;
             DocumentTabScroll.Background = Brushes.Transparent;
             DocumentTabs.Background = Brushes.Transparent;
-            TransportBarHost.Background = Brushes.Transparent;
+            TransportToolbarHost.Background = Brushes.Transparent;
             LoudnessMeter.Background = Brushes.Transparent;
             WaapiBar.Background = Brushes.Transparent;
         }
@@ -2443,7 +2659,7 @@ public partial class MainWindow
             MeterTopSlot.SetResourceReference(Border.BackgroundProperty, "TransportBackBrush");
             TransportChromeHost.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
             DocumentTabHost.SetResourceReference(Border.BackgroundProperty, "TransportBackBrush");
-            TransportBarHost.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
+            TransportToolbarHost.SetResourceReference(Border.BackgroundProperty, "TransportBackBrush");
             LoudnessMeter.SetResourceReference(Panel.BackgroundProperty, "TransportBackBrush");
             WaapiBar.SetResourceReference(Control.BackgroundProperty, "WaapiBarBackBrush");
         }
@@ -2471,6 +2687,128 @@ public partial class MainWindow
     /// エディタの拡大表示のまま描くと、133px の帯では画面外に残って空に見える。
     /// ウィンドウサイズの復元はクロム適用のあとなので、Loaded だけでは間に合わない。
     /// </summary>
+    /// <summary>
+    /// プレイヤーでラウドネス（アナライザ帯）表示中は、波形をその左へドックする。
+    /// アナライザ非表示やエディタは下段帯（または非表示）のまま。
+    /// </summary>
+    private bool ShouldDockPlayerWaveformBesideLoudness()
+    {
+        if (_activeLayoutSlot is { } slot)
+        {
+            var preset = AppStorage.Settings.ResolvedLayoutPreset(slot);
+            if (!preset.ResolvedShowWaveform(slot) || !preset.ShowAnalyzerArea)
+            {
+                return false;
+            }
+        }
+
+        return LibraryPlayerMode.DocksPlayerWaveformBesideLoudness(
+            libraryMaximized: IsLibraryMaximized,
+            waveformHostVisible: WaveformHostBorder.Visibility == Visibility.Visible,
+            analyzerAreaVisible: TransportChromeHost.Visibility == Visibility.Visible);
+    }
+
+    private void ApplyPlayerWaveformDockBesideLoudness()
+    {
+        var dock = ShouldDockPlayerWaveformBesideLoudness();
+        if (dock == _playerWaveformDockedBesideLoudness
+            && (!dock || ReferenceEquals(WaveformTileHost.Parent, PlayerWaveformSlot)))
+        {
+            if (dock)
+            {
+                CollapseLibraryWaveformRowForDock();
+            }
+
+            return;
+        }
+
+        if (dock)
+        {
+            DockWaveformTileHostBesideLoudness();
+        }
+        else
+        {
+            UndockWaveformTileHostFromLoudness();
+        }
+
+        _playerWaveformDockedBesideLoudness = dock;
+        QueueVideoHudFrostLayout();
+        ScheduleLibraryWaveformPaint();
+        SchedulePlaylistVideoFileNamePlacement();
+    }
+
+    private void DockWaveformTileHostBesideLoudness()
+    {
+        if (!ReferenceEquals(WaveformTileHost.Parent, PlayerWaveformSlot))
+        {
+            if (WaveformTileHost.Parent is Panel oldPanel)
+            {
+                oldPanel.Children.Remove(WaveformTileHost);
+            }
+            else if (WaveformTileHost.Parent is Decorator oldDecorator)
+            {
+                oldDecorator.Child = null;
+            }
+
+            PlayerWaveformSlot.Child = WaveformTileHost;
+        }
+
+        PlayerWaveformSlot.Visibility = Visibility.Visible;
+        WaveformTileHost.HorizontalAlignment = HorizontalAlignment.Stretch;
+        WaveformTileHost.VerticalAlignment = VerticalAlignment.Stretch;
+        CollapseLibraryWaveformRowForDock();
+        // アナライザ帯の高さに波形を合わせ、プレイリスト／映像側の縦を広げる。
+        if (IsLibraryMaximized)
+        {
+            WaveformHostBorder.MinHeight = DesignMetrics.LibraryPaneMinHeight;
+        }
+    }
+
+    private void UndockWaveformTileHostFromLoudness()
+    {
+        if (ReferenceEquals(WaveformTileHost.Parent, PlayerWaveformSlot))
+        {
+            PlayerWaveformSlot.Child = null;
+            if (!LibraryWaveformDock.Children.Contains(WaveformTileHost))
+            {
+                LibraryWaveformDock.Children.Add(WaveformTileHost);
+            }
+        }
+
+        PlayerWaveformSlot.Visibility = Visibility.Collapsed;
+        WaveformTileHost.ClearValue(FrameworkElement.HorizontalAlignmentProperty);
+        WaveformTileHost.ClearValue(FrameworkElement.VerticalAlignmentProperty);
+
+        if (!IsLibraryMaximized)
+        {
+            return;
+        }
+
+        // ApplyLibraryChrome / ApplyLayoutWaveformVisibility の行高を復元。
+        if (_activeLayoutSlot is { } slot
+            && !AppStorage.Settings.ResolvedLayoutPreset(slot).ResolvedShowWaveform(slot))
+        {
+            LibraryWaveformRowDef.MinHeight = 0;
+            LibraryWaveformRowDef.MaxHeight = 0;
+            LibraryWaveformRowDef.Height = new GridLength(0);
+            WaveformHostBorder.MinHeight = DesignMetrics.LibraryPaneMinHeight;
+            return;
+        }
+
+        LibraryWaveformRowDef.MinHeight = DesignMetrics.LibraryWaveformHeight;
+        LibraryWaveformRowDef.MaxHeight = DesignMetrics.LibraryWaveformHeight;
+        LibraryWaveformRowDef.Height = new GridLength(DesignMetrics.LibraryWaveformHeight);
+        WaveformHostBorder.MinHeight =
+            DesignMetrics.LibraryPaneMinHeight + DesignMetrics.LibraryWaveformHeight;
+    }
+
+    private void CollapseLibraryWaveformRowForDock()
+    {
+        LibraryWaveformRowDef.MinHeight = 0;
+        LibraryWaveformRowDef.MaxHeight = 0;
+        LibraryWaveformRowDef.Height = new GridLength(0);
+    }
+
     private void ScheduleLibraryWaveformPaint()
     {
         var ticket = ++_libraryWavePaintTicket;

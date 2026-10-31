@@ -136,9 +136,4 @@ public sealed class BrandLicenseNoticeTests
         Assert.Same(normal, BrandLicenseLabel.ForeForLink(false, normal, hover, rest));
     }
 
-    [Fact]
-    public void TransportHostMinHeight_IsTransportBarOnly()
-    {
-        Assert.Equal(DesignMetrics.TransportBarHeight, DesignMetrics.TransportHostMinHeight);
-    }
 }
