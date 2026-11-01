@@ -162,7 +162,7 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    public void SetCommandsEnabled(bool enabled, bool allowEdit = true)
+    public void SetCommandsEnabled(bool enabled, bool allowEdit = true, bool hasMarkers = true)
     {
         foreach (var (command, button) in _buttons)
         {
@@ -185,8 +185,20 @@ internal partial class TransportBar : UserControl
                 continue;
             }
 
+            if (command is TransportCommand.PreviousMarker
+                or TransportCommand.NextMarker
+                or TransportCommand.DeleteMarkers
+                or TransportCommand.DeleteAllMarkers)
+            {
+                button.IsEnabled = enabled && hasMarkers;
+                continue;
+            }
+
             button.IsEnabled = enabled;
         }
+
+        RefreshGroupVisibility();
+        Visibility = HasVisibleCommands ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>設定の並びに従い、グループ単位のベール付きでツールバーを組み直す。</summary>
@@ -212,7 +224,6 @@ internal partial class TransportBar : UserControl
         }
 
         StackPanel? groupButtons = null;
-        var anyVisible = false;
         foreach (var entry in layout)
         {
             if (TransportToolbarCatalog.IsSectionSeparator(entry))
@@ -248,7 +259,6 @@ internal partial class TransportBar : UserControl
             button.Visibility = Visibility.Visible;
             button.Margin = new Thickness(0, 0, DesignMetrics.TransportButtonGap, 0);
             groupButtons.Children.Add(button);
-            anyVisible = true;
         }
 
         foreach (var (command, button) in _buttons)
@@ -269,16 +279,55 @@ internal partial class TransportBar : UserControl
             }
         }
 
-        Visibility = anyVisible ? Visibility.Visible : Visibility.Collapsed;
+        RefreshGroupVisibility();
+        Visibility = HasVisibleCommands ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 押せるボタンが一つもないグループは畳む。
+    /// 中央揃えで右余白が偏らないよう、最後に見えるグループだけ右マージンを外す。
+    /// </summary>
+    private void RefreshGroupVisibility()
+    {
+        Border? lastVisible = null;
+        var gap = DesignMetrics.TransportGroupGap;
+        var bottom = DesignMetrics.From96(2);
+        foreach (var veil in _groupVeils)
+        {
+            var anyPressable = false;
+            if (veil.Child is Panel panel)
+            {
+                foreach (UIElement child in panel.Children)
+                {
+                    if (child is TransportIconButton && child.IsEnabled && child.Visibility == Visibility.Visible)
+                    {
+                        anyPressable = true;
+                        break;
+                    }
+                }
+            }
+
+            veil.Visibility = anyPressable ? Visibility.Visible : Visibility.Collapsed;
+            veil.Margin = new Thickness(0, 0, gap, bottom);
+            if (anyPressable)
+            {
+                lastVisible = veil;
+            }
+        }
+
+        if (lastVisible is not null)
+        {
+            lastVisible.Margin = new Thickness(0, 0, 0, bottom);
+        }
     }
 
     /// <summary>互換。並び適用に委譲。</summary>
     public void ApplyVisibilityFromSettings(AppSettings settings) =>
         ApplyLayoutFromSettings(settings);
 
-    /// <summary>いま表示中のコマンドがあるか（領域自体の表示判定用）。</summary>
+    /// <summary>押せるコマンドがグループとして見えているか（領域自体の表示判定用）。</summary>
     public bool HasVisibleCommands =>
-        _buttons.Values.Any(button => button.Visibility == Visibility.Visible);
+        _groupVeils.Any(veil => veil.Visibility == Visibility.Visible);
 
     private TransportIconButton BuildFromCatalog()
     {

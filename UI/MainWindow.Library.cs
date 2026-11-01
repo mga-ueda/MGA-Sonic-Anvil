@@ -3059,8 +3059,21 @@ public partial class MainWindow
         }
     }
 
-    private void RefreshTransportCommandsEnabled() =>
-        Transport.SetCommandsEnabled(_document is not null, allowEdit: !IsLibraryMaximized);
+    private void RefreshTransportCommandsEnabled()
+    {
+        Transport.SetCommandsEnabled(
+            _document is not null,
+            allowEdit: !IsLibraryMaximized,
+            hasMarkers: TransportHasMarkers());
+        // 押せるボタンが無いグループを畳んだあと、ツールバー領域自体の表示も合わせる。
+        ApplyTransportToolbarVisibility();
+    }
+
+    /// <summary>シーク先と同じソース（プレイヤーは捨てマーカー、編集はドキュメント）。</summary>
+    private bool TransportHasMarkers() =>
+        IsLibraryMaximized
+            ? Waveform.HasPlayerScratchMarkers
+            : _document is { Markers.Count: > 0 };
 
     private void ApplyLibraryWaapi(bool show)
     {

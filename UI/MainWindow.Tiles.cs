@@ -856,7 +856,7 @@ public partial class MainWindow
             ApplyChannelSolo();
             Overview.SetSelectedMarkerFrames(pane.View.SelectedMarkerFrames);
             SyncOverviewPlayhead();
-            Transport.SetCommandsEnabled(_document is not null, allowEdit: !IsLibraryMaximized);
+            RefreshTransportCommandsEnabled();
             if (resetInteraction)
             {
                 Transport.SetPlaying(false);
@@ -1226,6 +1226,7 @@ public partial class MainWindow
 
         Overview.SetSelectedMarkerFrames(Waveform.SelectedMarkerFrames);
         Overview.Refresh();
+        RefreshTransportCommandsEnabled();
     }
 
     private void OnWaveformContextMenuRequested(object? sender, WaveformContextHit hit)
