@@ -12,25 +12,48 @@ namespace MgaSonicAnvil.UI;
 internal enum TransportIcon
 {
     PlayPause,
+    Stop,
     Record,
+    GoToStart,
+    GoToEnd,
+    PreviousMarker,
+    NextMarker,
+    JumpToTime,
     Folder,
     NewDocument,
     FadeIn,
     FadeOut,
     FadeAround,
+    CrossfadeEdit,
     Normalize,
+    NormalizePerRegion,
     Volume,
     Pitch,
     TimeStretch,
     Reverse,
     Delete,
+    Undo,
+    Redo,
+    Cut,
+    Copy,
+    Paste,
+    SilenceSelection,
+    InsertSilence,
+    DetectSilence,
+    SelectAll,
+    ClearSelection,
     AddMarker,
     SetLoop,
+    ClearLoop,
     SetRegion,
+    DeleteMarkers,
     RangeClick,
     Save,
     SaveAs,
     SaveMp3,
+    SampleRate,
+    BitDepth,
+    Channels,
     Analysis,
     Overlay,
     Loudness,
@@ -46,6 +69,37 @@ internal enum TransportIcon
     EditorMode,
     AnalyzerMaximize,
     AnalyzerRestore,
+    SelectToStart,
+    SelectToEnd,
+    ExportWave,
+    ExportByMarkers,
+    ExportByRegions,
+    LoopPlay,
+    Restart,
+    Preroll,
+    CopySelectionTime,
+    CopyFilePath,
+    CloseTab,
+    AlwaysOnTop,
+    WaveformMaximize,
+    WaveformRestore,
+    WaveformView,
+    SeekViewLeft,
+    SeekViewRight,
+    MinimalChrome,
+    CopyFileName,
+    MergeTabs,
+    ExportByChannels,
+    DeleteAllMarkers,
+    DeleteRegions,
+    DeleteAllRegions,
+    PreviousTrack,
+    NextTrack,
+    TileOff,
+    TileHorizontal,
+    TileVertical,
+    TileGrid,
+    CopyAllTabTimes,
 }
 
 internal enum TransportCommand
@@ -71,7 +125,9 @@ internal enum TransportCommand
     FadeIn,
     FadeOut,
     FadeAround,
+    CrossfadeEdit,
     Normalize,
+    NormalizePerRegion,
     Volume,
     Pitch,
     TimeStretch,
@@ -79,15 +135,28 @@ internal enum TransportCommand
     Delete,
     Undo,
     Redo,
+    Cut,
+    Copy,
+    Paste,
+    SilenceSelection,
+    InsertSilence,
+    DetectSilence,
+    SelectAll,
+    ClearSelection,
     AddMarker,
     SetLoop,
+    ClearLoop,
     SetRegion,
+    DeleteMarkers,
     ToggleRangeClick,
     NewDocument,
     Open,
     Save,
     SaveAs,
     SaveMp3,
+    SampleRate,
+    BitDepth,
+    Channels,
     ToggleAnalysis,
     ToggleSpectrogram,
     ToggleLoudnessView,
@@ -99,6 +168,36 @@ internal enum TransportCommand
     ToggleWaapi,
     ToggleLibraryMaximize,
     ToggleAnalyzerMaximize,
+    SelectToStart,
+    SelectToEnd,
+    ExportWave,
+    ExportByMarkers,
+    ExportByRegions,
+    LoopPlay,
+    Restart,
+    Preroll,
+    CopySelectionTime,
+    CopyFilePath,
+    CloseTab,
+    AlwaysOnTop,
+    MaximizeWaveform,
+    ToggleMinimalChrome,
+    ViewWaveform,
+    SeekViewLeft,
+    SeekViewRight,
+    CopyFileName,
+    MergeTabs,
+    ExportByChannels,
+    DeleteAllMarkers,
+    DeleteRegions,
+    DeleteAllRegions,
+    PreviousTrack,
+    NextTrack,
+    TileOff,
+    TileHorizontal,
+    TileVertical,
+    TileGrid,
+    CopyAllTabTimes,
 }
 
 internal sealed class TransportIconButton : Button
@@ -195,22 +294,41 @@ internal sealed class TransportIconButton : Button
                 ? TransportIconDrawing.FolderHoverBounds(bounds)
                 : null);
         var fore = IconForeOverride ?? TransportChrome.Fore(IsEnabled);
-        if (Icon == TransportIcon.Help)
-        {
-            DrawHelpQuestion(dc, bounds, fore);
-            return;
-        }
         if (Icon == TransportIcon.Record && IsLatched)
         {
             fore = Theme.Get("RecordLatchForeBrush");
         }
 
-        if (Icon is TransportIcon.Analysis or TransportIcon.Overlay or TransportIcon.Loudness or TransportIcon.RangeClick)
+        if (Icon is TransportIcon.Analysis
+            or TransportIcon.Overlay
+            or TransportIcon.Loudness
+            or TransportIcon.RangeClick
+            or TransportIcon.WaveformView
+            or TransportIcon.AlwaysOnTop
+            or TransportIcon.WaveformMaximize
+            or TransportIcon.WaveformRestore
+            or TransportIcon.MinimalChrome
+            or TransportIcon.PlayerMode
+            or TransportIcon.EditorMode
+            or TransportIcon.AnalyzerMaximize
+            or TransportIcon.AnalyzerRestore
+            or TransportIcon.TileOff
+            or TransportIcon.TileHorizontal
+            or TransportIcon.TileVertical
+            or TransportIcon.TileGrid)
         {
             fore = IsLatched ? fore : TransportChrome.Fore(false);
         }
 
-        TransportIconDrawing.Draw(dc, Icon, bounds, fore, IsPlaying, UiThemeService.Current);
+        TransportIconDrawing.Draw(
+            dc,
+            Icon,
+            bounds,
+            fore,
+            IsPlaying,
+            UiThemeService.Current,
+            accent: IsEnabled,
+            latched: IsLatched);
     }
 
     private void DrawWaapiToggle(DrawingContext dc, Rect bounds)
@@ -280,22 +398,25 @@ internal sealed class TransportIconButton : Button
         return Theme.Get(backKey);
     }
 
-    private void DrawHelpQuestion(DrawingContext dc, Rect bounds, Color fore)
-    {
-        var formatted = new FormattedText(
-            "?",
-            CultureInfo.CurrentUICulture,
-            FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Segoe UI Semibold"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
-            Math.Max(12d, Math.Min(bounds.Width, bounds.Height) * 0.52),
-            WpfControlHelpers.FrozenBrush(fore),
-            UiDpi.Get(this).PixelsPerDip);
-        dc.DrawText(
-            formatted,
-            new Point((bounds.Width - formatted.Width) * 0.5, (bounds.Height - formatted.Height) * 0.5));
-    }
 }
 
+/// <summary>
+/// トランスポート／ツールバーのアイコン描画。アイコンを追加・変更するときは次の方針に従う。
+/// <list type="bullet">
+/// <item>座標は 34×36 のデザイン枠で描く。線幅は 1.8、端と角は丸める。等倍（約 17px）でも判別できる形にする。</item>
+/// <item>線は前景色（通常は白）。色は塗りで使うのを基本とし、2色目は意味を補う場合だけ入れる。無理に色を付けない。</item>
+/// <item>色はアプリ内の同じ意味の要素と揃え、テーマキーから描画時に読む（ユーザーが色を変えると追従する）。
+///   マーカー＝MarkerBrush（オレンジ）、リージョン＝RegionTimelineBrush（緑）、ループ＝SampleLoopTimelineBrush（青）、
+///   再生＝PlayheadBrush（シアン）、録音＝RecordLatchForeBrush（赤）、削除＝ClearButtonBackBrush（赤）、
+///   選択範囲＝WaveSelectionFillBrush。</item>
+/// <item>線に色を付けるのは、シークバー（再生ヘッド）のように実物が色線であるものに限る。</item>
+/// <item>アプリ内に実物がある形は合わせる。マーカー旗は <see cref="DrawMarkerFlag"/>（竿は白、旗は塗り）。</item>
+/// <item>削除系は元の図形に <see cref="DrawDeleteBadge"/>（赤い丸に白い ×）を右下に添える。</item>
+/// <item>状態はなるべく色で示す。再生中の停止は色なしの白、録音中は白線を外して赤く点灯させる。</item>
+/// <item>色設定だけは例外として固定の赤・緑・青の 3 色を半透明で重ね、白で縁取る。</item>
+/// <item><c>accent</c> が false（無効時など）は単色の線画に戻る。色付きの塗りは <see cref="AccentFill"/> で作り、無効時は null にする。</item>
+/// </list>
+/// </summary>
 internal static class TransportIconDrawing
 {
     public static void Draw(
@@ -304,10 +425,13 @@ internal static class TransportIconDrawing
         Rect bounds,
         Color fore,
         bool isPlaying,
-        UiTheme theme)
+        UiTheme theme,
+        bool accent = false,
+        bool latched = false)
     {
-        var designW = bounds.Width < 28 ? 28d : 34d;
-        var designH = bounds.Height < 28 ? 30d : 36d;
+        // 座標は常に 34×36。小さい枠でも同じデザインを縮小して中央に置く。
+        const double designW = 34d;
+        const double designH = 36d;
         var scale = Math.Min(bounds.Width / designW, bounds.Height / designH);
         if (scale <= 0d)
         {
@@ -332,179 +456,469 @@ internal static class TransportIconDrawing
         var stroke = pen;
         var cx = designW * 0.5;
         var cy = designH * 0.5;
+        // 2色目はアプリ内の対応色。ユーザーの色設定に追従させるため描画時に読む。
+        // 基本は「白い線＋色の塗り」。再生ヘッドだけはシークバーと同じく色線で描く。
+        var markerBrush = WpfControlHelpers.FrozenBrush(AccentColor("MarkerBrush", fore, accent));
+        var markerPen = pen;
+        var regionFill = AccentFill("RegionTimelineBrush", accent, 0xD2);
+        var loopFill = AccentFill("SampleLoopTimelineBrush", accent, 0xB4);
+        var playFill = AccentFill("PlayheadBrush", accent, 0xFF);
+        var playheadPen = OutlinePen(pen, WpfControlHelpers.FrozenBrush(AccentColor("PlayheadBrush", fore, accent)));
+        var deleteFill = AccentFill("ClearButtonBackBrush", accent, 0xFF);
+        var recordFill = accent || latched
+            ? WpfControlHelpers.FrozenBrush(AccentColor("RecordLatchForeBrush", fore, true))
+            : null;
+        Brush? selectionFill = accent
+            ? WpfControlHelpers.FrozenBrush(AccentColor("WaveSelectionFillBrush", fore, accent))
+            : null;
 
         switch (icon)
         {
             case TransportIcon.PlayPause:
                 if (isPlaying)
                 {
-                    dc.DrawRectangle(fill, stroke, new Rect(12, 12, 10, 12));
+                    // 停止表示は色なし。
+                    dc.DrawRectangle(fill, stroke, new Rect(cx - 5, cy - 6, 10, 12));
                 }
                 else
                 {
-                    var play = new StreamGeometry();
-                    using (var ctx = play.Open())
-                    {
-                        ctx.BeginFigure(new Point(12, 9), true, true);
-                        ctx.LineTo(new Point(25, 18), true, false);
-                        ctx.LineTo(new Point(12, 27), true, false);
-                    }
-
-                    play.Freeze();
-                    dc.DrawGeometry(fill, stroke, play);
+                    DrawPlayTriangle(dc, pen, playFill, cx - 5, cx + 8, cy, 9);
                 }
 
                 break;
+            case TransportIcon.Stop:
+                dc.DrawRectangle(fill, stroke, new Rect(cx - 6, cy - 6, 12, 12));
+                break;
             case TransportIcon.Record:
-                dc.DrawEllipse(fill, stroke, new Point(cx, cy), 6.2, 6.2);
+                if (latched && recordFill is not null)
+                {
+                    // 録音中は白線を外して赤で点灯させ、外側の赤リングで録音状態を示す。
+                    dc.DrawEllipse(recordFill, null, new Point(cx, cy), 6.4, 6.4);
+                    dc.DrawEllipse(null, OutlinePen(pen, recordFill), new Point(cx, cy), 9.6, 9.6);
+                }
+                else
+                {
+                    dc.DrawEllipse(recordFill, stroke, new Point(cx, cy), 7.2, 7.2);
+                }
+
+                break;
+            case TransportIcon.GoToStart:
+                dc.DrawLine(pen, new Point(cx - 7, cy - 8), new Point(cx - 7, cy + 8));
+                DrawChevron(dc, pen, cx + 2, cy, left: true);
+                break;
+            case TransportIcon.GoToEnd:
+                dc.DrawLine(pen, new Point(cx + 7, cy - 8), new Point(cx + 7, cy + 8));
+                DrawChevron(dc, pen, cx - 2, cy, left: false);
+                break;
+            case TransportIcon.PreviousMarker:
+                DrawChevron(dc, pen, cx - 5, cy, left: true);
+                DrawMarkerFlag(dc, markerBrush, markerPen, cx + 2, cy - 9, cy + 9, 7);
+                break;
+            case TransportIcon.NextMarker:
+                DrawMarkerFlag(dc, markerBrush, markerPen, cx - 7, cy - 9, cy + 9, 7);
+                DrawChevron(dc, pen, cx + 5, cy, left: false);
+                break;
+            case TransportIcon.Undo:
+                DrawCurvedArrow(dc, pen, cx, cy, clockwise: false);
+                break;
+            case TransportIcon.Redo:
+                DrawCurvedArrow(dc, pen, cx, cy, clockwise: true);
+                break;
+            case TransportIcon.Cut:
+                DrawCut(dc, pen, cx, cy);
+                break;
+            case TransportIcon.Copy:
+                DrawCopy(dc, pen, cx, cy);
+                break;
+            case TransportIcon.Paste:
+                DrawPaste(dc, pen, cx, cy);
+                break;
+            case TransportIcon.SilenceSelection:
+                DrawSilenceSelection(dc, pen, cx, cy);
+                break;
+            case TransportIcon.InsertSilence:
+                DrawInsertSilence(dc, pen, cx, cy);
+                break;
+            case TransportIcon.DetectSilence:
+                DrawDetectSilence(dc, pen, cx, cy);
+                break;
+            case TransportIcon.SelectAll:
+                dc.DrawRectangle(selectionFill, DashedPen(pen), new Rect(cx - 10, cy - 8, 20, 16));
+                DrawMiniWave(dc, pen, cx, cy, 6);
+                break;
+            case TransportIcon.ClearSelection:
+                dc.DrawRectangle(null, DashedPen(pen), new Rect(cx - 10, cy - 8, 20, 16));
+                dc.DrawLine(pen, new Point(cx - 4, cy - 4), new Point(cx + 4, cy + 4));
+                dc.DrawLine(pen, new Point(cx + 4, cy - 4), new Point(cx - 4, cy + 4));
+                break;
+            case TransportIcon.CrossfadeEdit:
+                dc.DrawLine(pen, new Point(cx - 9, cy - 6), new Point(cx, cy + 7));
+                dc.DrawLine(pen, new Point(cx, cy + 7), new Point(cx + 9, cy - 6));
+                dc.DrawLine(pen, new Point(cx - 9, cy + 6), new Point(cx, cy - 7));
+                dc.DrawLine(pen, new Point(cx, cy - 7), new Point(cx + 9, cy + 6));
+                break;
+            case TransportIcon.NormalizePerRegion:
+                if (regionFill is not null)
+                {
+                    dc.DrawRectangle(regionFill, null, new Rect(cx - 9, cy - 8, 18, 16));
+                }
+
+                dc.DrawLine(pen, new Point(cx - 9, cy - 8), new Point(cx - 9, cy + 8));
+                dc.DrawLine(pen, new Point(cx + 9, cy - 8), new Point(cx + 9, cy + 8));
+                dc.DrawLine(pen, new Point(cx - 5, cy + 5), new Point(cx - 5, cy - 1));
+                dc.DrawLine(pen, new Point(cx, cy + 5), new Point(cx, cy - 6));
+                dc.DrawLine(pen, new Point(cx + 5, cy + 5), new Point(cx + 5, cy));
+                dc.DrawLine(pen, new Point(cx - 7, cy - 7), new Point(cx + 7, cy - 7));
+                break;
+            case TransportIcon.ClearLoop:
+                DrawCassetteAutoReverse(dc, pen, loopFill);
+                DrawDeleteBadge(dc, pen, deleteFill, cx + 6, cy + 5);
+                break;
+            case TransportIcon.DeleteMarkers:
+                DrawMarkerFlag(dc, markerBrush, markerPen, cx - 6, cy - 9, cy + 9, 9);
+                DrawDeleteBadge(dc, pen, deleteFill, cx + 5.5, cy + 5);
+                break;
+            case TransportIcon.JumpToTime:
+                // 時計 → 再生ヘッド。編集履歴（巻き戻し矢印の時計）と区別する。
+                dc.DrawEllipse(null, pen, new Point(cx - 4, cy), 6, 6);
+                dc.DrawLine(pen, new Point(cx - 4, cy), new Point(cx - 4, cy - 3.5));
+                dc.DrawLine(pen, new Point(cx - 4, cy), new Point(cx - 1.5, cy + 1.5));
+                dc.DrawLine(pen, new Point(cx + 4, cy), new Point(cx + 7, cy));
+                dc.DrawLine(pen, new Point(cx + 5, cy - 2.5), new Point(cx + 7.5, cy));
+                dc.DrawLine(pen, new Point(cx + 5, cy + 2.5), new Point(cx + 7.5, cy));
+                dc.DrawLine(playheadPen, new Point(cx + 10, cy - 9), new Point(cx + 10, cy + 9));
+                break;
+            case TransportIcon.SampleRate:
+                DrawFormatGlyph(dc, pen, brush, cx, cy, "Hz");
+                break;
+            case TransportIcon.BitDepth:
+                DrawFormatGlyph(dc, pen, brush, cx, cy, "bit");
+                break;
+            case TransportIcon.Channels:
+                dc.DrawLine(pen, new Point(cx - 8, cy - 4), new Point(cx - 2, cy - 8));
+                dc.DrawLine(pen, new Point(cx - 2, cy - 8), new Point(cx + 2, cy));
+                dc.DrawLine(pen, new Point(cx + 2, cy), new Point(cx + 8, cy - 5));
+                dc.DrawLine(pen, new Point(cx - 8, cy + 5), new Point(cx - 2, cy + 1));
+                dc.DrawLine(pen, new Point(cx - 2, cy + 1), new Point(cx + 2, cy + 8));
+                dc.DrawLine(pen, new Point(cx + 2, cy + 8), new Point(cx + 8, cy + 3));
+                break;
+            case TransportIcon.Waapi:
+                DrawWaapiGlyph(dc, pen, brush, cx, cy);
                 break;
             case TransportIcon.Folder:
                 DrawFolder(dc, pen, cx, cy);
                 break;
             case TransportIcon.NewDocument:
-                DrawNewDocument(dc, pen);
+                DrawNewDocument(dc, pen, cx, cy);
                 break;
             case TransportIcon.Settings:
                 DrawGear(dc, pen, cx, cy);
                 break;
+            case TransportIcon.Help:
+                DrawHelp(dc, pen, brush, cx, cy);
+                break;
             case TransportIcon.FadeIn:
-                FadeCurveIcons.DrawCurve(dc, FadeShape.SCurve, isFadeIn: true, new Rect(8, 10, 18, 16), pen);
+                FadeCurveIcons.DrawCurve(dc, FadeShape.SCurve, isFadeIn: true, new Rect(cx - 9, cy - 8, 18, 16), pen);
                 break;
             case TransportIcon.FadeOut:
-                FadeCurveIcons.DrawCurve(dc, FadeShape.SCurve, isFadeIn: false, new Rect(8, 10, 18, 16), pen);
+                FadeCurveIcons.DrawCurve(dc, FadeShape.SCurve, isFadeIn: false, new Rect(cx - 9, cy - 8, 18, 16), pen);
                 break;
             case TransportIcon.FadeAround:
-                dc.DrawLine(pen, new Point(8, 12), new Point(17, 26));
-                dc.DrawLine(pen, new Point(17, 26), new Point(26, 12));
+                // 再生ヘッドの前でフェードアウト、後ろでフェードイン。
+                FadeCurveIcons.DrawCurve(dc, FadeShape.SCurve, isFadeIn: false, new Rect(cx - 10, cy - 7, 9, 14), pen);
+                FadeCurveIcons.DrawCurve(dc, FadeShape.SCurve, isFadeIn: true, new Rect(cx + 1, cy - 7, 9, 14), pen);
+                dc.DrawLine(playheadPen, new Point(cx, cy - 9), new Point(cx, cy + 9));
                 break;
             case TransportIcon.Volume:
-                dc.DrawLine(pen, new Point(9, 16), new Point(14, 16));
-                dc.DrawLine(pen, new Point(14, 16), new Point(19, 11));
-                dc.DrawLine(pen, new Point(19, 11), new Point(19, 25));
-                dc.DrawLine(pen, new Point(19, 25), new Point(14, 20));
-                dc.DrawLine(pen, new Point(14, 20), new Point(9, 20));
-                dc.DrawLine(pen, new Point(9, 20), new Point(9, 16));
-                dc.DrawLine(pen, new Point(22, 14), new Point(25, 18));
-                dc.DrawLine(pen, new Point(25, 18), new Point(22, 22));
+                dc.DrawLine(pen, new Point(cx - 8, cy - 2), new Point(cx - 3, cy - 2));
+                dc.DrawLine(pen, new Point(cx - 3, cy - 2), new Point(cx + 2, cy - 7));
+                dc.DrawLine(pen, new Point(cx + 2, cy - 7), new Point(cx + 2, cy + 7));
+                dc.DrawLine(pen, new Point(cx + 2, cy + 7), new Point(cx - 3, cy + 2));
+                dc.DrawLine(pen, new Point(cx - 3, cy + 2), new Point(cx - 8, cy + 2));
+                dc.DrawLine(pen, new Point(cx - 8, cy + 2), new Point(cx - 8, cy - 2));
+                dc.DrawLine(pen, new Point(cx + 5, cy - 4), new Point(cx + 8, cy));
+                dc.DrawLine(pen, new Point(cx + 8, cy), new Point(cx + 5, cy + 4));
                 break;
             case TransportIcon.Pitch:
-                dc.DrawEllipse(null, pen, new Point(13, 24), 3.2, 2.2);
-                dc.DrawLine(pen, new Point(16.2, 24), new Point(16.2, 10));
-                dc.DrawLine(pen, new Point(16.2, 10), new Point(23, 13));
+                dc.DrawEllipse(null, pen, new Point(cx - 3.5, cy + 6), 3.2, 2.2);
+                dc.DrawLine(pen, new Point(cx - 0.3, cy + 6), new Point(cx - 0.3, cy - 8));
+                dc.DrawLine(pen, new Point(cx - 0.3, cy - 8), new Point(cx + 6.5, cy - 5));
                 break;
             case TransportIcon.TimeStretch:
-                dc.DrawLine(pen, new Point(8, 18), new Point(26, 18));
-                dc.DrawLine(pen, new Point(8, 18), new Point(12, 14));
-                dc.DrawLine(pen, new Point(8, 18), new Point(12, 22));
-                dc.DrawLine(pen, new Point(26, 18), new Point(22, 14));
-                dc.DrawLine(pen, new Point(26, 18), new Point(22, 22));
-                dc.DrawLine(pen, new Point(14, 11), new Point(20, 11));
-                dc.DrawLine(pen, new Point(14, 25), new Point(20, 25));
+                dc.DrawLine(pen, new Point(cx - 9, cy), new Point(cx + 9, cy));
+                dc.DrawLine(pen, new Point(cx - 9, cy), new Point(cx - 5, cy - 4));
+                dc.DrawLine(pen, new Point(cx - 9, cy), new Point(cx - 5, cy + 4));
+                dc.DrawLine(pen, new Point(cx + 9, cy), new Point(cx + 5, cy - 4));
+                dc.DrawLine(pen, new Point(cx + 9, cy), new Point(cx + 5, cy + 4));
+                dc.DrawLine(pen, new Point(cx - 3, cy - 7), new Point(cx + 3, cy - 7));
+                dc.DrawLine(pen, new Point(cx - 3, cy + 7), new Point(cx + 3, cy + 7));
                 break;
             case TransportIcon.Reverse:
-                DrawChevron(dc, pen, 13, cy, left: true);
-                DrawChevron(dc, pen, 22, cy, left: true);
+                DrawChevron(dc, pen, cx - 4.5, cy, left: true);
+                DrawChevron(dc, pen, cx + 4.5, cy, left: true);
                 break;
             case TransportIcon.AddMarker:
-                dc.DrawLine(pen, new Point(17, 8), new Point(17, 27));
-                dc.DrawLine(pen, new Point(17, 8), new Point(25, 12));
-                dc.DrawLine(pen, new Point(25, 12), new Point(17, 16));
+                DrawMarkerFlag(dc, markerBrush, markerPen, cx - 6, cy - 9, cy + 9, 9);
+                dc.DrawLine(pen, new Point(cx + 5.5, cy + 1), new Point(cx + 5.5, cy + 9));
+                dc.DrawLine(pen, new Point(cx + 1.5, cy + 5), new Point(cx + 9.5, cy + 5));
                 break;
             case TransportIcon.SetLoop:
-                DrawCassetteAutoReverse(dc, pen);
+                DrawCassetteAutoReverse(dc, pen, loopFill);
                 break;
             case TransportIcon.SetRegion:
-                dc.DrawLine(pen, new Point(10, 10), new Point(10, 26));
-                dc.DrawLine(pen, new Point(10, 10), new Point(14, 10));
-                dc.DrawLine(pen, new Point(10, 26), new Point(14, 26));
-                dc.DrawLine(pen, new Point(24, 10), new Point(24, 26));
-                dc.DrawLine(pen, new Point(24, 10), new Point(20, 10));
-                dc.DrawLine(pen, new Point(24, 26), new Point(20, 26));
+                DrawRegionBrackets(dc, pen, regionFill, cx - 7, cx + 7, cy - 8, cy + 8, 4);
                 break;
             case TransportIcon.RangeClick:
                 // Hi Low Low — マーカークリックの拍イメージ
-                dc.DrawLine(pen, new Point(11, 9), new Point(11, 27));
-                dc.DrawLine(pen, new Point(17, 15), new Point(17, 27));
-                dc.DrawLine(pen, new Point(23, 15), new Point(23, 27));
+                dc.DrawLine(pen, new Point(cx - 6, cy - 9), new Point(cx - 6, cy + 9));
+                dc.DrawLine(pen, new Point(cx, cy - 3), new Point(cx, cy + 9));
+                dc.DrawLine(pen, new Point(cx + 6, cy - 3), new Point(cx + 6, cy + 9));
                 break;
             case TransportIcon.Analysis:
-                DrawSpectrumBars(dc, pen);
+                DrawSpectrumBars(dc, pen, cx, cy);
                 break;
             case TransportIcon.Overlay:
-                DrawSpectrumBars(dc, pen);
-                DrawWaveformOverlay(dc, pen);
+                DrawSpectrumBars(dc, pen, cx, cy);
+                DrawWaveformOverlay(dc, pen, cx, cy);
                 break;
             case TransportIcon.Loudness:
-                DrawLoudnessCurve(dc, pen);
+                DrawLoudnessCurve(dc, pen, cx, cy);
                 break;
             case TransportIcon.Center:
-                dc.DrawLine(pen, new Point(17, 9), new Point(17, 14));
-                dc.DrawLine(pen, new Point(17, 22), new Point(17, 27));
-                dc.DrawLine(pen, new Point(9, 18), new Point(14, 18));
-                dc.DrawLine(pen, new Point(20, 18), new Point(25, 18));
+                dc.DrawLine(playheadPen, new Point(cx, cy - 9), new Point(cx, cy - 4));
+                dc.DrawLine(playheadPen, new Point(cx, cy + 4), new Point(cx, cy + 9));
+                dc.DrawLine(pen, new Point(cx - 8, cy), new Point(cx - 3, cy));
+                dc.DrawLine(pen, new Point(cx + 3, cy), new Point(cx + 8, cy));
                 dc.DrawEllipse(null, pen, new Point(cx, cy), 4.5, 4.5);
                 break;
             case TransportIcon.History:
-                dc.DrawEllipse(null, pen, new Point(cx, cy), 8, 8);
-                dc.DrawLine(pen, new Point(17, 13), new Point(17, 18));
-                dc.DrawLine(pen, new Point(17, 18), new Point(21, 21));
+                DrawHistoryClock(dc, pen, cx, cy);
                 break;
             case TransportIcon.ColorPalette:
-                DrawColorPalette(dc, pen, brush, cx, cy);
+                DrawColorPalette(dc, pen, brush, cx, cy, accent);
                 break;
             case TransportIcon.Normalize:
-                dc.DrawLine(pen, new Point(10, 24), new Point(10, 16));
-                dc.DrawLine(pen, new Point(15, 24), new Point(15, 11));
-                dc.DrawLine(pen, new Point(20, 24), new Point(20, 18));
-                dc.DrawLine(pen, new Point(25, 24), new Point(25, 13));
-                dc.DrawLine(pen, new Point(8, 10), new Point(26, 10));
-                dc.DrawLine(pen, new Point(22, 8), new Point(26, 10));
-                dc.DrawLine(pen, new Point(22, 12), new Point(26, 10));
+                dc.DrawLine(pen, new Point(cx - 7, cy + 6), new Point(cx - 7, cy - 2));
+                dc.DrawLine(pen, new Point(cx - 2, cy + 6), new Point(cx - 2, cy - 7));
+                dc.DrawLine(pen, new Point(cx + 3, cy + 6), new Point(cx + 3, cy));
+                dc.DrawLine(pen, new Point(cx + 8, cy + 6), new Point(cx + 8, cy - 5));
+                dc.DrawLine(pen, new Point(cx - 9, cy - 8), new Point(cx + 9, cy - 8));
+                dc.DrawLine(pen, new Point(cx + 5, cy - 10), new Point(cx + 9, cy - 8));
+                dc.DrawLine(pen, new Point(cx + 5, cy - 6), new Point(cx + 9, cy - 8));
                 break;
             case TransportIcon.Delete:
-                dc.DrawLine(pen, new Point(9, 13), new Point(25, 13));
-                dc.DrawLine(pen, new Point(14, 10), new Point(20, 10));
-                dc.DrawLine(pen, new Point(11, 13), new Point(12, 26));
-                dc.DrawLine(pen, new Point(12, 26), new Point(22, 26));
-                dc.DrawLine(pen, new Point(22, 26), new Point(23, 13));
-                dc.DrawLine(pen, new Point(14, 16), new Point(14, 23));
-                dc.DrawLine(pen, new Point(17, 16), new Point(17, 23));
-                dc.DrawLine(pen, new Point(20, 16), new Point(20, 23));
+                dc.DrawLine(pen, new Point(cx - 8, cy - 5), new Point(cx + 8, cy - 5));
+                dc.DrawLine(pen, new Point(cx - 3, cy - 8), new Point(cx + 3, cy - 8));
+                dc.DrawLine(pen, new Point(cx - 6, cy - 5), new Point(cx - 5, cy + 8));
+                dc.DrawLine(pen, new Point(cx - 5, cy + 8), new Point(cx + 5, cy + 8));
+                dc.DrawLine(pen, new Point(cx + 5, cy + 8), new Point(cx + 6, cy - 5));
+                dc.DrawLine(pen, new Point(cx - 3, cy - 2), new Point(cx - 3, cy + 5));
+                dc.DrawLine(pen, new Point(cx, cy - 2), new Point(cx, cy + 5));
+                dc.DrawLine(pen, new Point(cx + 3, cy - 2), new Point(cx + 3, cy + 5));
                 break;
             case TransportIcon.Save:
-                dc.DrawLine(pen, new Point(17, 7), new Point(17, 20));
-                dc.DrawLine(pen, new Point(12, 16), new Point(17, 21));
-                dc.DrawLine(pen, new Point(22, 16), new Point(17, 21));
-                dc.DrawLine(pen, new Point(9, 26), new Point(25, 26));
+                dc.DrawLine(pen, new Point(cx, cy - 11), new Point(cx, cy + 2));
+                dc.DrawLine(pen, new Point(cx - 5, cy - 2), new Point(cx, cy + 3));
+                dc.DrawLine(pen, new Point(cx + 5, cy - 2), new Point(cx, cy + 3));
+                dc.DrawLine(pen, new Point(cx - 8, cy + 8), new Point(cx + 8, cy + 8));
                 break;
             case TransportIcon.SaveMp3:
-                DrawSaveMp3(dc, pen);
+                DrawSaveMp3(dc, pen, cx, cy);
                 break;
             case TransportIcon.SaveAs:
-                dc.DrawLine(pen, new Point(17, 7), new Point(17, 18));
-                dc.DrawLine(pen, new Point(12, 14), new Point(17, 19));
-                dc.DrawLine(pen, new Point(22, 14), new Point(17, 19));
-                dc.DrawLine(pen, new Point(9, 26), new Point(25, 26));
-                dc.DrawLine(pen, new Point(21, 8), new Point(26, 8));
-                dc.DrawLine(pen, new Point(21, 12), new Point(26, 12));
+                dc.DrawLine(pen, new Point(cx - 1, cy - 11), new Point(cx - 1, cy));
+                dc.DrawLine(pen, new Point(cx - 6, cy - 4), new Point(cx - 1, cy + 1));
+                dc.DrawLine(pen, new Point(cx + 4, cy - 4), new Point(cx - 1, cy + 1));
+                dc.DrawLine(pen, new Point(cx - 8, cy + 8), new Point(cx + 8, cy + 8));
+                dc.DrawLine(pen, new Point(cx + 4, cy - 10), new Point(cx + 9, cy - 10));
+                dc.DrawLine(pen, new Point(cx + 4, cy - 6), new Point(cx + 9, cy - 6));
                 break;
             case TransportIcon.Lock:
-                DrawPadlock(dc, stroke, brush, open: false, designW * 0.5, designH * 0.5);
+                DrawPadlock(dc, stroke, brush, open: false, cx, cy);
                 break;
             case TransportIcon.Unlock:
-                DrawPadlock(dc, stroke, brush, open: true, designW * 0.5, designH * 0.5);
+                DrawPadlock(dc, stroke, brush, open: true, cx, cy);
                 break;
             case TransportIcon.PlayerMode:
-                DrawPlayerMode(dc, pen);
+                DrawPlayerMode(dc, pen, cx, cy);
                 break;
             case TransportIcon.EditorMode:
-                DrawEditorMode(dc, pen);
+                DrawEditorMode(dc, pen, cx, cy);
                 break;
             case TransportIcon.AnalyzerMaximize:
-                DrawAnalyzerMaximize(dc, pen);
+                DrawAnalyzerMaximize(dc, pen, cx, cy);
                 break;
             case TransportIcon.AnalyzerRestore:
-                DrawAnalyzerRestore(dc, pen);
+                DrawAnalyzerRestore(dc, pen, cx, cy);
+                break;
+            case TransportIcon.MinimalChrome:
+                DrawMinimalChrome(dc, pen, cx, cy);
+                break;
+            case TransportIcon.CopyFileName:
+                DrawNewDocument(dc, pen, cx - 1, cy);
+                dc.DrawLine(pen, new Point(cx + 2, cy + 2), new Point(cx + 9, cy + 2));
+                dc.DrawLine(pen, new Point(cx + 2, cy + 6), new Point(cx + 9, cy + 6));
+                break;
+            case TransportIcon.MergeTabs:
+                // 2 ファイル → 1 ファイルへまとめる（バウンス）。
+                dc.DrawRectangle(null, pen, new Rect(cx - 10, cy - 9, 6, 6));
+                dc.DrawRectangle(null, pen, new Rect(cx - 10, cy + 3, 6, 6));
+                dc.DrawLine(pen, new Point(cx - 3, cy - 6), new Point(cx + 1, cy));
+                dc.DrawLine(pen, new Point(cx - 3, cy + 6), new Point(cx + 1, cy));
+                dc.DrawRectangle(null, pen, new Rect(cx + 3, cy - 6, 7, 12));
+                break;
+            case TransportIcon.ExportByChannels:
+                dc.DrawLine(pen, new Point(cx - 8, cy - 6), new Point(cx - 3, cy - 9));
+                dc.DrawLine(pen, new Point(cx - 3, cy - 9), new Point(cx + 1, cy - 2));
+                dc.DrawLine(pen, new Point(cx + 1, cy - 2), new Point(cx + 8, cy - 6));
+                dc.DrawLine(pen, new Point(cx - 8, cy + 4), new Point(cx - 3, cy + 1));
+                dc.DrawLine(pen, new Point(cx - 3, cy + 1), new Point(cx + 1, cy + 8));
+                dc.DrawLine(pen, new Point(cx + 1, cy + 8), new Point(cx + 8, cy + 4));
+                dc.DrawLine(pen, new Point(cx - 9, cy + 8), new Point(cx + 9, cy + 8));
+                break;
+            case TransportIcon.DeleteAllMarkers:
+                DrawMarkerFlag(dc, markerBrush, markerPen, cx - 9, cy - 9, cy + 9, 6);
+                DrawMarkerFlag(dc, markerBrush, markerPen, cx - 1, cy - 9, cy + 9, 6);
+                DrawDeleteBadge(dc, pen, deleteFill, cx + 6.5, cy + 5);
+                break;
+            case TransportIcon.DeleteRegions:
+                DrawRegionBrackets(dc, pen, regionFill, cx - 10, cx + 3, cy - 8, cy + 8, 3.5);
+                DrawDeleteBadge(dc, pen, deleteFill, cx + 6.5, cy + 5);
+                break;
+            case TransportIcon.DeleteAllRegions:
+                DrawRegionBrackets(dc, pen, regionFill, cx - 10, cx - 4, cy - 8, cy + 8, 2.5);
+                DrawRegionBrackets(dc, pen, regionFill, cx - 2, cx + 4, cy - 8, cy + 8, 2.5);
+                DrawDeleteBadge(dc, pen, deleteFill, cx + 7, cy + 5);
+                break;
+            case TransportIcon.PreviousTrack:
+                // ⏮。先頭へ（|<）・画面左端へ（枠内の <）と区別する。
+                dc.DrawLine(pen, new Point(cx - 9, cy - 7), new Point(cx - 9, cy + 7));
+                DrawTriangle(dc, pen, cx - 6.5, cx + 0.5, cy, 6.5);
+                DrawTriangle(dc, pen, cx + 1.5, cx + 8.5, cy, 6.5);
+                break;
+            case TransportIcon.NextTrack:
+                dc.DrawLine(pen, new Point(cx + 9, cy - 7), new Point(cx + 9, cy + 7));
+                DrawTriangle(dc, pen, cx + 6.5, cx - 0.5, cy, 6.5);
+                DrawTriangle(dc, pen, cx - 1.5, cx - 8.5, cy, 6.5);
+                break;
+            case TransportIcon.TileOff:
+                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 7, 16, 5));
+                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 1, 16, 5));
+                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy + 5, 16, 4));
+                break;
+            case TransportIcon.TileHorizontal:
+                dc.DrawRectangle(null, pen, new Rect(cx - 9, cy - 7, 8, 14));
+                dc.DrawRectangle(null, pen, new Rect(cx + 1, cy - 7, 8, 14));
+                break;
+            case TransportIcon.TileVertical:
+                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 9, 16, 7));
+                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy + 2, 16, 7));
+                break;
+            case TransportIcon.TileGrid:
+                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 8, 7, 7));
+                dc.DrawRectangle(null, pen, new Rect(cx + 1, cy - 8, 7, 7));
+                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy + 1, 7, 7));
+                dc.DrawRectangle(null, pen, new Rect(cx + 1, cy + 1, 7, 7));
+                break;
+            case TransportIcon.CopyAllTabTimes:
+                dc.DrawEllipse(null, pen, new Point(cx - 2, cy - 1), 6.5, 6.5);
+                dc.DrawLine(pen, new Point(cx - 2, cy - 1), new Point(cx - 2, cy - 5));
+                dc.DrawLine(pen, new Point(cx - 2, cy - 1), new Point(cx + 2, cy + 1));
+                dc.DrawRectangle(null, pen, new Rect(cx + 4, cy - 2, 6, 10));
+                break;
+            case TransportIcon.SelectToStart:
+                dc.DrawLine(pen, new Point(cx - 8, cy - 8), new Point(cx - 8, cy + 8));
+                dc.DrawRectangle(selectionFill, pen, new Rect(cx - 4, cy - 6, 12, 12));
+                DrawChevron(dc, pen, cx + 1, cy, left: true);
+                break;
+            case TransportIcon.SelectToEnd:
+                dc.DrawLine(pen, new Point(cx + 8, cy - 8), new Point(cx + 8, cy + 8));
+                dc.DrawRectangle(selectionFill, pen, new Rect(cx - 8, cy - 6, 12, 12));
+                DrawChevron(dc, pen, cx - 1, cy, left: false);
+                break;
+            case TransportIcon.ExportWave:
+                DrawExportWave(dc, pen, cx, cy);
+                break;
+            case TransportIcon.ExportByMarkers:
+                // マーカー位置で 2 つに分割。
+                DrawMarkerFlag(dc, markerBrush, markerPen, cx, cy - 9, cy + 9, 7);
+                dc.DrawRectangle(null, pen, new Rect(cx - 10, cy + 2, 7, 6));
+                dc.DrawRectangle(null, pen, new Rect(cx + 3, cy + 2, 7, 6));
+                break;
+            case TransportIcon.ExportByRegions:
+                DrawRegionBrackets(dc, pen, regionFill, cx - 10, cx - 2, cy - 8, cy + 2, 2.5);
+                DrawRegionBrackets(dc, pen, regionFill, cx + 2, cx + 10, cy - 8, cy + 2, 2.5);
+                dc.DrawLine(pen, new Point(cx - 10, cy + 7), new Point(cx - 2, cy + 7));
+                dc.DrawLine(pen, new Point(cx + 2, cy + 7), new Point(cx + 10, cy + 7));
+                break;
+            case TransportIcon.LoopPlay:
+                DrawCassetteAutoReverse(dc, pen, loopFill);
+                DrawPlayTriangle(dc, pen, playFill, cx - 2.5, cx + 4.5, cy, 4);
+                break;
+            case TransportIcon.Restart:
+                DrawCurvedArrow(dc, pen, cx - 1, cy, clockwise: false);
+                DrawPlayTriangle(dc, pen, playFill, cx + 4, cx + 10, cy, 5);
+                break;
+            case TransportIcon.Preroll:
+                DrawChevron(dc, pen, cx - 5, cy, left: true);
+                DrawChevron(dc, pen, cx - 1, cy, left: true);
+                DrawPlayTriangle(dc, pen, playFill, cx + 3, cx + 10, cy, 6);
+                break;
+            case TransportIcon.CopySelectionTime:
+                dc.DrawEllipse(null, pen, new Point(cx - 3, cy - 1), 6.5, 6.5);
+                dc.DrawLine(pen, new Point(cx - 3, cy - 1), new Point(cx - 3, cy - 5));
+                dc.DrawLine(pen, new Point(cx - 3, cy - 1), new Point(cx + 1, cy + 1));
+                dc.DrawLine(pen, new Point(cx + 2, cy + 3), new Point(cx + 9, cy + 3));
+                dc.DrawLine(pen, new Point(cx + 2, cy + 7), new Point(cx + 9, cy + 7));
+                break;
+            case TransportIcon.CopyFilePath:
+                // フォルダ＋文字行。ファイル名をコピー（書類＋文字行）と対にする。
+                dc.DrawLine(pen, new Point(cx - 9, cy + 1), new Point(cx - 9, cy - 9));
+                dc.DrawLine(pen, new Point(cx - 9, cy - 9), new Point(cx - 4, cy - 9));
+                dc.DrawLine(pen, new Point(cx - 4, cy - 9), new Point(cx - 2.5, cy - 7));
+                dc.DrawLine(pen, new Point(cx - 2.5, cy - 7), new Point(cx + 4, cy - 7));
+                dc.DrawLine(pen, new Point(cx + 4, cy - 7), new Point(cx + 4, cy + 1));
+                dc.DrawLine(pen, new Point(cx + 4, cy + 1), new Point(cx - 9, cy + 1));
+                dc.DrawLine(pen, new Point(cx - 3, cy + 5), new Point(cx + 9, cy + 5));
+                dc.DrawLine(pen, new Point(cx - 3, cy + 9), new Point(cx + 9, cy + 9));
+                break;
+            case TransportIcon.CloseTab:
+                dc.DrawRectangle(null, pen, new Rect(cx - 9, cy - 7, 14, 14));
+                dc.DrawLine(pen, new Point(cx - 5, cy - 3), new Point(cx + 1, cy + 3));
+                dc.DrawLine(pen, new Point(cx + 1, cy - 3), new Point(cx - 5, cy + 3));
+                dc.DrawLine(pen, new Point(cx + 5, cy - 4), new Point(cx + 9, cy));
+                dc.DrawLine(pen, new Point(cx + 9, cy), new Point(cx + 5, cy + 4));
+                break;
+            case TransportIcon.AlwaysOnTop:
+                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 2, 16, 10));
+                dc.DrawLine(pen, new Point(cx, cy - 9), new Point(cx, cy - 3));
+                dc.DrawLine(pen, new Point(cx - 4, cy - 6), new Point(cx, cy - 9));
+                dc.DrawLine(pen, new Point(cx + 4, cy - 6), new Point(cx, cy - 9));
+                break;
+            case TransportIcon.WaveformMaximize:
+                DrawEditorMode(dc, pen, cx, cy - 1);
+                dc.DrawLine(pen, new Point(cx - 9, cy + 8), new Point(cx - 5, cy + 8));
+                dc.DrawLine(pen, new Point(cx - 9, cy + 8), new Point(cx - 9, cy + 4));
+                dc.DrawLine(pen, new Point(cx + 9, cy + 8), new Point(cx + 5, cy + 8));
+                dc.DrawLine(pen, new Point(cx + 9, cy + 8), new Point(cx + 9, cy + 4));
+                break;
+            case TransportIcon.WaveformRestore:
+                DrawEditorMode(dc, pen, cx, cy);
+                dc.DrawRectangle(null, pen, new Rect(cx - 9, cy - 9, 6, 5));
+                break;
+            case TransportIcon.WaveformView:
+                DrawEditorMode(dc, pen, cx, cy);
+                break;
+            case TransportIcon.SeekViewLeft:
+                // 表示枠の左端へ。先頭へ（|<）と区別するため枠を描く。
+                dc.DrawRoundedRectangle(null, pen, new Rect(cx - 10, cy - 8, 20, 16), 2, 2);
+                DrawSmallChevron(dc, pen, cx - 3, cy, left: true);
+                dc.DrawLine(pen, new Point(cx - 6, cy - 4.5), new Point(cx - 6, cy + 4.5));
+                break;
+            case TransportIcon.SeekViewRight:
+                dc.DrawRoundedRectangle(null, pen, new Rect(cx - 10, cy - 8, 20, 16), 2, 2);
+                DrawSmallChevron(dc, pen, cx + 3, cy, left: false);
+                dc.DrawLine(pen, new Point(cx + 6, cy - 4.5), new Point(cx + 6, cy + 4.5));
                 break;
         }
 
@@ -512,45 +926,267 @@ internal static class TransportIconDrawing
         dc.Pop();
     }
 
-    private static void DrawSpectrumBars(DrawingContext dc, Pen pen)
+    private static Color AccentColor(string key, Color fore, bool accent)
     {
-        dc.DrawLine(pen, new Point(9, 24), new Point(9, 18));
-        dc.DrawLine(pen, new Point(13, 24), new Point(13, 12));
-        dc.DrawLine(pen, new Point(17, 24), new Point(17, 16));
-        dc.DrawLine(pen, new Point(21, 24), new Point(21, 10));
-        dc.DrawLine(pen, new Point(25, 24), new Point(25, 14));
+        if (!accent)
+        {
+            return fore;
+        }
+
+        try
+        {
+            return Theme.Get(key);
+        }
+        catch (InvalidOperationException)
+        {
+            return fore;
+        }
+    }
+
+    private static Brush? AccentFill(string key, bool accent, byte alpha)
+    {
+        if (!accent)
+        {
+            return null;
+        }
+
+        var color = AccentColor(key, Colors.Transparent, accent: true);
+        if (color.A == 0)
+        {
+            return null;
+        }
+
+        return WpfControlHelpers.FrozenBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
+    }
+
+    private static void DrawPlayTriangle(
+        DrawingContext dc,
+        Pen pen,
+        Brush? fill,
+        double baseX,
+        double tipX,
+        double cy,
+        double halfHeight)
+    {
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            ctx.BeginFigure(new Point(baseX, cy - halfHeight), true, true);
+            ctx.LineTo(new Point(tipX, cy), true, false);
+            ctx.LineTo(new Point(baseX, cy + halfHeight), true, false);
+        }
+
+        geo.Freeze();
+        dc.DrawGeometry(fill, pen, geo);
+    }
+
+    /// <summary>削除の印。色ありは赤い丸に白い ×、色なしは × のみ。</summary>
+    private static void DrawDeleteBadge(DrawingContext dc, Pen pen, Brush? fill, double cx, double cy)
+    {
+        if (fill is null)
+        {
+            DrawSmallCross(dc, pen, cx, cy);
+            return;
+        }
+
+        dc.DrawEllipse(fill, null, new Point(cx, cy), 4.8, 4.8);
+        var thin = new Pen(pen.Brush, 1.4)
+        {
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round,
+        };
+        thin.Freeze();
+        dc.DrawLine(thin, new Point(cx - 2.1, cy - 2.1), new Point(cx + 2.1, cy + 2.1));
+        dc.DrawLine(thin, new Point(cx + 2.1, cy - 2.1), new Point(cx - 2.1, cy + 2.1));
+    }
+
+    private static Pen OutlinePen(Pen source, Brush brush)
+    {
+        var pen = new Pen(brush, source.Thickness)
+        {
+            StartLineCap = source.StartLineCap,
+            EndLineCap = source.EndLineCap,
+            LineJoin = source.LineJoin,
+        };
+        pen.Freeze();
+        return pen;
+    }
+
+    private static Pen DashedPen(Pen source)
+    {
+        var pen = new Pen(source.Brush, 1.4)
+        {
+            DashStyle = new DashStyle([1.6, 1.6], 0),
+            DashCap = PenLineCap.Flat,
+            LineJoin = PenLineJoin.Miter,
+        };
+        pen.Freeze();
+        return pen;
+    }
+
+    /// <summary>波形上のマーカー旗と同じ形（棒の上端に、外側の角だけ丸めた塗り旗）。</summary>
+    private static void DrawMarkerFlag(
+        DrawingContext dc,
+        Brush fill,
+        Pen stem,
+        double stemX,
+        double top,
+        double bottom,
+        double width)
+    {
+        const double flagHeight = 6.5;
+        dc.DrawLine(stem, new Point(stemX, top + flagHeight), new Point(stemX, bottom));
+        var flag = WpfControlHelpers.FlagGeometry(
+            new Rect(stemX - 0.9, top, width + 0.9, flagHeight),
+            1.8,
+            stemOnLeft: true);
+        dc.DrawGeometry(fill, null, flag);
+    }
+
+    private static void DrawRegionBrackets(
+        DrawingContext dc,
+        Pen pen,
+        Brush? fill,
+        double left,
+        double right,
+        double top,
+        double bottom,
+        double arm)
+    {
+        if (fill is not null)
+        {
+            dc.DrawRectangle(fill, null, new Rect(left, top, right - left, bottom - top));
+        }
+
+        dc.DrawLine(pen, new Point(left, top), new Point(left, bottom));
+        dc.DrawLine(pen, new Point(left, top), new Point(left + arm, top));
+        dc.DrawLine(pen, new Point(left, bottom), new Point(left + arm, bottom));
+        dc.DrawLine(pen, new Point(right, top), new Point(right, bottom));
+        dc.DrawLine(pen, new Point(right, top), new Point(right - arm, top));
+        dc.DrawLine(pen, new Point(right, bottom), new Point(right - arm, bottom));
+    }
+
+    private static void DrawSmallCross(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawLine(pen, new Point(cx - 3, cy - 3), new Point(cx + 3, cy + 3));
+        dc.DrawLine(pen, new Point(cx + 3, cy - 3), new Point(cx - 3, cy + 3));
+    }
+
+    private static void DrawSmallChevron(DrawingContext dc, Pen pen, double centerX, double centerY, bool left)
+    {
+        var direction = left ? -1d : 1d;
+        dc.DrawLine(pen, new Point(centerX - direction * 2.5, centerY - 4.5), new Point(centerX + direction * 2, centerY));
+        dc.DrawLine(pen, new Point(centerX + direction * 2, centerY), new Point(centerX - direction * 2.5, centerY + 4.5));
+    }
+
+    private static void DrawTriangle(DrawingContext dc, Pen pen, double tipX, double baseX, double cy, double halfHeight)
+    {
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            ctx.BeginFigure(new Point(tipX, cy), false, true);
+            ctx.LineTo(new Point(baseX, cy - halfHeight), true, false);
+            ctx.LineTo(new Point(baseX, cy + halfHeight), true, false);
+        }
+
+        geo.Freeze();
+        dc.DrawGeometry(null, pen, geo);
+    }
+
+    private static void DrawMiniWave(DrawingContext dc, Pen pen, double cx, double cy, double amp)
+    {
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            ctx.BeginFigure(new Point(cx - 6, cy), false, false);
+            ctx.LineTo(new Point(cx - 3.5, cy - amp * 0.7), true, false);
+            ctx.LineTo(new Point(cx - 1, cy + amp * 0.7), true, false);
+            ctx.LineTo(new Point(cx + 1.5, cy - amp * 0.45), true, false);
+            ctx.LineTo(new Point(cx + 4, cy + amp * 0.45), true, false);
+            ctx.LineTo(new Point(cx + 6, cy), true, false);
+        }
+
+        geo.Freeze();
+        dc.DrawGeometry(null, pen, geo);
+    }
+
+    /// <summary>反時計回りの矢印で囲んだ時計。編集履歴。</summary>
+    private static void DrawHistoryClock(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        const double r = 8;
+        var start = new Point(cx - r * Math.Cos(Math.PI / 6), cy - r * Math.Sin(Math.PI / 6));
+        var end = new Point(cx - r * Math.Cos(Math.PI / 6) + 0.01, cy + r * Math.Sin(Math.PI / 6));
+        var arc = new StreamGeometry();
+        using (var ctx = arc.Open())
+        {
+            ctx.BeginFigure(start, false, false);
+            ctx.ArcTo(end, new Size(r, r), 0, true, SweepDirection.Clockwise, true, false);
+        }
+
+        arc.Freeze();
+        dc.DrawGeometry(null, pen, arc);
+        dc.DrawLine(pen, new Point(start.X - 3.2, start.Y - 0.6), start);
+        dc.DrawLine(pen, new Point(start.X + 0.4, start.Y - 3.4), start);
+        dc.DrawLine(pen, new Point(cx, cy - 4.5), new Point(cx, cy));
+        dc.DrawLine(pen, new Point(cx, cy), new Point(cx + 3.5, cy + 2.5));
+    }
+
+    private static void DrawSpectrumBars(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawLine(pen, new Point(cx - 8, cy + 6), new Point(cx - 8, cy));
+        dc.DrawLine(pen, new Point(cx - 4, cy + 6), new Point(cx - 4, cy - 6));
+        dc.DrawLine(pen, new Point(cx, cy + 6), new Point(cx, cy - 2));
+        dc.DrawLine(pen, new Point(cx + 4, cy + 6), new Point(cx + 4, cy - 8));
+        dc.DrawLine(pen, new Point(cx + 8, cy + 6), new Point(cx + 8, cy - 4));
     }
 
     /// <summary>プレイリスト行＋再生。プレイヤーへ切替。</summary>
-    private static void DrawPlayerMode(DrawingContext dc, Pen pen)
+    private static void DrawPlayerMode(DrawingContext dc, Pen pen, double cx, double cy)
     {
         var play = new StreamGeometry();
         using (var ctx = play.Open())
         {
-            ctx.BeginFigure(new Point(8, 11), true, true);
-            ctx.LineTo(new Point(14, 18), true, false);
-            ctx.LineTo(new Point(8, 25), true, false);
+            ctx.BeginFigure(new Point(cx - 9, cy - 7), true, true);
+            ctx.LineTo(new Point(cx - 3, cy), true, false);
+            ctx.LineTo(new Point(cx - 9, cy + 7), true, false);
         }
 
         play.Freeze();
         dc.DrawGeometry(null, pen, play);
-        dc.DrawLine(pen, new Point(17, 12), new Point(26, 12));
-        dc.DrawLine(pen, new Point(17, 18), new Point(26, 18));
-        dc.DrawLine(pen, new Point(17, 24), new Point(26, 24));
+        dc.DrawLine(pen, new Point(cx, cy - 6), new Point(cx + 9, cy - 6));
+        dc.DrawLine(pen, new Point(cx, cy), new Point(cx + 9, cy));
+        dc.DrawLine(pen, new Point(cx, cy + 6), new Point(cx + 9, cy + 6));
+    }
+
+    /// <summary>細いクローム＋再生。F09 ミニマルプレイヤー。</summary>
+    private static void DrawMinimalChrome(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawRectangle(null, pen, new Rect(cx - 10, cy - 7, 20, 14));
+        dc.DrawLine(pen, new Point(cx - 10, cy - 3), new Point(cx + 10, cy - 3));
+        var play = new StreamGeometry();
+        using (var ctx = play.Open())
+        {
+            ctx.BeginFigure(new Point(cx - 2, cy - 1), true, true);
+            ctx.LineTo(new Point(cx + 5, cy + 3.5), true, false);
+            ctx.LineTo(new Point(cx - 2, cy + 8), true, false);
+        }
+
+        play.Freeze();
+        dc.DrawGeometry(null, pen, play);
     }
 
     /// <summary>波形。エディタへ戻す。</summary>
-    private static void DrawEditorMode(DrawingContext dc, Pen pen)
+    private static void DrawEditorMode(DrawingContext dc, Pen pen, double cx, double cy)
     {
         var wave = new StreamGeometry();
         using (var ctx = wave.Open())
         {
-            ctx.BeginFigure(new Point(7, 18), false, false);
-            ctx.LineTo(new Point(11, 11), true, false);
-            ctx.LineTo(new Point(15, 25), true, false);
-            ctx.LineTo(new Point(19, 13), true, false);
-            ctx.LineTo(new Point(23, 23), true, false);
-            ctx.LineTo(new Point(27, 18), true, false);
+            ctx.BeginFigure(new Point(cx - 10, cy), false, false);
+            ctx.LineTo(new Point(cx - 6, cy - 7), true, false);
+            ctx.LineTo(new Point(cx - 2, cy + 7), true, false);
+            ctx.LineTo(new Point(cx + 2, cy - 5), true, false);
+            ctx.LineTo(new Point(cx + 6, cy + 5), true, false);
+            ctx.LineTo(new Point(cx + 10, cy), true, false);
         }
 
         wave.Freeze();
@@ -558,36 +1194,36 @@ internal static class TransportIconDrawing
     }
 
     /// <summary>メーター列。アナライザー最大化へ。</summary>
-    private static void DrawAnalyzerMaximize(DrawingContext dc, Pen pen)
+    private static void DrawAnalyzerMaximize(DrawingContext dc, Pen pen, double cx, double cy)
     {
-        dc.DrawLine(pen, new Point(8, 26), new Point(8, 16));
-        dc.DrawLine(pen, new Point(13, 26), new Point(13, 10));
-        dc.DrawLine(pen, new Point(18, 26), new Point(18, 14));
-        dc.DrawRectangle(null, pen, new Rect(22, 10, 5, 16));
+        dc.DrawLine(pen, new Point(cx - 9, cy + 8), new Point(cx - 9, cy - 2));
+        dc.DrawLine(pen, new Point(cx - 4, cy + 8), new Point(cx - 4, cy - 8));
+        dc.DrawLine(pen, new Point(cx + 1, cy + 8), new Point(cx + 1, cy - 4));
+        dc.DrawRectangle(null, pen, new Rect(cx + 5, cy - 8, 5, 16));
     }
 
     /// <summary>入れ子の窓。アナライザー最大化を解除。</summary>
-    private static void DrawAnalyzerRestore(DrawingContext dc, Pen pen)
+    private static void DrawAnalyzerRestore(DrawingContext dc, Pen pen, double cx, double cy)
     {
-        dc.DrawRectangle(null, pen, new Rect(11, 14, 14, 12));
-        dc.DrawLine(pen, new Point(14, 14), new Point(14, 10));
-        dc.DrawLine(pen, new Point(14, 10), new Point(26, 10));
-        dc.DrawLine(pen, new Point(26, 10), new Point(26, 20));
-        dc.DrawLine(pen, new Point(26, 20), new Point(25, 20));
+        dc.DrawRectangle(null, pen, new Rect(cx - 6, cy - 4, 14, 12));
+        dc.DrawLine(pen, new Point(cx - 3, cy - 4), new Point(cx - 3, cy - 8));
+        dc.DrawLine(pen, new Point(cx - 3, cy - 8), new Point(cx + 9, cy - 8));
+        dc.DrawLine(pen, new Point(cx + 9, cy - 8), new Point(cx + 9, cy + 2));
+        dc.DrawLine(pen, new Point(cx + 9, cy + 2), new Point(cx + 8, cy + 2));
     }
 
-    private static void DrawWaveformOverlay(DrawingContext dc, Pen pen)
+    private static void DrawWaveformOverlay(DrawingContext dc, Pen pen, double cx, double cy)
     {
         var geo = new StreamGeometry();
         using (var ctx = geo.Open())
         {
-            ctx.BeginFigure(new Point(8, 20), false, false);
-            ctx.LineTo(new Point(11, 16), true, false);
-            ctx.LineTo(new Point(14, 22), true, false);
-            ctx.LineTo(new Point(17, 14), true, false);
-            ctx.LineTo(new Point(20, 21), true, false);
-            ctx.LineTo(new Point(23, 17), true, false);
-            ctx.LineTo(new Point(26, 20), true, false);
+            ctx.BeginFigure(new Point(cx - 9, cy + 2), false, false);
+            ctx.LineTo(new Point(cx - 6, cy - 2), true, false);
+            ctx.LineTo(new Point(cx - 3, cy + 4), true, false);
+            ctx.LineTo(new Point(cx, cy - 4), true, false);
+            ctx.LineTo(new Point(cx + 3, cy + 3), true, false);
+            ctx.LineTo(new Point(cx + 6, cy - 1), true, false);
+            ctx.LineTo(new Point(cx + 9, cy + 2), true, false);
         }
 
         geo.Freeze();
@@ -612,17 +1248,33 @@ internal static class TransportIconDrawing
             h);
     }
 
-    private static void DrawNewDocument(DrawingContext dc, Pen pen)
+    private static void DrawNewDocument(DrawingContext dc, Pen pen, double cx, double cy)
     {
-        dc.DrawLine(pen, new Point(10, 26), new Point(10, 8));
-        dc.DrawLine(pen, new Point(10, 8), new Point(18, 8));
-        dc.DrawLine(pen, new Point(18, 8), new Point(24, 14));
-        dc.DrawLine(pen, new Point(24, 14), new Point(24, 26));
-        dc.DrawLine(pen, new Point(24, 26), new Point(10, 26));
-        dc.DrawLine(pen, new Point(18, 8), new Point(18, 14));
-        dc.DrawLine(pen, new Point(18, 14), new Point(24, 14));
-        dc.DrawLine(pen, new Point(13, 17), new Point(21, 17));
-        dc.DrawLine(pen, new Point(13, 21), new Point(21, 21));
+        dc.DrawLine(pen, new Point(cx - 7, cy + 8), new Point(cx - 7, cy - 10));
+        dc.DrawLine(pen, new Point(cx - 7, cy - 10), new Point(cx + 1, cy - 10));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 10), new Point(cx + 7, cy - 4));
+        dc.DrawLine(pen, new Point(cx + 7, cy - 4), new Point(cx + 7, cy + 8));
+        dc.DrawLine(pen, new Point(cx + 7, cy + 8), new Point(cx - 7, cy + 8));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 10), new Point(cx + 1, cy - 4));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 4), new Point(cx + 7, cy - 4));
+        dc.DrawLine(pen, new Point(cx - 4, cy - 1), new Point(cx + 4, cy - 1));
+        dc.DrawLine(pen, new Point(cx - 4, cy + 3), new Point(cx + 4, cy + 3));
+    }
+
+    private static void DrawHelp(DrawingContext dc, Pen pen, Brush brush, double cx, double cy)
+    {
+        dc.DrawEllipse(null, pen, new Point(cx, cy), 9, 9);
+        var mark = new FormattedText(
+            "?",
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI Semibold"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            14,
+            brush,
+            1.0);
+        dc.DrawText(
+            mark,
+            new Point(cx - mark.Width * 0.5, cy - mark.Height * 0.52));
     }
 
     private static void DrawFolder(DrawingContext dc, Pen pen, double cx, double cy)
@@ -643,7 +1295,17 @@ internal static class TransportIconDrawing
         dc.Pop();
     }
 
-    private static void DrawColorPalette(DrawingContext dc, Pen pen, Brush brush, double cx, double cy)
+    private static readonly Color PaletteRed = Color.FromRgb(0xFF, 0x4D, 0x4D);
+    private static readonly Color PaletteGreen = Color.FromRgb(0x4D, 0xE0, 0x5A);
+    private static readonly Color PaletteBlue = Color.FromRgb(0x4D, 0x8E, 0xFF);
+
+    private static void DrawPaletteCircle(DrawingContext dc, Color color, Point center, double radius)
+    {
+        var tint = WpfControlHelpers.FrozenBrush(Color.FromArgb(0xB4, color.R, color.G, color.B));
+        dc.DrawEllipse(tint, null, center, radius, radius);
+    }
+
+    private static void DrawColorPalette(DrawingContext dc, Pen pen, Brush brush, double cx, double cy, bool accent)
     {
         var stroke = OutlinePen(pen, 1.45);
         const double radius = 6.15;
@@ -660,6 +1322,21 @@ internal static class TransportIconDrawing
         dc.PushTransform(new TranslateTransform(
             cx - (hull.X + hull.Width * 0.5),
             cy - (hull.Y + hull.Height * 0.5)));
+
+        if (accent)
+        {
+            // RGB は「色そのもの」の記号なので、テーマ色ではなく固定の三原色。
+            // 塗りを先に全部敷き、白線を上に重ねて重なりの境界を見せる。
+            DrawPaletteCircle(dc, PaletteRed, top, radius);
+            DrawPaletteCircle(dc, PaletteGreen, left, radius);
+            DrawPaletteCircle(dc, PaletteBlue, right, radius);
+            var rim = OutlinePen(pen, 1.2);
+            dc.DrawEllipse(null, rim, top, radius, radius);
+            dc.DrawEllipse(null, rim, left, radius, radius);
+            dc.DrawEllipse(null, rim, right, radius, radius);
+            dc.Pop();
+            return;
+        }
 
         dc.DrawEllipse(brush, null, left, radius, radius);
 
@@ -680,22 +1357,22 @@ internal static class TransportIconDrawing
         dc.Pop();
     }
 
-    private static void DrawLoudnessCurve(DrawingContext dc, Pen pen)
+    private static void DrawLoudnessCurve(DrawingContext dc, Pen pen, double cx, double cy)
     {
         var geo = new StreamGeometry();
         using (var ctx = geo.Open())
         {
-            ctx.BeginFigure(new Point(8, 23), false, false);
-            ctx.LineTo(new Point(12, 17), true, false);
-            ctx.LineTo(new Point(16, 13), true, false);
-            ctx.LineTo(new Point(20, 16), true, false);
-            ctx.LineTo(new Point(24, 12), true, false);
-            ctx.LineTo(new Point(27, 14), true, false);
+            ctx.BeginFigure(new Point(cx - 9, cy + 5), false, false);
+            ctx.LineTo(new Point(cx - 5, cy - 1), true, false);
+            ctx.LineTo(new Point(cx - 1, cy - 5), true, false);
+            ctx.LineTo(new Point(cx + 3, cy - 2), true, false);
+            ctx.LineTo(new Point(cx + 7, cy - 6), true, false);
+            ctx.LineTo(new Point(cx + 10, cy - 4), true, false);
         }
 
         geo.Freeze();
         dc.DrawGeometry(null, pen, geo);
-        dc.DrawLine(pen, new Point(8, 20), new Point(27, 20));
+        dc.DrawLine(pen, new Point(cx - 9, cy + 2), new Point(cx + 10, cy + 2));
     }
 
     private static void DrawGear(DrawingContext dc, Pen pen, double cx, double cy)
@@ -793,7 +1470,7 @@ internal static class TransportIconDrawing
     }
 
     /// <summary>カセットデッキのオートリバース。上下で逆向きの矢印を付けた周回。</summary>
-    private static void DrawCassetteAutoReverse(DrawingContext dc, Pen pen)
+    private static void DrawCassetteAutoReverse(DrawingContext dc, Pen pen, Brush? fill = null)
     {
         const double left = 8.6;
         const double right = 25.4;
@@ -803,7 +1480,7 @@ internal static class TransportIconDrawing
         var loop = new StreamGeometry();
         using (var ctx = loop.Open())
         {
-            ctx.BeginFigure(new Point(left + radius, top), isFilled: false, isClosed: true);
+            ctx.BeginFigure(new Point(left + radius, top), isFilled: true, isClosed: true);
             ctx.LineTo(new Point(right - radius, top), true, true);
             ctx.ArcTo(
                 new Point(right - radius, bottom),
@@ -825,7 +1502,7 @@ internal static class TransportIconDrawing
         }
 
         loop.Freeze();
-        dc.DrawGeometry(null, pen, loop);
+        dc.DrawGeometry(fill, pen, loop);
         DrawLoopArrow(dc, pen, right - radius + 0.2, top, left: false);
         DrawLoopArrow(dc, pen, left + radius - 0.2, bottom, left: true);
     }
@@ -839,18 +1516,40 @@ internal static class TransportIconDrawing
     }
 
     /// <summary>折り角つきのファイルに音符。保存／名前を付けて保存の矢印トレイと区別する。</summary>
-    private static void DrawSaveMp3(DrawingContext dc, Pen pen)
+    private static void DrawSaveMp3(DrawingContext dc, Pen pen, double cx, double cy)
     {
-        dc.DrawLine(pen, new Point(10, 26), new Point(10, 8));
-        dc.DrawLine(pen, new Point(10, 8), new Point(18, 8));
-        dc.DrawLine(pen, new Point(18, 8), new Point(24, 14));
-        dc.DrawLine(pen, new Point(24, 14), new Point(24, 26));
-        dc.DrawLine(pen, new Point(24, 26), new Point(10, 26));
-        dc.DrawLine(pen, new Point(18, 8), new Point(18, 14));
-        dc.DrawLine(pen, new Point(18, 14), new Point(24, 14));
-        dc.DrawEllipse(null, pen, new Point(14.6, 21.4), 2.6, 1.8);
-        dc.DrawLine(pen, new Point(17.2, 21.4), new Point(17.2, 12.6));
-        dc.DrawLine(pen, new Point(17.2, 12.6), new Point(21.6, 15.2));
+        dc.DrawLine(pen, new Point(cx - 7, cy + 8), new Point(cx - 7, cy - 10));
+        dc.DrawLine(pen, new Point(cx - 7, cy - 10), new Point(cx + 1, cy - 10));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 10), new Point(cx + 7, cy - 4));
+        dc.DrawLine(pen, new Point(cx + 7, cy - 4), new Point(cx + 7, cy + 8));
+        dc.DrawLine(pen, new Point(cx + 7, cy + 8), new Point(cx - 7, cy + 8));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 10), new Point(cx + 1, cy - 4));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 4), new Point(cx + 7, cy - 4));
+        dc.DrawEllipse(null, pen, new Point(cx - 2.4, cy + 3.4), 2.6, 1.8);
+        dc.DrawLine(pen, new Point(cx + 0.2, cy + 3.4), new Point(cx + 0.2, cy - 5.4));
+        dc.DrawLine(pen, new Point(cx + 0.2, cy - 5.4), new Point(cx + 4.6, cy - 2.8));
+    }
+
+    private static void DrawExportWave(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawLine(pen, new Point(cx - 7, cy + 8), new Point(cx - 7, cy - 10));
+        dc.DrawLine(pen, new Point(cx - 7, cy - 10), new Point(cx + 1, cy - 10));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 10), new Point(cx + 7, cy - 4));
+        dc.DrawLine(pen, new Point(cx + 7, cy - 4), new Point(cx + 7, cy + 8));
+        dc.DrawLine(pen, new Point(cx + 7, cy + 8), new Point(cx - 7, cy + 8));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 10), new Point(cx + 1, cy - 4));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 4), new Point(cx + 7, cy - 4));
+        var wave = new StreamGeometry();
+        using (var ctx = wave.Open())
+        {
+            ctx.BeginFigure(new Point(cx - 5, cy + 3), false, false);
+            ctx.LineTo(new Point(cx - 2, cy - 1), true, false);
+            ctx.LineTo(new Point(cx + 1, cy + 5), true, false);
+            ctx.LineTo(new Point(cx + 4, cy + 1), true, false);
+        }
+
+        wave.Freeze();
+        dc.DrawGeometry(null, pen, wave);
     }
 
     private static void DrawChevron(DrawingContext dc, Pen pen, double centerX, double centerY, bool left)
@@ -858,6 +1557,133 @@ internal static class TransportIconDrawing
         var direction = left ? -1d : 1d;
         dc.DrawLine(pen, new Point(centerX - direction * 4, centerY - 7), new Point(centerX + direction * 3, centerY));
         dc.DrawLine(pen, new Point(centerX + direction * 3, centerY), new Point(centerX - direction * 4, centerY + 7));
+    }
+
+    private static void DrawCurvedArrow(DrawingContext dc, Pen pen, double cx, double cy, bool clockwise)
+    {
+        var arc = new StreamGeometry();
+        using (var ctx = arc.Open())
+        {
+            if (clockwise)
+            {
+                ctx.BeginFigure(new Point(cx - 7, cy - 4), false, false);
+                ctx.ArcTo(
+                    new Point(cx + 7, cy - 4),
+                    new Size(8, 8),
+                    0,
+                    true,
+                    SweepDirection.Clockwise,
+                    true,
+                    true);
+            }
+            else
+            {
+                ctx.BeginFigure(new Point(cx + 7, cy - 4), false, false);
+                ctx.ArcTo(
+                    new Point(cx - 7, cy - 4),
+                    new Size(8, 8),
+                    0,
+                    true,
+                    SweepDirection.Counterclockwise,
+                    true,
+                    true);
+            }
+        }
+
+        arc.Freeze();
+        dc.DrawGeometry(null, pen, arc);
+        var tipX = clockwise ? cx + 7 : cx - 7;
+        var dir = clockwise ? 1d : -1d;
+        dc.DrawLine(pen, new Point(tipX - dir * 4, cy - 8), new Point(tipX, cy - 4));
+        dc.DrawLine(pen, new Point(tipX - dir * 1, cy), new Point(tipX, cy - 4));
+    }
+
+    private static void DrawCut(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawLine(pen, new Point(cx - 8, cy - 7), new Point(cx + 8, cy + 7));
+        dc.DrawEllipse(null, pen, new Point(cx - 5, cy + 5), 3.2, 3.2);
+        dc.DrawEllipse(null, pen, new Point(cx + 5, cy - 5), 3.2, 3.2);
+    }
+
+    private static void DrawCopy(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 7, 11, 13));
+        dc.DrawRectangle(null, pen, new Rect(cx - 3, cy - 3, 11, 13));
+    }
+
+    private static void DrawPaste(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawRectangle(null, pen, new Rect(cx - 7, cy - 4, 14, 12));
+        dc.DrawRectangle(null, pen, new Rect(cx - 4, cy - 8, 8, 5));
+        dc.DrawLine(pen, new Point(cx - 2, cy + 1), new Point(cx + 2, cy + 1));
+        dc.DrawLine(pen, new Point(cx - 2, cy + 4), new Point(cx + 2, cy + 4));
+    }
+
+    private static void DrawSilenceSelection(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawLine(pen, new Point(cx - 9, cy), new Point(cx - 4, cy - 6));
+        dc.DrawLine(pen, new Point(cx - 4, cy - 6), new Point(cx - 4, cy + 6));
+        dc.DrawLine(pen, new Point(cx - 4, cy + 6), new Point(cx - 9, cy));
+        dc.DrawLine(pen, new Point(cx - 1, cy), new Point(cx + 9, cy));
+    }
+
+    private static void DrawInsertSilence(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawLine(pen, new Point(cx - 9, cy - 6), new Point(cx - 3, cy));
+        dc.DrawLine(pen, new Point(cx - 3, cy), new Point(cx - 9, cy + 6));
+        dc.DrawLine(pen, new Point(cx + 9, cy - 6), new Point(cx + 3, cy));
+        dc.DrawLine(pen, new Point(cx + 3, cy), new Point(cx + 9, cy + 6));
+        dc.DrawLine(pen, new Point(cx - 1, cy - 7), new Point(cx - 1, cy + 7));
+        dc.DrawLine(pen, new Point(cx + 1, cy - 7), new Point(cx + 1, cy + 7));
+    }
+
+    private static void DrawDetectSilence(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawLine(pen, new Point(cx - 9, cy + 2), new Point(cx - 5, cy - 5));
+        dc.DrawLine(pen, new Point(cx - 5, cy - 5), new Point(cx - 2, cy + 5));
+        dc.DrawLine(pen, new Point(cx - 2, cy + 5), new Point(cx + 2, cy + 5));
+        dc.DrawLine(pen, new Point(cx + 2, cy + 5), new Point(cx + 5, cy - 6));
+        dc.DrawLine(pen, new Point(cx + 5, cy - 6), new Point(cx + 9, cy + 2));
+        dc.DrawLine(pen, new Point(cx - 8, cy + 7), new Point(cx + 8, cy + 7));
+    }
+
+    private static void DrawFormatGlyph(
+        DrawingContext dc,
+        Pen pen,
+        Brush brush,
+        double cx,
+        double cy,
+        string text)
+    {
+        dc.DrawRoundedRectangle(null, pen, new Rect(cx - 10, cy - 7, 20, 14), 3, 3);
+        var mark = new FormattedText(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI Semibold"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            text.Length > 2 ? 8 : 10,
+            brush,
+            1.0);
+        dc.DrawText(mark, new Point(cx - mark.Width * 0.5, cy - mark.Height * 0.52));
+    }
+
+    private static void DrawWaapiGlyph(DrawingContext dc, Pen pen, Brush brush, double cx, double cy)
+    {
+        dc.DrawRoundedRectangle(
+            null,
+            pen,
+            new Rect(cx - 10, cy - 7, 20, 14),
+            3,
+            3);
+        var text = new FormattedText(
+            "W",
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI Semibold"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            11,
+            brush,
+            1.0);
+        dc.DrawText(text, new Point(cx - text.Width * 0.5, cy - text.Height * 0.52));
     }
 }
 
