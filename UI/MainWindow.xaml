@@ -92,10 +92,7 @@
                     Foreground="{DynamicResource StatusBarTitleForeBrush}"
                     Checked="AlwaysOnTopCheck_Changed"
                     Unchecked="AlwaysOnTopCheck_Changed" />
-          <TextBlock x:Name="SpeakerMenuLabel"
-                     Style="{StaticResource StatusTimecodeLabelStyle}"
-                     Width="Auto"
-                     Text="{x:Static domain:UiStrings.LabelStatusSpeaker}" />
+          <ui:StatusSpeakerIcon x:Name="SpeakerMenuIcon" />
           <ComboBox x:Name="SpeakerMenu"
                     Style="{StaticResource StatusTimecodeComboStyle}"
                     Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"

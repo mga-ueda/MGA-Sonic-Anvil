@@ -232,6 +232,9 @@ internal static class DesignMetrics
 
     public static double StatusTimecodeLabelWidth => From96(22);
 
+    /// <summary>ステータスバー SPEAKER 表記の代わりのアイコン一辺。</summary>
+    public static double StatusSpeakerIconSide => From96(18);
+
     /// <summary>
     /// F11／F12 全画面でのメーター／スペアナ／ラウドネス／ゴニオの倍率。
     /// DIP のまま掛けるので、OS の DPI とアプリの表示倍率は別途乗る。

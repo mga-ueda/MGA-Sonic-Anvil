@@ -1176,7 +1176,6 @@ internal static partial class UiStrings
     public static string LabelFileAssociationPlayerOnly => Get(
         "プレイヤーモードのみ",
         "Player mode only");
-    public static string LabelStatusSpeaker => "SPEAKER";
     public static string LabelStatusNowPos => "NOW\nPOS";
     public static string LabelStatusSelStart => "SEL\nST";
     public static string LabelStatusSelWidth => "SEL\nWID";
