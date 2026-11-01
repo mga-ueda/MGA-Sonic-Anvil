@@ -48,11 +48,9 @@ public partial class MainWindow
             or TransportCommand.AmpZoomMax
             or TransportCommand.AmpZoomReset
             or TransportCommand.CenterPlayhead
-            or TransportCommand.ViewWaveform
             or TransportCommand.ToggleLoudnessView
             or TransportCommand.ToggleMinimalChrome
             or TransportCommand.MaximizeWaveform
-            or TransportCommand.AlwaysOnTop
             or TransportCommand.OpenManual
             or TransportCommand.OpenSettings
             or TransportCommand.OpenColorPanel

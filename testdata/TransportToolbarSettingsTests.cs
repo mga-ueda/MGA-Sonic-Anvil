@@ -263,15 +263,7 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains(TransportCommand.NextTrack, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.CopyAllTabTimes, TransportToolbarCatalog.AllCommands);
         Assert.DoesNotContain(TransportCommand.TimeZoomIn, TransportToolbarCatalog.AllCommands);
-        // メニューのチェックボックストグルは非掲載
-        Assert.DoesNotContain(TransportCommand.ToggleRangeClick, TransportToolbarCatalog.AllCommands);
-        Assert.DoesNotContain(TransportCommand.AlwaysOnTop, TransportToolbarCatalog.AllCommands);
         Assert.DoesNotContain(TransportCommand.ToggleWaapi, TransportToolbarCatalog.AllCommands);
-        Assert.DoesNotContain(TransportCommand.ViewWaveform, TransportToolbarCatalog.AllCommands);
-        Assert.DoesNotContain(TransportCommand.TileOff, TransportToolbarCatalog.AllCommands);
-        Assert.DoesNotContain(TransportCommand.TileHorizontal, TransportToolbarCatalog.AllCommands);
-        Assert.DoesNotContain(TransportCommand.TileVertical, TransportToolbarCatalog.AllCommands);
-        Assert.DoesNotContain(TransportCommand.TileGrid, TransportToolbarCatalog.AllCommands);
         Assert.True(TransportToolbarCatalog.TryGetItem(TransportCommand.Cut, out var cut));
         Assert.Equal(TransportIcon.Cut, cut.Icon);
     }

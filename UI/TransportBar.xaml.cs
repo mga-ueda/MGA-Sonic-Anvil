@@ -321,10 +321,6 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    /// <summary>互換。並び適用に委譲。</summary>
-    public void ApplyVisibilityFromSettings(AppSettings settings) =>
-        ApplyLayoutFromSettings(settings);
-
     /// <summary>押せるコマンドがグループとして見えているか（領域自体の表示判定用）。</summary>
     public bool HasVisibleCommands =>
         _groupVeils.Any(veil => veil.Visibility == Visibility.Visible);

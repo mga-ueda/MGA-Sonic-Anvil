@@ -209,9 +209,6 @@ public partial class MainWindow
             case TransportCommand.DeleteMarkers:
                 ApplyDeleteMarkers();
                 break;
-            case TransportCommand.ToggleRangeClick:
-                ToggleRangeClick();
-                break;
             case TransportCommand.SampleRate:
                 PromptFormatConvert(FormatConvertKind.SampleRate);
                 break;
@@ -310,21 +307,6 @@ public partial class MainWindow
             case TransportCommand.NextTrack:
                 TryStepLibraryPlaylist(1);
                 break;
-            case TransportCommand.TileOff:
-                SetWaveformTileArrange(WaveformTileArrange.Off);
-                break;
-            case TransportCommand.TileHorizontal:
-                SetWaveformTileArrange(WaveformTileArrange.Horizontal);
-                break;
-            case TransportCommand.TileVertical:
-                SetWaveformTileArrange(WaveformTileArrange.Vertical);
-                break;
-            case TransportCommand.TileGrid:
-                SetWaveformTileArrange(WaveformTileArrange.Grid);
-                break;
-            case TransportCommand.ViewWaveform:
-                Waveform.SetAnalysisView(WaveformAnalysisView.Waveform);
-                break;
             case TransportCommand.ToggleAnalysis:
             case TransportCommand.ToggleSpectrogram:
                 Waveform.CycleSpectrogramView();
@@ -358,9 +340,6 @@ public partial class MainWindow
                 break;
             case TransportCommand.ToggleAnalyzerMaximize:
                 ToggleAnalyzerMaximize();
-                break;
-            case TransportCommand.AlwaysOnTop:
-                AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
                 break;
             case TransportCommand.ToggleWaapi:
                 ToggleWaapiPanel();

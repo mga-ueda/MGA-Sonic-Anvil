@@ -12,7 +12,6 @@ namespace MgaSonicAnvil.UI;
 internal enum TransportIcon
 {
     PlayPause,
-    Stop,
     Record,
     GoToStart,
     GoToEnd,
@@ -47,7 +46,6 @@ internal enum TransportIcon
     ClearLoop,
     SetRegion,
     DeleteMarkers,
-    RangeClick,
     Save,
     SaveAs,
     SaveMp3,
@@ -80,10 +78,8 @@ internal enum TransportIcon
     CopySelectionTime,
     CopyFilePath,
     CloseTab,
-    AlwaysOnTop,
     WaveformMaximize,
     WaveformRestore,
-    WaveformView,
     SeekViewLeft,
     SeekViewRight,
     MinimalChrome,
@@ -95,10 +91,6 @@ internal enum TransportIcon
     DeleteAllRegions,
     PreviousTrack,
     NextTrack,
-    TileOff,
-    TileHorizontal,
-    TileVertical,
-    TileGrid,
     CopyAllTabTimes,
 }
 
@@ -148,7 +140,6 @@ internal enum TransportCommand
     ClearLoop,
     SetRegion,
     DeleteMarkers,
-    ToggleRangeClick,
     NewDocument,
     Open,
     Save,
@@ -179,10 +170,8 @@ internal enum TransportCommand
     CopySelectionTime,
     CopyFilePath,
     CloseTab,
-    AlwaysOnTop,
     MaximizeWaveform,
     ToggleMinimalChrome,
-    ViewWaveform,
     SeekViewLeft,
     SeekViewRight,
     CopyFileName,
@@ -193,10 +182,6 @@ internal enum TransportCommand
     DeleteAllRegions,
     PreviousTrack,
     NextTrack,
-    TileOff,
-    TileHorizontal,
-    TileVertical,
-    TileGrid,
     CopyAllTabTimes,
 }
 
@@ -297,18 +282,11 @@ internal sealed class TransportIconButton : Button
             fore = Theme.Get("RecordLatchForeBrush");
         }
 
-        // 解析／最前面／タイルなど「今オフ」のトグルは弱い色。F9–F12 のモード切替は
+        // 解析など「今オフ」のトグルは弱い色。F9–F12 のモード切替は
         // 未選択でも押せるので、無効色にはしない（選択は IsLatched／アイコン差し替えで示す）。
         if (Icon is TransportIcon.Analysis
             or TransportIcon.Overlay
-            or TransportIcon.Loudness
-            or TransportIcon.RangeClick
-            or TransportIcon.WaveformView
-            or TransportIcon.AlwaysOnTop
-            or TransportIcon.TileOff
-            or TransportIcon.TileHorizontal
-            or TransportIcon.TileVertical
-            or TransportIcon.TileGrid)
+            or TransportIcon.Loudness)
         {
             fore = IsLatched ? fore : TransportChrome.Fore(false);
         }
@@ -478,9 +456,6 @@ internal static class TransportIconDrawing
                     DrawPlayTriangle(dc, pen, playFill, cx - 5, cx + 8, cy, 9);
                 }
 
-                break;
-            case TransportIcon.Stop:
-                dc.DrawRectangle(fill, stroke, new Rect(cx - 6, cy - 6, 12, 12));
                 break;
             case TransportIcon.Record:
                 if (latched && recordFill is not null)
@@ -661,12 +636,6 @@ internal static class TransportIconDrawing
             case TransportIcon.SetRegion:
                 DrawRegionBrackets(dc, pen, regionFill, cx - 7, cx + 7, cy - 8, cy + 8, 4);
                 break;
-            case TransportIcon.RangeClick:
-                // Hi Low Low — マーカークリックの拍イメージ
-                dc.DrawLine(pen, new Point(cx - 6, cy - 9), new Point(cx - 6, cy + 9));
-                dc.DrawLine(pen, new Point(cx, cy - 3), new Point(cx, cy + 9));
-                dc.DrawLine(pen, new Point(cx + 6, cy - 3), new Point(cx + 6, cy + 9));
-                break;
             case TransportIcon.Analysis:
                 DrawSpectrumBars(dc, pen, cx, cy);
                 break;
@@ -794,25 +763,6 @@ internal static class TransportIconDrawing
                 DrawTriangle(dc, pen, cx + 6.5, cx - 0.5, cy, 6.5);
                 DrawTriangle(dc, pen, cx - 1.5, cx - 8.5, cy, 6.5);
                 break;
-            case TransportIcon.TileOff:
-                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 7, 16, 5));
-                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 1, 16, 5));
-                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy + 5, 16, 4));
-                break;
-            case TransportIcon.TileHorizontal:
-                dc.DrawRectangle(null, pen, new Rect(cx - 9, cy - 7, 8, 14));
-                dc.DrawRectangle(null, pen, new Rect(cx + 1, cy - 7, 8, 14));
-                break;
-            case TransportIcon.TileVertical:
-                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 9, 16, 7));
-                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy + 2, 16, 7));
-                break;
-            case TransportIcon.TileGrid:
-                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 8, 7, 7));
-                dc.DrawRectangle(null, pen, new Rect(cx + 1, cy - 8, 7, 7));
-                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy + 1, 7, 7));
-                dc.DrawRectangle(null, pen, new Rect(cx + 1, cy + 1, 7, 7));
-                break;
             case TransportIcon.CopyAllTabTimes:
                 dc.DrawEllipse(null, pen, new Point(cx - 2, cy - 1), 6.5, 6.5);
                 dc.DrawLine(pen, new Point(cx - 2, cy - 1), new Point(cx - 2, cy - 5));
@@ -881,12 +831,6 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(cx + 5, cy - 4), new Point(cx + 9, cy));
                 dc.DrawLine(pen, new Point(cx + 9, cy), new Point(cx + 5, cy + 4));
                 break;
-            case TransportIcon.AlwaysOnTop:
-                dc.DrawRectangle(null, pen, new Rect(cx - 8, cy - 2, 16, 10));
-                dc.DrawLine(pen, new Point(cx, cy - 9), new Point(cx, cy - 3));
-                dc.DrawLine(pen, new Point(cx - 4, cy - 6), new Point(cx, cy - 9));
-                dc.DrawLine(pen, new Point(cx + 4, cy - 6), new Point(cx, cy - 9));
-                break;
             case TransportIcon.WaveformMaximize:
                 DrawEditorMode(dc, pen, cx, cy - 1);
                 dc.DrawLine(pen, new Point(cx - 9, cy + 8), new Point(cx - 5, cy + 8));
@@ -897,9 +841,6 @@ internal static class TransportIconDrawing
             case TransportIcon.WaveformRestore:
                 DrawEditorMode(dc, pen, cx, cy);
                 dc.DrawRectangle(null, pen, new Rect(cx - 9, cy - 9, 6, 5));
-                break;
-            case TransportIcon.WaveformView:
-                DrawEditorMode(dc, pen, cx, cy);
                 break;
             case TransportIcon.SeekViewLeft:
                 // 表示枠の左端へ。先頭へ（|<）と区別するため枠を描く。

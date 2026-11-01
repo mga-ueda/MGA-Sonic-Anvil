@@ -264,7 +264,6 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ExportWave));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleMinimalChrome));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.MaximizeWaveform));
-        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.AlwaysOnTop));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SeekViewLeft));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SeekViewRight));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.PreviousTrack));

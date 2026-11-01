@@ -152,7 +152,6 @@ public sealed class TransportIconThemeTests
         {
             foreach (var icon in new[]
             {
-                TransportIcon.Stop,
                 TransportIcon.GoToStart,
                 TransportIcon.GoToEnd,
                 TransportIcon.PreviousMarker,
