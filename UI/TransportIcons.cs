@@ -517,10 +517,10 @@ internal static class TransportIconDrawing
                 DrawChevron(dc, pen, cx + 5, cy, left: false);
                 break;
             case TransportIcon.Undo:
-                DrawCurvedArrow(dc, pen, cx, cy, clockwise: false);
+                DrawUndoRedoArrow(dc, pen, cx, cy, redo: false);
                 break;
             case TransportIcon.Redo:
-                DrawCurvedArrow(dc, pen, cx, cy, clockwise: true);
+                DrawUndoRedoArrow(dc, pen, cx, cy, redo: true);
                 break;
             case TransportIcon.Cut:
                 DrawCut(dc, pen, cx, cy);
@@ -854,8 +854,7 @@ internal static class TransportIconDrawing
                 DrawPlayTriangle(dc, pen, playFill, cx - 2.5, cx + 4.5, cy, 4);
                 break;
             case TransportIcon.Restart:
-                DrawCurvedArrow(dc, pen, cx - 1, cy, clockwise: false);
-                DrawPlayTriangle(dc, pen, playFill, cx + 4, cx + 10, cy, 5);
+                DrawRestart(dc, pen, playFill, cx, cy);
                 break;
             case TransportIcon.Preroll:
                 DrawChevron(dc, pen, cx - 5, cy, left: true);
@@ -1557,43 +1556,76 @@ internal static class TransportIconDrawing
         dc.DrawLine(pen, new Point(centerX + direction * 3, centerY), new Point(centerX - direction * 4, centerY + 7));
     }
 
-    private static void DrawCurvedArrow(DrawingContext dc, Pen pen, double cx, double cy, bool clockwise)
+    /// <summary>
+    /// 元に戻す（↶ の「戻り矢印」）。左向き矢じり → 横棒 → 右で半円を描いて下段へ戻る。
+    /// redo は左右反転。外形の縦横中央がアイコン枠の中心に来る座標で描く。
+    /// </summary>
+    private static void DrawUndoRedoArrow(DrawingContext dc, Pen pen, double cx, double cy, bool redo)
     {
-        var arc = new StreamGeometry();
-        using (var ctx = arc.Open())
+        if (redo)
         {
-            if (clockwise)
-            {
-                ctx.BeginFigure(new Point(cx - 7, cy - 4), false, false);
-                ctx.ArcTo(
-                    new Point(cx + 7, cy - 4),
-                    new Size(8, 8),
-                    0,
-                    true,
-                    SweepDirection.Clockwise,
-                    true,
-                    true);
-            }
-            else
-            {
-                ctx.BeginFigure(new Point(cx + 7, cy - 4), false, false);
-                ctx.ArcTo(
-                    new Point(cx - 7, cy - 4),
-                    new Size(8, 8),
-                    0,
-                    true,
-                    SweepDirection.Counterclockwise,
-                    true,
-                    true);
-            }
+            dc.PushTransform(new ScaleTransform(-1, 1, cx, cy));
         }
 
-        arc.Freeze();
-        dc.DrawGeometry(null, pen, arc);
-        var tipX = clockwise ? cx + 7 : cx - 7;
-        var dir = clockwise ? 1d : -1d;
-        dc.DrawLine(pen, new Point(tipX - dir * 4, cy - 8), new Point(tipX, cy - 4));
-        dc.DrawLine(pen, new Point(tipX - dir * 1, cy), new Point(tipX, cy - 4));
+        // 外形: x = cx-8.5 … cx+8.25、y = cy-9 … cy+7（見た目の中心がボタン中心に来る）。
+        var tip = new Point(cx - 8.5, cy - 4.5);
+        var bendTop = new Point(cx + 2.5, cy - 4.5);
+        var bendBottom = new Point(cx + 2.5, cy + 7);
+        var tail = new Point(cx - 4.5, cy + 7);
+        var path = new StreamGeometry();
+        using (var ctx = path.Open())
+        {
+            ctx.BeginFigure(tip, false, false);
+            ctx.LineTo(bendTop, true, true);
+            ctx.ArcTo(bendBottom, new Size(5.75, 5.75), 0, false, SweepDirection.Clockwise, true, true);
+            ctx.LineTo(tail, true, true);
+
+            ctx.BeginFigure(new Point(tip.X + 4.5, tip.Y - 4.5), false, false);
+            ctx.LineTo(tip, true, true);
+            ctx.LineTo(new Point(tip.X + 4.5, tip.Y + 4.5), true, true);
+        }
+
+        path.Freeze();
+        dc.DrawGeometry(null, pen, path);
+
+        if (redo)
+        {
+            dc.Pop();
+        }
+    }
+
+    /// <summary>
+    /// やり直し再生。反時計回りの円矢印（上で左向きの矢じり）の中に再生三角。
+    /// 三角は重心（底辺から 1/3）を円の中心に合わせる。
+    /// </summary>
+    private static void DrawRestart(DrawingContext dc, Pen pen, Brush? playFill, double cx, double cy)
+    {
+        const double r = 8d;
+        var center = new Point(cx, cy + 1.5);
+        var top = new Point(center.X, center.Y - r);
+        // 円の左上を開け、左やや上から下→右→上へ回って天辺で止める。
+        var startRad = 200d * Math.PI / 180d;
+        var start = new Point(center.X + r * Math.Cos(startRad), center.Y + r * Math.Sin(startRad));
+        var path = new StreamGeometry();
+        using (var ctx = path.Open())
+        {
+            ctx.BeginFigure(start, false, false);
+            ctx.ArcTo(top, new Size(r, r), 0, true, SweepDirection.Counterclockwise, true, true);
+            ctx.LineTo(new Point(top.X - 2.5, top.Y), true, true);
+
+            var tip = new Point(top.X - 2.5, top.Y);
+            ctx.BeginFigure(new Point(tip.X + 3.8, tip.Y - 3.8), false, false);
+            ctx.LineTo(tip, true, true);
+            ctx.LineTo(new Point(tip.X + 3.8, tip.Y + 3.8), true, true);
+        }
+
+        path.Freeze();
+        dc.DrawGeometry(null, pen, path);
+
+        const double half = 3.6;
+        const double length = 6.2;
+        var baseX = center.X - length / 3d;
+        DrawPlayTriangle(dc, pen, playFill, baseX, baseX + length, center.Y, half);
     }
 
     private static void DrawCut(DrawingContext dc, Pen pen, double cx, double cy)
