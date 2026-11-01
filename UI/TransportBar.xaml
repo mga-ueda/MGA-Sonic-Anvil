@@ -7,7 +7,7 @@
              ToolTipService.IsEnabled="True"
              MinHeight="{x:Static ui:DesignMetrics.TransportRowHeight}"
              Background="Transparent">
-  <!-- 幅が足りないときはグループ単位で折り返し、行を増やして全ボタンを見せる。 -->
+  <!-- グループは丸みベール単位。幅が足りないときはその単位で折り返す。 -->
   <WrapPanel x:Name="ItemsHost"
              Orientation="Horizontal"
              HorizontalAlignment="Left"

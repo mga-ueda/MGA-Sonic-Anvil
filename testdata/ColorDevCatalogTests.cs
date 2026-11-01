@@ -34,7 +34,7 @@ public sealed class ColorDevCatalogTests
     [InlineData("VectorScopeBackBrush", "VectorScope")]
     [InlineData("PlayerLevelMeterTickBrush", "Player")]
     [InlineData("TransportBackBrush", "Transport")]
-    [InlineData("TransportToolbarSeparatorBrush", "Transport")]
+    [InlineData("TransportToolbarGroupVeilBrush", "Transport")]
     [InlineData("ProjectBarBackBrush", "Transport")]
     [InlineData("HistoryStripBackBrush", "Transport")]
     [InlineData("ActionCopyrightForeBrush", "Transport")]
