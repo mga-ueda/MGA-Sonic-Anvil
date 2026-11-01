@@ -321,13 +321,40 @@ internal static class TransportToolbarCatalog
         string.Equals(entry?.Trim(), SeparatorToken, StringComparison.Ordinal);
 
     /// <summary>カタログ順＋既定表示コマンドのみ＋グループ境界。</summary>
-    public static string[] CreateDefaultLayout()
+    public static string[] CreateDefaultLayout() =>
+        BuildAutoLayout(
+            All.Where(item => item.InDefaultLayout).Select(item => item.Command.ToString()));
+
+    /// <summary>
+    /// 表示コマンドをカタログ順に並べ、グループが変わるところへセパレータを入れる（おまかせ配置）。
+    /// </summary>
+    public static string[] BuildAutoLayout(IEnumerable<string>? shownCommands)
     {
+        var shown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var raw in shownCommands ?? [])
+        {
+            if (IsSeparator(raw))
+            {
+                continue;
+            }
+
+            if (TryGetItem(raw, out var item))
+            {
+                shown.Add(item.Command.ToString());
+            }
+        }
+
+        if (shown.Count == 0)
+        {
+            return [];
+        }
+
         var result = new List<string>();
         string? currentGroup = null;
         foreach (var item in All)
         {
-            if (!item.InDefaultLayout)
+            var name = item.Command.ToString();
+            if (!shown.Contains(name))
             {
                 continue;
             }
@@ -342,7 +369,7 @@ internal static class TransportToolbarCatalog
             }
 
             currentGroup = group;
-            result.Add(item.Command.ToString());
+            result.Add(name);
         }
 
         return [.. result];
@@ -350,6 +377,7 @@ internal static class TransportToolbarCatalog
 
     /// <summary>
     /// 設定から実際の並びを解決。Layout が空なら既定＋ Hidden で移行。
+    /// 表示コマンドは常にカタログ順＋カテゴリ境界へ組み直す。
     /// </summary>
     public static string[] ResolveLayout(AppSettings settings) =>
         ResolveLayout(settings.TransportToolbarLayout, settings.HiddenTransportToolbarCommands);
@@ -357,22 +385,31 @@ internal static class TransportToolbarCatalog
     public static string[] ResolveLayout(IEnumerable<string>? layout, IEnumerable<string>? hidden)
     {
         var stored = layout?.ToArray() ?? [];
+        string[] baseLayout;
         if (stored.Length > 0)
         {
-            return NormalizeLayout(stored);
+            baseLayout = NormalizeLayout(stored);
         }
-
-        var defaults = CreateDefaultLayout();
-        var hiddenSet = new HashSet<string>(
-            NormalizeHidden(hidden),
-            StringComparer.OrdinalIgnoreCase);
-        if (hiddenSet.Count == 0)
+        else
         {
-            return defaults;
+            var defaults = CreateDefaultLayout();
+            var hiddenSet = new HashSet<string>(
+                NormalizeHidden(hidden),
+                StringComparer.OrdinalIgnoreCase);
+            baseLayout = hiddenSet.Count == 0
+                ? defaults
+                : NormalizeLayout(
+                    defaults.Where(entry => IsSeparator(entry) || !hiddenSet.Contains(entry)));
         }
 
-        return NormalizeLayout(
-            defaults.Where(entry => IsSeparator(entry) || !hiddenSet.Contains(entry)));
+        return BuildAutoLayout(baseLayout);
+    }
+
+    /// <summary>Layout を正本にし Hidden を同期した組を返す（並びはおまかせ配置へ正規化）。</summary>
+    public static (string[] Layout, string[] Hidden) ApplyLayout(IEnumerable<string>? layout)
+    {
+        var normalized = BuildAutoLayout(NormalizeLayout(layout));
+        return (normalized, HiddenFromLayout(normalized));
     }
 
     /// <summary>未知名除去・コマンド重複除去・端／連続セパレータ整理。</summary>
@@ -529,12 +566,5 @@ internal static class TransportToolbarCatalog
         }
 
         return [.. result];
-    }
-
-    /// <summary>Layout を正本にし Hidden を同期した組を返す。</summary>
-    public static (string[] Layout, string[] Hidden) ApplyLayout(IEnumerable<string>? layout)
-    {
-        var normalized = NormalizeLayout(layout);
-        return (normalized, HiddenFromLayout(normalized));
     }
 }

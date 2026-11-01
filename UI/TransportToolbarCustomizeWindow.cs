@@ -6,16 +6,13 @@ using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>ツールバーの並び・境界を Excel 風に調整する専用ダイアログ。</summary>
+/// <summary>ツールバーに出すコマンドを選ぶ専用ダイアログ。並びは常におまかせ配置。</summary>
 internal sealed class TransportToolbarCustomizeWindow : Window
 {
     private readonly ListBox _availableList = CreateList();
     private readonly ListBox _currentList = CreateList();
     private readonly RoundedButton _addButton;
     private readonly RoundedButton _removeButton;
-    private readonly RoundedButton _upButton;
-    private readonly RoundedButton _downButton;
-    private readonly RoundedButton _separatorButton;
     private readonly TextBlock _descriptionText;
     private readonly WrapPanel _iconStatesPanel;
     private readonly Action<string[]>? _preview;
@@ -67,18 +64,6 @@ internal sealed class TransportToolbarCustomizeWindow : Window
             UiStrings.ButtonTransportToolbarRemove,
             RemoveSelected,
             new Thickness(0, 0, 0, 0));
-        _upButton = CreateActionButton(
-            UiStrings.ButtonLibraryExplorerRootUp,
-            () => MoveSelected(-1),
-            new Thickness(0, 0, 0, 8));
-        _downButton = CreateActionButton(
-            UiStrings.ButtonLibraryExplorerRootDown,
-            () => MoveSelected(1),
-            new Thickness(0, 0, 0, 0));
-        _separatorButton = CreateActionButton(
-            UiStrings.ButtonTransportToolbarInsertSeparator,
-            InsertSeparator,
-            new Thickness(0, 0, 8, 0));
         var resetButton = CreateActionButton(
             UiStrings.ButtonTransportToolbarResetLayout,
             ResetToDefault,
@@ -117,30 +102,17 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         WireDescriptionHover(_currentList);
         _availableList.SelectionChanged += (_, _) =>
         {
-            if (_availableList.SelectedItem is not null)
-            {
-                _currentList.SelectedItem = null;
-            }
-
             RefreshButtons();
             RefreshDescription();
         };
         _currentList.SelectionChanged += (_, _) =>
         {
-            if (_currentList.SelectedItem is not null)
-            {
-                _availableList.SelectedItem = null;
-            }
-
             RefreshButtons();
             RefreshDescription();
         };
 
         ActionButtonLooks.ApplyClear(_addButton);
         ActionButtonLooks.ApplyClear(_removeButton);
-        ActionButtonLooks.ApplyClear(_upButton);
-        ActionButtonLooks.ApplyClear(_downButton);
-        ActionButtonLooks.ApplyClear(_separatorButton);
         ActionButtonLooks.ApplyClear(resetButton);
 
         var ok = CreateDialogButton(UiStrings.ButtonOk, accept: true, accent: true, isDefault: true);
@@ -154,19 +126,10 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         midButtons.Children.Add(_addButton);
         midButtons.Children.Add(_removeButton);
 
-        var orderButtons = new StackPanel
-        {
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(8, 0, 0, 0),
-        };
-        orderButtons.Children.Add(_upButton);
-        orderButtons.Children.Add(_downButton);
-
         var lists = new Grid();
         lists.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         lists.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         lists.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        lists.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         lists.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         lists.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
@@ -182,14 +145,11 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         Grid.SetColumn(midButtons, 1);
         Grid.SetRow(_currentList, 1);
         Grid.SetColumn(_currentList, 2);
-        Grid.SetRow(orderButtons, 1);
-        Grid.SetColumn(orderButtons, 3);
         lists.Children.Add(availableHeader);
         lists.Children.Add(currentHeader);
         lists.Children.Add(_availableList);
         lists.Children.Add(midButtons);
         lists.Children.Add(_currentList);
-        lists.Children.Add(orderButtons);
 
         var bottomLeft = new StackPanel
         {
@@ -197,7 +157,6 @@ internal sealed class TransportToolbarCustomizeWindow : Window
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        bottomLeft.Children.Add(_separatorButton);
         bottomLeft.Children.Add(resetButton);
 
         var bottomRight = new StackPanel
@@ -304,18 +263,9 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         return placed;
     }
 
-    private string[] ReadLayout()
-    {
-        var entries = new List<string>();
-        foreach (var row in _currentList.Items.OfType<LayoutRow>())
-        {
-            entries.Add(row.IsSeparator
-                ? TransportToolbarCatalog.SeparatorToken
-                : row.Command.ToString());
-        }
-
-        return TransportToolbarCatalog.NormalizeLayout(entries);
-    }
+    private string[] ReadLayout() =>
+        TransportToolbarCatalog.BuildAutoLayout(
+            ReadPlacedCommands().Select(command => command.ToString()));
 
     private void AddSelected()
     {
@@ -327,132 +277,114 @@ internal sealed class TransportToolbarCustomizeWindow : Window
             return;
         }
 
-        var insertAt = _currentList.SelectedIndex;
-        if (insertAt < 0)
-        {
-            insertAt = _currentList.Items.Count;
-        }
-        else
-        {
-            insertAt++;
-        }
-
-        LayoutRow? last = null;
+        // 連続追加のため、追加後も候補リストの同じ位置付近を選んだままフォーカスを戻す。
+        var resumeIndex = FirstSelectedIndex(_availableList, selected);
+        var placed = ReadPlacedCommands();
         foreach (var row in selected)
         {
-            _currentList.Items.Insert(insertAt++, row);
-            last = row;
+            placed.Add(row.Command);
         }
 
-        RebuildAvailableList(ReadPlacedCommands());
-        _currentList.SelectedItems.Clear();
-        if (last is not null)
-        {
-            _currentList.SelectedItem = last;
-            _currentList.ScrollIntoView(last);
-        }
-
-        RefreshButtons();
+        LoadLayout(TransportToolbarCatalog.BuildAutoLayout(
+            placed.Select(command => command.ToString())));
+        SelectNearestCommandRow(_availableList, resumeIndex);
         NotifyPreview();
     }
 
     private void RemoveSelected()
     {
-        var selected = _currentList.SelectedItems.OfType<LayoutRow>().ToArray();
+        var selected = _currentList.SelectedItems.OfType<LayoutRow>()
+            .Where(row => !row.IsSeparator && !row.IsCategoryHeader)
+            .ToArray();
         if (selected.Length == 0)
         {
             return;
         }
 
-        var index = _currentList.SelectedIndex;
+        // 連続削除のため、削除後も配置リストの同じ位置付近を選んだままフォーカスを戻す。
+        var resumeIndex = FirstSelectedIndex(_currentList, selected);
+        var placed = ReadPlacedCommands();
         foreach (var row in selected)
         {
-            _currentList.Items.Remove(row);
+            placed.Remove(row.Command);
         }
 
-        RebuildAvailableList(ReadPlacedCommands());
-        if (_currentList.Items.Count > 0)
-        {
-            _currentList.SelectedIndex = Math.Clamp(index, 0, _currentList.Items.Count - 1);
-        }
-
-        RefreshButtons();
+        LoadLayout(TransportToolbarCatalog.BuildAutoLayout(
+            placed.Select(command => command.ToString())));
+        SelectNearestCommandRow(_currentList, resumeIndex);
         NotifyPreview();
     }
 
-    private void InsertSeparator()
+    private static int FirstSelectedIndex(ListBox list, IReadOnlyList<LayoutRow> selected)
     {
-        var insertAt = _currentList.SelectedIndex;
-        if (insertAt < 0)
+        var min = int.MaxValue;
+        foreach (var row in selected)
         {
-            insertAt = _currentList.Items.Count;
-        }
-        else
-        {
-            insertAt++;
+            var index = list.Items.IndexOf(row);
+            if (index >= 0 && index < min)
+            {
+                min = index;
+            }
         }
 
-        var row = LayoutRow.Separator();
-        _currentList.Items.Insert(insertAt, row);
-        _currentList.SelectedItem = row;
-        _currentList.ScrollIntoView(row);
-        RefreshButtons();
-        NotifyPreview();
+        return min == int.MaxValue ? 0 : min;
     }
 
-    private void MoveSelected(int direction)
+    private static void SelectNearestCommandRow(ListBox list, int preferredIndex)
     {
-        var items = _currentList.Items.OfType<LayoutRow>().ToList();
-        var selected = _currentList.SelectedItems.OfType<LayoutRow>().ToHashSet();
-        if (selected.Count == 0)
+        if (list.Items.Count == 0)
         {
+            list.UnselectAll();
+            list.Focus();
             return;
         }
 
-        if (direction < 0)
+        LayoutRow? pick = null;
+        for (var i = Math.Max(0, preferredIndex); i < list.Items.Count; i++)
         {
-            for (var i = 1; i < items.Count; i++)
+            if (list.Items[i] is LayoutRow { IsSeparator: false, IsCategoryHeader: false } row)
             {
-                if (!selected.Contains(items[i]) || selected.Contains(items[i - 1]))
-                {
-                    continue;
-                }
-
-                (items[i - 1], items[i]) = (items[i], items[i - 1]);
-            }
-        }
-        else
-        {
-            for (var i = items.Count - 2; i >= 0; i--)
-            {
-                if (!selected.Contains(items[i]) || selected.Contains(items[i + 1]))
-                {
-                    continue;
-                }
-
-                (items[i + 1], items[i]) = (items[i], items[i + 1]);
+                pick = row;
+                break;
             }
         }
 
-        _currentList.Items.Clear();
-        foreach (var item in items)
+        if (pick is null)
         {
-            _currentList.Items.Add(item);
+            for (var i = Math.Min(preferredIndex, list.Items.Count) - 1; i >= 0; i--)
+            {
+                if (list.Items[i] is LayoutRow { IsSeparator: false, IsCategoryHeader: false } row)
+                {
+                    pick = row;
+                    break;
+                }
+            }
         }
 
-        _currentList.SelectedItems.Clear();
-        foreach (var item in selected)
+        list.UnselectAll();
+        if (pick is null)
         {
-            _currentList.SelectedItems.Add(item);
+            list.Focus();
+            return;
         }
 
-        if (_currentList.SelectedItem is LayoutRow focus)
-        {
-            _currentList.ScrollIntoView(focus);
-        }
+        list.SelectedItem = pick;
+        list.ScrollIntoView(pick);
+        // Items 再構築直後はコンテナ未生成のため、フォーカスはレイアウト後に当てる。
+        list.Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                if (!list.IsKeyboardFocusWithin)
+                {
+                    list.Focus();
+                }
 
-        RefreshButtons();
-        NotifyPreview();
+                if (list.ItemContainerGenerator.ContainerFromItem(pick) is ListBoxItem container)
+                {
+                    container.Focus();
+                }
+            }));
     }
 
     private void ResetToDefault()
@@ -465,24 +397,8 @@ internal sealed class TransportToolbarCustomizeWindow : Window
     {
         _addButton.IsEnabled = _availableList.SelectedItems.OfType<LayoutRow>()
             .Any(row => !row.IsSeparator && !row.IsCategoryHeader);
-        _removeButton.IsEnabled = _currentList.SelectedItems.Count > 0;
-        var selected = _currentList.SelectedItems.OfType<LayoutRow>().ToHashSet();
-        var min = int.MaxValue;
-        var max = -1;
-        for (var i = 0; i < _currentList.Items.Count; i++)
-        {
-            if (_currentList.Items[i] is not LayoutRow row || !selected.Contains(row))
-            {
-                continue;
-            }
-
-            min = Math.Min(min, i);
-            max = Math.Max(max, i);
-        }
-
-        _upButton.IsEnabled = selected.Count > 0 && min > 0;
-        _downButton.IsEnabled = selected.Count > 0 && max >= 0 && max < _currentList.Items.Count - 1;
-        _separatorButton.IsEnabled = true;
+        _removeButton.IsEnabled = _currentList.SelectedItems.OfType<LayoutRow>()
+            .Any(row => !row.IsSeparator && !row.IsCategoryHeader);
     }
 
     private void WireDescriptionHover(ListBox list)
@@ -535,9 +451,10 @@ internal sealed class TransportToolbarCustomizeWindow : Window
 
     private void RefreshDescription()
     {
+        // 追加候補（左）を配置済み（右）より優先して説明する。
         var row = _hoveredRow
-            ?? _currentList.SelectedItem as LayoutRow
-            ?? _availableList.SelectedItem as LayoutRow;
+            ?? _availableList.SelectedItem as LayoutRow
+            ?? _currentList.SelectedItem as LayoutRow;
         if (row is null || row.IsCategoryHeader)
         {
             _descriptionText.Text = UiStrings.LabelTransportToolbarDescriptionHint;

@@ -25,6 +25,47 @@ public sealed class TransportToolbarSettingsTests
     }
 
     [Fact]
+    public void BuildAutoLayout_OrdersByCatalogAndInsertsGroupSeparators()
+    {
+        var layout = TransportToolbarCatalog.BuildAutoLayout(
+        [
+            nameof(TransportCommand.Open),
+            nameof(TransportCommand.TogglePlayback),
+            nameof(TransportCommand.Delete),
+        ]);
+        Assert.Equal(
+            [
+                nameof(TransportCommand.TogglePlayback),
+                TransportToolbarCatalog.SeparatorToken,
+                nameof(TransportCommand.Delete),
+                TransportToolbarCatalog.SeparatorToken,
+                nameof(TransportCommand.Open),
+            ],
+            layout);
+        Assert.Equal(
+            TransportToolbarCatalog.CreateDefaultLayout(),
+            TransportToolbarCatalog.BuildAutoLayout(TransportToolbarCatalog.CreateDefaultLayout()));
+    }
+
+    [Fact]
+    public void ResolveLayout_AlwaysRebuildsToCatalogOrder()
+    {
+        var resolved = TransportToolbarCatalog.ResolveLayout(
+            [
+                nameof(TransportCommand.Open),
+                nameof(TransportCommand.TogglePlayback),
+            ],
+            hidden: null);
+        Assert.Equal(
+            [
+                nameof(TransportCommand.TogglePlayback),
+                TransportToolbarCatalog.SeparatorToken,
+                nameof(TransportCommand.Open),
+            ],
+            resolved);
+    }
+
+    [Fact]
     public void Settings_HiddenCommandsRoundTrip()
     {
         var json = JsonSerializer.Serialize(
@@ -291,12 +332,21 @@ public sealed class TransportToolbarSettingsTests
     }
 
     [Fact]
-    public void ResolveLayout_PrefersStoredLayout()
+    public void ResolveLayout_IgnoresStoredOrderAndKeepsShownCommands()
     {
+        // 保存並び・セパレータは捨て、Layout に載っているコマンドだけをカタログ順へ組み直す。
+        // Layout があるとき Hidden は使わない（表示セットの正本は Layout）。
         var resolved = TransportToolbarCatalog.ResolveLayout(
-            ["Open", TransportToolbarCatalog.SeparatorToken, "Save"],
+            ["Save", TransportToolbarCatalog.SeparatorToken, "Open", nameof(TransportCommand.TogglePlayback)],
             hidden: ["Open"]);
-        Assert.Equal(["Open", TransportToolbarCatalog.SeparatorToken, "Save"], resolved);
+        Assert.Equal(
+            [
+                nameof(TransportCommand.TogglePlayback),
+                TransportToolbarCatalog.SeparatorToken,
+                "Open",
+                "Save",
+            ],
+            resolved);
     }
 
     [Fact]
