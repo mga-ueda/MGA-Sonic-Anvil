@@ -1351,6 +1351,8 @@ internal sealed class CrossfadeEditWindow : Window
         }
 
         _state.TruncateOutside = value;
+        AppStorage.Settings.FadeToolTruncateOutside = value;
+        AppStorage.Save();
         if (_splice.Document is not null)
         {
             _state.Clamp(_splice.Document.FrameCount);
@@ -1367,6 +1369,8 @@ internal sealed class CrossfadeEditWindow : Window
         }
 
         _state.DeleteAfterLoop = value;
+        AppStorage.Settings.FadeToolDeleteAfterLoop = value;
+        AppStorage.Save();
         if (_splice.Document is not null)
         {
             _state.Clamp(_splice.Document.FrameCount);

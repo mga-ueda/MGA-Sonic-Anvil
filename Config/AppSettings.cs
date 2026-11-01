@@ -455,6 +455,12 @@ internal sealed class AppSettings
     /// <summary>フェード調整ツールのクロスフェード表示。既定はオン。最終値を記憶する。</summary>
     public bool FadeToolShowXfadePreview { get; set; } = true;
 
+    /// <summary>フェード調整ツールの「ループ前後を削除」。既定はオフ。最終値を記憶する。</summary>
+    public bool FadeToolTruncateOutside { get; set; }
+
+    /// <summary>フェード調整ツールの「ループ後を削除」。既定はオフ。最終値を記憶する。</summary>
+    public bool FadeToolDeleteAfterLoop { get; set; }
+
     public string UiLanguage { get; set; } = "auto";
 
     /// <summary>配色。auto / dark / light。既定は OS に従う。</summary>

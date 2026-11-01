@@ -130,6 +130,10 @@ public partial class MainWindow
             AppStorage.Settings.FadeToolAlignLoopEndsToTwentyEight;
         _crossfadeEdit.ShowXfadePreview =
             AppStorage.Settings.FadeToolShowXfadePreview;
+        _crossfadeEdit.TruncateOutside =
+            AppStorage.Settings.FadeToolTruncateOutside;
+        _crossfadeEdit.DeleteAfterLoop =
+            AppStorage.Settings.FadeToolDeleteAfterLoop;
         if (_crossfadeEdit.AlignLoopEndsToTwentyEight)
         {
             _crossfadeEdit.Clamp(_document.FrameCount);
