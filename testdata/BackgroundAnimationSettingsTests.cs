@@ -7,10 +7,10 @@ namespace MgaSonicAnvil.Tests;
 public sealed class BackgroundAnimationSettingsTests
 {
     [Fact]
-    public void Settings_DefaultOnAndRoundTrips()
+    public void Settings_DefaultOffAndRoundTrips()
     {
-        Assert.True(new AppSettings().EnableBackgroundAnimation);
-        Assert.True(AppSettings.CreateDefault().EnableBackgroundAnimation);
+        Assert.False(new AppSettings().EnableBackgroundAnimation);
+        Assert.False(AppSettings.CreateDefault().EnableBackgroundAnimation);
         Assert.Equal(
             AppSettings.BackgroundAnimationSpeedPercentDefault,
             new AppSettings().BackgroundAnimationSpeedPercent);
@@ -21,18 +21,18 @@ public sealed class BackgroundAnimationSettingsTests
         var json = JsonSerializer.Serialize(
             new AppSettings
             {
-                EnableBackgroundAnimation = false,
+                EnableBackgroundAnimation = true,
                 BackgroundAnimationSpeedPercent = 200,
             },
             AppSettingsJsonContext.Default.AppSettings);
         var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
-        Assert.False(back!.EnableBackgroundAnimation);
+        Assert.True(back!.EnableBackgroundAnimation);
         Assert.Equal(200, back.BackgroundAnimationSpeedPercent);
 
         var missing = JsonSerializer.Deserialize(
             """{"SettingsGeneration":1}""",
             AppSettingsJsonContext.Default.AppSettings);
-        Assert.True(missing!.EnableBackgroundAnimation);
+        Assert.False(missing!.EnableBackgroundAnimation);
         Assert.Equal(
             AppSettings.BackgroundAnimationSpeedPercentDefault,
             missing.BackgroundAnimationSpeedPercent);
