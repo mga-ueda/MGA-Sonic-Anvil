@@ -11,6 +11,7 @@ internal static unsafe class D3D11Native
     public const int D3D_DRIVER_TYPE_HARDWARE = 1;
     public const int D3D_DRIVER_TYPE_WARP = 5;
     public const uint D3D11_CREATE_DEVICE_BGRA_SUPPORT = 0x20;
+    public const uint D3D11_CREATE_DEVICE_VIDEO_SUPPORT = 0x800;
     public const uint D3D11_SDK_VERSION = 7;
 
     public const int DXGI_FORMAT_R16G16B16A16_FLOAT = 10;
@@ -367,6 +368,9 @@ internal static unsafe class D3D11Native
 
     public static void MultithreadLeave(IntPtr multithread) =>
         ((delegate* unmanaged[Stdcall]<IntPtr, void>)Slot(multithread, 4))(multithread);
+
+    public static int MultithreadSetProtected(IntPtr multithread, bool protect) =>
+        ((delegate* unmanaged[Stdcall]<IntPtr, int, int>)Slot(multithread, 5))(multithread, protect ? 1 : 0);
 
     // ID3D11DeviceChild::GetDevice（AddRef 済みで返る）
     public static void DeviceChildGetDevice(IntPtr child, out IntPtr device)

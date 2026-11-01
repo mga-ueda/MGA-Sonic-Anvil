@@ -24,13 +24,13 @@ internal enum DxgiReadResult
 /// RGB32（リーダー内ソフト変換、重い）へフォールバックする。<see cref="PixelFormat"/> で確かめる。
 /// 通常は <see cref="DxgiAsyncFramePump"/> がワーカースレッド上で使い、UI から直接呼ぶのはテスト用の
 /// <see cref="TryReadFrameAt"/> だけ。単一スレッド前提（同時に複数スレッドから触らない）。
-/// 開けないときは <see cref="GenerateTestPattern"/> で presenter だけ確かめられる。
 /// <para>
-/// 次の段階（未実装）: IMFDXGIDeviceManager を渡して DXVA（D3D11 テクスチャ出力）にすれば CPU コピーも消えるが、
-/// デバイス共有・同期が重いのでこのパスでは扱わない。
+/// まず専用 D3D11 デバイスの IMFDXGIDeviceManager を渡して GPU デコード（DXVA）＋GPU 縮小で開き、
+/// 駄目ならソフトデコードで開き直す。どちらもサンプルは CPU へ読み戻してコピーする
+/// （表示側とのテクスチャ共有・同期はしない）。
 /// </para>
 /// </summary>
-internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
+internal sealed unsafe class DxgiPrototypeFrameSource : IVideoFrameReader
 {
     /// <summary>これより先へ飛ぶならシーク。手前なら読み進める。</summary>
     private static readonly long ForwardReadLimitTicks = TimeSpan.FromSeconds(1.5).Ticks;
@@ -256,6 +256,8 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
     public void Close()
     {
         Mf.Release(ref _reader);
+        ReleaseDeviceManager();
+        IsHardwareDecoding = false;
         if (_mfStarted)
         {
             _mfStarted = false;
@@ -290,7 +292,7 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
     public void Dispose() => Close();
 
     /// <summary>
-    /// MF が使えないときのデモ用。横に流れる白帯＋経過時間（mm:ss.ff）を BGRA（stride = w*4）で返す。
+    /// presenter の確認用。横に流れる白帯＋経過時間（mm:ss.ff）を BGRA（stride = w*4）で返す。
     /// </summary>
     public static byte[] GenerateTestPattern(TimeSpan t, int w, int h)
     {
@@ -301,8 +303,8 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
         return buffer;
     }
 
-    /// <summary><see cref="GenerateTestPattern"/> の再利用版。buffer は w*h*4 以上。</summary>
-    public static void FillTestPattern(Span<byte> buffer, TimeSpan t, int w, int h)
+    /// <summary>buffer は w*h*4 以上。</summary>
+    private static void FillTestPattern(Span<byte> buffer, TimeSpan t, int w, int h)
     {
         if (w <= 0 || h <= 0 || buffer.Length < w * h * 4)
         {
@@ -345,18 +347,50 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
         }
     }
 
+    /// <summary>
+    /// GPU デコード（DXVA）を先に試し、通らなければ従来のソフトデコードで開き直す。
+    /// GPU 経路は 4K など大きいソースを <see cref="MaxOutputWidth"/>×<see cref="MaxOutputHeight"/> に収まるよう
+    /// GPU 上で縮めてから読み戻す（プロキシと同じ上限。CPU コピーとキャッシュの量を抑える）。
+    /// </summary>
     private bool OpenReader(string path)
+    {
+        if (OpenReader(path, hardware: true))
+        {
+            return true;
+        }
+
+        Mf.Release(ref _reader);
+        ReleaseDeviceManager();
+        return OpenReader(path, hardware: false);
+    }
+
+    private bool OpenReader(string path, bool hardware)
     {
         var attrs = IntPtr.Zero;
         try
         {
-            if (Mf.MFCreateAttributes(out attrs, 1) < 0)
+            if (hardware && !EnsureDeviceManager())
             {
                 return false;
             }
 
-            // 変換（YUY2→NV12 や、フォールバックの →RGB32）をソースリーダー内で行わせる。
-            Mf.AttrSetUInt32(attrs, Mf.MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING, 1);
+            if (Mf.MFCreateAttributes(out attrs, 2) < 0)
+            {
+                return false;
+            }
+
+            if (hardware)
+            {
+                // 拡張処理（色変換・縮小）はデバイスマネージャ必須。ENABLE_VIDEO_PROCESSING とは排他。
+                Mf.AttrSetUnknown(attrs, Mf.MF_SOURCE_READER_D3D_MANAGER, _deviceManager);
+                Mf.AttrSetUInt32(attrs, Mf.MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, 1);
+            }
+            else
+            {
+                // 変換（YUY2→NV12 や、フォールバックの →RGB32）をソースリーダー内で行わせる。
+                Mf.AttrSetUInt32(attrs, Mf.MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING, 1);
+            }
+
             if (Mf.MFCreateSourceReaderFromURL(path, attrs, out _reader) < 0 || _reader == IntPtr.Zero)
             {
                 _reader = IntPtr.Zero;
@@ -373,11 +407,12 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
             ReadNativeColorInfo();
 
             // NV12 優先（デコーダ出力そのまま。YUV→RGB は表示側の GPU）。駄目なら RGB32（リーダー内ソフト変換）。
-            if (TrySetOutputSubtype(Mf.MFVideoFormat_NV12))
+            // GPU 経路は NV12 だけ（縮小寸法を指定する）。
+            if (TrySetOutputSubtype(Mf.MFVideoFormat_NV12, hardware))
             {
                 _pixelFormat = DxgiFramePixelFormat.Nv12;
             }
-            else if (TrySetOutputSubtype(Mf.MFVideoFormat_RGB32))
+            else if (!hardware && TrySetOutputSubtype(Mf.MFVideoFormat_RGB32, scaled: false))
             {
                 _pixelFormat = DxgiFramePixelFormat.Bgra32;
             }
@@ -386,7 +421,20 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
                 return false;
             }
 
-            return RefreshFormat();
+            if (!RefreshFormat())
+            {
+                return false;
+            }
+
+            // デコーダが実際に動くか 1 枚読んで確かめる（コーデック拡張が無い・GPU が受け付けないなどは
+            // ここで初めて失敗する）。確かめたら先頭へ戻す。
+            if (!ProbeFirstSample())
+            {
+                return false;
+            }
+
+            IsHardwareDecoding = hardware;
+            return true;
         }
         finally
         {
@@ -394,7 +442,130 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
         }
     }
 
-    private bool TrySetOutputSubtype(Guid subtype)
+    /// <summary>GPU 経路で縮める上限（<see cref="Audio.VideoProxy"/> のプロキシと同じ箱）。</summary>
+    internal const int MaxOutputWidth = 1920;
+    internal const int MaxOutputHeight = 1080;
+
+    /// <summary>GPU デコードで開けたか。</summary>
+    public bool IsHardwareDecoding { get; private set; }
+
+    /// <summary>
+    /// (w, h) を <see cref="MaxOutputWidth"/>×<see cref="MaxOutputHeight"/> の箱に縦横比を保って収める（拡大しない）。
+    /// NV12 のため偶数へ丸める。縦長（回転なしで 1080x1920 など）も同じ箱に収める。
+    /// </summary>
+    internal static (int Width, int Height) FitOutputSize(int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return (width, height);
+        }
+
+        var scale = Math.Min(1.0, Math.Min(MaxOutputWidth / (double)width, MaxOutputHeight / (double)height));
+        if (width < height)
+        {
+            scale = Math.Min(1.0, Math.Min(MaxOutputHeight / (double)width, MaxOutputWidth / (double)height));
+        }
+
+        var w = Math.Max(2, (int)Math.Round(width * scale / 2, MidpointRounding.AwayFromZero) * 2);
+        var h = Math.Max(2, (int)Math.Round(height * scale / 2, MidpointRounding.AwayFromZero) * 2);
+        return (w, h);
+    }
+
+    private bool ProbeFirstSample()
+    {
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            var hr = Mf.ReaderReadSample(_reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, out var flags, out _, out var sample);
+            try
+            {
+                if (hr < 0)
+                {
+                    return false;
+                }
+
+                if ((flags & Mf.MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) != 0 && !RefreshFormat())
+                {
+                    return false;
+                }
+
+                if ((flags & Mf.MF_SOURCE_READERF_ENDOFSTREAM) != 0)
+                {
+                    return false;
+                }
+
+                if (sample == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                if (_frame is null || !CopySample(sample, _frame))
+                {
+                    return false;
+                }
+
+                Seek(0);
+                return true;
+            }
+            finally
+            {
+                Mf.Release(ref sample);
+            }
+        }
+
+        return false;
+    }
+
+    private IntPtr _d3dDevice;
+    private IntPtr _deviceManager;
+
+    /// <summary>デコード専用の D3D11 デバイス（ビデオ対応・マルチスレッド保護）と DXGI デバイスマネージャ。</summary>
+    private bool EnsureDeviceManager()
+    {
+        if (_deviceManager != IntPtr.Zero)
+        {
+            return true;
+        }
+
+        if (D3D11Native.D3D11CreateDevice(
+                IntPtr.Zero,
+                D3D11Native.D3D_DRIVER_TYPE_HARDWARE,
+                IntPtr.Zero,
+                D3D11Native.D3D11_CREATE_DEVICE_VIDEO_SUPPORT | D3D11Native.D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                IntPtr.Zero,
+                0,
+                D3D11Native.D3D11_SDK_VERSION,
+                out _d3dDevice,
+                out _,
+                out var context) < 0 || _d3dDevice == IntPtr.Zero)
+        {
+            _d3dDevice = IntPtr.Zero;
+            return false;
+        }
+
+        D3D11Native.Release(ref context);
+        if (D3D11Native.QueryInterface(_d3dDevice, D3D11Native.IID_ID3D10Multithread, out var multithread) >= 0)
+        {
+            D3D11Native.MultithreadSetProtected(multithread, true);
+            D3D11Native.Release(ref multithread);
+        }
+
+        if (Mf.MFCreateDXGIDeviceManager(out var token, out _deviceManager) < 0 || _deviceManager == IntPtr.Zero
+            || Mf.DeviceManagerResetDevice(_deviceManager, _d3dDevice, token) < 0)
+        {
+            ReleaseDeviceManager();
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ReleaseDeviceManager()
+    {
+        Mf.Release(ref _deviceManager);
+        D3D11Native.Release(ref _d3dDevice);
+    }
+
+    private bool TrySetOutputSubtype(Guid subtype, bool scaled)
     {
         if (Mf.MFCreateMediaType(out var type) < 0)
         {
@@ -405,6 +576,19 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
         {
             Mf.AttrSetGuid(type, Mf.MF_MT_MAJOR_TYPE, Mf.MFMediaType_Video);
             Mf.AttrSetGuid(type, Mf.MF_MT_SUBTYPE, subtype);
+            if (scaled && TryReadNativeFrameSize(out var nativeWidth, out var nativeHeight, out var rotation))
+            {
+                // 拡張処理は MF_MT_VIDEO_ROTATION（iPhone の縦撮りなど）を回して出力枠に収めるので、
+                // 90°／270° は枠の縦横を入れ替えないと左右に黒帯が付く。
+                if (rotation is 90 or 270)
+                {
+                    (nativeWidth, nativeHeight) = (nativeHeight, nativeWidth);
+                }
+
+                var (w, h) = FitOutputSize(nativeWidth, nativeHeight);
+                Mf.AttrSetUInt64(type, Mf.MF_MT_FRAME_SIZE, ((ulong)(uint)w << 32) | (uint)h);
+            }
+
             if (Mf.ReaderSetCurrentMediaType(_reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, type) < 0)
             {
                 return false;
@@ -424,6 +608,44 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
             {
                 Mf.Release(ref current);
             }
+        }
+        finally
+        {
+            Mf.Release(ref type);
+        }
+    }
+
+    private bool TryReadNativeFrameSize(out int width, out int height, out uint rotation)
+    {
+        width = height = 0;
+        rotation = 0;
+        if (Mf.ReaderGetNativeMediaType(_reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, out var type) < 0 || type == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (Mf.AttrGetUInt32(type, Mf.MF_MT_VIDEO_ROTATION, out var degrees) >= 0)
+            {
+                rotation = degrees % 360;
+            }
+
+            if (TryReadAperture(type, out _, out _, out var aw, out var ah) && aw > 0 && ah > 0)
+            {
+                width = aw;
+                height = ah;
+                return true;
+            }
+
+            if (Mf.AttrGetUInt64(type, Mf.MF_MT_FRAME_SIZE, out var size) < 0)
+            {
+                return false;
+            }
+
+            width = (int)(size >> 32);
+            height = (int)(size & 0xFFFFFFFF);
+            return width > 0 && height > 0;
         }
         finally
         {
@@ -839,6 +1061,9 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
         public const ushort VT_UI8 = 21;
 
         public static readonly Guid MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING = new("fb394f3d-ccf1-42ee-bbb3-f9b845d5681d");
+        public static readonly Guid MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING = new("0f81da2c-b537-4672-a8b2-a681b17307a3");
+        public static readonly Guid MF_SOURCE_READER_D3D_MANAGER = new("ec822da2-e1e9-4b29-a0d8-563c719f5269");
+        public static readonly Guid MF_MT_VIDEO_ROTATION = new("c380465d-2271-428c-9b83-ecea3b4a85c1");
         public static readonly Guid MF_MT_MAJOR_TYPE = new("48eba18e-f8c9-4687-bf11-0a74c9f96a8f");
         public static readonly Guid MF_MT_SUBTYPE = new("f7e34c9a-42e8-4714-b74b-cb29d72c35e5");
         public static readonly Guid MF_MT_FRAME_SIZE = new("1652c33d-d6b2-4012-b834-72030849a37d");
@@ -878,6 +1103,13 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
 
         [DllImport("mfplat.dll", ExactSpelling = true)]
         public static extern int MFCreateMediaType(out IntPtr mediaType);
+
+        [DllImport("mfplat.dll", ExactSpelling = true)]
+        public static extern int MFCreateDXGIDeviceManager(out uint resetToken, out IntPtr manager);
+
+        // IMFDXGIDeviceManager::ResetDevice
+        public static int DeviceManagerResetDevice(IntPtr manager, IntPtr device, uint resetToken) =>
+            ((delegate* unmanaged[Stdcall]<IntPtr, IntPtr, uint, int>)Slot(manager, 7))(manager, device, resetToken);
 
         [DllImport("mfreadwrite.dll", ExactSpelling = true)]
         public static extern int MFCreateSourceReaderFromURL(
@@ -944,6 +1176,22 @@ internal sealed unsafe class DxgiPrototypeFrameSource : IDisposable
             fixed (Guid* k = &key)
             {
                 return ((delegate* unmanaged[Stdcall]<IntPtr, Guid*, uint, int>)Slot(attrs, 21))(attrs, k, value);
+            }
+        }
+
+        public static int AttrSetUInt64(IntPtr attrs, in Guid key, ulong value)
+        {
+            fixed (Guid* k = &key)
+            {
+                return ((delegate* unmanaged[Stdcall]<IntPtr, Guid*, ulong, int>)Slot(attrs, 22))(attrs, k, value);
+            }
+        }
+
+        public static int AttrSetUnknown(IntPtr attrs, in Guid key, IntPtr unknown)
+        {
+            fixed (Guid* k = &key)
+            {
+                return ((delegate* unmanaged[Stdcall]<IntPtr, Guid*, IntPtr, int>)Slot(attrs, 27))(attrs, k, unknown);
             }
         }
 
