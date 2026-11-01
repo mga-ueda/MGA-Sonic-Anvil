@@ -235,7 +235,7 @@ internal sealed partial class PlaybackSampleProvider : ISampleProvider
     internal const double ShuttleGainDb = -4;
     internal static readonly float ShuttleGainLinear = (float)Math.Pow(10, ShuttleGainDb / 20.0);
     /// <summary>モニター DIM の規定減衰（dB）。</summary>
-    internal const double DefaultMonitorDimDb = -15;
+    internal const double DefaultMonitorDimDb = -10;
     internal const double MinMonitorDimDb = -60;
     internal const double MaxMonitorDimDb = 0;
     internal static readonly float DefaultMonitorDimLinear =

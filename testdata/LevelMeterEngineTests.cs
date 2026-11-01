@@ -298,7 +298,7 @@ public sealed class LevelMeterEngineTests
         Assert.Equal(-20, PlaybackSampleProvider.FixedMonitorLowCutGainDb);
         Assert.Equal(20, PlaybackSampleProvider.MinMonitorLowCutHz);
         Assert.Equal(500, PlaybackSampleProvider.MaxMonitorLowCutHz);
-        Assert.Equal(-15, PlaybackSampleProvider.DefaultMonitorDimDb);
+        Assert.Equal(-10, PlaybackSampleProvider.DefaultMonitorDimDb);
     }
 
     [Fact]
