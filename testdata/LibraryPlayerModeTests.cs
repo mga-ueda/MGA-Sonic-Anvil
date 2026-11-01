@@ -157,8 +157,29 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryVisualStage.WantsAmbientSpill(640, 480, 800, 600));
         Assert.False(LibraryVisualStage.WantsAmbientSpill(0, 1920, 1920, 1080));
         Assert.False(LibraryVisualStage.WantsAmbientSpill(1080, 1920, 0, 1080));
-        Assert.InRange(LibraryVisualStage.AmbientSpillBlurRadius, 48, 96);
-        Assert.InRange(LibraryVisualStage.AmbientSpillScale, 1.08, 1.2);
+        Assert.InRange(LibraryVisualStage.AmbientSpillBlurRadius, 96, 160);
+        Assert.InRange(LibraryVisualStage.AmbientSpillScale, 1.5, 2.5);
+        Assert.InRange(LibraryVisualStage.AmbientSpillCrossScale, 1.0, 1.4);
+        // 減衰は映像の縁より内側から始まり、外周より手前で 0。途中は単調に滑らかに落ちる。
+        Assert.True(LibraryVisualStage.AmbientSpillFadeStart < 1 / LibraryVisualStage.AmbientSpillScale);
+        Assert.True(LibraryVisualStage.AmbientSpillFadeEnd < 1);
+        Assert.Equal(1, LibraryVisualStage.AmbientSpillFadeAlpha(0.2), 6);
+        Assert.Equal(0, LibraryVisualStage.AmbientSpillFadeAlpha(LibraryVisualStage.AmbientSpillFadeEnd), 6);
+        Assert.Equal(0, LibraryVisualStage.AmbientSpillFadeAlpha(1), 6);
+        var previous = 1.0;
+        for (var d = 0.4; d <= 1.0; d += 0.01)
+        {
+            var a = LibraryVisualStage.AmbientSpillFadeAlpha(d);
+            Assert.True(a <= previous + 1e-9);
+            Assert.True(previous - a < 0.04);
+            previous = a;
+        }
+        // 縦長映像を横長ステージへ → 左右の帯、横長映像を縦長／正方形ステージへ → 上下の帯。
+        Assert.True(LibraryVisualStage.IsPillarbox(1080, 1920, 1920, 1080));
+        Assert.True(LibraryVisualStage.IsPillarbox(640, 480, 1920, 1080));
+        Assert.False(LibraryVisualStage.IsPillarbox(1920, 1080, 900, 1600));
+        Assert.False(LibraryVisualStage.IsPillarbox(1920, 800, 1920, 1080));
+        Assert.False(LibraryVisualStage.IsPillarbox(0, 1920, 1920, 1080));
         Assert.InRange(LibraryVisualStage.AmbientSpillOpacity, 0.35, 0.65);
         Assert.InRange(LibraryVisualStage.AmbientSpillAspectEpsilon, 0.005, 0.05);
         // 格子線はデバイス 1px（pixelsPerDip=2 → DIP 0.5）。

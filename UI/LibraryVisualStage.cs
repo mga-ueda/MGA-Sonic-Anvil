@@ -37,7 +37,7 @@ internal sealed partial class LibraryVisualStage : Grid
     internal const double PreviewDimFadeSeconds = 0.25;
 
     /// <summary>映像枠まわりへにじませるぼかし。フル塗りつぶしには使わない。</summary>
-    internal const double AmbientSpillBlurRadius = 72;
+    internal const double AmbientSpillBlurRadius = 128;
 
     /// <summary>メーター・波形・ファイル名の背後を、縁を溶かしながら少し暗くする。</summary>
     private const double HudFrostFeather = 32;
@@ -45,11 +45,70 @@ internal sealed partial class LibraryVisualStage : Grid
     /// <summary>暗幕の濃さ。映像は透けたまま、文字が読める程度。</summary>
     private const byte HudDimAlpha = 0x66;
 
-    /// <summary>映像と同じ枠を広げ、縁から光をこぼす。</summary>
-    internal const double AmbientSpillScale = 1.12;
+    /// <summary>黒帯の方向へ映像と同じ枠を広げ、縁から光をこぼす。外周は帯方向の直線減衰で闇へ溶かす。</summary>
+    internal const double AmbientSpillScale = 2.0;
+
+    /// <summary>帯と直交する方向の広げ率。ぼかしの減光が画面端に出ない程度だけはみ出させる。</summary>
+    internal const double AmbientSpillCrossScale = 1.2;
 
     /// <summary>光漏れの不透明度。</summary>
-    internal const double AmbientSpillOpacity = 0.50;
+    internal const double AmbientSpillOpacity = 0.55;
+
+    /// <summary>左右の帯（ピラーボックス）用。中央から左右の外周へ減衰する。</summary>
+    private static readonly Brush AmbientSpillFadeHorizontal = CreateAmbientSpillFadeMask(horizontal: true);
+
+    /// <summary>上下の帯（レターボックス）用。中央から上下の外周へ減衰する。</summary>
+    private static readonly Brush AmbientSpillFadeVertical = CreateAmbientSpillFadeMask(horizontal: false);
+
+    /// <summary>減衰の始まり（中心からの距離、1=外周）。映像の縁（1/<see cref="AmbientSpillScale"/>）の少し内側。</summary>
+    internal const double AmbientSpillFadeStart = 0.42;
+
+    /// <summary>減衰の終わり。外周より手前で 0 にし、残りはぼかしのにじみ代として空ける。</summary>
+    internal const double AmbientSpillFadeEnd = 0.92;
+
+    /// <summary>
+    /// 中心からの距離に対する光漏れの不透明度（0..1）。始まりから終わりまで余弦で滑らかに一様に落とし、
+    /// 途中で急に暗くなったり、端で折れ目が出たりしないようにする。
+    /// </summary>
+    internal static double AmbientSpillFadeAlpha(double distance)
+    {
+        var t = Math.Clamp((distance - AmbientSpillFadeStart) / (AmbientSpillFadeEnd - AmbientSpillFadeStart), 0, 1);
+        return 0.5 * (1 + Math.Cos(Math.PI * t));
+    }
+
+    /// <summary>
+    /// 帯の方向だけに掛ける直線の減衰。円形には落とさない。
+    /// </summary>
+    private static Brush CreateAmbientSpillFadeMask(bool horizontal)
+    {
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = horizontal ? new Point(0, 0.5) : new Point(0.5, 0),
+            EndPoint = horizontal ? new Point(1, 0.5) : new Point(0.5, 1),
+        };
+        const int steps = 24;
+        for (var i = 0; i <= steps; i++)
+        {
+            // 中心からの距離（0=中心, 1=外周）。
+            var distance = AmbientSpillFadeStart + ((AmbientSpillFadeEnd - AmbientSpillFadeStart) * i / steps);
+            var alpha = (byte)Math.Round(255 * AmbientSpillFadeAlpha(distance));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(alpha, 0, 0, 0), 0.5 - (distance / 2)));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(alpha, 0, 0, 0), 0.5 + (distance / 2)));
+        }
+
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>映像が描画エリアより縦長で、左右に帯が出るとき true。</summary>
+    internal static bool IsPillarbox(int naturalWidth, int naturalHeight, double stageWidth, double stageHeight) =>
+        naturalWidth > 0
+        && naturalHeight > 0
+        && stageWidth > 0
+        && stageHeight > 0
+        && naturalWidth / (double)naturalHeight < stageWidth / stageHeight;
+
+    private readonly ScaleTransform _spillScale = new(AmbientSpillScale, AmbientSpillScale);
 
     /// <summary>映像と描画エリアのアスペクト差。これ未満は黒帯なしとみなす。</summary>
     internal const double AmbientSpillAspectEpsilon = 0.02;
@@ -89,7 +148,6 @@ internal sealed partial class LibraryVisualStage : Grid
         IsHitTestVisible = false,
         Opacity = AmbientSpillOpacity,
         RenderTransformOrigin = new Point(0.5, 0.5),
-        RenderTransform = new ScaleTransform(AmbientSpillScale, AmbientSpillScale),
         Effect = new BlurEffect
         {
             Radius = AmbientSpillBlurRadius,
@@ -197,6 +255,7 @@ internal sealed partial class LibraryVisualStage : Grid
         Visibility = Visibility.Collapsed;
         SnapsToDevicePixels = true;
         _spill.Child = _spillImage;
+        _spill.RenderTransform = _spillScale;
         _spillHost.Children.Add(_spill);
         // フェードイン／SnapMediaBlack は _dxgiHost.Opacity。光漏れも同じ値に追従する。
         _spillHost.SetBinding(
@@ -1464,7 +1523,7 @@ internal sealed partial class LibraryVisualStage : Grid
 
     /// <summary>
     /// 映像とステージのアスペクトがずれて黒帯が出るとき（非最大化の窓でも起き得る）だけ光漏れを出す。
-    /// 映像の表示矩形へ枠を置き、原映像を枠いっぱいに塗って中心から 1.12 倍・強ぼかしで縁へこぼす。
+    /// 映像の表示矩形へ枠を置き、原映像を枠いっぱいに塗って帯の方向へ 2 倍・強ぼかしで縁へこぼし、帯方向だけの直線減衰で外周を闇へ溶かす。
     /// 中身は <see cref="UpdateAmbientSpillFrame"/> の縮小 CPU ビットマップ。DXGI の帯は透明クリアなので、
     /// 本編ホストの背面に置いたこの層が帯から透けて見える。
     /// </summary>
@@ -1499,6 +1558,10 @@ internal sealed partial class LibraryVisualStage : Grid
         _spill.Width = rect.Width;
         _spill.Height = rect.Height;
         _spill.Margin = new Thickness(rect.X, rect.Y, 0, 0);
+        var pillarbox = IsPillarbox(_dxgiWidth, _dxgiHeight, ActualWidth, ActualHeight);
+        _spillScale.ScaleX = pillarbox ? AmbientSpillScale : AmbientSpillCrossScale;
+        _spillScale.ScaleY = pillarbox ? AmbientSpillCrossScale : AmbientSpillScale;
+        _spill.OpacityMask = pillarbox ? AmbientSpillFadeHorizontal : AmbientSpillFadeVertical;
     }
 
     /// <summary>デコード済みフレームを縮小して光漏れビットマップへ書く。NV12／BGRA 両対応。</summary>
