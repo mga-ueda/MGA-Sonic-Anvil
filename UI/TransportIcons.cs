@@ -297,19 +297,14 @@ internal sealed class TransportIconButton : Button
             fore = Theme.Get("RecordLatchForeBrush");
         }
 
+        // 解析／最前面／タイルなど「今オフ」のトグルは弱い色。F9–F12 のモード切替は
+        // 未選択でも押せるので、無効色にはしない（選択は IsLatched／アイコン差し替えで示す）。
         if (Icon is TransportIcon.Analysis
             or TransportIcon.Overlay
             or TransportIcon.Loudness
             or TransportIcon.RangeClick
             or TransportIcon.WaveformView
             or TransportIcon.AlwaysOnTop
-            or TransportIcon.WaveformMaximize
-            or TransportIcon.WaveformRestore
-            or TransportIcon.MinimalChrome
-            or TransportIcon.PlayerMode
-            or TransportIcon.EditorMode
-            or TransportIcon.AnalyzerMaximize
-            or TransportIcon.AnalyzerRestore
             or TransportIcon.TileOff
             or TransportIcon.TileHorizontal
             or TransportIcon.TileVertical
