@@ -35,6 +35,11 @@ internal static class DesignMetrics
 
     public static double WaapiBarHeight => From96(32);
 
+    /// <summary>メーター列の WAAPI トグルとピーク LED のあいだ。</summary>
+    public static double WaapiToPeakLampGap => From96(5);
+
+    public static Thickness WaapiToPeakLampGapMargin => new(0, 0, 0, WaapiToPeakLampGap);
+
     public static double StatusExportButtonWidth => From96(80);
 
     public static double StatusExportButtonHeight => From96(24);

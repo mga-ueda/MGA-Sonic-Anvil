@@ -1143,7 +1143,9 @@ public sealed class LibraryPlayerModeTests
             scale: 1.5);
         Assert.Equal(DesignMetrics.LevelMeterWidth * 1.5, grow.Width, 3);
         // 動画ミニ：列実高 − 上段/下段アナライザ帯。16:9 より高い窓は 16:9 相当で打ち切り、低い窓は列高で縮む。
-        var reserved = DesignMetrics.ProjectBarHeight + DesignMetrics.VectorScopeHeight;
+        var reserved = DesignMetrics.ProjectBarHeight
+            + DesignMetrics.WaapiToPeakLampGap
+            + DesignMetrics.VectorScopeHeight;
         var col16x9 = 1080 - DesignMetrics.StatusBarHeight;
         Assert.Equal(
             col16x9 - reserved,
