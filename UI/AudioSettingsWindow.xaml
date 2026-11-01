@@ -17,8 +17,9 @@
         Title="{x:Static domain:UiStrings.DialogSettingsTitle}"
         KeyboardNavigation.TabNavigation="Cycle"
         PreviewKeyDown="Window_PreviewKeyDown">
-  <Border Padding="{x:Static ui:DesignMetrics.AudioPad}">
-    <Grid>
+  <Border x:Name="SettingsChrome"
+          Padding="{x:Static ui:DesignMetrics.AudioPad}">
+    <Grid x:Name="SettingsBody">
       <Grid.RowDefinitions>
         <RowDefinition Height="*" />
         <RowDefinition Height="Auto" />
@@ -1137,6 +1138,166 @@
                                 Click="VideoProxyClearAllButton_Click" />
             </Grid>
           </StackPanel>
+        </TabItem>
+
+        <!-- Release ではコンストラクタで Items から外す（Collapsed にすると SelectedIndex 巡回がずれる）。 -->
+        <TabItem x:Name="VstTab" Header="{x:Static domain:UiStrings.LabelSettingsTabVst}">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" MinHeight="96" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="2*" MinHeight="180" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="Vst3SearchPathsHeader"
+                       Text="{x:Static domain:UiStrings.LabelVst3SearchPaths}"
+                       FontWeight="Bold"
+                       FontSize="11.333"
+                       Margin="0,0,0,4"
+                       HorizontalAlignment="Left" />
+            <ListBox x:Name="Vst3SearchPathsList"
+                     Grid.Row="1"
+                     FontSize="11"
+                     Padding="2"
+                     HorizontalAlignment="Stretch"
+                     HorizontalContentAlignment="Stretch"
+                     VerticalAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.CanContentScroll="False"
+                     SelectionMode="Extended"
+                     SelectionChanged="Vst3SearchPathsList_SelectionChanged" />
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Left">
+              <ui:RoundedButton x:Name="Vst3SearchPathAddButton"
+                                Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootAdd}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="Vst3SearchPathAddButton_Click" />
+              <ui:RoundedButton x:Name="Vst3SearchPathRemoveButton"
+                                Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootRemove}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="Vst3SearchPathRemoveButton_Click" />
+              <ui:RoundedButton x:Name="Vst3SearchPathUpButton"
+                                Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootUp}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="Vst3SearchPathUpButton_Click" />
+              <ui:RoundedButton x:Name="Vst3SearchPathDownButton"
+                                Content="{x:Static domain:UiStrings.ButtonLibraryExplorerRootDown}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="72"
+                                Padding="12,0"
+                                Click="Vst3SearchPathDownButton_Click" />
+            </StackPanel>
+            <CheckBox x:Name="VstUseSteinbergHostCacheBox"
+                      Grid.Row="3"
+                      Style="{StaticResource DarkCheckBoxStyle}"
+                      Content="{x:Static domain:UiStrings.LabelVstUseSteinbergHostCache}"
+                      HorizontalAlignment="Left"
+                      Margin="0,16,0,0" />
+            <StackPanel Grid.Row="4"
+                        Orientation="Horizontal"
+                        Margin="0,12,0,0"
+                        HorizontalAlignment="Left">
+              <ui:RoundedButton x:Name="VstScanButton"
+                                Content="{x:Static domain:UiStrings.ButtonVstScan}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="96"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="VstScanButton_Click" />
+              <ui:RoundedButton x:Name="VstClearButton"
+                                Content="{x:Static domain:UiStrings.ButtonVstClear}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="96"
+                                Padding="12,0"
+                                Click="VstClearButton_Click" />
+            </StackPanel>
+            <StackPanel Grid.Row="5" Margin="0,16,0,4">
+              <TextBlock x:Name="VstPluginListHeader"
+                         Text="{x:Static domain:UiStrings.LabelVstPluginList}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,2"
+                         HorizontalAlignment="Left" />
+              <TextBlock Text="{x:Static domain:UiStrings.HintVstInstrumentsAutoExcluded}"
+                         FontSize="11.333"
+                         Foreground="{DynamicResource MutedForeBrush}"
+                         TextWrapping="Wrap"
+                         Margin="0,0,0,2"
+                         HorizontalAlignment="Left" />
+              <TextBlock x:Name="VstStatusText"
+                         FontSize="11.333"
+                         TextTrimming="CharacterEllipsis"
+                         HorizontalAlignment="Left" />
+            </StackPanel>
+            <!-- ツールバーのカスタマイズと同じ左右振り分け。左＝認識しない（手動／認識失敗）、右＝認識する。 -->
+            <Grid Grid.Row="6">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+              <TextBlock x:Name="VstExcludedHeader"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,4"
+                         HorizontalAlignment="Left" />
+              <TextBlock x:Name="VstRecognizedHeader"
+                         Grid.Column="2"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,4"
+                         HorizontalAlignment="Left" />
+              <DataGrid x:Name="VstExcludedGrid"
+                        Grid.Row="1"
+                        FontSize="11"
+                        SelectionChanged="VstPluginGrid_SelectionChanged"
+                        MouseDoubleClick="VstExcludedGrid_MouseDoubleClick" />
+              <StackPanel Grid.Row="1"
+                          Grid.Column="1"
+                          VerticalAlignment="Center"
+                          Margin="8,0">
+                <ui:RoundedButton x:Name="VstPluginAddButton"
+                                  Content="{x:Static domain:UiStrings.ButtonVstPluginAdd}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="72"
+                                  Padding="10,0"
+                                  Margin="0,0,0,8"
+                                  HorizontalAlignment="Stretch"
+                                  Click="VstPluginAddButton_Click" />
+                <ui:RoundedButton x:Name="VstPluginRemoveButton"
+                                  Content="{x:Static domain:UiStrings.ButtonVstPluginRemove}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="72"
+                                  Padding="10,0"
+                                  HorizontalAlignment="Stretch"
+                                  Click="VstPluginRemoveButton_Click" />
+              </StackPanel>
+              <DataGrid x:Name="VstRecognizedGrid"
+                        Grid.Row="1"
+                        Grid.Column="2"
+                        FontSize="11"
+                        SelectionChanged="VstPluginGrid_SelectionChanged"
+                        MouseDoubleClick="VstRecognizedGrid_MouseDoubleClick" />
+            </Grid>
+          </Grid>
         </TabItem>
 
         <TabItem Header="{x:Static domain:UiStrings.LabelSettingsTabWwise}">

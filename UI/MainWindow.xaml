@@ -316,6 +316,7 @@
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <!-- プレイヤーでラウドネス表示中: 波形帯をここ（ラウドネス左）へドックする。 -->
         <Border x:Name="PlayerWaveformSlot"
@@ -329,21 +330,27 @@
                              Margin="0,0,6,0"
                              VerticalAlignment="Stretch"
                              OpenRequested="HistoryStrip_OpenRequested" />
-        <ui:LoudnessMeterView x:Name="LoudnessMeter"
+        <!-- エディタ限定 VST インサート。ラウドネス情報エリアの左。 -->
+        <ui:VstInsertRackView x:Name="VstInsertRack"
                               Grid.Column="2"
+                              Margin="0,0,6,0"
+                              VerticalAlignment="Stretch"
+                              Visibility="Collapsed" />
+        <ui:LoudnessMeterView x:Name="LoudnessMeter"
+                              Grid.Column="3"
                               Margin="0,0,6,0"
                               VerticalAlignment="Stretch"
                               Background="Transparent"
                               Opacity="0"
                               IsHitTestVisible="False" />
         <ui:MonitorToggleColumn x:Name="MonitorToggles"
-                                Grid.Column="3"
+                                Grid.Column="4"
                                 Margin="0,0,6,0"
                                 VerticalAlignment="Center"
                                 Opacity="0"
                                 IsHitTestVisible="False" />
         <ui:ProjectSpectrumView x:Name="Spectrum"
-                                Grid.Column="4"
+                                Grid.Column="5"
                                 Height="{x:Static ui:DesignMetrics.SpectrumHeight}"
                                 Margin="0,0,1,0"
                                 Opacity="0"

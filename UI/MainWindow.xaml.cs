@@ -287,6 +287,7 @@ public partial class MainWindow : Window
         Mp3Gapless.Enabled = AppStorage.Settings.GaplessPlayback;
         ApplyMonitorMixFromSettings();
         ApplySilentSkipFromSettings();
+        MaybeStartVstAppReplaceSmoke();
 
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);
         StatusTimes.CurrentCommitted += (_, frame) =>
@@ -828,6 +829,7 @@ public partial class MainWindow : Window
             RefreshHistoryStrip();
             TryApplyAutoSpeaker();
             SyncRangeClicks();
+            SyncVstInsertEngine();
         }
         finally
         {
@@ -1212,8 +1214,17 @@ public partial class MainWindow : Window
             PersistCurrentWindowPlacement();
         }
 
-        // Hide の前に子ツール窓と Acrylic トーストを閉じる（Popup が本体より残らないように）。
+        // Hide の前に子ツール窓・VST エディタ・Acrylic トーストを閉じる
+        // （Owner 無しのプラグイン UI がプロセス終了まで残らないように）。
         CloseToolWindowsForExit();
+        try
+        {
+            CloseAllVstEditorsForAppExit();
+        }
+        catch
+        {
+        }
+
         HideAllAcrylicOverlays();
         HideFromTaskAndFocus();
         StopMeterRendering();

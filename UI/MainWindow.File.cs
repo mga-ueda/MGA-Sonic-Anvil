@@ -2200,7 +2200,9 @@ public partial class MainWindow
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F9),
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F10),
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F11),
-            settings.ResolvedLayoutPreset(WindowLayoutSlot.F12))
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F12),
+            settings.ResolvedVst3SearchPaths(),
+            settings.Vst3UseSteinbergHostCache)
         {
             Owner = this,
             OpenColorSettings = ShowColorDevPanel,
@@ -2237,6 +2239,8 @@ public partial class MainWindow
         settings.LaunchMode = AppLaunchModes.Format(dialog.SelectedLaunchMode);
         settings.ApplyLibraryExplorerRoots(dialog.SelectedLibraryExplorerRoots);
         LibraryBrowser.SetExplorerRoots(settings.ResolvedLibraryExplorerRoots());
+        settings.ApplyVst3SearchPaths(dialog.SelectedVst3SearchPaths);
+        settings.Vst3UseSteinbergHostCache = dialog.SelectedVst3UseSteinbergHostCache;
         settings.ApplyLibraryListColumnPresets(
             dialog.SelectedLibraryListColumnsWave,
             dialog.SelectedLibraryListColumnsMp3,

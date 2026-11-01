@@ -350,6 +350,15 @@ internal static class DesignMetrics
     /// <summary>スペアナ左のラウドネスメーター幅。列はキャプション／値／単位の最大幅の合計。</summary>
     public static double LoudnessMeterWidth => From96(240);
 
+    /// <summary>ラウドネス左の VST インサートラック幅（8 スロット縦並び）。</summary>
+    public static double VstInsertRackWidth => From96(112);
+
+    /// <summary>インサート 1 スロットの高さ。</summary>
+    public static double VstInsertSlotHeight => From96(14);
+
+    /// <summary>VST プラグイン選択メニューの最大高さ（超えたらスクロール）。</summary>
+    public static double VstInsertMenuMaxHeight => From96(560);
+
     /// <summary>正方形ゴニオ直下の位相バー高さ。</summary>
     public static double VectorScopeCorrelationHeight => From96(18);
 

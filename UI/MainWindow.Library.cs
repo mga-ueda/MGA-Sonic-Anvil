@@ -645,6 +645,7 @@ public partial class MainWindow
         }
 
         ApplyLibraryPlayerHost(show);
+        SyncVstInsertEngine();
         if (show)
         {
             ProbeLibraryTags();
@@ -3431,6 +3432,7 @@ public partial class MainWindow
                 RememberClosedTab(session, i);
             }
 
+            ForgetVstInserts(session);
             _sessions.RemoveAt(i);
         }
     }
@@ -4018,6 +4020,7 @@ public partial class MainWindow
             }
         }
 
+        ForgetVstInserts(dropSet);
         _sessions.RemoveAll(dropSet.Contains);
         DetachTabItems(dropSet);
 
@@ -4756,6 +4759,7 @@ public partial class MainWindow
         RefreshTitle();
         RefreshStatus();
         SyncMonitorLayout();
+        SyncVstInsertEngine();
         ScheduleLibraryGaplessPrefetch();
         return true;
     }
@@ -7244,6 +7248,7 @@ public partial class MainWindow
         {
             _selectedTabs.Clear();
             _tabSelectionAnchor = null;
+            ForgetVstInserts(_sessions.ToArray());
             _sessions.Clear();
             BindWorkspace(null);
             RebuildTabBar();
