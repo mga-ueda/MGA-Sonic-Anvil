@@ -129,8 +129,8 @@ internal sealed class AppSettings
     public string[] HiddenTransportToolbarCommands { get; set; } = [];
 
     /// <summary>
-    /// ツールバーの並び。コマンド名と <c>|</c>（セパレータ）。空は既定（カタログ順＋旧グループ境界）。
-    /// ここに無いコマンドは非表示。
+    /// ツールバーに出すコマンド名と <c>|</c>（セパレータ）。空は既定。
+    /// 並びは常にカタログのカテゴリ順（おまかせ配置）。ここに無いコマンドは非表示。
     /// </summary>
     public string[] TransportToolbarLayout { get; set; } = [];
 

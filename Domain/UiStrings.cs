@@ -239,9 +239,6 @@ internal static partial class UiStrings
         "Toolbar layout");
     public static string ButtonTransportToolbarAdd => Get("追加(_A) >>", "Add(_A) >>");
     public static string ButtonTransportToolbarRemove => Get("<< 削除(_R)", "<< Remove(_R)");
-    public static string ButtonTransportToolbarInsertSeparator => Get(
-        "境界を挿入",
-        "Insert separator");
     public static string ButtonTransportToolbarResetLayout => Get(
         "既定に戻す",
         "Reset to default");

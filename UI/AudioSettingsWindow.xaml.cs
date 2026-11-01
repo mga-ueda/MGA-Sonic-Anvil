@@ -712,8 +712,11 @@ internal partial class AudioSettingsWindow : Window
         AppStorage.Settings.TransportToolbarLayout = _transportToolbarLayoutOpenedAt.ToArray();
         AppStorage.Settings.HiddenTransportToolbarCommands = _hiddenTransportToolbarCommandsOpenedAt.ToArray();
         SelectedShowTransportToolbar = _showTransportToolbarOpenedAt;
-        SelectedTransportToolbarLayout = _transportToolbarLayoutOpenedAt.ToArray();
-        SelectedHiddenTransportToolbarCommands = _hiddenTransportToolbarCommandsOpenedAt.ToArray();
+        SelectedTransportToolbarLayout = TransportToolbarCatalog.ResolveLayout(
+            _transportToolbarLayoutOpenedAt,
+            _hiddenTransportToolbarCommandsOpenedAt);
+        SelectedHiddenTransportToolbarCommands =
+            TransportToolbarCatalog.HiddenFromLayout(SelectedTransportToolbarLayout);
         if (Owner is MainWindow window)
         {
             window.ApplyTransportToolbarVisibility();
