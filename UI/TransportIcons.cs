@@ -1628,11 +1628,19 @@ internal static class TransportIconDrawing
         DrawPlayTriangle(dc, pen, playFill, baseX, baseX + length, center.Y, half);
     }
 
+    /// <summary>ハサミ。下に持ち手の輪を 2 つ、刃は交差して上へ開く。</summary>
     private static void DrawCut(DrawingContext dc, Pen pen, double cx, double cy)
     {
-        dc.DrawLine(pen, new Point(cx - 8, cy - 7), new Point(cx + 8, cy + 7));
-        dc.DrawEllipse(null, pen, new Point(cx - 5, cy + 5), 3.2, 3.2);
-        dc.DrawEllipse(null, pen, new Point(cx + 5, cy - 5), 3.2, 3.2);
+        const double ringR = 3.4;
+        var leftRing = new Point(cx - 4.6, cy + 6.4);
+        var rightRing = new Point(cx + 4.6, cy + 6.4);
+        dc.DrawEllipse(null, pen, leftRing, ringR, ringR);
+        dc.DrawEllipse(null, pen, rightRing, ringR, ringR);
+
+        // 輪の内側上から、反対側の刃先へ。
+        var inset = ringR * 0.7071;
+        dc.DrawLine(pen, new Point(leftRing.X + inset, leftRing.Y - inset), new Point(cx + 3.6, cy - 10));
+        dc.DrawLine(pen, new Point(rightRing.X - inset, rightRing.Y - inset), new Point(cx - 3.6, cy - 10));
     }
 
     private static void DrawCopy(DrawingContext dc, Pen pen, double cx, double cy)
