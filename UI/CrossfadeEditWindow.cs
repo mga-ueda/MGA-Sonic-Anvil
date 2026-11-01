@@ -54,7 +54,7 @@ internal sealed class CrossfadeEditWindow : Window
     private TextBlock? _loopNudgeHint;
     private TextBlock? _unitTimeLabel;
     private TextBlock? _unitSamplesLabel;
-    /// <summary>このウィンドウだけの時間／サンプル表示。ステータスバー（トランスポート）とは共有しない。</summary>
+    /// <summary>このウィンドウだけの時間／サンプル表示。ステータスバーとは共有せず、設定に記憶する。</summary>
     private bool _showSamples;
     private CrossfadeEditState? _state;
     private bool _syncing;
@@ -138,6 +138,7 @@ internal sealed class CrossfadeEditWindow : Window
         _deleteAfterLoopCheck.Foreground = BrushOf("PrimaryForeBrush");
         _align28Check.Foreground = BrushOf("PrimaryForeBrush");
 
+        _showSamples = AppStorage.Settings.CrossfadeShowSamples;
         WireToggles();
         _splice.LoopEndsChanged += () =>
         {
@@ -664,6 +665,8 @@ internal sealed class CrossfadeEditWindow : Window
         CancelPendingValueCommit();
         StopValueNudge();
         _showSamples = showSamples;
+        AppStorage.Settings.CrossfadeShowSamples = showSamples;
+        AppStorage.Save();
         SyncFromState(updateSplice: false);
     }
 
