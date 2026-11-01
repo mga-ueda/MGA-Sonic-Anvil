@@ -116,8 +116,14 @@ public partial class MainWindow
             case TransportCommand.FadeAround:
                 ApplyFadeAroundPlayhead();
                 break;
+            case TransportCommand.CrossfadeEdit:
+                TryEnterCrossfadeEditMode();
+                break;
             case TransportCommand.Normalize:
                 ApplyNormalize();
+                break;
+            case TransportCommand.NormalizePerRegion:
+                ApplyNormalizePerRegion();
                 break;
             case TransportCommand.Volume:
                 PromptVolume();
@@ -140,17 +146,80 @@ public partial class MainWindow
             case TransportCommand.Redo:
                 RedoEdit();
                 break;
+            case TransportCommand.Cut:
+                ApplyCut();
+                break;
+            case TransportCommand.Copy:
+                ApplyCopy();
+                break;
+            case TransportCommand.Paste:
+                ApplyPaste();
+                break;
+            case TransportCommand.SilenceSelection:
+                PromptSilenceSelection();
+                break;
+            case TransportCommand.InsertSilence:
+                PromptInsertSilence();
+                break;
+            case TransportCommand.DetectSilence:
+                ApplyDetectSilence();
+                break;
+            case TransportCommand.SelectAll:
+                Waveform.SelectAll();
+                break;
+            case TransportCommand.ClearSelection:
+                Waveform.ClearSelection();
+                break;
+            case TransportCommand.SelectToStart:
+                Waveform.SelectToDocumentEdge(-1);
+                break;
+            case TransportCommand.SelectToEnd:
+                Waveform.SelectToDocumentEdge(1);
+                break;
+            case TransportCommand.CopySelectionTime:
+                CopySelectionTimes(SelectionClipboardPathKind.FileName);
+                break;
+            case TransportCommand.LoopPlay:
+                JumpToLoopPrerollAndPlay();
+                break;
+            case TransportCommand.Restart:
+                RestartFromLastPlaybackStart();
+                break;
+            case TransportCommand.Preroll:
+                StartPrerollPlayback();
+                break;
+            case TransportCommand.SeekViewLeft:
+                Waveform.SeekToViewEdge(-1);
+                break;
+            case TransportCommand.SeekViewRight:
+                Waveform.SeekToViewEdge(1);
+                break;
             case TransportCommand.AddMarker:
                 TryAddMarkerAtPlayhead();
                 break;
             case TransportCommand.SetLoop:
                 SetSampleLoopFromSelection();
                 break;
+            case TransportCommand.ClearLoop:
+                ClearSampleLoop();
+                break;
             case TransportCommand.SetRegion:
                 TrySetRegionFromSelection();
                 break;
+            case TransportCommand.DeleteMarkers:
+                ApplyDeleteMarkers();
+                break;
             case TransportCommand.ToggleRangeClick:
                 ToggleRangeClick();
+                break;
+            case TransportCommand.SampleRate:
+                PromptFormatConvert(FormatConvertKind.SampleRate);
+                break;
+            case TransportCommand.BitDepth:
+                PromptFormatConvert(FormatConvertKind.BitDepth);
+                break;
+            case TransportCommand.Channels:
+                PromptFormatConvert(FormatConvertKind.Channels);
                 break;
             case TransportCommand.NewDocument:
                 NewDocument();
@@ -166,6 +235,95 @@ public partial class MainWindow
                 break;
             case TransportCommand.SaveMp3:
                 ExportMp3FromUi();
+                break;
+            case TransportCommand.ExportWave:
+                if (HasBatchEditTargets)
+                {
+                    ExportBatchWave();
+                }
+                else
+                {
+                    ExportActiveTab(AudioFileKind.Wave);
+                }
+
+                break;
+            case TransportCommand.ExportByMarkers:
+                if (HasBatchEditTargets)
+                {
+                    ExportBatchSeparated(TabExportSplit.Markers);
+                }
+                else
+                {
+                    ExportActiveTabSeparated(TabExportSplit.Markers);
+                }
+
+                break;
+            case TransportCommand.ExportByRegions:
+                if (HasBatchEditTargets)
+                {
+                    ExportBatchSeparated(TabExportSplit.Regions);
+                }
+                else
+                {
+                    ExportActiveTabSeparated(TabExportSplit.Regions);
+                }
+
+                break;
+            case TransportCommand.ExportByChannels:
+                if (HasBatchEditTargets)
+                {
+                    ExportBatchSeparated(TabExportSplit.Channels);
+                }
+                else
+                {
+                    ExportActiveTabSeparated(TabExportSplit.Channels);
+                }
+
+                break;
+            case TransportCommand.MergeTabs:
+                MergeSelectedTabs();
+                break;
+            case TransportCommand.CopyFileName:
+                CopySessionPathTexts(fullPath: false);
+                break;
+            case TransportCommand.CopyFilePath:
+                CopySessionPathTexts(fullPath: true);
+                break;
+            case TransportCommand.CopyAllTabTimes:
+                CopyAllTabTimes();
+                break;
+            case TransportCommand.CloseTab:
+                CloseDocument();
+                break;
+            case TransportCommand.DeleteAllMarkers:
+                ApplyDeleteAllMarkers();
+                break;
+            case TransportCommand.DeleteRegions:
+                ApplyDeleteSelectedRegions();
+                break;
+            case TransportCommand.DeleteAllRegions:
+                ApplyDeleteAllRegions();
+                break;
+            case TransportCommand.PreviousTrack:
+                TryStepLibraryPlaylist(-1);
+                break;
+            case TransportCommand.NextTrack:
+                TryStepLibraryPlaylist(1);
+                break;
+            case TransportCommand.TileOff:
+                SetWaveformTileArrange(WaveformTileArrange.Off);
+                break;
+            case TransportCommand.TileHorizontal:
+                SetWaveformTileArrange(WaveformTileArrange.Horizontal);
+                break;
+            case TransportCommand.TileVertical:
+                SetWaveformTileArrange(WaveformTileArrange.Vertical);
+                break;
+            case TransportCommand.TileGrid:
+                SetWaveformTileArrange(WaveformTileArrange.Grid);
+                break;
+            case TransportCommand.ViewWaveform:
+                Waveform.SetAnalysisView(WaveformAnalysisView.Waveform);
                 break;
             case TransportCommand.ToggleAnalysis:
             case TransportCommand.ToggleSpectrogram:
@@ -189,11 +347,20 @@ public partial class MainWindow
             case TransportCommand.OpenManual:
                 ManualViewer.Open(this);
                 break;
+            case TransportCommand.ToggleMinimalChrome:
+                ToggleLibraryMinimalChrome();
+                break;
             case TransportCommand.ToggleLibraryMaximize:
                 ToggleLibraryMaximize();
                 break;
+            case TransportCommand.MaximizeWaveform:
+                ToggleWaveformMaximize();
+                break;
             case TransportCommand.ToggleAnalyzerMaximize:
                 ToggleAnalyzerMaximize();
+                break;
+            case TransportCommand.AlwaysOnTop:
+                AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
                 break;
             case TransportCommand.ToggleWaapi:
                 ToggleWaapiPanel();
@@ -1126,7 +1293,6 @@ public partial class MainWindow
     private void ToggleRangeClick()
     {
         _rangeClickEnabled = !_rangeClickEnabled;
-        Transport.SetRangeClickEnabled(_rangeClickEnabled);
         SyncRangeClicks();
         Waveform.Focus();
     }
@@ -3387,7 +3553,7 @@ public partial class MainWindow
         ApplyWaapiPanelVisible();
         ApplyLibraryChrome();
         ApplyLayoutWaveformVisibility(preset);
-        Transport.SetMaximizeMode(_waveformMaximizeMode);
+        Transport.SetMaximizeMode(_waveformMaximizeMode, _activeLayoutSlot);
         ApplyWaveformScaleLanes();
         RefreshTileDividers();
         // 全体表示は波形の dB 目盛り列に揃える。タブ左は ＜ 有無も見て ApplyDocumentTabScaleColumn。

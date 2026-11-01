@@ -261,6 +261,14 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.Save));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveAs));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveMp3));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ExportWave));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleMinimalChrome));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.MaximizeWaveform));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.AlwaysOnTop));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SeekViewLeft));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SeekViewRight));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.PreviousTrack));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.NextTrack));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CenterPlayhead));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleSpectrogram));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleLoudnessView));
@@ -274,7 +282,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.Pitch));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.TimeZoomIn));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.NewDocument));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleWaapi));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleWaapi));
+        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SelectToStart));
+        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CloseTab));
+        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.LoopPlay));
     }
 
     [Fact]

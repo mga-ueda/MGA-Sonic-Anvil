@@ -98,6 +98,30 @@ internal static partial class UiStrings
     public static string WithParenAccessKey(string label, char accessKey) =>
         $"{label}(_{char.ToUpperInvariant(accessKey)})";
 
+    /// <summary>
+    /// メニューヘッダからアクセスキー表記を除く。
+    /// 日本語の <c>(_X)</c> と英語の <c>_</c> マーカーを落とし、ツールバー等と表記を揃える。
+    /// </summary>
+    public static string WithoutAccessKey(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        var s = text;
+        if (s.Length >= 4
+            && s[^1] == ')'
+            && s[^3] == '_'
+            && s[^4] == '('
+            && char.IsLetterOrDigit(s[^2]))
+        {
+            s = s[..^4];
+        }
+
+        return s.Replace("_", string.Empty, StringComparison.Ordinal);
+    }
+
     public const string AppName = AppVersion.ProductName;
 
     /// <summary>
@@ -201,40 +225,121 @@ internal static partial class UiStrings
         "Show _toolbar");
     /// <summary>設定・レイアウトプリセット。ツールバー位置コンボの見出し。</summary>
     public static string LabelTransportToolbarDock => Get("ツールバー", "Toolbar");
-    public static string LabelTransportToolbarIcons => Get(
-        "ツールバーに表示するアイコン",
-        "Toolbar icons");
-    public static string ButtonTransportToolbarAllOn => Get("すべて表示", "Show all");
-    public static string ButtonTransportToolbarAllOff => Get("すべて非表示", "Hide all");
-    public static string LabelToolbarPlay => Get("再生", "Play");
-    public static string LabelToolbarRecord => Get("録音", "Record");
-    public static string LabelToolbarFadeIn => Get("フェードイン", "Fade in");
-    public static string LabelToolbarFadeOut => Get("フェードアウト", "Fade out");
-    public static string LabelToolbarFadeAround => Get("前後フェード", "Fade around");
-    public static string LabelToolbarNormalize => Get("ノーマライズ", "Normalize");
-    public static string LabelToolbarVolume => Get("音量", "Volume");
-    public static string LabelToolbarPitch => Get("ピッチ", "Pitch");
-    public static string LabelToolbarTimeStretch => Get("タイムストレッチ", "Time stretch");
-    public static string LabelToolbarReverse => Get("リバース", "Reverse");
-    public static string LabelToolbarDelete => Get("削除", "Delete");
-    public static string LabelToolbarNew => Get("新規", "New");
-    public static string LabelToolbarOpen => Get("開く", "Open");
-    public static string LabelToolbarSave => Get("保存", "Save");
-    public static string LabelToolbarSaveAs => Get("別名で保存", "Save as");
-    public static string LabelToolbarSaveMp3 => Get("MP3 保存", "Save MP3");
-    public static string LabelToolbarAddMarker => Get("マーカー", "Marker");
-    public static string LabelToolbarSetLoop => Get("ループ", "Loop");
-    public static string LabelToolbarSetRegion => Get("リージョン", "Region");
-    public static string LabelToolbarRangeClick => Get("マーカークリック", "Marker click");
-    public static string LabelToolbarSpectrogram => Get("スペクトログラム", "Spectrogram");
-    public static string LabelToolbarLoudness => Get("ラウドネス表示", "Loudness view");
-    public static string LabelToolbarCenter => Get("再生ヘッド中央", "Center playhead");
-    public static string LabelToolbarHistory => Get("履歴", "History");
-    public static string LabelToolbarLibraryMaximize => Get("プレイヤー", "Player");
-    public static string LabelToolbarAnalyzerMaximize => Get("アナライザ拡大", "Analyzer maximize");
-    public static string LabelToolbarColorPanel => Get("色", "Colors");
-    public static string LabelToolbarSettings => Get("設定", "Settings");
-    public static string LabelToolbarManual => Get("マニュアル", "Manual");
+    public static string ButtonTransportToolbarCustomize => Get(
+        "ツールバーをカスタマイズ…",
+        "Customize toolbar…");
+    public static string DialogTransportToolbarCustomizeTitle => Get(
+        "ツールバーのユーザー設定",
+        "Customize Toolbar");
+    public static string LabelTransportToolbarAvailable => Get(
+        "コマンドの選択",
+        "Choose commands from");
+    public static string LabelTransportToolbarCurrent => Get(
+        "ツールバーの配置",
+        "Toolbar layout");
+    public static string ButtonTransportToolbarAdd => Get("追加(_A) >>", "Add(_A) >>");
+    public static string ButtonTransportToolbarRemove => Get("<< 削除(_R)", "<< Remove(_R)");
+    public static string ButtonTransportToolbarInsertSeparator => Get(
+        "境界を挿入",
+        "Insert separator");
+    public static string ButtonTransportToolbarResetLayout => Get(
+        "既定に戻す",
+        "Reset to default");
+    public static string LabelTransportToolbarDescriptionHint => Get(
+        "項目を選ぶと、ここに機能の説明が表示されます。",
+        "Select an item to see its description here.");
+    public static string LabelTransportToolbarSeparatorDescription => Get(
+        "ツールバー上のグループ境界（縦線）。コマンドのあいだに区切りを入れます。",
+        "A vertical separator between toolbar groups.");
+    public static string NoteToolbarEditorModeOnly => Get(
+        "エディタモードで使用（プレイヤーモードでは無効）。",
+        "Editor mode only (unavailable in player mode).");
+    public static string NoteToolbarPlayerMode => Get(
+        "プレイヤーモード向け。",
+        "Intended for player mode.");
+    public static string NoteToolbarLayoutModeSwitch => Get(
+        "レイアウトモード切替（F9〜F12）。",
+        "Layout mode switch (F9–F12).");
+    public static string LabelTransportToolbarIconStates => Get("状態ごとのアイコン", "Icons by state");
+    public static string IconStateStopped => Get("停止中", "Stopped");
+    public static string IconStatePlaying => Get("再生中", "Playing");
+    public static string IconStateRecordIdle => Get("待機中", "Idle");
+    public static string IconStateRecording => Get("録音中", "Recording");
+    // ツールバー表示名はメニュー文言を正本にし、アクセスキーだけ除く（表記揺れ防止）。
+    public static string LabelToolbarPlay => WithoutAccessKey(WaveMenuPlay);
+    public static string LabelToolbarRecord => WithoutAccessKey(WaveMenuRecord);
+    public static string LabelToolbarGoToStart => WithoutAccessKey(WaveMenuGoStart);
+    public static string LabelToolbarGoToEnd => WithoutAccessKey(WaveMenuGoEnd);
+    public static string LabelToolbarPreviousMarker => WithoutAccessKey(WaveMenuPrevMarker);
+    public static string LabelToolbarNextMarker => WithoutAccessKey(WaveMenuNextMarker);
+    public static string LabelToolbarUndo => WithoutAccessKey(WaveMenuUndo);
+    public static string LabelToolbarRedo => WithoutAccessKey(WaveMenuRedo);
+    public static string LabelToolbarFadeIn => WithoutAccessKey(WaveMenuFadeIn);
+    public static string LabelToolbarFadeOut => WithoutAccessKey(WaveMenuFadeOut);
+    public static string LabelToolbarFadeAround => WithoutAccessKey(WaveMenuFadeAround);
+    public static string LabelToolbarNormalize => WithoutAccessKey(WaveMenuNormalize);
+    public static string LabelToolbarVolume => WithoutAccessKey(WaveMenuVolume);
+    public static string LabelToolbarPitch => WithoutAccessKey(WaveMenuPitch);
+    public static string LabelToolbarTimeStretch => WithoutAccessKey(WaveMenuTimeStretch);
+    public static string LabelToolbarReverse => WithoutAccessKey(WaveMenuReverse);
+    public static string LabelToolbarDelete => WithoutAccessKey(WaveMenuDelete);
+    public static string LabelToolbarNew => WithoutAccessKey(WaveMenuNew);
+    public static string LabelToolbarOpen => WithoutAccessKey(WaveMenuOpen);
+    public static string LabelToolbarSave => WithoutAccessKey(WaveMenuSave);
+    public static string LabelToolbarSaveAs => WithoutAccessKey(WaveMenuSaveAs);
+    public static string LabelToolbarSaveMp3 => WithoutAccessKey(WaveMenuExportMp3);
+    public static string LabelToolbarExportWave => WithoutAccessKey(WaveMenuExportWave);
+    public static string LabelToolbarExportByMarkers => WithoutAccessKey(WaveMenuExportByMarkers);
+    public static string LabelToolbarExportByRegions => WithoutAccessKey(WaveMenuExportByRegions);
+    public static string LabelToolbarCopyFilePath => WithoutAccessKey(WaveMenuCopyFilePath);
+    public static string LabelToolbarCopyFileName => WithoutAccessKey(WaveMenuCopyFileName);
+    public static string LabelToolbarMergeTabs => WithoutAccessKey(WaveMenuMergeTabs);
+    public static string LabelToolbarExportByChannels => WithoutAccessKey(WaveMenuExportByChannels);
+    public static string LabelToolbarDeleteAllMarkers => WithoutAccessKey(WaveMenuDeleteAllMarkers);
+    public static string LabelToolbarDeleteRegions => WithoutAccessKey(WaveMenuDeleteRegions);
+    public static string LabelToolbarDeleteAllRegions => WithoutAccessKey(WaveMenuDeleteAllRegions);
+    public static string LabelToolbarPreviousTrack => WithoutAccessKey(WaveMenuPreviousTrack);
+    public static string LabelToolbarNextTrack => WithoutAccessKey(WaveMenuNextTrack);
+    public static string LabelToolbarCopyAllTabTimes => WithoutAccessKey(WaveMenuCopyAllTabTimes);
+    public static string LabelToolbarCloseTab => WithoutAccessKey(TabMenuCloseThis);
+    public static string LabelToolbarSelectToStart => WithoutAccessKey(WaveMenuSelectToStart);
+    public static string LabelToolbarSelectToEnd => WithoutAccessKey(WaveMenuSelectToEnd);
+    public static string LabelToolbarCopySelectionTime => WithoutAccessKey(WaveMenuCopySelectionTime);
+    public static string LabelToolbarSeekViewLeft => WithoutAccessKey(WaveMenuViewLeft);
+    public static string LabelToolbarSeekViewRight => WithoutAccessKey(WaveMenuViewRight);
+    public static string LabelToolbarLoopPlay => WithoutAccessKey(WaveMenuLoopPlay);
+    public static string LabelToolbarRestart => WithoutAccessKey(WaveMenuRestart);
+    public static string LabelToolbarPreroll => WithoutAccessKey(WaveMenuPreroll);
+    public static string LabelToolbarWaveformMaximize => LabelLayoutPresetF11;
+    public static string LabelToolbarMinimalChrome => LabelLayoutPresetF9;
+    public static string LabelToolbarAddMarker => WithoutAccessKey(WaveMenuAddMarker);
+    public static string LabelToolbarSetLoop => WithoutAccessKey(WaveMenuSetLoop);
+    public static string LabelToolbarSetRegion => WithoutAccessKey(WaveMenuSetRegion);
+    public static string LabelToolbarCut => WithoutAccessKey(WaveMenuCut);
+    public static string LabelToolbarCopy => WithoutAccessKey(WaveMenuCopy);
+    public static string LabelToolbarPaste => WithoutAccessKey(WaveMenuPaste);
+    public static string LabelToolbarSilenceSelection => WithoutAccessKey(WaveMenuSilenceSelection);
+    public static string LabelToolbarInsertSilence => WithoutAccessKey(WaveMenuInsertSilence);
+    public static string LabelToolbarDetectSilence => WithoutAccessKey(WaveMenuDetectSilence);
+    public static string LabelToolbarSelectAll => WithoutAccessKey(WaveMenuSelectAll);
+    public static string LabelToolbarClearSelection => WithoutAccessKey(WaveMenuClearSelection);
+    public static string LabelToolbarCrossfadeEdit => WithoutAccessKey(WaveMenuCrossfadeEdit);
+    public static string LabelToolbarNormalizePerRegion => WithoutAccessKey(WaveMenuNormalizePerRegion);
+    public static string LabelToolbarSampleRate => WithoutAccessKey(WaveMenuSampleRate);
+    public static string LabelToolbarBitDepth => WithoutAccessKey(WaveMenuBitDepth);
+    public static string LabelToolbarChannels => WithoutAccessKey(WaveMenuChannels);
+    public static string LabelToolbarClearLoop => WithoutAccessKey(WaveMenuClearLoop);
+    public static string LabelToolbarDeleteMarkers => WithoutAccessKey(WaveMenuDeleteMarkers);
+    public static string LabelToolbarJumpToTime => WithoutAccessKey(WaveMenuFocusTime);
+    public static string LabelToolbarSpectrogram => WithoutAccessKey(WaveMenuViewSpectrogram);
+    public static string LabelToolbarLoudness => WithoutAccessKey(WaveMenuViewLoudness);
+    public static string LabelToolbarCenter => WithoutAccessKey(WaveMenuCenterPlayhead);
+    public static string LabelToolbarHistory => WithoutAccessKey(WaveMenuHistory);
+    public static string LabelToolbarLibraryMaximize => LabelLayoutPresetF10;
+    public static string LabelToolbarAnalyzerMaximize => LabelLayoutPresetF12;
+    public static string LabelToolbarColorPanel => WithoutAccessKey(WaveMenuColorPanel);
+    public static string LabelToolbarSettings => WithoutAccessKey(WaveMenuSettings);
+    public static string LabelToolbarManual => WithoutAccessKey(WaveMenuManual);
     public static string LabelLayoutPresetF9 => Get(
         "F09：プレイヤーモード１",
         "F09: Player mode 1");
@@ -364,6 +469,7 @@ internal static partial class UiStrings
     public static string LabelWallpaperHint => Get(
         "空欄は壁紙なし。比率を保って中央に広げ、画面全体を覆います。",
         "Leave blank for no wallpaper. The image keeps its aspect ratio, stays centered, and covers the window.");
+    /// <summary>設定・一般。ジャケット由来の動的背景色の動き。</summary>
     public static string ButtonWallpaperClear => Get("クリア", "Clear");
     public static string FilterWallpaperImage => Get(
         "画像|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff|すべてのファイル|*.*",
@@ -943,15 +1049,41 @@ internal static partial class UiStrings
         "Wave|*.wav|MP3|*.mp3",
         "Wave|*.wav|MP3|*.mp3");
 
-    public static string LabelTransportGroup => Get("TRANS", "TRANS");
-    public static string LabelEditGroup => Get("EDIT", "EDIT");
-    public static string LabelMarkerGroup => Get("MARK", "MARK");
-    public static string LabelFileGroup => Get("FILE", "FILE");
-    public static string LabelViewGroup => Get("VIEW", "VIEW");
-    public static string LabelOtherGroup => Get("OTHER", "OTHER");
+    // カスタマイズ一覧のカテゴリ見出し（Obsidian「メニュー vs ツールバー」と揃える）
+    public static string LabelTransportGroup => Get("再生・移動", "Playback / navigation");
+    public static string LabelEditGroup => Get("編集", "Edit");
+    public static string LabelFileGroup => Get("ファイル・書き出し", "File / export");
+    public static string LabelMarkerGroup => Get(
+        "タイムライン（マーカー・ループ・リージョン）",
+        "Timeline (markers / loop / regions)");
+    public static string LabelFormatGroup => Get("変換（フォーマット）", "Convert (format)");
+    public static string LabelViewGroup => Get("表示・その他", "View / other");
+    public static string LabelOtherGroup => Get("表示・その他", "View / other");
 
     public static string TooltipRecord => Get("録音 (Ctrl+R)", "Record (Ctrl+R)");
     public static string TooltipPlay => Get("再生 / 停止 (Space)", "Play / stop (Space)");
+    public static string TooltipGoToStart => Get("先頭へ (Ctrl+Home)", "Go to start (Ctrl+Home)");
+    public static string TooltipGoToEnd => Get("末尾へ (Ctrl+End)", "Go to end (Ctrl+End)");
+    public static string TooltipPreviousMarker => Get("前のマーカー", "Previous marker");
+    public static string TooltipNextMarker => Get("次のマーカー", "Next marker");
+    public static string TooltipJumpToTime => Get("時間へ移動 (G)", "Jump to time (G)");
+    public static string TooltipUndo => Get("元に戻す (Ctrl+Z)", "Undo (Ctrl+Z)");
+    public static string TooltipRedo => Get("やり直す (Ctrl+Y)", "Redo (Ctrl+Y)");
+    public static string TooltipCut => Get("切り取り (Ctrl+X)", "Cut (Ctrl+X)");
+    public static string TooltipCopy => Get("コピー (Ctrl+C)", "Copy (Ctrl+C)");
+    public static string TooltipPaste => Get("貼り付け (Ctrl+V)", "Paste (Ctrl+V)");
+    public static string TooltipSilenceSelection => Get("選択範囲を無音化 (Shift+Delete)", "Mute selection (Shift+Delete)");
+    public static string TooltipInsertSilence => Get("無音を挿入 (Ctrl+Ins)", "Insert silence (Ctrl+Ins)");
+    public static string TooltipDetectSilence => Get("無音・ヒット検出 (Ctrl+D)", "Silence & hit detection (Ctrl+D)");
+    public static string TooltipSelectAll => Get("すべて選択 (Ctrl+A)", "Select all (Ctrl+A)");
+    public static string TooltipClearSelection => Get("選択を解除 (Esc)", "Clear selection (Esc)");
+    public static string TooltipCrossfadeEdit => Get("フェード調整ツール (Shift+X)", "Fade adjust tool (Shift+X)");
+    public static string TooltipNormalizePerRegion => Get("リージョン毎にノーマライズ", "Normalize per region");
+    public static string TooltipSampleRate => Get("サンプルレート (S)", "Sample rate (S)");
+    public static string TooltipBitDepth => Get("ビット深度 (B)", "Bit depth (B)");
+    public static string TooltipChannels => Get("チャンネル (C)", "Channels (C)");
+    public static string TooltipClearLoop => Get("ループを削除", "Clear loop");
+    public static string TooltipDeleteMarkers => Get("マーカーを削除 (Ctrl+Delete)", "Delete markers (Ctrl+Delete)");
     public static string TooltipTimeZoomIn => Get("時間拡大 (↑)", "Zoom in time (↑)");
     public static string TooltipTimeZoomOut => Get("時間縮小 (↓)", "Zoom out time (↓)");
     public static string TooltipAmpZoomIn => Get("振幅拡大 (Shift+↑)", "Zoom in amplitude (Shift+↑)");
@@ -962,6 +1094,30 @@ internal static partial class UiStrings
     public static string TooltipDelete => Get("部分削除 (Delete)", "Ripple delete (Delete)");
     public static string TooltipSave => Get("保存 (Ctrl+S)  複数選択時は選択ファイル全部", "Save (Ctrl+S)  all selected files when several tabs are selected");
     public static string TooltipSaveMp3 => Get("MP3 として保存 (Ctrl+Shift+M)", "Save as MP3 (Ctrl+Shift+M)");
+    public static string TooltipExportWave => Get("Wave で書き出す", "Export as Wave");
+    public static string TooltipExportByMarkers => Get("マーカーでセパレート書き出し", "Export split by markers");
+    public static string TooltipExportByRegions => Get("リージョンでセパレート書き出し", "Export split by regions");
+    public static string TooltipCopyFilePath => Get("フルパスをコピー", "Copy full path");
+    public static string TooltipCopyFileName => LabelToolbarCopyFileName;
+    public static string TooltipMergeTabs => LabelToolbarMergeTabs;
+    public static string TooltipExportByChannels => LabelToolbarExportByChannels;
+    public static string TooltipDeleteAllMarkers => LabelToolbarDeleteAllMarkers;
+    public static string TooltipDeleteRegions => LabelToolbarDeleteRegions;
+    public static string TooltipDeleteAllRegions => LabelToolbarDeleteAllRegions;
+    public static string TooltipPreviousTrack => LabelToolbarPreviousTrack;
+    public static string TooltipNextTrack => LabelToolbarNextTrack;
+    public static string TooltipCopyAllTabTimes => LabelToolbarCopyAllTabTimes;
+    public static string TooltipCloseTab => Get("タブを閉じる (Ctrl+W)", "Close tab (Ctrl+W)");
+    public static string TooltipSelectToStart => Get("先頭まで選択 (Ctrl+Shift+Home)", "Select to start (Ctrl+Shift+Home)");
+    public static string TooltipSelectToEnd => Get("末尾まで選択 (Ctrl+Shift+End)", "Select to end (Ctrl+Shift+End)");
+    public static string TooltipCopySelectionTime => Get("選択範囲の時間をコピー", "Copy selection time");
+    public static string TooltipSeekViewLeft => Get("画面左端へ", "Go to view left");
+    public static string TooltipSeekViewRight => Get("画面右端へ", "Go to view right");
+    public static string TooltipLoopPlay => Get("ループ再生 (L)", "Loop play (L)");
+    public static string TooltipRestart => Get("やり直し再生 (Alt+Enter)", "Restart playback (Alt+Enter)");
+    public static string TooltipPreroll => Get("3秒前から再生 (Ctrl+Space)", "Play from 3s before (Ctrl+Space)");
+    public static string TooltipWaveformMaximize => LabelLayoutPresetF11;
+    public static string TooltipMinimalChrome => LabelLayoutPresetF9;
     public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");
     public static string TooltipManualHelp => Get("マニュアル", "Manual");
     public static string TooltipFadeAround => Get(

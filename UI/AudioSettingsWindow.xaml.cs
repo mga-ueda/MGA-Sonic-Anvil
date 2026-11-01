@@ -91,11 +91,14 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedGaplessPlayback { get; private set; } = true;
 
+
     public bool SelectedShowMainMenuBar { get; private set; } = true;
 
     public bool SelectedShowTransportToolbar { get; private set; } = true;
 
     public string[] SelectedHiddenTransportToolbarCommands { get; private set; } = [];
+
+    public string[] SelectedTransportToolbarLayout { get; private set; } = [];
 
     public WindowLayoutPreset SelectedLayoutPresetF9 { get; private set; } =
         WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F9);
@@ -176,7 +179,7 @@ internal partial class AudioSettingsWindow : Window
     private readonly bool _showMainMenuBarOpenedAt;
     private readonly bool _showTransportToolbarOpenedAt;
     private readonly string[] _hiddenTransportToolbarCommandsOpenedAt;
-    private readonly List<(TransportCommand Command, CheckBox Box)> _transportToolbarChecks = [];
+    private readonly string[] _transportToolbarLayoutOpenedAt;
     private bool _transportToolbarPreviewReady;
     private readonly string _wallpaperPathOpenedAt;
     private readonly double _wallpaperOpacityOpenedAt;
@@ -220,6 +223,7 @@ internal partial class AudioSettingsWindow : Window
         bool showMainMenuBar = true,
         bool showTransportToolbar = true,
         IEnumerable<string>? hiddenTransportToolbarCommands = null,
+        IEnumerable<string>? transportToolbarLayout = null,
         bool libraryShowPlaylistPdf = true,
         bool libraryShowPlaylistMov = false,
         bool libraryShowPlaylistMp4 = false,
@@ -282,9 +286,15 @@ internal partial class AudioSettingsWindow : Window
         _showMainMenuBarOpenedAt = SelectedShowMainMenuBar;
         SelectedShowTransportToolbar = showTransportToolbar;
         _showTransportToolbarOpenedAt = SelectedShowTransportToolbar;
-        SelectedHiddenTransportToolbarCommands =
+        // ディスク上の生値（空 Layout＝既定）。Cancel でここへ戻す。
+        _transportToolbarLayoutOpenedAt = transportToolbarLayout?.ToArray() ?? [];
+        _hiddenTransportToolbarCommandsOpenedAt =
             TransportToolbarCatalog.NormalizeHidden(hiddenTransportToolbarCommands);
-        _hiddenTransportToolbarCommandsOpenedAt = SelectedHiddenTransportToolbarCommands.ToArray();
+        SelectedTransportToolbarLayout = TransportToolbarCatalog.ResolveLayout(
+            _transportToolbarLayoutOpenedAt,
+            _hiddenTransportToolbarCommandsOpenedAt);
+        SelectedHiddenTransportToolbarCommands =
+            TransportToolbarCatalog.HiddenFromLayout(SelectedTransportToolbarLayout);
         SelectedLayoutPresetF9 = (layoutPresetF9 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F9)).Clone();
         SelectedLayoutPresetF10 = (layoutPresetF10 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F10)).Clone();
         SelectedLayoutPresetF11 = (layoutPresetF11 ?? WindowLayoutPreset.CreateDefault(WindowLayoutSlot.F11)).Clone();
@@ -371,6 +381,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(AssociationAllOffButton);
         ActionButtonLooks.ApplyClear(WallpaperBrowseButton);
         ActionButtonLooks.ApplyClear(WallpaperClearButton);
+        ActionButtonLooks.ApplyClear(TransportToolbarCustomizeButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
         AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
@@ -566,110 +577,62 @@ internal partial class AudioSettingsWindow : Window
         ShowTransportToolbarBox.IsChecked = SelectedShowTransportToolbar;
         ShowTransportToolbarBox.Checked += (_, _) => PreviewShowTransportToolbar(true);
         ShowTransportToolbarBox.Unchecked += (_, _) => PreviewShowTransportToolbar(false);
-        FillTransportToolbarIcons();
+        SyncTransportToolbarCustomizeEnabled();
         _transportToolbarPreviewReady = true;
         FillLayoutPresets();
         _layoutPreviewReady = true;
         RefreshLibraryExplorerRootButtons();
     }
 
-    private void FillTransportToolbarIcons()
+    private void TransportToolbarCustomizeButton_Click(object sender, RoutedEventArgs e)
     {
-        TransportToolbarIconsHost.Children.Clear();
-        _transportToolbarChecks.Clear();
-        string? currentGroup = null;
-        foreach (var item in TransportToolbarCatalog.All)
-        {
-            var group = item.GroupTitle();
-            if (!string.Equals(currentGroup, group, StringComparison.Ordinal))
+        var result = TransportToolbarCustomizeWindow.Show(
+            this,
+            SelectedTransportToolbarLayout,
+            SelectedHiddenTransportToolbarCommands,
+            previewLayout =>
             {
-                currentGroup = group;
-                TransportToolbarIconsHost.Children.Add(new TextBlock
+                if (!_transportToolbarPreviewReady)
                 {
-                    Text = group,
-                    FontWeight = FontWeights.Bold,
-                    FontSize = 11,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 4, 10, 4),
-                    Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")),
-                });
-            }
+                    return;
+                }
 
-            var visible = TransportToolbarCatalog.IsCommandVisible(
-                SelectedHiddenTransportToolbarCommands,
-                item.Command);
-            var box = new CheckBox
-            {
-                Style = (Style)FindResource("DarkCheckBoxStyle"),
-                Content = item.Label(),
-                IsChecked = visible,
-                Margin = new Thickness(0, 2, 12, 2),
-                VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = item.Tooltip(),
-            };
-            box.Checked += (_, _) => PreviewTransportToolbarIcons();
-            box.Unchecked += (_, _) => PreviewTransportToolbarIcons();
-            _transportToolbarChecks.Add((item.Command, box));
-            TransportToolbarIconsHost.Children.Add(box);
-        }
-
-        SyncTransportToolbarIconsEnabled();
-    }
-
-    private void TransportToolbarAllOnButton_Click(object sender, RoutedEventArgs e)
-    {
-        foreach (var (_, box) in _transportToolbarChecks)
+                ApplyLayoutSelection(previewLayout);
+                ApplyTransportToolbarPreview();
+            });
+        if (result is null)
         {
-            box.IsChecked = true;
+            // Cancel 時はダイアログ側のプレビュー復帰コールバック済み。
+            return;
         }
+
+        ApplyLayoutSelection(result);
+        ApplyTransportToolbarPreview();
     }
 
-    private void TransportToolbarAllOffButton_Click(object sender, RoutedEventArgs e)
+    private void ApplyLayoutSelection(IEnumerable<string> layout)
     {
-        foreach (var (_, box) in _transportToolbarChecks)
-        {
-            box.IsChecked = false;
-        }
+        var applied = TransportToolbarCatalog.ApplyLayout(layout);
+        SelectedTransportToolbarLayout = applied.Layout;
+        SelectedHiddenTransportToolbarCommands = applied.Hidden;
     }
 
-    private void SyncTransportToolbarIconsEnabled()
+    private void SyncTransportToolbarCustomizeEnabled()
     {
-        var on = ShowTransportToolbarBox.IsChecked != false;
-        TransportToolbarIconsHeader.IsEnabled = on;
-        TransportToolbarAllOnButton.IsEnabled = on;
-        TransportToolbarAllOffButton.IsEnabled = on;
-        TransportToolbarIconsHost.IsEnabled = on;
-    }
-
-    private string[] ReadHiddenTransportToolbarCommands()
-    {
-        var visible = _transportToolbarChecks
-            .Where(entry => entry.Box.IsChecked != false)
-            .Select(entry => entry.Command);
-        return TransportToolbarCatalog.HiddenFromVisible(visible);
+        TransportToolbarCustomizeButton.IsEnabled = ShowTransportToolbarBox.IsChecked != false;
     }
 
     private void PreviewShowTransportToolbar(bool show)
     {
         SelectedShowTransportToolbar = show;
-        SyncTransportToolbarIconsEnabled();
-        ApplyTransportToolbarPreview();
-    }
-
-    private void PreviewTransportToolbarIcons()
-    {
-        if (!_transportToolbarPreviewReady)
-        {
-            return;
-        }
-
-        SelectedHiddenTransportToolbarCommands = ReadHiddenTransportToolbarCommands();
+        SyncTransportToolbarCustomizeEnabled();
         ApplyTransportToolbarPreview();
     }
 
     private void ApplyTransportToolbarPreview()
     {
         AppStorage.Settings.ShowTransportToolbar = SelectedShowTransportToolbar;
+        AppStorage.Settings.TransportToolbarLayout = SelectedTransportToolbarLayout;
         AppStorage.Settings.HiddenTransportToolbarCommands = SelectedHiddenTransportToolbarCommands;
         if (Owner is MainWindow window)
         {
@@ -680,18 +643,24 @@ internal partial class AudioSettingsWindow : Window
     private void RevertTransportToolbarPreview()
     {
         var sameShow = AppStorage.Settings.ShowTransportToolbar == _showTransportToolbarOpenedAt;
+        var currentLayout = AppStorage.Settings.TransportToolbarLayout ?? [];
+        var sameLayout = currentLayout.SequenceEqual(
+            _transportToolbarLayoutOpenedAt,
+            StringComparer.OrdinalIgnoreCase);
         var currentHidden = AppStorage.Settings.HiddenTransportToolbarCommands ?? [];
         var sameHidden = currentHidden.SequenceEqual(
             _hiddenTransportToolbarCommandsOpenedAt,
             StringComparer.OrdinalIgnoreCase);
-        if (sameShow && sameHidden)
+        if (sameShow && sameLayout && sameHidden)
         {
             return;
         }
 
         AppStorage.Settings.ShowTransportToolbar = _showTransportToolbarOpenedAt;
+        AppStorage.Settings.TransportToolbarLayout = _transportToolbarLayoutOpenedAt.ToArray();
         AppStorage.Settings.HiddenTransportToolbarCommands = _hiddenTransportToolbarCommandsOpenedAt.ToArray();
         SelectedShowTransportToolbar = _showTransportToolbarOpenedAt;
+        SelectedTransportToolbarLayout = _transportToolbarLayoutOpenedAt.ToArray();
         SelectedHiddenTransportToolbarCommands = _hiddenTransportToolbarCommandsOpenedAt.ToArray();
         if (Owner is MainWindow window)
         {
@@ -1645,7 +1614,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
         SelectedShowMainMenuBar = ShowMainMenuBarBox.IsChecked != false;
         SelectedShowTransportToolbar = ShowTransportToolbarBox.IsChecked != false;
-        SelectedHiddenTransportToolbarCommands = ReadHiddenTransportToolbarCommands();
+        ApplyLayoutSelection(SelectedTransportToolbarLayout);
         ReadLayoutPresets();
         SelectedLibraryShowPlaylistPdf = LibraryShowPlaylistPdfBox.IsChecked != false;
         SelectedLibraryShowPlaylistMov = LibraryShowPlaylistMovBox.IsChecked != false;
@@ -2763,7 +2732,7 @@ internal partial class AudioSettingsWindow : Window
         return Max(
             MeasureCheckBoxContentWidth(ShowMainMenuBarBox),
             MeasureCheckBoxContentWidth(ShowTransportToolbarBox),
-            ComboBoxFit.MeasureText(this, UiStrings.LabelTransportToolbarIcons, 11.333),
+            ComboBoxFit.MeasureText(this, UiStrings.ButtonTransportToolbarCustomize, 11.333) + 36,
             fullscreenRow,
             checksWithToolbar) + gutter;
     }
@@ -3042,6 +3011,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(AssociationAllOffButton);
         ActionButtonLooks.ApplyClear(WallpaperBrowseButton);
         ActionButtonLooks.ApplyClear(WallpaperClearButton);
+        ActionButtonLooks.ApplyClear(TransportToolbarCustomizeButton);
         ActionButtonLooks.ApplyClear(OpenColorSettingsButton);
         ActionButtonLooks.ApplyClear(FileNameColorMarkerAddButton);
         ApplyLibraryExplorerRootButtons();

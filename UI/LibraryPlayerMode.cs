@@ -154,13 +154,22 @@ internal static class LibraryPlayerMode
             or TransportCommand.NextMarker
             or TransportCommand.NextPage
             or TransportCommand.GoToEnd
+            or TransportCommand.SeekViewLeft
+            or TransportCommand.SeekViewRight
+            or TransportCommand.PreviousTrack
+            or TransportCommand.NextTrack
             or TransportCommand.Open
             or TransportCommand.OpenColorPanel
             or TransportCommand.OpenSettings
             or TransportCommand.OpenManual
+            or TransportCommand.ToggleWaapi
+            or TransportCommand.ToggleMinimalChrome
+            or TransportCommand.MaximizeWaveform
             or TransportCommand.ToggleLibraryMaximize
             or TransportCommand.ToggleAnalyzerMaximize
+            or TransportCommand.AlwaysOnTop
             or TransportCommand.SaveMp3
+            or TransportCommand.ExportWave
             => false,
         _ => true,
     };

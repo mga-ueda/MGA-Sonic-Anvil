@@ -884,7 +884,7 @@ public partial class MainWindow : Window
         StatusTimes.ApplyLocalizedText();
         TimeScrollStrip.ApplyLocalizedText();
         Transport.ApplyLocalizedText();
-        Transport.SetMaximizeMode(_waveformMaximizeMode);
+        Transport.SetMaximizeMode(_waveformMaximizeMode, _activeLayoutSlot);
         RefreshCrossfadeLocalizedText();
         SpeakerMenuLabel.Text = UiStrings.LabelStatusSpeaker;
         RefreshSpeakerMenu();

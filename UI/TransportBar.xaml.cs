@@ -10,7 +10,8 @@ internal partial class TransportBar : UserControl
 {
     private readonly TransportIconButton _play;
     private readonly Dictionary<TransportCommand, TransportIconButton> _buttons = new();
-    private readonly List<(TextBlock Label, Func<string> Title, List<TransportIconButton> Buttons)> _groups = [];
+    private readonly List<Border> _separators = [];
+    private string[]? _appliedLayout;
 
     public event EventHandler<TransportCommand>? CommandInvoked;
 
@@ -19,19 +20,14 @@ internal partial class TransportBar : UserControl
         InitializeComponent();
         _play = BuildFromCatalog();
         ApplyLocalizedText();
-        ApplyVisibilityFromSettings(AppStorage.Settings);
+        ApplyLayoutFromSettings(AppStorage.Settings);
     }
 
     public void ApplyLocalizedText()
     {
         foreach (var item in TransportToolbarCatalog.All)
         {
-            SetTooltip(item.Command, item.Tooltip());
-        }
-
-        foreach (var (label, title, _) in _groups)
-        {
-            label.Text = title();
+            SetTooltip(item.Command, TransportToolbarCatalog.Describe(item));
         }
     }
 
@@ -58,15 +54,6 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    public void SetRangeClickEnabled(bool enabled)
-    {
-        if (_buttons.TryGetValue(TransportCommand.ToggleRangeClick, out var button))
-        {
-            button.IsLatched = enabled;
-            button.InvalidateVisual();
-        }
-    }
-
     public void SetAnalysisView(WaveformAnalysisView view)
     {
         if (_buttons.TryGetValue(TransportCommand.ToggleSpectrogram, out var spectrogram))
@@ -83,22 +70,48 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    public void SetMaximizeMode(WaveformMaximizeMode mode)
+    public void SetMaximizeMode(WaveformMaximizeMode mode, WindowLayoutSlot? activeSlot = null)
     {
+        var f9 = activeSlot == WindowLayoutSlot.F9;
+        var f10 = activeSlot == WindowLayoutSlot.F10;
+        var f11 = activeSlot == WindowLayoutSlot.F11;
+        var f12 = activeSlot == WindowLayoutSlot.F12;
+        if (activeSlot is null)
+        {
+            f10 = mode == WaveformMaximizeMode.Library;
+            f11 = mode == WaveformMaximizeMode.Waveform;
+            f12 = mode == WaveformMaximizeMode.Analyzers;
+        }
+
+        if (_buttons.TryGetValue(TransportCommand.ToggleMinimalChrome, out var minimal))
+        {
+            minimal.IsLatched = f9;
+            TransportToolTip.Attach(minimal, UiStrings.TooltipMinimalChrome);
+            minimal.InvalidateVisual();
+        }
+
         if (_buttons.TryGetValue(TransportCommand.ToggleLibraryMaximize, out var library))
         {
-            var player = mode == WaveformMaximizeMode.Library;
-            library.Icon = player ? TransportIcon.EditorMode : TransportIcon.PlayerMode;
-            library.IsLatched = player;
+            library.Icon = f10 ? TransportIcon.EditorMode : TransportIcon.PlayerMode;
+            library.IsLatched = f10;
             TransportToolTip.Attach(library, UiStrings.TooltipLibraryMaximize);
+            library.InvalidateVisual();
+        }
+
+        if (_buttons.TryGetValue(TransportCommand.MaximizeWaveform, out var waveform))
+        {
+            waveform.Icon = f11 ? TransportIcon.WaveformRestore : TransportIcon.WaveformMaximize;
+            waveform.IsLatched = f11;
+            TransportToolTip.Attach(waveform, UiStrings.TooltipWaveformMaximize);
+            waveform.InvalidateVisual();
         }
 
         if (_buttons.TryGetValue(TransportCommand.ToggleAnalyzerMaximize, out var analyzers))
         {
-            var on = mode == WaveformMaximizeMode.Analyzers;
-            analyzers.Icon = on ? TransportIcon.AnalyzerRestore : TransportIcon.AnalyzerMaximize;
-            analyzers.IsLatched = on;
+            analyzers.Icon = f12 ? TransportIcon.AnalyzerRestore : TransportIcon.AnalyzerMaximize;
+            analyzers.IsLatched = f12;
             TransportToolTip.Attach(analyzers, UiStrings.TooltipAnalyzerMaximize);
+            analyzers.InvalidateVisual();
         }
     }
 
@@ -131,9 +144,9 @@ internal partial class TransportBar : UserControl
             button.InvalidateVisual();
         }
 
-        foreach (var (label, _, _) in _groups)
+        foreach (var separator in _separators)
         {
-            label.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+            separator.Background = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush"));
         }
     }
 
@@ -145,6 +158,8 @@ internal partial class TransportBar : UserControl
                 or TransportCommand.OpenSettings
                 or TransportCommand.OpenColorPanel
                 or TransportCommand.OpenManual
+                or TransportCommand.ToggleMinimalChrome
+                or TransportCommand.MaximizeWaveform
                 or TransportCommand.ToggleLibraryMaximize
                 or TransportCommand.ToggleAnalyzerMaximize)
             {
@@ -162,66 +177,97 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    /// <summary>設定の非表示リストに従い、グループ見出し／ボタンを畳む。</summary>
-    public void ApplyVisibilityFromSettings(AppSettings settings)
+    /// <summary>設定の並び／セパレータに従い、ツールバーを組み直す。</summary>
+    public void ApplyLayoutFromSettings(AppSettings settings)
     {
-        var anyVisible = false;
-        foreach (var (label, _, buttons) in _groups)
+        var layout = TransportToolbarCatalog.ResolveLayout(settings);
+        // 再生／停止のクローム同期からも呼ばれる。並びが同じなら組み直さない（全ボタンが一瞬消えて点滅する）。
+        if (_appliedLayout is { } applied && applied.SequenceEqual(layout, StringComparer.Ordinal))
         {
-            var visibleCount = 0;
-            foreach (var button in buttons)
+            return;
+        }
+
+        _appliedLayout = layout;
+        ItemsHost.Children.Clear();
+        _separators.Clear();
+
+        var anyVisible = false;
+        var firstInSegment = true;
+        foreach (var entry in layout)
+        {
+            if (TransportToolbarCatalog.IsSeparator(entry))
             {
-                var show = TransportToolbarCatalog.IsCommandVisible(settings, button.CommandKind);
-                button.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-                if (show)
+                if (!anyVisible)
                 {
-                    visibleCount++;
+                    continue;
                 }
+
+                var separator = CreateSeparator();
+                _separators.Add(separator);
+                ItemsHost.Children.Add(separator);
+                firstInSegment = true;
+                continue;
             }
 
-            label.Visibility = visibleCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-            anyVisible |= visibleCount > 0;
+            if (!TransportToolbarCatalog.TryGetItem(entry, out var item)
+                || !_buttons.TryGetValue(item.Command, out var button))
+            {
+                continue;
+            }
+
+            button.Visibility = Visibility.Visible;
+            button.Margin = new Thickness(
+                firstInSegment ? 0 : 0,
+                0,
+                DesignMetrics.TransportButtonGap,
+                0);
+            ItemsHost.Children.Add(button);
+            firstInSegment = false;
+            anyVisible = true;
+        }
+
+        foreach (var (command, button) in _buttons)
+        {
+            if (!TransportToolbarCatalog.IsCommandInLayout(layout, command))
+            {
+                button.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        // 末尾直後のセパレータは出さない（Normalize 済みだが防御）。
+        while (ItemsHost.Children.Count > 0
+               && ItemsHost.Children[^1] is Border)
+        {
+            ItemsHost.Children.RemoveAt(ItemsHost.Children.Count - 1);
         }
 
         Visibility = anyVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>互換。並び適用に委譲。</summary>
+    public void ApplyVisibilityFromSettings(AppSettings settings) =>
+        ApplyLayoutFromSettings(settings);
+
     /// <summary>いま表示中のコマンドがあるか（領域自体の表示判定用）。</summary>
     public bool HasVisibleCommands =>
-        _groups.Any(group => group.Buttons.Any(button => button.Visibility == Visibility.Visible));
+        _buttons.Values.Any(button => button.Visibility == Visibility.Visible
+            && ItemsHost.Children.Contains(button));
 
     private TransportIconButton BuildFromCatalog()
     {
         TransportIconButton? play = null;
-        string? currentGroupKey = null;
-        TextBlock? groupLabel = null;
-        List<TransportIconButton>? groupButtons = null;
-        var firstGroup = true;
-
         foreach (var item in TransportToolbarCatalog.All)
         {
-            var groupKey = item.GroupTitle();
-            if (!string.Equals(currentGroupKey, groupKey, StringComparison.Ordinal))
-            {
-                currentGroupKey = groupKey;
-                groupLabel = CreateGroupLabel(item.GroupTitle, firstGroup);
-                firstGroup = false;
-                groupButtons = [];
-                _groups.Add((groupLabel, item.GroupTitle, groupButtons));
-                ItemsHost.Children.Add(groupLabel);
-            }
-
             var button = new TransportIconButton
             {
                 CommandKind = item.Command,
                 Icon = item.Icon,
                 Margin = new Thickness(0, 0, DesignMetrics.TransportButtonGap, 0),
+                Visibility = Visibility.Collapsed,
             };
             TransportToolTip.Attach(button, item.Tooltip());
             button.Click += (_, _) => CommandInvoked?.Invoke(this, item.Command);
             _buttons[item.Command] = button;
-            ItemsHost.Children.Add(button);
-            groupButtons!.Add(button);
             if (item.Command == TransportCommand.TogglePlayback)
             {
                 play = button;
@@ -231,19 +277,18 @@ internal partial class TransportBar : UserControl
         return play!;
     }
 
-    private static TextBlock CreateGroupLabel(Func<string> title, bool firstGroup) =>
+    private static Border CreateSeparator() =>
         new()
         {
-            Text = title(),
-            Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")),
-            FontWeight = FontWeights.Bold,
-            FontSize = DesignMetrics.TransportGroupLabelFontSize,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextAlignment = TextAlignment.Right,
+            Width = 1,
             Margin = new Thickness(
-                firstGroup ? 0 : DesignMetrics.TransportGroupGap,
-                0,
-                DesignMetrics.TransportGroupLabelGap,
-                0),
+                DesignMetrics.TransportGroupGap * 0.5,
+                DesignMetrics.From96(8),
+                DesignMetrics.TransportGroupGap * 0.5,
+                DesignMetrics.From96(8)),
+            VerticalAlignment = VerticalAlignment.Stretch,
+            MinHeight = DesignMetrics.TransportButtonSide * 0.55,
+            Background = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")),
+            SnapsToDevicePixels = true,
         };
 }
