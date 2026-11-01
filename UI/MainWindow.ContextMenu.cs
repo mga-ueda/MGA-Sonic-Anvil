@@ -111,8 +111,9 @@ public partial class MainWindow
     internal void ApplyTransportToolbarDock()
     {
         var slot = _activeLayoutSlot ?? WindowLayoutSlot.F12;
-        var dockBottom = AppStorage.Settings.ResolvedLayoutPreset(slot).ResolvedTransportToolbarDock()
-            == LayoutTransportToolbarDock.Bottom;
+        var preset = AppStorage.Settings.ResolvedLayoutPreset(slot);
+        Transport.SetItemsAlignment(preset.ResolvedTransportToolbarAlign());
+        var dockBottom = preset.ResolvedTransportToolbarDock() == LayoutTransportToolbarDock.Bottom;
         DockPanel.SetDock(TransportToolbarHost, dockBottom ? Dock.Bottom : Dock.Top);
 
         var children = RootDock.Children;

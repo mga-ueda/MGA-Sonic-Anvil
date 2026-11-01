@@ -150,6 +150,36 @@ public sealed class WindowLayoutPresetTests
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F9).ResolvedTransportToolbarDock());
     }
 
+    [Fact]
+    public void TransportToolbarAlign_DefaultsCenterAndPerSlotIndependent()
+    {
+        var settings = AppSettings.CreateDefault();
+        foreach (var slot in Enum.GetValues<WindowLayoutSlot>())
+        {
+            Assert.Equal(
+                LayoutTransportToolbarAlign.Center,
+                settings.ResolvedLayoutPreset(slot).ResolvedTransportToolbarAlign());
+        }
+
+        var left = new WindowLayoutPreset { FullscreenMode = "Toggle" };
+        left.ApplyTransportToolbarAlign(LayoutTransportToolbarAlign.Left);
+        settings.ApplyLayoutPreset(WindowLayoutSlot.F11, left);
+
+        Assert.Equal(
+            LayoutTransportToolbarAlign.Left,
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F11).ResolvedTransportToolbarAlign());
+        Assert.Equal(
+            LayoutTransportToolbarAlign.Center,
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F12).ResolvedTransportToolbarAlign());
+
+        // 旧プリセットで欠落・空文字なら中央。
+        var legacy = new WindowLayoutPreset { FullscreenMode = "Off", TransportToolbarAlign = "" };
+        settings.ApplyLayoutPreset(WindowLayoutSlot.F9, legacy);
+        Assert.Equal(
+            LayoutTransportToolbarAlign.Center,
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F9).ResolvedTransportToolbarAlign());
+    }
+
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]

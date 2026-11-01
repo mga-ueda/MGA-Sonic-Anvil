@@ -115,6 +115,11 @@ internal partial class TransportBar : UserControl
         }
     }
 
+    public void SetItemsAlignment(LayoutTransportToolbarAlign align) =>
+        ItemsHost.HorizontalAlignment = align == LayoutTransportToolbarAlign.Left
+            ? HorizontalAlignment.Left
+            : HorizontalAlignment.Center;
+
     public FrameworkElement? ButtonFor(TransportCommand command) =>
         _buttons.TryGetValue(command, out var button) ? button : null;
 

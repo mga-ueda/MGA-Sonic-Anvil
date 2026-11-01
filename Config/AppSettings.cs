@@ -807,6 +807,11 @@ internal sealed class AppSettings
             copy.TransportToolbarDock = defaults.TransportToolbarDock;
         }
 
+        if (string.IsNullOrWhiteSpace(copy.TransportToolbarAlign))
+        {
+            copy.TransportToolbarAlign = defaults.TransportToolbarAlign;
+        }
+
         copy.ShowStatusBar ??= defaults.ShowStatusBar;
         // ライブラリ列は設定に出さないため、常にスロット既定へ寄せる。
         copy.ShowLibraryAndFavorites = defaults.ShowLibraryAndFavorites;
