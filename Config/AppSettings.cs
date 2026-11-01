@@ -534,6 +534,14 @@ internal sealed class AppSettings
     /// <summary>F10 お気に入り（フォルダのパスのみ。ファイル単体は含めない）。存在しないものは起動時に落とす。</summary>
     public string[] LibraryFavorites { get; set; } = [];
 
+    /// <summary>VST3 検索フォルダ。空ならスキャナ既定。</summary>
+    public string[] Vst3SearchPaths { get; set; } = [];
+
+    /// <summary>
+    /// Cubase / Nuendo の vst3plugins.xml を種別取得に使うか。既定オフ（無い環境と同じ経路で確認できるようにする）。
+    /// </summary>
+    public bool Vst3UseSteinbergHostCache { get; set; }
+
     /// <summary>F10 左のフォルダツリー幅。0 以下は既定。</summary>
     public double LibraryExplorerWidth { get; set; }
 
@@ -1129,6 +1137,12 @@ internal sealed class AppSettings
 
     public void ApplyLibraryFavoritePaths(IEnumerable<string> paths) =>
         LibraryFavorites = LibraryFavoritePaths.Serialize(paths);
+
+    public string[] ResolvedVst3SearchPaths() =>
+        Vst3SearchPathList.Resolve(Vst3SearchPaths);
+
+    public void ApplyVst3SearchPaths(IEnumerable<string> paths) =>
+        Vst3SearchPaths = Vst3SearchPathList.Resolve(paths);
 }
 
 [JsonSerializable(typeof(AppSettings))]
