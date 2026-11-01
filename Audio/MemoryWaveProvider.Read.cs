@@ -26,7 +26,13 @@ internal sealed partial class PlaybackSampleProvider
             {
                 ApplySeekCrossfade(buffer, offset, ref written);
             }
+        }
 
+        // VST は provider ロックの外（エンジン側ロックのみ）。UI Apply と順序が交差しても死なない。
+        ApplyVstInserts(buffer, offset, written);
+
+        lock (_gate)
+        {
             ApplyPlaybackPitch(buffer, offset, written);
             ApplyBpmMonitorNoLock(buffer, offset, written);
             pushedSource = _sourceMeterThisRead > 0;
@@ -114,6 +120,24 @@ internal sealed partial class PlaybackSampleProvider
 
     private double PlaybackStep(bool resampled) =>
         (resampled ? _sourceRate / (double)_deviceRate : 1d) * _playbackSpeed;
+
+    private void ApplyVstInserts(float[] buffer, int offset, int written)
+    {
+        if (written <= 0)
+        {
+            return;
+        }
+
+        VstInsertEngine? engine;
+        int channels;
+        lock (_gate)
+        {
+            engine = _vstInserts;
+            channels = Math.Max(1, _outputChannels);
+        }
+
+        engine?.Process(buffer, offset, written, channels);
+    }
 
     private void ApplyPlaybackPitch(float[] buffer, int offset, int written)
     {
