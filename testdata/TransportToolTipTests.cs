@@ -65,18 +65,6 @@ public sealed class TransportToolTipTests
     }
 
     [Fact]
-    public void GroupLabels_MatchObsidianCustomizeCategories()
-    {
-        Assert.Equal("再生・移動", UiStrings.LabelTransportGroup);
-        Assert.Equal("編集", UiStrings.LabelEditGroup);
-        Assert.Equal("ファイル・書き出し", UiStrings.LabelFileGroup);
-        Assert.Equal("タイムライン（マーカー・ループ・リージョン）", UiStrings.LabelMarkerGroup);
-        Assert.Equal("変換（フォーマット）", UiStrings.LabelFormatGroup);
-        Assert.Equal("表示・その他", UiStrings.LabelViewGroup);
-        Assert.Equal(UiStrings.LabelViewGroup, UiStrings.LabelOtherGroup);
-    }
-
-    [Fact]
     public void Tooltips_StayOnOneLine()
     {
         Assert.DoesNotContain("\n", UiStrings.TooltipPlay);

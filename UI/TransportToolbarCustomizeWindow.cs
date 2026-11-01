@@ -210,7 +210,7 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         {
             if (TransportToolbarCatalog.IsSeparator(entry))
             {
-                _currentList.Items.Add(LayoutRow.Separator());
+                _currentList.Items.Add(LayoutRow.Separator(TransportToolbarCatalog.IsSectionSeparator(entry)));
                 continue;
             }
 
@@ -231,14 +231,13 @@ internal sealed class TransportToolbarCustomizeWindow : Window
     {
         _availableList.Items.Clear();
         string? currentGroup = null;
-        foreach (var item in TransportToolbarCatalog.All)
+        foreach (var (item, group) in TransportToolbarCatalog.OrderedWithGroupTitles())
         {
             if (placed.Contains(item.Command))
             {
                 continue;
             }
 
-            var group = item.GroupTitle();
             if (!string.Equals(currentGroup, group, StringComparison.Ordinal))
             {
                 currentGroup = group;
@@ -708,7 +707,8 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         root.AppendChild(commandPanel);
 
         var rule = new FrameworkElementFactory(typeof(SeparatorRule));
-        rule.SetValue(FrameworkElement.HeightProperty, 22d);
+        rule.SetBinding(FrameworkElement.HeightProperty, new System.Windows.Data.Binding(nameof(LayoutRow.SeparatorHeight)));
+        rule.SetBinding(UIElement.OpacityProperty, new System.Windows.Data.Binding(nameof(LayoutRow.SeparatorOpacity)));
         rule.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
         rule.SetBinding(
             UIElement.VisibilityProperty,
@@ -727,9 +727,11 @@ internal sealed class TransportToolbarCustomizeWindow : Window
             TransportCommand command,
             TransportIcon icon,
             string label,
-            string description)
+            string description,
+            bool section = false)
         {
             IsSeparator = separator;
+            IsSectionSeparator = section;
             IsCategoryHeader = category;
             Command = command;
             Icon = icon;
@@ -745,6 +747,11 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         public IReadOnlyList<TransportToolbarCatalog.IconVariant> OtherVariants => [.. Variants.Skip(1)];
 
         public bool IsSeparator { get; }
+
+        /// <summary>グループ内の区切り（メニューのセパレータ／サブメニュー境界）。カテゴリ境界より控えめに描く。</summary>
+        public bool IsSectionSeparator { get; }
+        public double SeparatorHeight => IsSectionSeparator ? 10d : 22d;
+        public double SeparatorOpacity => IsSectionSeparator ? 0.45 : 1d;
         public bool IsCategoryHeader { get; }
         public TransportCommand Command { get; }
         public TransportIcon Icon { get; }
@@ -757,14 +764,15 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         public Visibility SeparatorVisibility =>
             IsSeparator ? Visibility.Visible : Visibility.Collapsed;
 
-        public static LayoutRow Separator() =>
+        public static LayoutRow Separator(bool section) =>
             new(
                 true,
                 false,
                 default,
                 TransportIcon.PlayPause,
                 string.Empty,
-                UiStrings.LabelTransportToolbarSeparatorDescription);
+                UiStrings.LabelTransportToolbarSeparatorDescription,
+                section);
 
         public static LayoutRow Category(string title) =>
             new(

@@ -127,6 +127,8 @@
     <SolidColorBrush x:Key="TransportBackBrush" Color="#FF1A1B26" />
     <!-- ツールバーのグループ背景ベール。半透明でカテゴリのかたまりを示す。 -->
     <SolidColorBrush x:Key="TransportToolbarGroupVeilBrush" Color="#16686870" />
+    <!-- グループ内の区切り線。メニューのサブメニュー／区切りに対応する。 -->
+    <SolidColorBrush x:Key="TransportToolbarSectionSeparatorBrush" Color="#40EBEBEB" />
     <SolidColorBrush x:Key="TransportForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="RecordLatchForeBrush" Color="#FFE24B4A" />
     <SolidColorBrush x:Key="TransportDisabledForeBrush" Color="#FF5B5B5B" />

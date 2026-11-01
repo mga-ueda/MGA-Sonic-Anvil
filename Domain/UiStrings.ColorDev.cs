@@ -177,6 +177,7 @@ internal static partial class UiStrings
             "VectorScopeCorrelation" => Get("相関針", "Correlation"),
             "TransportBack" => Get("背景", "Background"),
             "TransportToolbarGroupVeil" => Get("ツールバー・グループ背景", "Toolbar · group veil"),
+            "TransportToolbarSectionSeparator" => Get("ツールバー・グループ内区切り", "Toolbar · section separator"),
             "TransportFore" => Get("文字", "Text"),
             "RecordLatchFore" => Get("録音ラッチ", "Record latch"),
             "TransportDisabledFore" => Get("無効文字", "Disabled text"),

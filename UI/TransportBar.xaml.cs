@@ -152,6 +152,13 @@ internal partial class TransportBar : UserControl
         foreach (var veil in _groupVeils)
         {
             veil.SetResourceReference(BackgroundProperty, "TransportToolbarGroupVeilBrush");
+            if (veil.Child is Panel panel)
+            {
+                foreach (var line in panel.Children.OfType<Border>())
+                {
+                    line.SetResourceReference(BackgroundProperty, "TransportToolbarSectionSeparatorBrush");
+                }
+            }
         }
     }
 
@@ -195,11 +202,25 @@ internal partial class TransportBar : UserControl
         _appliedLayout = layout;
         ItemsHost.Children.Clear();
         _groupVeils.Clear();
+        // 旧グループの StackPanel に残ったボタンを外してから付け直す。
+        foreach (var button in _buttons.Values)
+        {
+            if (button.Parent is Panel oldParent)
+            {
+                oldParent.Children.Remove(button);
+            }
+        }
 
         StackPanel? groupButtons = null;
         var anyVisible = false;
         foreach (var entry in layout)
         {
+            if (TransportToolbarCatalog.IsSectionSeparator(entry))
+            {
+                groupButtons?.Children.Add(CreateSectionSeparator());
+                continue;
+            }
+
             if (TransportToolbarCatalog.IsSeparator(entry))
             {
                 groupButtons = null;
@@ -304,5 +325,25 @@ internal partial class TransportBar : UserControl
         };
         veil.SetResourceReference(BackgroundProperty, "TransportToolbarGroupVeilBrush");
         return veil;
+    }
+
+    /// <summary>グループ内の区切り線（メニューのセパレータ／サブメニュー境界）。</summary>
+    private static Border CreateSectionSeparator()
+    {
+        var line = new Border
+        {
+            Width = DesignMetrics.From96(1),
+            Height = DesignMetrics.From96(18),
+            Margin = new Thickness(
+                DesignMetrics.From96(2),
+                0,
+                DesignMetrics.From96(2) + DesignMetrics.TransportButtonGap,
+                0),
+            VerticalAlignment = VerticalAlignment.Center,
+            SnapsToDevicePixels = true,
+            IsHitTestVisible = false,
+        };
+        line.SetResourceReference(BackgroundProperty, "TransportToolbarSectionSeparatorBrush");
+        return line;
     }
 }

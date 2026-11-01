@@ -82,6 +82,7 @@ internal static class UiThemePalette
         "OverviewOutsideFillBrush",
         "TransportBackBrush",
         "TransportToolbarGroupVeilBrush",
+        "TransportToolbarSectionSeparatorBrush",
         "TransportForeBrush",
         "TransportDisabledForeBrush",
         "TransportHoverBackBrush",
@@ -199,6 +200,7 @@ internal static class UiThemePalette
         ["ChannelLabelOnTintForeBrush"] = Rgb(0xFF, 0xFF, 0xFF),
         ["RecordLatchForeBrush"] = Rgb(0xE2, 0x4B, 0x4A),
         ["TransportToolbarGroupVeilBrush"] = Argb(0x16, 0x68, 0x68, 0x70),
+        ["TransportToolbarSectionSeparatorBrush"] = Argb(0x40, 0xEB, 0xEB, 0xEB),
     };
 
     public static IReadOnlyCollection<string> ThemeableKeys => Themeable;

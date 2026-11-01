@@ -331,7 +331,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.CopySelectionTimePath, CommandsIn(tree, UiStrings.WaveMenuCatHere));
             var root = tree.OfType<WaveMenuItemEntry>().Select(item => item.Command).ToArray();
             Assert.All(root, command => Assert.Null(command));
-            Assert.DoesNotContain(WaveMenuCommand.CopySelectionTime, CommandsIn(tree, UiStrings.WaveMenuCatEdit));
+            Assert.Contains(WaveMenuCommand.CopySelectionTime, CommandsIn(tree, UiStrings.WaveMenuCatEdit));
+            Assert.Contains(WaveMenuCommand.CopySelectionTimePath, CommandsIn(tree, UiStrings.WaveMenuCatEdit));
             Assert.DoesNotContain(WaveMenuCommand.DeleteAllMarkers, root);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
             Assert.Contains(WaveMenuCommand.DeleteAllRegions, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
