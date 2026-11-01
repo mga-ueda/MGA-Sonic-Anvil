@@ -91,6 +91,10 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedGaplessPlayback { get; private set; } = true;
 
+    public bool SelectedEnableBackgroundAnimation { get; private set; } = true;
+
+    public int SelectedBackgroundAnimationSpeedPercent { get; private set; } =
+        AppSettings.BackgroundAnimationSpeedPercentDefault;
 
     public bool SelectedShowMainMenuBar { get; private set; } = true;
 
@@ -176,7 +180,14 @@ internal partial class AudioSettingsWindow : Window
     private string[] _outputPortNames = [];
     private float[] _meterPeaks = [];
     private readonly int _uiScaleOpenedAt;
+    private readonly bool _enableBackgroundAnimationOpenedAt;
+    private readonly int _backgroundAnimationSpeedOpenedAt;
     private readonly bool _showMainMenuBarOpenedAt;
+    private readonly DispatcherTimer _backgroundAnimationSpeedPreviewTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(150),
+    };
+    private bool _updatingBackgroundAnimationSpeed;
     private readonly bool _showTransportToolbarOpenedAt;
     private readonly string[] _hiddenTransportToolbarCommandsOpenedAt;
     private readonly string[] _transportToolbarLayoutOpenedAt;
@@ -237,6 +248,8 @@ internal partial class AudioSettingsWindow : Window
         WindowLayoutSlot launchMode = WindowLayoutSlot.F12,
         string? wallpaperPath = null,
         double wallpaperOpacity = AppSettings.WallpaperOpacityDefault,
+        bool enableBackgroundAnimation = true,
+        int backgroundAnimationSpeedPercent = AppSettings.BackgroundAnimationSpeedPercentDefault,
         WindowLayoutPreset? layoutPresetF9 = null,
         WindowLayoutPreset? layoutPresetF10 = null,
         WindowLayoutPreset? layoutPresetF11 = null,
@@ -317,6 +330,11 @@ internal partial class AudioSettingsWindow : Window
         SelectedWallpaperOpacity = AppSettings.ClampWallpaperOpacity(wallpaperOpacity);
         _wallpaperPathOpenedAt = SelectedWallpaperPath;
         _wallpaperOpacityOpenedAt = SelectedWallpaperOpacity;
+        SelectedEnableBackgroundAnimation = enableBackgroundAnimation;
+        _enableBackgroundAnimationOpenedAt = SelectedEnableBackgroundAnimation;
+        SelectedBackgroundAnimationSpeedPercent =
+            AppSettings.ClampBackgroundAnimationSpeedPercent(backgroundAnimationSpeedPercent);
+        _backgroundAnimationSpeedOpenedAt = SelectedBackgroundAnimationSpeedPercent;
         SelectedAutoSpeakerSelect = autoSpeakerSelect;
         SelectedActiveSpeakerId = string.IsNullOrWhiteSpace(activeSpeakerId)
             ? _presets[0].Id
@@ -381,6 +399,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(AssociationAllOffButton);
         ActionButtonLooks.ApplyClear(WallpaperBrowseButton);
         ActionButtonLooks.ApplyClear(WallpaperClearButton);
+        ActionButtonLooks.ApplyClear(BackgroundAnimationSpeedResetButton);
         ActionButtonLooks.ApplyClear(TransportToolbarCustomizeButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
@@ -475,6 +494,39 @@ internal partial class AudioSettingsWindow : Window
             NudgeWallpaperOpacity(key == Key.Up ? 1 : -1);
             e.Handled = true;
         };
+        EnableBackgroundAnimationBox.IsChecked = SelectedEnableBackgroundAnimation;
+        EnableBackgroundAnimationBox.Checked += (_, _) => PreviewEnableBackgroundAnimation(true);
+        EnableBackgroundAnimationBox.Unchecked += (_, _) => PreviewEnableBackgroundAnimation(false);
+        BackgroundAnimationSpeedSlider.Minimum = AppSettings.BackgroundAnimationSpeedPercentMin;
+        BackgroundAnimationSpeedSlider.Maximum = AppSettings.BackgroundAnimationSpeedPercentMax;
+        SetBackgroundAnimationSpeedSlider(SelectedBackgroundAnimationSpeedPercent);
+        BackgroundAnimationSpeedSlider.ValueChanged += (_, _) => OnBackgroundAnimationSpeedSliderChanged();
+        BackgroundAnimationSpeedSlider.PreviewMouseWheel += (_, e) =>
+        {
+            if (e.Delta == 0 || EnableBackgroundAnimationBox.IsChecked == false)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            var next = AppSettings.NudgeBackgroundAnimationSpeedPercent(
+                (int)Math.Round(BackgroundAnimationSpeedSlider.Value),
+                Math.Sign(e.Delta));
+            if ((int)Math.Round(BackgroundAnimationSpeedSlider.Value) == next)
+            {
+                return;
+            }
+
+            SetBackgroundAnimationSpeedSlider(next);
+            _backgroundAnimationSpeedPreviewTimer.Stop();
+            _backgroundAnimationSpeedPreviewTimer.Start();
+        };
+        _backgroundAnimationSpeedPreviewTimer.Tick += (_, _) =>
+        {
+            _backgroundAnimationSpeedPreviewTimer.Stop();
+            ApplyBackgroundAnimationSpeedPreview();
+        };
+        SyncBackgroundAnimationSpeedEnabled();
         FillAssociations();
         FillLibraryExplorerRoots();
         FillLibraryColumns();
@@ -1463,6 +1515,8 @@ internal partial class AudioSettingsWindow : Window
 
         SelectedWallpaperPath = WallpaperPathBox.Text.Trim().Trim('"');
         SelectedWallpaperOpacity = wallpaperOpacity;
+        SelectedBackgroundAnimationSpeedPercent = AppSettings.ClampBackgroundAnimationSpeedPercent(
+            (int)Math.Round(BackgroundAnimationSpeedSlider.Value));
         SelectedUiScalePercent = UiScaleCombo.SelectedItem is ScaleItem scaleItem
             ? scaleItem.Percent
             : UiScale.DefaultPercent;
@@ -1612,6 +1666,7 @@ internal partial class AudioSettingsWindow : Window
             LibraryPlaylistWaveformSizeMp3Combo,
             LibraryPlaylistWaveformSize.L);
         SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
+        SelectedEnableBackgroundAnimation = EnableBackgroundAnimationBox.IsChecked != false;
         SelectedShowMainMenuBar = ShowMainMenuBarBox.IsChecked != false;
         SelectedShowTransportToolbar = ShowTransportToolbarBox.IsChecked != false;
         ApplyLayoutSelection(SelectedTransportToolbarLayout);
@@ -2506,6 +2561,111 @@ internal partial class AudioSettingsWindow : Window
         }
     }
 
+    private void PreviewEnableBackgroundAnimation(bool enabled)
+    {
+        SelectedEnableBackgroundAnimation = enabled;
+        SyncBackgroundAnimationSpeedEnabled();
+        if (AppStorage.Settings.EnableBackgroundAnimation == enabled)
+        {
+            return;
+        }
+
+        AppStorage.Settings.EnableBackgroundAnimation = enabled;
+        if (Owner is MainWindow window)
+        {
+            window.LibraryBrowser.ApplyBackgroundAnimationSetting();
+        }
+    }
+
+    private void RevertEnableBackgroundAnimationPreview()
+    {
+        _backgroundAnimationSpeedPreviewTimer.Stop();
+        var enableChanged =
+            AppStorage.Settings.EnableBackgroundAnimation != _enableBackgroundAnimationOpenedAt;
+        var speedChanged =
+            AppStorage.Settings.BackgroundAnimationSpeedPercent != _backgroundAnimationSpeedOpenedAt;
+        if (!enableChanged && !speedChanged)
+        {
+            return;
+        }
+
+        AppStorage.Settings.EnableBackgroundAnimation = _enableBackgroundAnimationOpenedAt;
+        AppStorage.Settings.BackgroundAnimationSpeedPercent = _backgroundAnimationSpeedOpenedAt;
+        SelectedEnableBackgroundAnimation = _enableBackgroundAnimationOpenedAt;
+        SelectedBackgroundAnimationSpeedPercent = _backgroundAnimationSpeedOpenedAt;
+        SetBackgroundAnimationSpeedSlider(_backgroundAnimationSpeedOpenedAt);
+        if (Owner is MainWindow window)
+        {
+            window.LibraryBrowser.ApplyBackgroundAnimationSetting();
+        }
+    }
+
+    private void SyncBackgroundAnimationSpeedEnabled()
+    {
+        var on = EnableBackgroundAnimationBox.IsChecked != false;
+        BackgroundAnimationSpeedLabel.IsEnabled = on;
+        BackgroundAnimationSpeedSlider.IsEnabled = on;
+        BackgroundAnimationSpeedValueText.IsEnabled = on;
+        BackgroundAnimationSpeedResetButton.IsEnabled = on;
+    }
+
+    private void OnBackgroundAnimationSpeedSliderChanged()
+    {
+        if (_updatingBackgroundAnimationSpeed)
+        {
+            return;
+        }
+
+        var percent = AppSettings.ClampBackgroundAnimationSpeedPercent(
+            (int)Math.Round(BackgroundAnimationSpeedSlider.Value));
+        BackgroundAnimationSpeedValueText.Text = FormatBackgroundAnimationSpeed(percent);
+        SelectedBackgroundAnimationSpeedPercent = percent;
+        _backgroundAnimationSpeedPreviewTimer.Stop();
+        _backgroundAnimationSpeedPreviewTimer.Start();
+    }
+
+    private void ApplyBackgroundAnimationSpeedPreview()
+    {
+        var percent = SelectedBackgroundAnimationSpeedPercent;
+        if (AppStorage.Settings.BackgroundAnimationSpeedPercent == percent)
+        {
+            return;
+        }
+
+        AppStorage.Settings.BackgroundAnimationSpeedPercent = percent;
+        if (Owner is MainWindow window)
+        {
+            window.LibraryBrowser.ApplyBackgroundAnimationSetting();
+        }
+    }
+
+    private void SetBackgroundAnimationSpeedSlider(int percent)
+    {
+        percent = AppSettings.ClampBackgroundAnimationSpeedPercent(percent);
+        _updatingBackgroundAnimationSpeed = true;
+        try
+        {
+            BackgroundAnimationSpeedSlider.Value = percent;
+        }
+        finally
+        {
+            _updatingBackgroundAnimationSpeed = false;
+        }
+
+        BackgroundAnimationSpeedValueText.Text = FormatBackgroundAnimationSpeed(percent);
+        SelectedBackgroundAnimationSpeedPercent = percent;
+    }
+
+    private void BackgroundAnimationSpeedResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetBackgroundAnimationSpeedSlider(AppSettings.BackgroundAnimationSpeedPercentDefault);
+        _backgroundAnimationSpeedPreviewTimer.Stop();
+        ApplyBackgroundAnimationSpeedPreview();
+    }
+
+    private static string FormatBackgroundAnimationSpeed(int percent) =>
+        AppSettings.FormatBackgroundAnimationSpeedPercent(percent) + UiStrings.LabelPercent;
+
     private void SelectApi(AudioOutputApi api)
     {
         foreach (ApiItem item in ApiCombo.Items)
@@ -3153,12 +3313,14 @@ internal partial class AudioSettingsWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _fadeCurveMenu = null;
+        _backgroundAnimationSpeedPreviewTimer.Stop();
         StopProbeUi();
         _probe.Dispose();
         if (DialogResult != true)
         {
             RevertUiScalePreview();
             RevertWallpaperPreview();
+            RevertEnableBackgroundAnimationPreview();
             RevertShowMainMenuBarPreview();
             RevertTransportToolbarPreview();
             RevertLayoutPresetPreviews();

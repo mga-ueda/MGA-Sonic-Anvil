@@ -2195,6 +2195,8 @@ public partial class MainWindow
             settings.ResolvedLaunchMode(),
             settings.ResolvedWallpaperPath(),
             settings.ResolvedWallpaperOpacity(),
+            settings.EnableBackgroundAnimation,
+            settings.ResolvedBackgroundAnimationSpeedPercent(),
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F9),
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F10),
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F11),
@@ -2250,6 +2252,9 @@ public partial class MainWindow
         settings.WallpaperPath = dialog.SelectedWallpaperPath;
         settings.WallpaperOpacity = dialog.SelectedWallpaperOpacity;
         LibraryBrowser.ApplyWallpaper(settings.ResolvedWallpaperPath(), settings.ResolvedWallpaperOpacity());
+        settings.EnableBackgroundAnimation = dialog.SelectedEnableBackgroundAnimation;
+        settings.BackgroundAnimationSpeedPercent = dialog.SelectedBackgroundAnimationSpeedPercent;
+        LibraryBrowser.ApplyBackgroundAnimationSetting();
         settings.GaplessPlayback = dialog.SelectedGaplessPlayback;
         Mp3Gapless.Enabled = settings.GaplessPlayback;
         settings.ShowMainMenuBar = dialog.SelectedShowMainMenuBar;

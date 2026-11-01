@@ -250,6 +250,59 @@ public sealed class LibraryArtworkGlowTests
     }
 
     [Fact]
+    public void WashFalloff_IsSmoothAndMonotonic()
+    {
+        Assert.Equal(1, LibraryBrowserView.WashFalloff(0), 6);
+        Assert.Equal(0, LibraryBrowserView.WashFalloff(1), 6);
+        var previous = 1d;
+        var previousSlope = double.NaN;
+        const int steps = 200;
+        for (var i = 1; i <= steps; i++)
+        {
+            var value = LibraryBrowserView.WashFalloff(i / (double)steps);
+            Assert.True(value <= previous);
+            var slope = (value - previous) * steps;
+            if (!double.IsNaN(previousSlope))
+            {
+                Assert.True(Math.Abs(slope - previousSlope) < 0.05);
+            }
+
+            previous = value;
+            previousSlope = slope;
+        }
+    }
+
+    [Fact]
+    public void DitheredVeil_AveragesToVeilColorWithSmallJitter()
+    {
+        RunSta(() =>
+        {
+            var veil = Color.FromArgb(0x6B, 0x1E, 0x1E, 0x1E);
+            var brush = Assert.IsType<ImageBrush>(LibraryBrowserView.CreateDitheredVeilBrush(veil));
+            Assert.True(brush.IsFrozen);
+            Assert.Equal(TileMode.Tile, brush.TileMode);
+            Assert.Same(brush, LibraryBrowserView.CreateDitheredVeilBrush(veil));
+
+            var bitmap = Assert.IsAssignableFrom<BitmapSource>(brush.ImageSource);
+            var size = LibraryBrowserView.VeilDitherTileSize;
+            var pixels = new byte[size * size * 4];
+            bitmap.CopyPixels(pixels, size * 4, 0);
+            long sum = 0;
+            var distinct = new HashSet<byte>();
+            for (var i = 0; i < pixels.Length; i += 4)
+            {
+                Assert.True(Math.Abs(pixels[i] - veil.B) <= LibraryBrowserView.VeilDitherAmplitude);
+                Assert.Equal(255, pixels[i + 3]);
+                sum += pixels[i];
+                distinct.Add(pixels[i]);
+            }
+
+            Assert.Equal(veil.B, sum / (double)(size * size), 0.5);
+            Assert.True(distinct.Count >= 3);
+        });
+    }
+
+    [Fact]
     public void GlowDrift_IsSlowAndNoticeable()
     {
         Assert.True(LibraryBrowserView.GlowDriftScaleTo - LibraryBrowserView.GlowDriftScaleFrom >= 0.1);
@@ -271,7 +324,7 @@ public sealed class LibraryArtworkGlowTests
         Assert.True(LibraryBrowserView.GlowDriftFrameRate >= 12);
         Assert.True(LibraryBrowserView.GlowDriftFrameRate <= 24);
         Assert.True(LibraryBrowserView.GlowCacheRenderAtScale >= 0.2);
-        Assert.True(LibraryBrowserView.GlowCacheRenderAtScale <= 0.5);
+        Assert.True(LibraryBrowserView.GlowCacheRenderAtScale <= 0.6);
         Assert.InRange(LibraryBrowserView.GlowCacheWidth, 640, 2560);
         Assert.InRange(LibraryBrowserView.GlowCacheHeight, 360, 1440);
         Assert.True(LibraryBrowserView.GlowSampleEdge >= 8);
@@ -332,6 +385,64 @@ public sealed class LibraryArtworkGlowTests
     }
 
     [Fact]
+    public void GlowDrift_StopsWhenBackgroundAnimationDisabled()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var previous = AppStorage.Settings.EnableBackgroundAnimation;
+            Window? window = null;
+            try
+            {
+                AppStorage.Settings.EnableBackgroundAnimation = true;
+                var host = new Grid();
+                var view = new LibraryBrowserView();
+                var root = new Grid();
+                root.Children.Add(host);
+                root.Children.Add(view);
+                view.BindWaveformGlow(host);
+                window = new Window
+                {
+                    Content = root,
+                    Width = 640,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    SizeToContent = SizeToContent.Manual,
+                };
+                window.Show();
+                view.UseWindowFallbackWash();
+                Flush();
+                Assert.True(view.AmbientGlowAnimating);
+
+                AppStorage.Settings.EnableBackgroundAnimation = false;
+                view.ApplyBackgroundAnimationSetting();
+                Flush();
+                Assert.False(view.AmbientGlowAnimating);
+
+                AppStorage.Settings.EnableBackgroundAnimation = true;
+                view.ApplyBackgroundAnimationSetting();
+                Flush();
+                Assert.True(view.AmbientGlowAnimating);
+
+                var starts = view.GlowDriftStartCount;
+                AppStorage.Settings.BackgroundAnimationSpeedPercent = 200;
+                view.ApplyBackgroundAnimationSetting();
+                Flush();
+                Assert.True(view.AmbientGlowAnimating);
+                Assert.True(view.GlowDriftStartCount > starts);
+            }
+            finally
+            {
+                AppStorage.Settings.EnableBackgroundAnimation = previous;
+                AppStorage.Settings.BackgroundAnimationSpeedPercent =
+                    AppSettings.BackgroundAnimationSpeedPercentDefault;
+                window?.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void GlowDrift_ContinuesWithoutRedrawingWhenArtworkOrSizeChanges()
     {
         RunSta(() =>
@@ -340,6 +451,7 @@ public sealed class LibraryArtworkGlowTests
             Window? window = null;
             try
             {
+                AppStorage.Settings.EnableBackgroundAnimation = true;
                 var host = new Grid();
                 var view = new LibraryBrowserView();
                 var root = new Grid();

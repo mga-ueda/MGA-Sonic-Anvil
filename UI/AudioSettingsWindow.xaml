@@ -197,7 +197,50 @@
                        FontSize="11.333"
                        Foreground="{DynamicResource MutedForeBrush}"
                        TextWrapping="Wrap"
-                       Margin="0,0,0,4" />
+                       Margin="0,0,0,8" />
+            <CheckBox x:Name="EnableBackgroundAnimationBox"
+                      Style="{StaticResource DarkCheckBoxStyle}"
+                      Content="{x:Static domain:UiStrings.LabelEnableBackgroundAnimation}"
+                      HorizontalAlignment="Left"
+                      Margin="0,0,0,8" />
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="BackgroundAnimationSpeedLabel"
+                         Text="{x:Static domain:UiStrings.LabelBackgroundAnimationSpeed}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,8,0" />
+              <Slider x:Name="BackgroundAnimationSpeedSlider"
+                      Grid.Column="1"
+                      Style="{StaticResource SilenceDetectRiseSliderStyle}"
+                      SmallChange="5"
+                      LargeChange="25"
+                      TickFrequency="5"
+                      IsSnapToTickEnabled="True"
+                      IsMoveToPointEnabled="True"
+                      VerticalAlignment="Center"
+                      FocusVisualStyle="{x:Null}"
+                      Cursor="Hand" />
+              <TextBlock x:Name="BackgroundAnimationSpeedValueText"
+                         Grid.Column="2"
+                         MinWidth="44"
+                         VerticalAlignment="Center"
+                         Margin="8,0,0,0"
+                         TextAlignment="Right" />
+              <ui:RoundedButton x:Name="BackgroundAnimationSpeedResetButton"
+                                Grid.Column="3"
+                                Content="{x:Static domain:UiStrings.ButtonTransportToolbarResetLayout}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="88"
+                                Padding="12,0"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                Click="BackgroundAnimationSpeedResetButton_Click" />
+            </Grid>
 
             <TextBlock x:Name="AssociationHeader"
                        Text="{x:Static domain:UiStrings.LabelFileAssociations}"
