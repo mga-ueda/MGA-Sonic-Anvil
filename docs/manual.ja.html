@@ -297,7 +297,7 @@
           <li><strong>録音／再生ポートと Ch</strong> …… スピーカー名は配置から、ポート名は機器から来ます。チャンネル番号は録音と再生で共通。「なし」はそのスピーカーを使いません。録音はレベルメーターで確認します。</li>
           <li><strong>確認音</strong> …… 再生ポートごとに、Sine -20 dB（ふつう 1 kHz、LFE は 80 Hz）と英語の Voice（LFE には無し）。</li>
           <li>左右 2 本だけで再生していて、ポートを決めていないときは、スピーカーの音を左右にまとめます。</li>
-          <li><strong>DIM 減衰</strong> …… モニター列の <span class="ui">DIM</span> をオンにしたときの減衰量。既定 −15 dB（−60〜0）。セッション中のオン／オフは覚えません。</li>
+          <li><strong>DIM 減衰</strong> …… モニター列の <span class="ui">DIM</span> をオンにしたときの減衰量。既定 −10 dB（−60〜0）。セッション中のオン／オフは覚えません。</li>
           <li><strong>ローカット周波数</strong> …… モニター列の <span class="ui">LC</span> 用ローシェルフの基準周波数。既定 120 Hz（範囲 20〜500 Hz。RME TotalMix の Lo Cut 周波数レンジと同じ）。ゲインは −20 dB 固定（設定では変更不可）。フィルターは RBJ ローシェルフ（バイキューアド 1 段、Q≈0.707≈1/√2）。低域は約 −20 dB に漸近して頭打ちし、ハイパスのように −∞ dB までは落ちません。オン／オフはセッションのみ。</li>
         </ul>
 
@@ -782,7 +782,7 @@
         <ul>
           <li><span class="ui">BPM</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>）…… オフ／オンの 2 段階です（既定オフ。セッションのみ。ラベルは常に BPM）。オン時は解析・表示と拍クリックを同時に有効にします。ボタン上にテンポ数値が出ます。表示 BPM は EffeTune が返す半／倍テンポ値ではなく、検出拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算します。クリック音はマーカークリックと同じ本アプリの Low.wav（−20 dB）で、EffeTune の合成クリックは出力しません。拍のタイミングは EffeTune の検出拍に合わせます。再生停止中はクリックも止まります。</li>
           <li><span class="ui">MONO</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>）…… L+R を合算してモニターします。既定オフ。セッションのみ。</li>
-          <li><span class="ui">DIM</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>）…… モニターを減衰します。量は設定のオーディオタブ（既定 −15 dB）。オン／オフはセッションのみ。</li>
+          <li><span class="ui">DIM</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>）…… モニターを減衰します。量は設定のオーディオタブ（既定 −10 dB）。オン／オフはセッションのみ。</li>
           <li><span class="ui">LC</span>（<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>）…… モニターにローシェルフをかけます。周波数は設定のオーディオタブ（既定 120 Hz、20〜500）。ゲイン −20 dB 固定。RBJ ローシェルフ（Q≈0.707）。低域は約 −20 dB で頭打ち。オン／オフはセッションのみ。詳細は設定のオーディオタブ説明を参照。</li>
         </ul>
 
