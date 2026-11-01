@@ -104,8 +104,8 @@ internal sealed class AppSettings
 
     public double WallpaperOpacity { get; set; } = WallpaperOpacityDefault;
 
-    /// <summary>動的背景色（ジャケットウォッシュ）のドリフト／回転アニメ。既定オン。</summary>
-    public bool EnableBackgroundAnimation { get; set; } = true;
+    /// <summary>動的背景色（ジャケットウォッシュ）のドリフト／回転アニメ。既定オフ。</summary>
+    public bool EnableBackgroundAnimation { get; set; }
 
     /// <summary>背景色アニメの速度（％）。100（既定）が最遅。大きいほど速い。</summary>
     public const int BackgroundAnimationSpeedPercentDefault = 100;

@@ -91,7 +91,7 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedGaplessPlayback { get; private set; } = true;
 
-    public bool SelectedEnableBackgroundAnimation { get; private set; } = true;
+    public bool SelectedEnableBackgroundAnimation { get; private set; }
 
     public int SelectedBackgroundAnimationSpeedPercent { get; private set; } =
         AppSettings.BackgroundAnimationSpeedPercentDefault;
@@ -248,7 +248,7 @@ internal partial class AudioSettingsWindow : Window
         WindowLayoutSlot launchMode = WindowLayoutSlot.F12,
         string? wallpaperPath = null,
         double wallpaperOpacity = AppSettings.WallpaperOpacityDefault,
-        bool enableBackgroundAnimation = true,
+        bool enableBackgroundAnimation = false,
         int backgroundAnimationSpeedPercent = AppSettings.BackgroundAnimationSpeedPercentDefault,
         WindowLayoutPreset? layoutPresetF9 = null,
         WindowLayoutPreset? layoutPresetF10 = null,
