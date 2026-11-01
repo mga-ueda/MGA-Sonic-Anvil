@@ -184,6 +184,8 @@ public partial class MainWindow
         {
             RememberClosedTab(session, index);
         }
+
+        ForgetVstInserts(session);
         _sessions.RemoveAt(index);
         if (_sessions.Count == 0)
         {

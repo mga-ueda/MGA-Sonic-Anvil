@@ -64,6 +64,9 @@ internal sealed class DocumentSession
 
     public string? PersistedHistoryName { get; set; }
 
+    /// <summary>エディタ用 VST インサート（最大 8）。プレイヤーではバイパス。プレイリスト削除で破棄。</summary>
+    public VstInsertChain VstInserts { get; } = new();
+
     public string DisplayName =>
         Document.SourcePath is { } path
             ? System.IO.Path.GetFileName(path)

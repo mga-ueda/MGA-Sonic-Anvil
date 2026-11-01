@@ -3548,6 +3548,7 @@ public partial class MainWindow
         ApplyAnalyzerMaximizeScale();
         ApplyWaapiPanelVisible();
         ApplyLibraryChrome();
+        SyncVstInsertRackUi();
         ApplyLayoutWaveformVisibility(preset);
         Transport.SetMaximizeMode(_waveformMaximizeMode, _activeLayoutSlot);
         ApplyWaveformScaleLanes();

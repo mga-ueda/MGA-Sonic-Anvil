@@ -253,7 +253,9 @@ internal partial class AudioSettingsWindow : Window
         WindowLayoutPreset? layoutPresetF9 = null,
         WindowLayoutPreset? layoutPresetF10 = null,
         WindowLayoutPreset? layoutPresetF11 = null,
-        WindowLayoutPreset? layoutPresetF12 = null)
+        WindowLayoutPreset? layoutPresetF12 = null,
+        IEnumerable<string>? vst3SearchPaths = null,
+        bool vst3UseSteinbergHostCache = false)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
@@ -418,6 +420,7 @@ internal partial class AudioSettingsWindow : Window
         AppDialogKeys.PrepareActionButton(LibraryCatalogClearButton);
         AppDialogKeys.PrepareActionButton(WallpaperBrowseButton);
         AppDialogKeys.PrepareActionButton(WallpaperClearButton);
+        InitializeVstTab(vst3SearchPaths, vst3UseSteinbergHostCache);
         AppDialogKeys.AllowTabToLeave(SettingsTabs);
         AppDialogKeys.Attach(
             this,
@@ -1009,18 +1012,26 @@ internal partial class AudioSettingsWindow : Window
 
     private void ApplyLibraryExplorerRootsChrome()
     {
-        LibraryExplorerRootsList.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
-        LibraryExplorerRootsList.SetResourceReference(BackgroundProperty, "DialogInputBackBrush");
-        LibraryExplorerRootsList.SetResourceReference(BorderBrushProperty, "ChromeBorderBrush");
-        LibraryExplorerRootsList.BorderThickness = new Thickness(1);
+        ApplyPathListChrome(LibraryExplorerRootsList);
+        // DisplayMemberPath と ItemTemplate は同時に使えない（欠落パス色付け用テンプレートを使う）
+        ApplyLibraryExplorerRootTemplate(LibraryExplorerRootsList);
+    }
+
+    /// <summary>パス一覧 ListBox の枠・選択色・行スタイル（テンプレートは呼び出し側）。</summary>
+    private static void ApplyPathListChrome(ListBox list)
+    {
+        list.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        list.SetResourceReference(BackgroundProperty, "DialogInputBackBrush");
+        list.SetResourceReference(BorderBrushProperty, "ChromeBorderBrush");
+        list.BorderThickness = new Thickness(1);
 
         var highlight = ResolveThemeBrush("MenuHighlightBackBrush");
         var fore = ResolveThemeBrush("PrimaryForeBrush");
-        LibraryExplorerRootsList.Resources[SystemColors.HighlightBrushKey] = highlight;
-        LibraryExplorerRootsList.Resources[SystemColors.HighlightTextBrushKey] = fore;
-        LibraryExplorerRootsList.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = highlight;
-        LibraryExplorerRootsList.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = fore;
-        LibraryExplorerRootsList.Resources[SystemColors.ControlBrushKey] = Brushes.Transparent;
+        list.Resources[SystemColors.HighlightBrushKey] = highlight;
+        list.Resources[SystemColors.HighlightTextBrushKey] = fore;
+        list.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = highlight;
+        list.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = fore;
+        list.Resources[SystemColors.ControlBrushKey] = Brushes.Transparent;
 
         var itemStyle = new Style(typeof(ListBoxItem));
         itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
@@ -1028,9 +1039,7 @@ internal partial class AudioSettingsWindow : Window
         itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(6, 3, 6, 3)));
         itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
         itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
-        LibraryExplorerRootsList.ItemContainerStyle = itemStyle;
-        // DisplayMemberPath と ItemTemplate は同時に使えない（欠落パス色付け用テンプレートを使う）
-        ApplyLibraryExplorerRootTemplate(LibraryExplorerRootsList);
+        list.ItemContainerStyle = itemStyle;
     }
 
     /// <summary>設定のエクスプローラールート一覧へ、欠落パスを赤くする ItemTemplate を載せる。</summary>
@@ -1653,6 +1662,7 @@ internal partial class AudioSettingsWindow : Window
             .Select(item => item.Path)
             .ToArray();
         SelectedLibraryExplorerRoots = LibraryExplorerPaths.ResolveRoots(SelectedLibraryExplorerRoots);
+        CaptureVst3SearchPaths();
         SelectedLibraryListColumnsWave = ReadLibraryColumns(
             _libraryColumnChecksWave,
             SelectedLibraryListColumnsWave);
@@ -3180,6 +3190,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(FileNameColorMarkerAddButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
+        RefreshVstChrome();
         RefreshTestButtons();
     }
 
