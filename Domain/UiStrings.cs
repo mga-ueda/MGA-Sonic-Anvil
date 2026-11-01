@@ -246,8 +246,8 @@ internal static partial class UiStrings
         "項目を選ぶと、ここに機能の説明が表示されます。",
         "Select an item to see its description here.");
     public static string LabelTransportToolbarSeparatorDescription => Get(
-        "ツールバー上のグループ境界（縦線）。コマンドのあいだに区切りを入れます。",
-        "A vertical separator between toolbar groups.");
+        "区切り線。メニューのカテゴリ境界と、メニュー内の区切り・サブメニューに合わせて自動で入ります。",
+        "Separator. Added automatically at menu category boundaries and at menu separators / submenus.");
     public static string NoteToolbarEditorModeOnly => Get(
         "エディタモードで使用（プレイヤーモードでは無効）。",
         "Editor mode only (unavailable in player mode).");
@@ -1122,7 +1122,6 @@ internal static partial class UiStrings
     public static string TooltipAddMarker => Get("マーカーを追加 (M)", "Add marker (M)");
     public static string TooltipSetLoop => Get("選択をループに (Shift+L)", "Set selection as loop (Shift+L)");
     public static string TooltipSetRegion => Get("選択をリージョンに (Shift+R)", "Set selection as region (Shift+R)");
-    public static string TooltipRangeClick => Get("マーカークリック (Q)", "Marker click (Q)");
     public static string TooltipOpen => Get("開く (Ctrl+O)", "Open (Ctrl+O)");
     public static string TooltipNew => Get("新規 (Ctrl+N)", "New (Ctrl+N)");
     public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)  複数選択時は保存先フォルダ", "Save As (Ctrl+Shift+S)  pick a folder when several tabs are selected");

@@ -167,7 +167,6 @@ internal static class LibraryPlayerMode
             or TransportCommand.MaximizeWaveform
             or TransportCommand.ToggleLibraryMaximize
             or TransportCommand.ToggleAnalyzerMaximize
-            or TransportCommand.AlwaysOnTop
             or TransportCommand.SaveMp3
             or TransportCommand.ExportWave
             => false,
