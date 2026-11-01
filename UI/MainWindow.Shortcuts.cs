@@ -40,12 +40,33 @@ public partial class MainWindow
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr hWnd);
+
     private static bool IsVkDown(int vKey) => (GetAsyncKeyState(vKey) & 0x8000) != 0;
+
+    private MediaKeyHook? _mediaKeyHook;
 
     private void AttachNumpadMessageFilter()
     {
         ComponentDispatcher.ThreadFilterMessage += OnNumpadMessageFilter;
         Closed += (_, _) => ComponentDispatcher.ThreadFilterMessage -= OnNumpadMessageFilter;
+    }
+
+    /// <summary>
+    /// 背面でも届くメディアキー。処理中・録音中・モーダル表示中は握りつぶすだけで何もしない。
+    /// </summary>
+    private void OnGlobalMediaKey(Key key)
+    {
+        if (_closing
+            || IsUiBusy
+            || _recording
+            || !IsWindowEnabled(new WindowInteropHelper(this).Handle))
+        {
+            return;
+        }
+
+        TryHandleMediaKey(key, isRepeat: false);
     }
 
     private void OnNumpadMessageFilter(ref MSG msg, ref bool handled)
@@ -764,6 +785,12 @@ public partial class MainWindow
             StopPlaybackShuttle();
             StopSeekNudge();
             StopVideoFrameStep();
+            return true;
+        }
+
+        // 文字入力中でも効かせる（メディアキーは文字を打たない）。
+        if (TryHandleMediaKey(key, isRepeat))
+        {
             return true;
         }
 
@@ -3003,20 +3030,7 @@ public partial class MainWindow
         switch (command)
         {
             case LibraryNumpadCommand.PlayPause:
-                if (IsLibraryMaximized)
-                {
-                    ToggleLibraryPlayPause();
-                }
-                else if (IsPlaybackActive())
-                {
-                    // Space（停止で頭へ戻る）ではなく、プレイヤーの 0 と同じ一時停止／再開。
-                    PausePlaybackHere();
-                }
-                else if (_document is not null)
-                {
-                    StartPlayback(_document.CursorFrame, prerollSeconds: 0);
-                }
-
+                ToggleTransportPlayPause();
                 break;
             case LibraryNumpadCommand.Restart:
                 if (IsLibraryMaximized)
@@ -3070,6 +3084,77 @@ public partial class MainWindow
                 if (CanPlaybackShuttle(allowWhileStopped: true))
                 {
                     BeginOrContinuePlaybackShuttle(1);
+                }
+
+                break;
+        }
+
+        return true;
+    }
+
+    /// <summary>テンキー 0／メディアキーの再生・一時停止。</summary>
+    private void ToggleTransportPlayPause()
+    {
+        if (IsLibraryMaximized)
+        {
+            ToggleLibraryPlayPause();
+        }
+        else if (IsPlaybackActive())
+        {
+            // Space（停止で頭へ戻る）ではなく、プレイヤーの 0 と同じ一時停止／再開。
+            PausePlaybackHere();
+        }
+        else if (_document is not null)
+        {
+            StartPlayback(_document.CursorFrame, prerollSeconds: 0);
+        }
+    }
+
+    /// <summary>
+    /// キーボードのメディアキー。前後はプレイヤーの P／N、エディタのタブ送りと同じ。
+    /// 音量／ミュートは OS に任せるのでここでは扱わない。
+    /// </summary>
+    private bool TryHandleMediaKey(Key key, bool isRepeat)
+    {
+        if (!LibraryPlayerMode.IsMediaTransportKey(key))
+        {
+            return false;
+        }
+
+        if (isRepeat)
+        {
+            return true;
+        }
+
+        StopPlaybackShuttle();
+        StopSeekNudge();
+        StopVideoFrameStep();
+        switch (key)
+        {
+            case Key.MediaPlayPause:
+                ToggleTransportPlayPause();
+                break;
+            case Key.MediaStop:
+                if (IsLibraryMaximized)
+                {
+                    PausePlaybackHere(immersiveVideoHold: IsPlaylistVideoPlaying());
+                }
+                else if (IsPlaybackActive())
+                {
+                    StopPlayback();
+                }
+
+                break;
+            case Key.MediaPreviousTrack:
+            case Key.MediaNextTrack:
+                var direction = key == Key.MediaPreviousTrack ? -1 : 1;
+                if (IsLibraryMaximized)
+                {
+                    TryStepLibraryPlaylist(direction);
+                }
+                else
+                {
+                    ActivateAdjacentTab(direction);
                 }
 
                 break;

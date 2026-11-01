@@ -434,6 +434,7 @@ public partial class MainWindow : Window
         // クラスハンドラが先に Handled にしても、Alt 解放直後のテンキーを見る。
         AddHandler(PreviewKeyUpEvent, new KeyEventHandler(MainWindow_PreviewKeyUp), handledEventsToo: true);
         AttachNumpadMessageFilter();
+        _mediaKeyHook = MediaKeyHook.TryStart(Dispatcher, OnGlobalMediaKey);
         PreviewMouseDown += MainWindow_PreviewMouseDown;
         PreviewMouseDoubleClick += MainWindow_PreviewMouseDoubleClick;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
@@ -1187,6 +1188,9 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         _closing = true;
+        // 終了中はメディアキーをほかのアプリへ返す。
+        _mediaKeyHook?.Dispose();
+        _mediaKeyHook = null;
         WindowPlacement.SetShellFullscreen(this, false);
         SingleInstance.MarkExiting();
         // 未保存の録音 WAV 書き出しより先に実音を止める。保存を先にすると長く鳴り続ける。

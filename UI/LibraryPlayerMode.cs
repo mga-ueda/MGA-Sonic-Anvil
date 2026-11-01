@@ -2611,6 +2611,10 @@ internal static class LibraryPlayerMode
         };
     }
 
+    /// <summary>再生・一時停止／停止／前後のメディアキー（修飾は見ない）。</summary>
+    public static bool IsMediaTransportKey(Key key) =>
+        key is Key.MediaPlayPause or Key.MediaStop or Key.MediaPreviousTrack or Key.MediaNextTrack;
+
     public static int PageStep(int visibleRows) =>
         Math.Max(1, visibleRows - 1);
 
