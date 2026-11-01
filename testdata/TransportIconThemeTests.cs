@@ -133,6 +133,78 @@ public sealed class TransportIconThemeTests
         });
     }
 
+    [Fact]
+    public void Help_DrawsAndIsCentered()
+    {
+        RunSta(() =>
+        {
+            var pixels = Render(TransportIcon.Help, UiTheme.Dark, 34, 36);
+            Assert.True(CountInk(pixels, 34, 36) >= 40, "Help should draw a circle and mark");
+            AssertIconCentered(TransportIcon.Help, UiTheme.Dark, 34, 36);
+            AssertIconCentered(TransportIcon.Help, UiTheme.Dark, 20, 20);
+        });
+    }
+
+    [Fact]
+    public void NewToolbarIcons_Draw()
+    {
+        RunSta(() =>
+        {
+            foreach (var icon in new[]
+            {
+                TransportIcon.Stop,
+                TransportIcon.GoToStart,
+                TransportIcon.GoToEnd,
+                TransportIcon.PreviousMarker,
+                TransportIcon.NextMarker,
+                TransportIcon.JumpToTime,
+                TransportIcon.Undo,
+                TransportIcon.Redo,
+                TransportIcon.Cut,
+                TransportIcon.Copy,
+                TransportIcon.Paste,
+                TransportIcon.SilenceSelection,
+                TransportIcon.InsertSilence,
+                TransportIcon.DetectSilence,
+                TransportIcon.SelectAll,
+                TransportIcon.ClearSelection,
+                TransportIcon.CrossfadeEdit,
+                TransportIcon.NormalizePerRegion,
+                TransportIcon.ClearLoop,
+                TransportIcon.DeleteMarkers,
+                TransportIcon.SampleRate,
+                TransportIcon.BitDepth,
+                TransportIcon.Channels,
+                TransportIcon.Waapi,
+            })
+            {
+                var pixels = Render(icon, UiTheme.Dark, 34, 36);
+                Assert.True(CountInk(pixels, 34, 36) >= 12, $"{icon} should draw");
+            }
+        });
+    }
+
+    [Fact]
+    public void CommonToolbarIcons_AreCenteredAtListSize()
+    {
+        RunSta(() =>
+        {
+            foreach (var icon in new[]
+            {
+                TransportIcon.PlayPause,
+                TransportIcon.AddMarker,
+                TransportIcon.TimeStretch,
+                TransportIcon.Reverse,
+                TransportIcon.Volume,
+                TransportIcon.Pitch,
+            })
+            {
+                AssertIconCentered(icon, UiTheme.Dark, 20, 20);
+                AssertIconCentered(icon, UiTheme.Dark, 34, 36);
+            }
+        });
+    }
+
     private static void AssertIconCentered(TransportIcon icon, UiTheme theme, int width, int height)
     {
         var pixels = Render(icon, theme, width, height);
