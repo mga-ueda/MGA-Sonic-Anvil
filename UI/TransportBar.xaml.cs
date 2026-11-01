@@ -146,7 +146,7 @@ internal partial class TransportBar : UserControl
 
         foreach (var separator in _separators)
         {
-            separator.Background = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush"));
+            separator.SetResourceReference(BackgroundProperty, "TransportToolbarSeparatorBrush");
         }
     }
 
@@ -277,8 +277,9 @@ internal partial class TransportBar : UserControl
         return play!;
     }
 
-    private static Border CreateSeparator() =>
-        new()
+    private static Border CreateSeparator()
+    {
+        var separator = new Border
         {
             Width = 1,
             Margin = new Thickness(
@@ -288,7 +289,9 @@ internal partial class TransportBar : UserControl
                 DesignMetrics.From96(8)),
             VerticalAlignment = VerticalAlignment.Stretch,
             MinHeight = DesignMetrics.TransportButtonSide * 0.55,
-            Background = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")),
             SnapsToDevicePixels = true,
         };
+        separator.SetResourceReference(BackgroundProperty, "TransportToolbarSeparatorBrush");
+        return separator;
+    }
 }
