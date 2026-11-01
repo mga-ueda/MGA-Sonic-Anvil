@@ -1634,7 +1634,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform)
+        // 旧 F11（プリセット無し Waveform）は列を畳む前提で幅計算をスキップ。
+        // プリセット F11 はメーターあり Waveform 全画面なので、ここで倍率付き幅を当てる。
+        if (_waveformMaximizeMode == WaveformMaximizeMode.Waveform
+            && ActiveLayoutPresetOrNull() is null)
         {
             return;
         }

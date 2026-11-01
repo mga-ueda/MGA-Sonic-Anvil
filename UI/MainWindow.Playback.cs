@@ -3331,7 +3331,10 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>アナライザ帯オンかつ全画面のとき拡大。旧 F12 相当。</summary>
+    /// <summary>
+    /// 全画面かつメーター／アナライザ帯のどれかが出ているとき拡大。
+    /// F11（メーターのみ）も F12（帯＋メーター）と同じ倍率にする。
+    /// </summary>
     private double AnalyzerMaximizeLayoutScale
     {
         get
@@ -3339,7 +3342,8 @@ public partial class MainWindow
             var preset = ActiveLayoutPresetOrNull();
             if (preset is not null)
             {
-                return preset.ShowAnalyzerArea && _layoutFullscreenOn
+                var showChrome = preset.ShowAnalyzerArea || preset.ShowLevelMeter;
+                return showChrome && _layoutFullscreenOn
                     ? DesignMetrics.AnalyzerMaximizeScale
                     : 1d;
             }
