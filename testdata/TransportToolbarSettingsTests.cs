@@ -389,6 +389,118 @@ public sealed class TransportToolbarSettingsTests
     }
 
     [Fact]
+    public void SetCommandsEnabled_HidesGroupsWithNoPressableButtons()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (System.Windows.Application.Current is null)
+                {
+                    _ = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+                }
+
+                var assembly = Uri.EscapeDataString(typeof(TransportBar).Assembly.GetName().Name!);
+                System.Windows.Application.Current!.Resources.MergedDictionaries.Add(new System.Windows.ResourceDictionary
+                {
+                    Source = new Uri($"pack://application:,,,/{assembly};component/Themes/UiColors.xaml", UriKind.Absolute),
+                });
+
+                var bar = new TransportBar();
+                bar.ApplyLayoutFromSettings(new AppSettings
+                {
+                    TransportToolbarLayout =
+                    [
+                        nameof(TransportCommand.Cut),
+                        nameof(TransportCommand.Copy),
+                        TransportToolbarCatalog.SeparatorToken,
+                        nameof(TransportCommand.Open),
+                    ],
+                });
+                Assert.Equal(2, bar.ItemsHost.Children.Count);
+
+                // メニュー順でファイル（Open）→ 編集（Cut/Copy）。プレイヤー相当: 編集は不可、Open は常に可。
+                bar.SetCommandsEnabled(enabled: true, allowEdit: false);
+                Assert.Equal(System.Windows.Visibility.Visible, ((System.Windows.FrameworkElement)bar.ItemsHost.Children[0]).Visibility);
+                Assert.Equal(System.Windows.Visibility.Collapsed, ((System.Windows.FrameworkElement)bar.ItemsHost.Children[1]).Visibility);
+                Assert.True(bar.HasVisibleCommands);
+
+                bar.SetCommandsEnabled(enabled: true, allowEdit: true);
+                Assert.Equal(System.Windows.Visibility.Visible, ((System.Windows.FrameworkElement)bar.ItemsHost.Children[0]).Visibility);
+                Assert.Equal(System.Windows.Visibility.Visible, ((System.Windows.FrameworkElement)bar.ItemsHost.Children[1]).Visibility);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+            throw new Exception(error.ToString());
+        }
+    }
+
+    [Fact]
+    public void SetCommandsEnabled_DisablesMarkerJumpWhenNoMarkers()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (System.Windows.Application.Current is null)
+                {
+                    _ = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+                }
+
+                var assembly = Uri.EscapeDataString(typeof(TransportBar).Assembly.GetName().Name!);
+                System.Windows.Application.Current!.Resources.MergedDictionaries.Add(new System.Windows.ResourceDictionary
+                {
+                    Source = new Uri($"pack://application:,,,/{assembly};component/Themes/UiColors.xaml", UriKind.Absolute),
+                });
+
+                var bar = new TransportBar();
+                bar.ApplyLayoutFromSettings(new AppSettings
+                {
+                    TransportToolbarLayout =
+                    [
+                        nameof(TransportCommand.TogglePlayback),
+                        nameof(TransportCommand.PreviousMarker),
+                        nameof(TransportCommand.NextMarker),
+                        nameof(TransportCommand.DeleteMarkers),
+                    ],
+                });
+
+                bar.SetCommandsEnabled(enabled: true, allowEdit: true, hasMarkers: false);
+                Assert.True(bar.ButtonFor(TransportCommand.TogglePlayback)!.IsEnabled);
+                Assert.False(bar.ButtonFor(TransportCommand.PreviousMarker)!.IsEnabled);
+                Assert.False(bar.ButtonFor(TransportCommand.NextMarker)!.IsEnabled);
+                Assert.False(bar.ButtonFor(TransportCommand.DeleteMarkers)!.IsEnabled);
+
+                bar.SetCommandsEnabled(enabled: true, allowEdit: true, hasMarkers: true);
+                Assert.True(bar.ButtonFor(TransportCommand.PreviousMarker)!.IsEnabled);
+                Assert.True(bar.ButtonFor(TransportCommand.NextMarker)!.IsEnabled);
+                Assert.True(bar.ButtonFor(TransportCommand.DeleteMarkers)!.IsEnabled);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+            throw new Exception(error.ToString());
+        }
+    }
+
+    [Fact]
     public void IconVariants_EmptyForSingleIconCommands()
     {
         Assert.Empty(TransportToolbarCatalog.IconVariants(TransportCommand.Cut));
