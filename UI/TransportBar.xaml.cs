@@ -10,7 +10,7 @@ internal partial class TransportBar : UserControl
 {
     private readonly TransportIconButton _play;
     private readonly Dictionary<TransportCommand, TransportIconButton> _buttons = new();
-    private readonly List<Border> _separators = [];
+    private readonly List<Border> _groupVeils = [];
     private string[]? _appliedLayout;
 
     public event EventHandler<TransportCommand>? CommandInvoked;
@@ -144,9 +144,9 @@ internal partial class TransportBar : UserControl
             button.InvalidateVisual();
         }
 
-        foreach (var separator in _separators)
+        foreach (var veil in _groupVeils)
         {
-            separator.SetResourceReference(BackgroundProperty, "TransportToolbarSeparatorBrush");
+            veil.SetResourceReference(BackgroundProperty, "TransportToolbarGroupVeilBrush");
         }
     }
 
@@ -177,7 +177,7 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    /// <summary>設定の並び／セパレータに従い、ツールバーを組み直す。</summary>
+    /// <summary>設定の並びに従い、グループ単位のベール付きでツールバーを組み直す。</summary>
     public void ApplyLayoutFromSettings(AppSettings settings)
     {
         var layout = TransportToolbarCatalog.ResolveLayout(settings);
@@ -189,23 +189,15 @@ internal partial class TransportBar : UserControl
 
         _appliedLayout = layout;
         ItemsHost.Children.Clear();
-        _separators.Clear();
+        _groupVeils.Clear();
 
+        StackPanel? groupButtons = null;
         var anyVisible = false;
-        var firstInSegment = true;
         foreach (var entry in layout)
         {
             if (TransportToolbarCatalog.IsSeparator(entry))
             {
-                if (!anyVisible)
-                {
-                    continue;
-                }
-
-                var separator = CreateSeparator();
-                _separators.Add(separator);
-                ItemsHost.Children.Add(separator);
-                firstInSegment = true;
+                groupButtons = null;
                 continue;
             }
 
@@ -215,14 +207,21 @@ internal partial class TransportBar : UserControl
                 continue;
             }
 
+            if (groupButtons is null)
+            {
+                groupButtons = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+                var veil = CreateGroupVeil(groupButtons);
+                _groupVeils.Add(veil);
+                ItemsHost.Children.Add(veil);
+            }
+
             button.Visibility = Visibility.Visible;
-            button.Margin = new Thickness(
-                firstInSegment ? 0 : 0,
-                0,
-                DesignMetrics.TransportButtonGap,
-                0);
-            ItemsHost.Children.Add(button);
-            firstInSegment = false;
+            button.Margin = new Thickness(0, 0, DesignMetrics.TransportButtonGap, 0);
+            groupButtons.Children.Add(button);
             anyVisible = true;
         }
 
@@ -234,11 +233,14 @@ internal partial class TransportBar : UserControl
             }
         }
 
-        // 末尾直後のセパレータは出さない（Normalize 済みだが防御）。
-        while (ItemsHost.Children.Count > 0
-               && ItemsHost.Children[^1] is Border)
+        // グループ末尾ボタンの右余白はベールの Padding に任せる。
+        foreach (var veil in _groupVeils)
         {
-            ItemsHost.Children.RemoveAt(ItemsHost.Children.Count - 1);
+            if (veil.Child is Panel { Children.Count: > 0 } panel
+                && panel.Children[^1] is FrameworkElement last)
+            {
+                last.Margin = new Thickness(0);
+            }
         }
 
         Visibility = anyVisible ? Visibility.Visible : Visibility.Collapsed;
@@ -250,8 +252,7 @@ internal partial class TransportBar : UserControl
 
     /// <summary>いま表示中のコマンドがあるか（領域自体の表示判定用）。</summary>
     public bool HasVisibleCommands =>
-        _buttons.Values.Any(button => button.Visibility == Visibility.Visible
-            && ItemsHost.Children.Contains(button));
+        _buttons.Values.Any(button => button.Visibility == Visibility.Visible);
 
     private TransportIconButton BuildFromCatalog()
     {
@@ -277,21 +278,26 @@ internal partial class TransportBar : UserControl
         return play!;
     }
 
-    private static Border CreateSeparator()
+    private static Border CreateGroupVeil(UIElement content)
     {
-        var separator = new Border
+        var veil = new Border
         {
-            Width = 1,
+            Child = content,
+            CornerRadius = new CornerRadius(DesignMetrics.From96(10)),
+            Padding = new Thickness(
+                DesignMetrics.From96(4),
+                DesignMetrics.From96(3),
+                DesignMetrics.From96(4),
+                DesignMetrics.From96(3)),
             Margin = new Thickness(
-                DesignMetrics.TransportGroupGap * 0.5,
-                DesignMetrics.From96(8),
-                DesignMetrics.TransportGroupGap * 0.5,
-                DesignMetrics.From96(8)),
-            VerticalAlignment = VerticalAlignment.Stretch,
-            MinHeight = DesignMetrics.TransportButtonSide * 0.55,
+                0,
+                0,
+                DesignMetrics.TransportGroupGap,
+                DesignMetrics.From96(2)),
+            VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true,
         };
-        separator.SetResourceReference(BackgroundProperty, "TransportToolbarSeparatorBrush");
-        return separator;
+        veil.SetResourceReference(BackgroundProperty, "TransportToolbarGroupVeilBrush");
+        return veil;
     }
 }

@@ -281,15 +281,13 @@ internal sealed class TransportIconButton : Button
             return;
         }
 
-        var backKey = QuietChrome ? "ProjectBarBackBrush" : "TransportBackBrush";
+        // スロットは塗らない。グループベール／バー背景を透かして見せ、ホバーだけ乗せる。
         TransportChrome.Paint(
             dc,
             bounds,
             IsEnabled,
             IsMouseOver,
             IsPressed,
-            backKey,
-            fillSlot: !QuietChrome && !WashThrough,
             hoverBounds: QuietChrome && Icon == TransportIcon.Folder
                 ? TransportIconDrawing.FolderHoverBounds(bounds)
                 : null);
@@ -1708,15 +1706,8 @@ internal static class TransportChrome
         bool enabled,
         bool hover,
         bool pressed,
-        string backKey = "TransportBackBrush",
-        bool fillSlot = true,
         Rect? hoverBounds = null)
     {
-        if (fillSlot)
-        {
-            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(backKey)), null, bounds);
-        }
-
         if (enabled && (hover || pressed))
         {
             var fill = pressed

@@ -167,7 +167,7 @@ internal static class ColorDevCatalog
             ("PlayerWaapiToggleOnHoverBackBrush", ColorDevGroup.Player),
 
             ("TransportBackBrush", ColorDevGroup.Transport),
-            ("TransportToolbarSeparatorBrush", ColorDevGroup.Transport),
+            ("TransportToolbarGroupVeilBrush", ColorDevGroup.Transport),
             ("ProjectBarBackBrush", ColorDevGroup.Transport),
             ("TransportForeBrush", ColorDevGroup.Transport),
             ("TransportDisabledForeBrush", ColorDevGroup.Transport),
