@@ -452,6 +452,9 @@ internal sealed class AppSettings
     /// <summary>フェード調整ツールで始点／終点を 28 サンプル格子に揃える。既定はオフ。</summary>
     public bool FadeToolAlignLoopEndsToTwentyEight { get; set; }
 
+    /// <summary>フェード調整ツールのクロスフェード表示。既定はオン。最終値を記憶する。</summary>
+    public bool FadeToolShowXfadePreview { get; set; } = true;
+
     public string UiLanguage { get; set; } = "auto";
 
     /// <summary>配色。auto / dark / light。既定は OS に従う。</summary>
