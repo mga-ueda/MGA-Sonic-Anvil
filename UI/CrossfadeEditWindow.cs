@@ -1402,6 +1402,8 @@ internal sealed class CrossfadeEditWindow : Window
         }
 
         _state.ShowXfadePreview = value;
+        AppStorage.Settings.FadeToolShowXfadePreview = value;
+        AppStorage.Save();
         _splice.InvalidateVisual();
         NotifyDraftChanged();
     }

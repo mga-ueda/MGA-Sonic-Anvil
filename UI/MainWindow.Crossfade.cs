@@ -128,6 +128,8 @@ public partial class MainWindow
         _crossfadeEdit = CrossfadeEditState.CreateInitial(_document);
         _crossfadeEdit.AlignLoopEndsToTwentyEight =
             AppStorage.Settings.FadeToolAlignLoopEndsToTwentyEight;
+        _crossfadeEdit.ShowXfadePreview =
+            AppStorage.Settings.FadeToolShowXfadePreview;
         if (_crossfadeEdit.AlignLoopEndsToTwentyEight)
         {
             _crossfadeEdit.Clamp(_document.FrameCount);

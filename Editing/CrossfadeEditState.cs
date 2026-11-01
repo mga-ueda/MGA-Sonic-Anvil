@@ -36,7 +36,7 @@ internal sealed class CrossfadeEditState
 
     public const long LoopEndAlignStep = 28;
 
-    /// <summary>継ぎ目のクロスフェード合成プレビュー。記憶せず、起動時は常にオフ。</summary>
+    /// <summary>継ぎ目のクロスフェード合成プレビュー。設定の最終値を引き継ぐ（既定オン）。</summary>
     public bool ShowXfadePreview { get; set; }
 
     /// <summary>プリ側アウト脚（減衰側）。既定はアウトメニュー先頭。</summary>
