@@ -359,6 +359,9 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     public event EventHandler<TimeSpan>? PlaylistVisualOpened;
 
+    /// <summary>プレイリスト動画を開けなかった。引数はダイアログ本文。</summary>
+    public event EventHandler<string>? PlaylistVisualOpenFailed;
+
     public event EventHandler? PlaylistVisualStateChanged;
 
     public event EventHandler<LibraryColumnPresets>? VisibleColumnPresetsChanged;
@@ -440,6 +443,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         BuildLayout();
         _visualStage.Ended += (_, _) => PlaylistVisualEnded?.Invoke(this, EventArgs.Empty);
         _visualStage.Opened += (_, duration) => PlaylistVisualOpened?.Invoke(this, duration);
+        _visualStage.OpenFailed += (_, message) => PlaylistVisualOpenFailed?.Invoke(this, message);
         ConfigureGrid();
         ConfigureGroupCombo();
         ApplyActiveColumnVisibility(notify: false);

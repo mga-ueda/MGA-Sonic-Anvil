@@ -1,6 +1,8 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Video.Dxgi;
 
@@ -16,15 +18,22 @@ namespace MgaSonicAnvil.UI;
 internal sealed partial class LibraryVisualStage
 {
     private const double DxgiFrameTickMs = 33;
-    private const int DxgiTestPatternWidth = 1280;
-    private const int DxgiTestPatternHeight = 720;
-    private static readonly TimeSpan DxgiTestPatternDuration = TimeSpan.FromSeconds(30);
+    /// <summary>開けなかったときに仮に置く寸法と尺（画面は黒のまま）。</summary>
+    private const int DxgiPlaceholderWidth = 1280;
+    private const int DxgiPlaceholderHeight = 720;
+    private static readonly TimeSpan DxgiPlaceholderDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan DxgiEndedRearm = TimeSpan.FromMilliseconds(250);
 
     private readonly DxgiVideoHost _dxgiHost = new() { Visibility = Visibility.Collapsed };
     private readonly DxgiAsyncFramePump _dxgiPump = new();
     private DispatcherTimer? _dxgiTimer;
-    private byte[]? _dxgiPattern;
+    private bool _dxgiOpenFailed;
+
+    /// <summary>失敗を知らせ済みのパス（同じファイルを選び直すたびにダイアログを出さない）。</summary>
+    private readonly HashSet<string> _dxgiFailureNotified = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>動画を開けなかった。引数はダイアログ本文（なぜ再生できないか）。</summary>
+    public event EventHandler<string>? OpenFailed;
 
     /// <summary>直近に描いたフレームと、そのときのホストの RenderVersion（同じなら描き直さない）。</summary>
     private DxgiDecodedFrame? _dxgiLastFrame;
@@ -108,7 +117,12 @@ internal sealed partial class LibraryVisualStage
         // MJPEG プロキシは TV レンジで焼いてある（VideoProxy.ProxyVideoFilter）。MF の MJPEG デコーダは JPEG 慣例で
         // フルレンジ／不明を返しうるので、プロキシを開くときだけ色情報の Range を Limited に固定する
         // （シェーダの行列・レンジ計算はそのまま。原ファイルのフルレンジはそのまま通す）。
-        if (_dxgiPump.Open(openPath, forceLimitedRange: VideoProxy.IsProxyPath(openPath)))
+        // プロキシを作らない経路（引数起動・F8 など）でも再生できるよう、MF で読めない／GPU で読めない動画は
+        // 設定の ffmpeg.exe があればパイプで読む。
+        var ffmpeg = VideoProxy.FindFfmpeg();
+        var opened = _dxgiPump.Open(openPath, forceLimitedRange: VideoProxy.IsProxyPath(openPath), ffmpegExe: ffmpeg);
+        _dxgiOpenFailed = !opened;
+        if (opened)
         {
             _dxgiDuration = _dxgiPump.Duration;
             _dxgiWidth = _dxgiPump.Width;
@@ -117,10 +131,13 @@ internal sealed partial class LibraryVisualStage
         }
         else
         {
-            // MF で開けない: テストパターンで presenter だけ動かす。
-            _dxgiDuration = _fallbackDuration > TimeSpan.Zero ? _fallbackDuration : DxgiTestPatternDuration;
-            _dxgiWidth = DxgiTestPatternWidth;
-            _dxgiHeight = DxgiTestPatternHeight;
+            // 開けない: 寸法だけ仮に置いて黒のまま（動く絵は出さない）。理由はダイアログで知らせる。
+            _dxgiDuration = _fallbackDuration > TimeSpan.Zero ? _fallbackDuration : DxgiPlaceholderDuration;
+            _dxgiWidth = DxgiPlaceholderWidth;
+            _dxgiHeight = DxgiPlaceholderHeight;
+            _dxgiHost.Clear();
+            _dxgiLastRenderVersion = -1;
+            NotifyOpenFailed(openPath, ffmpeg, _dxgiPump.LastOpenFailure);
         }
 
         if (_dxgiDuration > TimeSpan.Zero)
@@ -149,9 +166,38 @@ internal sealed partial class LibraryVisualStage
             DispatcherPriority.Background);
     }
 
+    private void NotifyOpenFailed(string path, string? ffmpeg, DxgiAsyncFramePump.VideoOpenFailure? failure)
+    {
+        if (!_dxgiFailureNotified.Add(path))
+        {
+            return;
+        }
+
+        var configured = AppStorage.Settings.FfmpegExePath?.Trim().Trim('"') ?? string.Empty;
+        var state = failure?.FfmpegTried == true || ffmpeg is not null
+            ? VideoOpenFailureText.FfmpegState.Failed
+            : configured.Length > 0
+                ? VideoOpenFailureText.FfmpegState.Missing
+                : VideoOpenFailureText.FfmpegState.NotConfigured;
+        var codec = failure?.FfmpegCodec is { Length: > 0 } ffCodec
+            ? ffCodec
+            : VideoCodecProbe.TryReadVideoFourCcs(path, out var fourccs) && fourccs.Count > 0 ? fourccs[0] : string.Empty;
+        var message = VideoOpenFailureText.Build(
+            Path.GetFileName(path),
+            codec,
+            state,
+            configured,
+            failure?.FfmpegError,
+            failure?.TimedOut == true);
+
+        // ShowVideo の途中でダイアログを出さない（モーダルの間に呼び出し側の状態が進まないように）。
+        Dispatcher.BeginInvoke(() => OpenFailed?.Invoke(this, message), DispatcherPriority.ApplicationIdle);
+    }
+
     private void StopDxgiPresenter()
     {
         _dxgiOpenTicket++;
+        _dxgiOpenFailed = false;
         _dxgiTimer?.Stop();
         _dxgiPump.Close();
         _dxgiLastFrame = null;
@@ -236,16 +282,11 @@ internal sealed partial class LibraryVisualStage
                 }
             }
         }
-        else if (_dxgiWidth > 0 && _dxgiHeight > 0)
+        else if (_dxgiOpenFailed && _dxgiHost.RenderVersion != _dxgiLastRenderVersion)
         {
-            var size = _dxgiWidth * _dxgiHeight * 4;
-            if (_dxgiPattern is null || _dxgiPattern.Length != size)
-            {
-                _dxgiPattern = new byte[size];
-            }
-
-            DxgiPrototypeFrameSource.FillTestPattern(_dxgiPattern, pos, _dxgiWidth, _dxgiHeight);
-            _dxgiHost.PresentBgraFrame(_dxgiPattern, _dxgiWidth, _dxgiHeight, _dxgiWidth * 4);
+            // サーフェスが作り直されても黒のまま。
+            _dxgiHost.Clear();
+            _dxgiLastRenderVersion = _dxgiHost.RenderVersion;
         }
 
         // 黒帯が出る映像で光漏れがまだ出ていなければ、寸法確定後のここで出す（以後は present ごとに更新）。

@@ -87,7 +87,10 @@ internal sealed class DxgiAsyncFramePump : IDisposable
     private readonly Queue<(Action Action, ManualResetEventSlim Done)> _commands = new();
     private readonly AutoResetEvent _wake = new(false);
     private readonly DxgiFrameCache _cache;
-    private readonly DxgiPrototypeFrameSource _reader = new();
+    private readonly DxgiPrototypeFrameSource _mfReader = new();
+    private FfmpegPipeFrameSource? _ffmpegReader;
+    private string? _ffmpegReaderExe;
+    private IVideoFrameReader _reader;
     private readonly Stack<byte[]> _pool = new();
 
     private Thread? _worker;
@@ -122,8 +125,15 @@ internal sealed class DxgiAsyncFramePump : IDisposable
     {
         _cache = new DxgiFrameCache(cacheCapacity > 0 ? cacheCapacity : 32);
         _cache.Evicted += ReturnBuffer;
+        _reader = _mfReader;
         ExplicitCapacity = cacheCapacity;
     }
+
+    /// <summary>いま開いている読み手が ffmpeg パイプか（false なら Media Foundation）。</summary>
+    public bool UsesFfmpeg { get; private set; }
+
+    /// <summary>直近の <see cref="Open"/> が失敗したときの詳細。</summary>
+    public VideoOpenFailure? LastOpenFailure { get; private set; }
 
     /// <summary>0 ならフレーム寸法とメモリ目安から自動。</summary>
     public int ExplicitCapacity { get; }
@@ -183,9 +193,13 @@ internal sealed class DxgiAsyncFramePump : IDisposable
     /// <paramref name="forceLimitedRange"/> は MJPEG プロキシ用: プロキシは TV レンジで焼いてあるが、MF の MJPEG デコーダは
     /// JPEG 慣例でフルレンジ（または不明）を返すことがあるので、<see cref="ColorInfo"/> とフレームの色情報を
     /// リミテッドレンジに固定する（行列・原色はそのまま。シェーダ側の計算は変えない）。
+    /// <paramref name="ffmpegExe"/> があれば、Media Foundation で開けないときと、GPU デコードできず
+    /// 縮小が要る大きさのとき（ソフトデコードでは追いつかない）に ffmpeg パイプで読む。
+    /// 失敗の詳細は <see cref="LastOpenFailure"/>。
     /// </summary>
-    public bool Open(string path, bool forceLimitedRange = false)
+    public bool Open(string path, bool forceLimitedRange = false, string? ffmpegExe = null)
     {
+        LastOpenFailure = null;
         if (_disposed || string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             return false;
@@ -194,10 +208,11 @@ internal sealed class DxgiAsyncFramePump : IDisposable
         Close();
         EnsureWorker();
         var ok = false;
-        if (!RunOnWorker(() => ok = OpenOnWorker(path, forceLimitedRange), TimeSpan.FromSeconds(15)))
+        if (!RunOnWorker(() => ok = OpenOnWorker(path, forceLimitedRange, ffmpegExe), TimeSpan.FromSeconds(30)))
         {
             // 時間切れ: 遅れて開いても使わないように閉じ直す。
             Close();
+            LastOpenFailure = new VideoOpenFailure(FfmpegTried: ffmpegExe is not null, FfmpegError: string.Empty, FfmpegCodec: string.Empty, TimedOut: true);
             return false;
         }
 
@@ -397,7 +412,8 @@ internal sealed class DxgiAsyncFramePump : IDisposable
             _isOpen = false;
             try
             {
-                _reader.Close();
+                _mfReader.Close();
+                _ffmpegReader?.Close();
             }
             catch
             {
@@ -458,14 +474,50 @@ internal sealed class DxgiAsyncFramePump : IDisposable
         }
     }
 
-    private bool OpenOnWorker(string path, bool forceLimitedRange)
+    private bool OpenOnWorker(string path, bool forceLimitedRange, string? ffmpegExe)
     {
         CloseOnWorker();
-        if (!_reader.TryOpen(path, out var duration, out var width, out var height))
+        var hasFfmpeg = !string.IsNullOrWhiteSpace(ffmpegExe) && File.Exists(ffmpegExe);
+        var mfOpened = _mfReader.TryOpen(path, out var duration, out var width, out var height);
+        _reader = _mfReader;
+        if (!mfOpened
+            || (!_mfReader.IsHardwareDecoding && hasFfmpeg && DxgiPrototypeFrameSource.FitOutputSize(width, height) != (width, height)))
         {
-            return false;
+            if (!hasFfmpeg)
+            {
+                LastOpenFailure = new VideoOpenFailure(FfmpegTried: false, FfmpegError: string.Empty, FfmpegCodec: string.Empty, TimedOut: false);
+                return false;
+            }
+
+            if (_ffmpegReader is null || !string.Equals(_ffmpegReaderExe, ffmpegExe, StringComparison.OrdinalIgnoreCase))
+            {
+                _ffmpegReader?.Dispose();
+                _ffmpegReader = new FfmpegPipeFrameSource(ffmpegExe!);
+                _ffmpegReaderExe = ffmpegExe;
+            }
+
+            if (_ffmpegReader.TryOpen(path, out var ffDuration, out var ffWidth, out var ffHeight))
+            {
+                _mfReader.Close();
+                _reader = _ffmpegReader;
+                // 尺は MF（コンテナ）の値があればそちらを優先する。
+                duration = mfOpened && duration > TimeSpan.Zero ? duration : ffDuration;
+                width = ffWidth;
+                height = ffHeight;
+            }
+            else if (!mfOpened)
+            {
+                LastOpenFailure = new VideoOpenFailure(
+                    FfmpegTried: true,
+                    FfmpegError: _ffmpegReader.LastError,
+                    FfmpegCodec: _ffmpegReader.CodecName,
+                    TimedOut: false);
+                _ffmpegReader.Close();
+                return false;
+            }
         }
 
+        UsesFfmpeg = ReferenceEquals(_reader, _ffmpegReader);
         Duration = duration;
         Width = width;
         Height = height;
@@ -479,7 +531,10 @@ internal sealed class DxgiAsyncFramePump : IDisposable
     private void CloseOnWorker()
     {
         _isOpen = false;
-        _reader.Close();
+        _mfReader.Close();
+        _ffmpegReader?.Close();
+        _reader = _mfReader;
+        UsesFfmpeg = false;
         _cache.Clear();
         _pool.Clear();
         _frameBytes = 0;
@@ -873,6 +928,9 @@ internal sealed class DxgiAsyncFramePump : IDisposable
     }
 
     private const uint COINIT_MULTITHREADED = 0x0;
+
+    /// <summary>ffmpeg を試したか、試したならその最後のエラー行とコーデック名、時間切れか。</summary>
+    internal sealed record VideoOpenFailure(bool FfmpegTried, string FfmpegError, string FfmpegCodec, bool TimedOut);
 
     [DllImport("ole32.dll", ExactSpelling = true)]
     private static extern int CoInitializeEx(IntPtr reserved, uint coInit);
