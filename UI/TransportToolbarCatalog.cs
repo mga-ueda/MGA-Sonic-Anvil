@@ -5,19 +5,22 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// ツールバーに載るトランスポートコマンドの一覧と、設定からの表示判定。
+/// グループ・並び・グループ内の区切りは、対応するメニュー項目の位置（<see cref="WaveformContextMenuBuilder"/>）から決める。
 /// </summary>
 internal static class TransportToolbarCatalog
 {
-    /// <summary>レイアウト配列内のセパレータ（カテゴリ境界）。</summary>
+    /// <summary>レイアウト配列内のセパレータ（メニューのカテゴリ境界）。</summary>
     public const string SeparatorToken = "|";
+
+    /// <summary>グループ内の区切り（メニューのセパレータ／サブメニュー境界）。</summary>
+    public const string SectionSeparatorToken = "¦";
 
     internal readonly record struct Item(
         TransportCommand Command,
         TransportIcon Icon,
-        Func<string> GroupTitle,
+        WaveMenuCommand MenuCommand,
         Func<string> Label,
-        Func<string> Tooltip,
-        bool InDefaultLayout = true);
+        Func<string> Tooltip);
 
     internal readonly record struct IconVariant(
         TransportIcon Icon,
@@ -31,215 +34,269 @@ internal static class TransportToolbarCatalog
     /// <summary>ツールバーに出しうる全コマンド。</summary>
     public static IReadOnlyList<Item> All { get; } =
     [
-        // TRANS
         new(TransportCommand.TogglePlayback, TransportIcon.PlayPause,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarPlay, () => UiStrings.TooltipPlay),
+            WaveMenuCommand.TogglePlayback, () => UiStrings.LabelToolbarPlay, () => UiStrings.TooltipPlay),
         new(TransportCommand.Record, TransportIcon.Record,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarRecord, () => UiStrings.TooltipRecord),
+            WaveMenuCommand.Record, () => UiStrings.LabelToolbarRecord, () => UiStrings.TooltipRecord),
         new(TransportCommand.GoToStart, TransportIcon.GoToStart,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarGoToStart, () => UiStrings.TooltipGoToStart,
-            InDefaultLayout: false),
+            WaveMenuCommand.GoStart, () => UiStrings.LabelToolbarGoToStart, () => UiStrings.TooltipGoToStart),
         new(TransportCommand.PreviousMarker, TransportIcon.PreviousMarker,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarPreviousMarker, () => UiStrings.TooltipPreviousMarker,
-            InDefaultLayout: false),
+            WaveMenuCommand.PrevMarker, () => UiStrings.LabelToolbarPreviousMarker, () => UiStrings.TooltipPreviousMarker),
         new(TransportCommand.NextMarker, TransportIcon.NextMarker,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarNextMarker, () => UiStrings.TooltipNextMarker,
-            InDefaultLayout: false),
+            WaveMenuCommand.NextMarker, () => UiStrings.LabelToolbarNextMarker, () => UiStrings.TooltipNextMarker),
         new(TransportCommand.GoToEnd, TransportIcon.GoToEnd,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarGoToEnd, () => UiStrings.TooltipGoToEnd,
-            InDefaultLayout: false),
+            WaveMenuCommand.GoEnd, () => UiStrings.LabelToolbarGoToEnd, () => UiStrings.TooltipGoToEnd),
 
         new(TransportCommand.JumpToTime, TransportIcon.JumpToTime,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarJumpToTime, () => UiStrings.TooltipJumpToTime,
-            InDefaultLayout: false),
+            WaveMenuCommand.FocusTime, () => UiStrings.LabelToolbarJumpToTime, () => UiStrings.TooltipJumpToTime),
         new(TransportCommand.SeekViewLeft, TransportIcon.SeekViewLeft,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarSeekViewLeft, () => UiStrings.TooltipSeekViewLeft,
-            InDefaultLayout: false),
+            WaveMenuCommand.ViewLeft, () => UiStrings.LabelToolbarSeekViewLeft, () => UiStrings.TooltipSeekViewLeft),
         new(TransportCommand.SeekViewRight, TransportIcon.SeekViewRight,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarSeekViewRight, () => UiStrings.TooltipSeekViewRight,
-            InDefaultLayout: false),
+            WaveMenuCommand.ViewRight, () => UiStrings.LabelToolbarSeekViewRight, () => UiStrings.TooltipSeekViewRight),
         new(TransportCommand.LoopPlay, TransportIcon.LoopPlay,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarLoopPlay, () => UiStrings.TooltipLoopPlay,
-            InDefaultLayout: false),
+            WaveMenuCommand.LoopPlay, () => UiStrings.LabelToolbarLoopPlay, () => UiStrings.TooltipLoopPlay),
         new(TransportCommand.Restart, TransportIcon.Restart,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarRestart, () => UiStrings.TooltipRestart,
-            InDefaultLayout: false),
+            WaveMenuCommand.Restart, () => UiStrings.LabelToolbarRestart, () => UiStrings.TooltipRestart),
         new(TransportCommand.Preroll, TransportIcon.Preroll,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarPreroll, () => UiStrings.TooltipPreroll,
-            InDefaultLayout: false),
+            WaveMenuCommand.Preroll, () => UiStrings.LabelToolbarPreroll, () => UiStrings.TooltipPreroll),
         new(TransportCommand.PreviousTrack, TransportIcon.PreviousTrack,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarPreviousTrack, () => UiStrings.TooltipPreviousTrack,
-            InDefaultLayout: false),
+            WaveMenuCommand.PreviousTrack, () => UiStrings.LabelToolbarPreviousTrack, () => UiStrings.TooltipPreviousTrack),
         new(TransportCommand.NextTrack, TransportIcon.NextTrack,
-            () => UiStrings.LabelTransportGroup, () => UiStrings.LabelToolbarNextTrack, () => UiStrings.TooltipNextTrack,
-            InDefaultLayout: false),
+            WaveMenuCommand.NextTrack, () => UiStrings.LabelToolbarNextTrack, () => UiStrings.TooltipNextTrack),
 
-        // EDIT
         new(TransportCommand.Undo, TransportIcon.Undo,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarUndo, () => UiStrings.TooltipUndo,
-            InDefaultLayout: false),
+            WaveMenuCommand.Undo, () => UiStrings.LabelToolbarUndo, () => UiStrings.TooltipUndo),
         new(TransportCommand.Redo, TransportIcon.Redo,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarRedo, () => UiStrings.TooltipRedo,
-            InDefaultLayout: false),
+            WaveMenuCommand.Redo, () => UiStrings.LabelToolbarRedo, () => UiStrings.TooltipRedo),
         new(TransportCommand.Cut, TransportIcon.Cut,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarCut, () => UiStrings.TooltipCut,
-            InDefaultLayout: false),
+            WaveMenuCommand.Cut, () => UiStrings.LabelToolbarCut, () => UiStrings.TooltipCut),
         new(TransportCommand.Copy, TransportIcon.Copy,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarCopy, () => UiStrings.TooltipCopy,
-            InDefaultLayout: false),
+            WaveMenuCommand.Copy, () => UiStrings.LabelToolbarCopy, () => UiStrings.TooltipCopy),
         new(TransportCommand.Paste, TransportIcon.Paste,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarPaste, () => UiStrings.TooltipPaste,
-            InDefaultLayout: false),
+            WaveMenuCommand.Paste, () => UiStrings.LabelToolbarPaste, () => UiStrings.TooltipPaste),
         new(TransportCommand.Delete, TransportIcon.Delete,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarDelete, () => UiStrings.TooltipDelete),
+            WaveMenuCommand.Delete, () => UiStrings.LabelToolbarDelete, () => UiStrings.TooltipDelete),
         new(TransportCommand.SilenceSelection, TransportIcon.SilenceSelection,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarSilenceSelection, () => UiStrings.TooltipSilenceSelection,
-            InDefaultLayout: false),
+            WaveMenuCommand.SilenceSelection, () => UiStrings.LabelToolbarSilenceSelection, () => UiStrings.TooltipSilenceSelection),
         new(TransportCommand.InsertSilence, TransportIcon.InsertSilence,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarInsertSilence, () => UiStrings.TooltipInsertSilence,
-            InDefaultLayout: false),
+            WaveMenuCommand.InsertSilence, () => UiStrings.LabelToolbarInsertSilence, () => UiStrings.TooltipInsertSilence),
         new(TransportCommand.DetectSilence, TransportIcon.DetectSilence,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarDetectSilence, () => UiStrings.TooltipDetectSilence,
-            InDefaultLayout: false),
+            WaveMenuCommand.DetectSilence, () => UiStrings.LabelToolbarDetectSilence, () => UiStrings.TooltipDetectSilence),
         new(TransportCommand.SelectAll, TransportIcon.SelectAll,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarSelectAll, () => UiStrings.TooltipSelectAll,
-            InDefaultLayout: false),
+            WaveMenuCommand.SelectAll, () => UiStrings.LabelToolbarSelectAll, () => UiStrings.TooltipSelectAll),
         new(TransportCommand.ClearSelection, TransportIcon.ClearSelection,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarClearSelection, () => UiStrings.TooltipClearSelection,
-            InDefaultLayout: false),
+            WaveMenuCommand.ClearSelection, () => UiStrings.LabelToolbarClearSelection, () => UiStrings.TooltipClearSelection),
         new(TransportCommand.SelectToStart, TransportIcon.SelectToStart,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarSelectToStart, () => UiStrings.TooltipSelectToStart,
-            InDefaultLayout: false),
+            WaveMenuCommand.SelectToStart, () => UiStrings.LabelToolbarSelectToStart, () => UiStrings.TooltipSelectToStart),
         new(TransportCommand.SelectToEnd, TransportIcon.SelectToEnd,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarSelectToEnd, () => UiStrings.TooltipSelectToEnd,
-            InDefaultLayout: false),
+            WaveMenuCommand.SelectToEnd, () => UiStrings.LabelToolbarSelectToEnd, () => UiStrings.TooltipSelectToEnd),
         new(TransportCommand.CopySelectionTime, TransportIcon.CopySelectionTime,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarCopySelectionTime, () => UiStrings.TooltipCopySelectionTime,
-            InDefaultLayout: false),
+            WaveMenuCommand.CopySelectionTime, () => UiStrings.LabelToolbarCopySelectionTime, () => UiStrings.TooltipCopySelectionTime),
         new(TransportCommand.FadeIn, TransportIcon.FadeIn,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarFadeIn, () => UiStrings.TooltipFadeIn),
+            WaveMenuCommand.FadeIn, () => UiStrings.LabelToolbarFadeIn, () => UiStrings.TooltipFadeIn),
         new(TransportCommand.FadeOut, TransportIcon.FadeOut,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarFadeOut, () => UiStrings.TooltipFadeOut),
+            WaveMenuCommand.FadeOut, () => UiStrings.LabelToolbarFadeOut, () => UiStrings.TooltipFadeOut),
         new(TransportCommand.FadeAround, TransportIcon.FadeAround,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarFadeAround, () => UiStrings.TooltipFadeAround),
+            WaveMenuCommand.FadeAround, () => UiStrings.LabelToolbarFadeAround, () => UiStrings.TooltipFadeAround),
         new(TransportCommand.CrossfadeEdit, TransportIcon.CrossfadeEdit,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarCrossfadeEdit, () => UiStrings.TooltipCrossfadeEdit,
-            InDefaultLayout: false),
+            WaveMenuCommand.CrossfadeEdit, () => UiStrings.LabelToolbarCrossfadeEdit, () => UiStrings.TooltipCrossfadeEdit),
         new(TransportCommand.Normalize, TransportIcon.Normalize,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarNormalize, () => UiStrings.TooltipNormalize),
+            WaveMenuCommand.Normalize, () => UiStrings.LabelToolbarNormalize, () => UiStrings.TooltipNormalize),
         new(TransportCommand.NormalizePerRegion, TransportIcon.NormalizePerRegion,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarNormalizePerRegion, () => UiStrings.TooltipNormalizePerRegion,
-            InDefaultLayout: false),
+            WaveMenuCommand.NormalizePerRegion, () => UiStrings.LabelToolbarNormalizePerRegion, () => UiStrings.TooltipNormalizePerRegion),
         new(TransportCommand.Volume, TransportIcon.Volume,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarVolume, () => UiStrings.TooltipVolume),
+            WaveMenuCommand.Volume, () => UiStrings.LabelToolbarVolume, () => UiStrings.TooltipVolume),
         new(TransportCommand.Pitch, TransportIcon.Pitch,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarPitch, () => UiStrings.TooltipPitch),
+            WaveMenuCommand.Pitch, () => UiStrings.LabelToolbarPitch, () => UiStrings.TooltipPitch),
         new(TransportCommand.TimeStretch, TransportIcon.TimeStretch,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarTimeStretch, () => UiStrings.TooltipTimeStretch),
+            WaveMenuCommand.TimeStretch, () => UiStrings.LabelToolbarTimeStretch, () => UiStrings.TooltipTimeStretch),
         new(TransportCommand.Reverse, TransportIcon.Reverse,
-            () => UiStrings.LabelEditGroup, () => UiStrings.LabelToolbarReverse, () => UiStrings.TooltipReverse),
+            WaveMenuCommand.Reverse, () => UiStrings.LabelToolbarReverse, () => UiStrings.TooltipReverse),
 
-        // FILE
         new(TransportCommand.NewDocument, TransportIcon.NewDocument,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarNew, () => UiStrings.TooltipNew),
+            WaveMenuCommand.NewDocument, () => UiStrings.LabelToolbarNew, () => UiStrings.TooltipNew),
         new(TransportCommand.Open, TransportIcon.Folder,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarOpen, () => UiStrings.TooltipOpen),
+            WaveMenuCommand.Open, () => UiStrings.LabelToolbarOpen, () => UiStrings.TooltipOpen),
         new(TransportCommand.Save, TransportIcon.Save,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarSave, () => UiStrings.TooltipSave),
+            WaveMenuCommand.Save, () => UiStrings.LabelToolbarSave, () => UiStrings.TooltipSave),
         new(TransportCommand.SaveAs, TransportIcon.SaveAs,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarSaveAs, () => UiStrings.TooltipSaveAs),
+            WaveMenuCommand.SaveAs, () => UiStrings.LabelToolbarSaveAs, () => UiStrings.TooltipSaveAs),
         new(TransportCommand.SaveMp3, TransportIcon.SaveMp3,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarSaveMp3, () => UiStrings.TooltipSaveMp3),
+            WaveMenuCommand.ExportMp3, () => UiStrings.LabelToolbarSaveMp3, () => UiStrings.TooltipSaveMp3),
         new(TransportCommand.ExportWave, TransportIcon.ExportWave,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarExportWave, () => UiStrings.TooltipExportWave),
+            WaveMenuCommand.ExportWave, () => UiStrings.LabelToolbarExportWave, () => UiStrings.TooltipExportWave),
         new(TransportCommand.ExportByMarkers, TransportIcon.ExportByMarkers,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarExportByMarkers, () => UiStrings.TooltipExportByMarkers,
-            InDefaultLayout: false),
+            WaveMenuCommand.ExportByMarkers, () => UiStrings.LabelToolbarExportByMarkers, () => UiStrings.TooltipExportByMarkers),
         new(TransportCommand.ExportByRegions, TransportIcon.ExportByRegions,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarExportByRegions, () => UiStrings.TooltipExportByRegions,
-            InDefaultLayout: false),
+            WaveMenuCommand.ExportByRegions, () => UiStrings.LabelToolbarExportByRegions, () => UiStrings.TooltipExportByRegions),
         new(TransportCommand.ExportByChannels, TransportIcon.ExportByChannels,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarExportByChannels, () => UiStrings.TooltipExportByChannels,
-            InDefaultLayout: false),
+            WaveMenuCommand.ExportByChannels, () => UiStrings.LabelToolbarExportByChannels, () => UiStrings.TooltipExportByChannels),
         new(TransportCommand.MergeTabs, TransportIcon.MergeTabs,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarMergeTabs, () => UiStrings.TooltipMergeTabs,
-            InDefaultLayout: false),
+            WaveMenuCommand.MergeTabs, () => UiStrings.LabelToolbarMergeTabs, () => UiStrings.TooltipMergeTabs),
         new(TransportCommand.CopyFileName, TransportIcon.CopyFileName,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarCopyFileName, () => UiStrings.TooltipCopyFileName,
-            InDefaultLayout: false),
+            WaveMenuCommand.CopyFileName, () => UiStrings.LabelToolbarCopyFileName, () => UiStrings.TooltipCopyFileName),
         new(TransportCommand.CopyFilePath, TransportIcon.CopyFilePath,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarCopyFilePath, () => UiStrings.TooltipCopyFilePath,
-            InDefaultLayout: false),
+            WaveMenuCommand.CopyFilePath, () => UiStrings.LabelToolbarCopyFilePath, () => UiStrings.TooltipCopyFilePath),
         new(TransportCommand.CopyAllTabTimes, TransportIcon.CopyAllTabTimes,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarCopyAllTabTimes, () => UiStrings.TooltipCopyAllTabTimes,
-            InDefaultLayout: false),
+            WaveMenuCommand.CopyAllTabTimes, () => UiStrings.LabelToolbarCopyAllTabTimes, () => UiStrings.TooltipCopyAllTabTimes),
         new(TransportCommand.CloseTab, TransportIcon.CloseTab,
-            () => UiStrings.LabelFileGroup, () => UiStrings.LabelToolbarCloseTab, () => UiStrings.TooltipCloseTab),
+            WaveMenuCommand.CloseTab, () => UiStrings.LabelToolbarCloseTab, () => UiStrings.TooltipCloseTab),
 
-        // MARK
         new(TransportCommand.AddMarker, TransportIcon.AddMarker,
-            () => UiStrings.LabelMarkerGroup, () => UiStrings.LabelToolbarAddMarker, () => UiStrings.TooltipAddMarker),
+            WaveMenuCommand.AddMarker, () => UiStrings.LabelToolbarAddMarker, () => UiStrings.TooltipAddMarker),
         new(TransportCommand.SetLoop, TransportIcon.SetLoop,
-            () => UiStrings.LabelMarkerGroup, () => UiStrings.LabelToolbarSetLoop, () => UiStrings.TooltipSetLoop),
+            WaveMenuCommand.SetLoop, () => UiStrings.LabelToolbarSetLoop, () => UiStrings.TooltipSetLoop),
         new(TransportCommand.ClearLoop, TransportIcon.ClearLoop,
-            () => UiStrings.LabelMarkerGroup, () => UiStrings.LabelToolbarClearLoop, () => UiStrings.TooltipClearLoop,
-            InDefaultLayout: false),
+            WaveMenuCommand.ClearLoopItem, () => UiStrings.LabelToolbarClearLoop, () => UiStrings.TooltipClearLoop),
         new(TransportCommand.SetRegion, TransportIcon.SetRegion,
-            () => UiStrings.LabelMarkerGroup, () => UiStrings.LabelToolbarSetRegion, () => UiStrings.TooltipSetRegion),
+            WaveMenuCommand.SetRegion, () => UiStrings.LabelToolbarSetRegion, () => UiStrings.TooltipSetRegion),
         new(TransportCommand.DeleteMarkers, TransportIcon.DeleteMarkers,
-            () => UiStrings.LabelMarkerGroup, () => UiStrings.LabelToolbarDeleteMarkers, () => UiStrings.TooltipDeleteMarkers,
-            InDefaultLayout: false),
+            WaveMenuCommand.DeleteMarkers, () => UiStrings.LabelToolbarDeleteMarkers, () => UiStrings.TooltipDeleteMarkers),
         new(TransportCommand.DeleteAllMarkers, TransportIcon.DeleteAllMarkers,
-            () => UiStrings.LabelMarkerGroup, () => UiStrings.LabelToolbarDeleteAllMarkers, () => UiStrings.TooltipDeleteAllMarkers,
-            InDefaultLayout: false),
+            WaveMenuCommand.DeleteAllMarkers, () => UiStrings.LabelToolbarDeleteAllMarkers, () => UiStrings.TooltipDeleteAllMarkers),
         new(TransportCommand.DeleteRegions, TransportIcon.DeleteRegions,
-            () => UiStrings.LabelMarkerGroup, () => UiStrings.LabelToolbarDeleteRegions, () => UiStrings.TooltipDeleteRegions,
-            InDefaultLayout: false),
+            WaveMenuCommand.DeleteRegions, () => UiStrings.LabelToolbarDeleteRegions, () => UiStrings.TooltipDeleteRegions),
         new(TransportCommand.DeleteAllRegions, TransportIcon.DeleteAllRegions,
-            () => UiStrings.LabelMarkerGroup, () => UiStrings.LabelToolbarDeleteAllRegions, () => UiStrings.TooltipDeleteAllRegions,
-            InDefaultLayout: false),
+            WaveMenuCommand.DeleteAllRegions, () => UiStrings.LabelToolbarDeleteAllRegions, () => UiStrings.TooltipDeleteAllRegions),
         // マーカークリック・最前面・タイル・WAAPI 等のメニュー Check トグルは非掲載
 
-        // FMT
         new(TransportCommand.SampleRate, TransportIcon.SampleRate,
-            () => UiStrings.LabelFormatGroup, () => UiStrings.LabelToolbarSampleRate, () => UiStrings.TooltipSampleRate,
-            InDefaultLayout: false),
+            WaveMenuCommand.SampleRate, () => UiStrings.LabelToolbarSampleRate, () => UiStrings.TooltipSampleRate),
         new(TransportCommand.BitDepth, TransportIcon.BitDepth,
-            () => UiStrings.LabelFormatGroup, () => UiStrings.LabelToolbarBitDepth, () => UiStrings.TooltipBitDepth,
-            InDefaultLayout: false),
+            WaveMenuCommand.BitDepth, () => UiStrings.LabelToolbarBitDepth, () => UiStrings.TooltipBitDepth),
         new(TransportCommand.Channels, TransportIcon.Channels,
-            () => UiStrings.LabelFormatGroup, () => UiStrings.LabelToolbarChannels, () => UiStrings.TooltipChannels,
-            InDefaultLayout: false),
+            WaveMenuCommand.Channels, () => UiStrings.LabelToolbarChannels, () => UiStrings.TooltipChannels),
 
-        // VIEW（解析表示・レイアウトモードはアクション／モード切替として掲載。設定系 Check は非掲載）
         new(TransportCommand.ToggleSpectrogram, TransportIcon.Analysis,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarSpectrogram, () => UiStrings.TooltipSpectrogramView),
+            WaveMenuCommand.ViewSpectrogram, () => UiStrings.LabelToolbarSpectrogram, () => UiStrings.TooltipSpectrogramView),
         new(TransportCommand.ToggleLoudnessView, TransportIcon.Loudness,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarLoudness, () => UiStrings.TooltipLoudnessView),
+            WaveMenuCommand.ViewLoudness, () => UiStrings.LabelToolbarLoudness, () => UiStrings.TooltipLoudnessView),
         new(TransportCommand.CenterPlayhead, TransportIcon.Center,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarCenter, () => UiStrings.TooltipCenterPlayhead),
+            WaveMenuCommand.CenterPlayhead, () => UiStrings.LabelToolbarCenter, () => UiStrings.TooltipCenterPlayhead),
         new(TransportCommand.History, TransportIcon.History,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarHistory, () => UiStrings.TooltipHistory),
+            WaveMenuCommand.History, () => UiStrings.LabelToolbarHistory, () => UiStrings.TooltipHistory),
         new(TransportCommand.ToggleMinimalChrome, TransportIcon.MinimalChrome,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarMinimalChrome, () => UiStrings.TooltipMinimalChrome),
+            WaveMenuCommand.MinimalChrome, () => UiStrings.LabelToolbarMinimalChrome, () => UiStrings.TooltipMinimalChrome),
         new(TransportCommand.ToggleLibraryMaximize, TransportIcon.PlayerMode,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarLibraryMaximize, () => UiStrings.TooltipLibraryMaximize),
+            WaveMenuCommand.MaximizeLibrary, () => UiStrings.LabelToolbarLibraryMaximize, () => UiStrings.TooltipLibraryMaximize),
         new(TransportCommand.MaximizeWaveform, TransportIcon.WaveformMaximize,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarWaveformMaximize, () => UiStrings.TooltipWaveformMaximize),
+            WaveMenuCommand.MaximizeWaveform, () => UiStrings.LabelToolbarWaveformMaximize, () => UiStrings.TooltipWaveformMaximize),
         new(TransportCommand.ToggleAnalyzerMaximize, TransportIcon.AnalyzerMaximize,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarAnalyzerMaximize, () => UiStrings.TooltipAnalyzerMaximize),
+            WaveMenuCommand.MaximizeAnalyzers, () => UiStrings.LabelToolbarAnalyzerMaximize, () => UiStrings.TooltipAnalyzerMaximize),
         new(TransportCommand.OpenColorPanel, TransportIcon.ColorPalette,
-            () => UiStrings.LabelViewGroup, () => UiStrings.LabelToolbarColorPanel, () => UiStrings.TooltipColorPanel),
+            WaveMenuCommand.ColorPanel, () => UiStrings.LabelToolbarColorPanel, () => UiStrings.TooltipColorPanel),
 
-        // OTHER
         new(TransportCommand.OpenSettings, TransportIcon.Settings,
-            () => UiStrings.LabelOtherGroup, () => UiStrings.LabelToolbarSettings, () => UiStrings.TooltipSettings),
+            WaveMenuCommand.Settings, () => UiStrings.LabelToolbarSettings, () => UiStrings.TooltipSettings),
         new(TransportCommand.OpenManual, TransportIcon.Help,
-            () => UiStrings.LabelOtherGroup, () => UiStrings.LabelToolbarManual, () => UiStrings.TooltipManualHelp),
+            WaveMenuCommand.Manual, () => UiStrings.LabelToolbarManual, () => UiStrings.TooltipManualHelp),
     ];
 
     public static IReadOnlyList<TransportCommand> AllCommands { get; } =
         All.Select(item => item.Command).ToArray();
+
+    /// <summary>
+    /// メニュー上の位置。Group は上部メニューのカテゴリ、Section はカテゴリ内でセパレータ／サブメニューに区切られたかたまり。
+    /// </summary>
+    internal readonly record struct MenuPlacement(int Group, int Section, int Order);
+
+    private static readonly Lazy<MenuLayout> Menu = new(BuildMenuLayout);
+
+    private sealed record MenuLayout(
+        IReadOnlyDictionary<WaveMenuCommand, MenuPlacement> Placements,
+        IReadOnlyList<Item> Ordered);
+
+    /// <summary>メニュー順（再生カテゴリのみ先頭）に並べた全コマンド。</summary>
+    public static IReadOnlyList<Item> Ordered => Menu.Value.Ordered;
+
+    /// <summary>メニューに無いコマンドは null（テストで検出する）。</summary>
+    public static MenuPlacement? PlacementOf(Item item) =>
+        Menu.Value.Placements.TryGetValue(item.MenuCommand, out var placement) ? placement : null;
+
+    /// <summary>グループ名＝メニューのカテゴリ見出し（表示言語に追従）。</summary>
+    public static IReadOnlyList<(Item Item, string GroupTitle)> OrderedWithGroupTitles()
+    {
+        var headers = MenuTree().OfType<WaveMenuItemEntry>()
+            .Select(entry => UiStrings.WithoutAccessKey(entry.Header))
+            .ToArray();
+        return Ordered
+            .Select(item => (item, PlacementOf(item) is { } placement && placement.Group < headers.Length
+                ? headers[placement.Group]
+                : UiStrings.WithoutAccessKey(UiStrings.WaveMenuCatOther)))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<WaveMenuEntry> MenuTree() =>
+        WaveformContextMenuBuilder.Build(new WaveformContextMenuModel(), includeHere: false);
+
+    private static MenuLayout BuildMenuLayout()
+    {
+        var placements = new Dictionary<WaveMenuCommand, MenuPlacement>();
+        var order = 0;
+        var tree = MenuTree();
+        for (var group = 0; group < tree.Count; group++)
+        {
+            if (tree[group] is not WaveMenuItemEntry { Children: { } children })
+            {
+                continue;
+            }
+
+            var section = 0;
+            Walk(children, group, ref section, ref order, placements);
+        }
+
+        var playbackGroup = placements.TryGetValue(WaveMenuCommand.TogglePlayback, out var play) ? play.Group : -1;
+        var ordered = All
+            .Select((item, index) => (item, index))
+            .OrderBy(pair => SortKey(pair.item, placements, playbackGroup, pair.index))
+            .Select(pair => pair.item)
+            .ToArray();
+        return new MenuLayout(placements, ordered);
+    }
+
+    private static void Walk(
+        IReadOnlyList<WaveMenuEntry> entries,
+        int group,
+        ref int section,
+        ref int order,
+        Dictionary<WaveMenuCommand, MenuPlacement> placements)
+    {
+        foreach (var entry in entries)
+        {
+            switch (entry)
+            {
+                case WaveMenuSeparatorEntry:
+                    section++;
+                    break;
+                case WaveMenuItemEntry { Children.Count: > 0 } sub:
+                    section++;
+                    Walk(sub.Children, group, ref section, ref order, placements);
+                    section++;
+                    break;
+                case WaveMenuItemEntry { Command: { } command }:
+                    placements.TryAdd(command, new MenuPlacement(group, section, order++));
+                    break;
+            }
+        }
+    }
+
+    private static (int Group, int Order, int CatalogIndex) SortKey(
+        Item item,
+        IReadOnlyDictionary<WaveMenuCommand, MenuPlacement> placements,
+        int playbackGroup,
+        int catalogIndex)
+    {
+        if (!placements.TryGetValue(item.MenuCommand, out var placement))
+        {
+            return (int.MaxValue, int.MaxValue, catalogIndex);
+        }
+
+        return (GroupRank(placement.Group, playbackGroup), placement.Order, catalogIndex);
+    }
+
+    /// <summary>再生カテゴリだけツールバー先頭へ。他はメニューのカテゴリ順。</summary>
+    private static int GroupRank(int group, int playbackGroup) =>
+        group == playbackGroup ? -1 : group;
 
     private static readonly Dictionary<string, Item> ItemsByName =
         All.ToDictionary(
@@ -317,16 +374,23 @@ internal static class TransportToolbarCatalog
         return false;
     }
 
+    /// <summary>グループ境界・グループ内区切りのどちらか。</summary>
     public static bool IsSeparator(string? entry) =>
+        IsGroupSeparator(entry) || IsSectionSeparator(entry);
+
+    public static bool IsGroupSeparator(string? entry) =>
         string.Equals(entry?.Trim(), SeparatorToken, StringComparison.Ordinal);
 
-    /// <summary>カタログ順＋既定表示コマンドのみ＋グループ境界。</summary>
+    public static bool IsSectionSeparator(string? entry) =>
+        string.Equals(entry?.Trim(), SectionSeparatorToken, StringComparison.Ordinal);
+
+    /// <summary>既定は全コマンドをメニュー順＋境界で並べる。</summary>
     public static string[] CreateDefaultLayout() =>
-        BuildAutoLayout(
-            All.Where(item => item.InDefaultLayout).Select(item => item.Command.ToString()));
+        BuildAutoLayout(AllCommands.Select(command => command.ToString()));
 
     /// <summary>
-    /// 表示コマンドをカタログ順に並べ、グループが変わるところへセパレータを入れる（おまかせ配置）。
+    /// 表示コマンドをメニュー順に並べ、カテゴリが変わるところへ <see cref="SeparatorToken"/>、
+    /// カテゴリ内でセパレータ／サブメニューをまたぐところへ <see cref="SectionSeparatorToken"/> を入れる（おまかせ配置）。
     /// </summary>
     public static string[] BuildAutoLayout(IEnumerable<string>? shownCommands)
     {
@@ -350,8 +414,8 @@ internal static class TransportToolbarCatalog
         }
 
         var result = new List<string>();
-        string? currentGroup = null;
-        foreach (var item in All)
+        MenuPlacement? previous = null;
+        foreach (var item in Ordered)
         {
             var name = item.Command.ToString();
             if (!shown.Contains(name))
@@ -359,16 +423,20 @@ internal static class TransportToolbarCatalog
                 continue;
             }
 
-            var group = item.GroupTitle();
-            if (currentGroup is not null
-                && !string.Equals(currentGroup, group, StringComparison.Ordinal)
-                && result.Count > 0
-                && !IsSeparator(result[^1]))
+            var placement = PlacementOf(item) ?? new MenuPlacement(int.MaxValue, 0, 0);
+            if (previous is { } prev)
             {
-                result.Add(SeparatorToken);
+                if (prev.Group != placement.Group)
+                {
+                    result.Add(SeparatorToken);
+                }
+                else if (prev.Section != placement.Section)
+                {
+                    result.Add(SectionSeparatorToken);
+                }
             }
 
-            currentGroup = group;
+            previous = placement;
             result.Add(name);
         }
 
@@ -432,12 +500,23 @@ internal static class TransportToolbarCatalog
             var trimmed = raw.Trim();
             if (IsSeparator(trimmed))
             {
-                if (result.Count == 0 || IsSeparator(result[^1]))
+                var token = IsGroupSeparator(trimmed) ? SeparatorToken : SectionSeparatorToken;
+                if (result.Count == 0)
                 {
                     continue;
                 }
 
-                result.Add(SeparatorToken);
+                if (IsSeparator(result[^1]))
+                {
+                    if (token == SeparatorToken)
+                    {
+                        result[^1] = SeparatorToken;
+                    }
+
+                    continue;
+                }
+
+                result.Add(token);
                 continue;
             }
 
@@ -485,12 +564,6 @@ internal static class TransportToolbarCatalog
         if (layout is { Length: > 0 })
         {
             return IsCommandInLayout(layout, command);
-        }
-
-        // 空 Layout の既定は InDefaultLayout のみ表示。
-        if (TryGetItem(command, out var item) && !item.InDefaultLayout)
-        {
-            return false;
         }
 
         return IsCommandVisible(settings.HiddenTransportToolbarCommands, command);

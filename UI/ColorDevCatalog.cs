@@ -168,6 +168,7 @@ internal static class ColorDevCatalog
 
             ("TransportBackBrush", ColorDevGroup.Transport),
             ("TransportToolbarGroupVeilBrush", ColorDevGroup.Transport),
+            ("TransportToolbarSectionSeparatorBrush", ColorDevGroup.Transport),
             ("ProjectBarBackBrush", ColorDevGroup.Transport),
             ("TransportForeBrush", ColorDevGroup.Transport),
             ("TransportDisabledForeBrush", ColorDevGroup.Transport),

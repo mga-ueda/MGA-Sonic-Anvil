@@ -674,6 +674,14 @@ internal static class WaveformContextMenuBuilder
             WaveMenuCommand.SelectToEnd,
             "Ctrl+Shift+End",
             SingleFileOnly(m) && m.CanNavigate),
+        Cmd(
+            m.HasSelectedTabs ? UiStrings.WaveMenuCopySelectionTimeSelected : UiStrings.WaveMenuCopySelectionTime,
+            WaveMenuCommand.CopySelectionTime,
+            enabled: m.CanCopySelectionTimes),
+        Cmd(
+            m.HasSelectedTabs ? UiStrings.WaveMenuCopySelectionTimePathSelected : UiStrings.WaveMenuCopySelectionTimePath,
+            WaveMenuCommand.CopySelectionTimePath,
+            enabled: m.CanCopySelectionTimes),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuDetectSilenceSelected : UiStrings.WaveMenuDetectSilence,

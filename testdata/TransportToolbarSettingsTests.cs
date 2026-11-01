@@ -18,33 +18,144 @@ public sealed class TransportToolbarSettingsTests
         Assert.True(AppSettings.CreateDefault().ShowTransportToolbar);
         foreach (var item in TransportToolbarCatalog.All)
         {
-            Assert.Equal(
-                item.InDefaultLayout,
-                TransportToolbarCatalog.IsCommandVisible(settings, item.Command));
+            Assert.True(TransportToolbarCatalog.IsCommandVisible(settings, item.Command));
         }
     }
 
     [Fact]
-    public void BuildAutoLayout_OrdersByCatalogAndInsertsGroupSeparators()
+    public void BuildAutoLayout_OrdersByMenuWithPlaybackFirst()
     {
         var layout = TransportToolbarCatalog.BuildAutoLayout(
         [
+            nameof(TransportCommand.Delete),
             nameof(TransportCommand.Open),
             nameof(TransportCommand.TogglePlayback),
-            nameof(TransportCommand.Delete),
         ]);
         Assert.Equal(
             [
                 nameof(TransportCommand.TogglePlayback),
                 TransportToolbarCatalog.SeparatorToken,
-                nameof(TransportCommand.Delete),
-                TransportToolbarCatalog.SeparatorToken,
                 nameof(TransportCommand.Open),
+                TransportToolbarCatalog.SeparatorToken,
+                nameof(TransportCommand.Delete),
             ],
             layout);
         Assert.Equal(
             TransportToolbarCatalog.CreateDefaultLayout(),
             TransportToolbarCatalog.BuildAutoLayout(TransportToolbarCatalog.CreateDefaultLayout()));
+    }
+
+    [Fact]
+    public void Catalog_EveryCommandMapsToOneMenuItem()
+    {
+        var missing = TransportToolbarCatalog.All
+            .Where(item => TransportToolbarCatalog.PlacementOf(item) is null)
+            .Select(item => $"{item.Command}→{item.MenuCommand}")
+            .ToArray();
+        Assert.True(missing.Length == 0, "上部メニューに無い: " + string.Join(", ", missing));
+
+        var duplicated = TransportToolbarCatalog.All
+            .GroupBy(item => item.MenuCommand)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key.ToString())
+            .ToArray();
+        Assert.True(duplicated.Length == 0, "同じメニュー項目に複数ボタン: " + string.Join(", ", duplicated));
+    }
+
+    [Fact]
+    public void Ordered_FollowsMenuCategoriesAndOrder()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            var menu = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel(), includeHere: false)
+                .OfType<WaveMenuItemEntry>()
+                .ToArray();
+            string CategoryOf(WaveMenuCommand command) => UiStrings.WithoutAccessKey(
+                menu.First(category => WaveformContextMenuBuilder.Commands(category.Children ?? []).Contains(command)).Header);
+
+            var ordered = TransportToolbarCatalog.OrderedWithGroupTitles();
+            foreach (var (item, title) in ordered)
+            {
+                Assert.Equal(CategoryOf(item.MenuCommand), title);
+            }
+
+            // 再生カテゴリが先頭、以降はメニューのカテゴリ順で、各カテゴリは一続き。
+            var titles = ordered.Select(pair => pair.GroupTitle).Distinct().ToArray();
+            Assert.Equal(UiStrings.WithoutAccessKey(UiStrings.WaveMenuCatPlayback), titles[0]);
+            var menuTitles = menu.Select(category => UiStrings.WithoutAccessKey(category.Header))
+                .Where(title => titles.Contains(title) && title != titles[0])
+                .ToArray();
+            Assert.Equal(menuTitles, titles.Skip(1));
+            Assert.Equal(titles.Length, ordered.Select(pair => pair.GroupTitle)
+                .Where((title, i) => i == 0 || title != ordered[i - 1].GroupTitle).Count());
+
+            var menuOrder = WaveformContextMenuBuilder.Commands(menu).ToList();
+            foreach (var group in ordered.GroupBy(pair => pair.GroupTitle))
+            {
+                var indexes = group.Select(pair => menuOrder.IndexOf(pair.Item.MenuCommand)).ToArray();
+                Assert.Equal(indexes.Order(), indexes);
+            }
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
+    public void BuildAutoLayout_SplitsSectionsLikeMenuSeparatorsAndSubmenus()
+    {
+        var layout = TransportToolbarCatalog.BuildAutoLayout(
+        [
+            nameof(TransportCommand.TogglePlayback),
+            nameof(TransportCommand.LoopPlay),
+            nameof(TransportCommand.GoToStart),
+            nameof(TransportCommand.GoToEnd),
+            nameof(TransportCommand.Undo),
+            nameof(TransportCommand.Redo),
+            nameof(TransportCommand.Cut),
+        ]);
+        Assert.Equal(
+            [
+                // 再生：同じかたまり → シーク サブメニュー
+                nameof(TransportCommand.TogglePlayback),
+                nameof(TransportCommand.LoopPlay),
+                TransportToolbarCatalog.SectionSeparatorToken,
+                nameof(TransportCommand.GoToStart),
+                nameof(TransportCommand.GoToEnd),
+                TransportToolbarCatalog.SeparatorToken,
+                // 編集：元に戻す系 → セパレータ → クリップボード系
+                nameof(TransportCommand.Undo),
+                nameof(TransportCommand.Redo),
+                TransportToolbarCatalog.SectionSeparatorToken,
+                nameof(TransportCommand.Cut),
+            ],
+            layout);
+    }
+
+    [Fact]
+    public void NormalizeLayout_KeepsSectionSeparatorAndPrefersGroupBoundary()
+    {
+        var normalized = TransportToolbarCatalog.NormalizeLayout(
+        [
+            "TogglePlayback",
+            TransportToolbarCatalog.SectionSeparatorToken,
+            "GoToStart",
+            TransportToolbarCatalog.SectionSeparatorToken,
+            TransportToolbarCatalog.SeparatorToken,
+            "Open",
+        ]);
+        Assert.Equal(
+            [
+                "TogglePlayback",
+                TransportToolbarCatalog.SectionSeparatorToken,
+                "GoToStart",
+                TransportToolbarCatalog.SeparatorToken,
+                "Open",
+            ],
+            normalized);
     }
 
     [Fact]
@@ -115,27 +226,18 @@ public sealed class TransportToolbarSettingsTests
     }
 
     [Fact]
-    public void CreateDefaultLayout_InsertsGroupSeparators()
+    public void CreateDefaultLayout_ContainsEveryCommandWithSeparators()
     {
         var layout = TransportToolbarCatalog.CreateDefaultLayout();
         Assert.Contains(TransportToolbarCatalog.SeparatorToken, layout);
+        Assert.Contains(TransportToolbarCatalog.SectionSeparatorToken, layout);
         Assert.Equal("TogglePlayback", layout[0]);
-        Assert.False(TransportToolbarCatalog.IsSeparator(layout[0]));
         Assert.False(TransportToolbarCatalog.IsSeparator(layout[^1]));
-        // 既定掲載があるカテゴリ境界（FMT は既定なし、VIEW/OTHER は同一見出し）
-        Assert.True(layout.Count(TransportToolbarCatalog.IsSeparator) >= 4);
-        Assert.DoesNotContain("Stop", layout);
-        Assert.DoesNotContain("Undo", layout);
-        Assert.DoesNotContain("LoopPlay", layout);
         // Stop は再生トグルで兼ねるためカタログ非掲載
-        Assert.Contains("TogglePlayback", layout);
-        Assert.Contains("ExportWave", layout);
-        Assert.Contains("CloseTab", layout);
-        Assert.Contains("ToggleMinimalChrome", layout);
-        Assert.Contains("ToggleLibraryMaximize", layout);
-        Assert.Contains("MaximizeWaveform", layout);
-        Assert.Contains("ToggleAnalyzerMaximize", layout);
-        Assert.Contains("OpenSettings", layout);
+        Assert.DoesNotContain("Stop", layout);
+        Assert.Equal(
+            TransportToolbarCatalog.AllCommands.Select(command => command.ToString()).Order(),
+            layout.Where(entry => !TransportToolbarCatalog.IsSeparator(entry)).Order());
     }
 
     [Fact]
@@ -171,7 +273,6 @@ public sealed class TransportToolbarSettingsTests
         Assert.DoesNotContain(TransportCommand.TileVertical, TransportToolbarCatalog.AllCommands);
         Assert.DoesNotContain(TransportCommand.TileGrid, TransportToolbarCatalog.AllCommands);
         Assert.True(TransportToolbarCatalog.TryGetItem(TransportCommand.Cut, out var cut));
-        Assert.False(cut.InDefaultLayout);
         Assert.Equal(TransportIcon.Cut, cut.Icon);
     }
 

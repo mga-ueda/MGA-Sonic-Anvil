@@ -1052,17 +1052,6 @@ internal static partial class UiStrings
         "Wave|*.wav|MP3|*.mp3",
         "Wave|*.wav|MP3|*.mp3");
 
-    // カスタマイズ一覧のカテゴリ見出し（Obsidian「メニュー vs ツールバー」と揃える）
-    public static string LabelTransportGroup => Get("再生・移動", "Playback / navigation");
-    public static string LabelEditGroup => Get("編集", "Edit");
-    public static string LabelFileGroup => Get("ファイル・書き出し", "File / export");
-    public static string LabelMarkerGroup => Get(
-        "タイムライン（マーカー・ループ・リージョン）",
-        "Timeline (markers / loop / regions)");
-    public static string LabelFormatGroup => Get("変換（フォーマット）", "Convert (format)");
-    public static string LabelViewGroup => Get("表示・その他", "View / other");
-    public static string LabelOtherGroup => Get("表示・その他", "View / other");
-
     public static string TooltipRecord => Get("録音 (Ctrl+R)", "Record (Ctrl+R)");
     public static string TooltipPlay => Get("再生 / 停止 (Space)", "Play / stop (Space)");
     public static string TooltipGoToStart => Get("先頭へ (Ctrl+Home)", "Go to start (Ctrl+Home)");
