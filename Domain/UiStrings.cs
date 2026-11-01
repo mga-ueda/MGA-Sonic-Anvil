@@ -197,6 +197,39 @@ internal static partial class UiStrings
     public static string LabelSettingsTabEditing => Get("編集", "Editing");
     public static string LabelSettingsTabExport => Get("書き出し・パス", "Export · Paths");
     public static string LabelSettingsTabWwise => Get("Wwise", "Wwise");
+    public static string LabelSettingsTabVst => Get("VST", "VST");
+    public static string LabelVstInsertRack => Get("Insert", "Insert");
+    public static string LabelVstInsertEmpty => Get("+", "+");
+    public static string LabelVstInsertBypass => Get("バイパス", "Bypass");
+    public static string LabelVstInsertRemove => Get("削除", "Remove");
+    public static string LabelVstInsertOpenEditor => Get("エディタを開く", "Open editor");
+    public static string LabelVstInsertPickPlugin => Get("プラグインを選ぶ", "Choose plug-in");
+    public static string LabelVstInsertNoneRecognized => Get(
+        "認識済みプラグインがありません（設定 → VST）",
+        "No recognized plug-ins (Settings → VST)");
+    public static string LabelVstInsertVendorUnknown => Get("（メーカー不明）", "(Unknown vendor)");
+    public static string TooltipVstInsertSlot => Get(
+        "クリックでプラグイン選択（メーカーにマウスを乗せると開く） / Ctrl+クリックでバイパス",
+        "Click to choose plug-in (hover vendor to open) / Ctrl+click to bypass");
+    /// <summary>カテゴリ表記。VST の Fx|Reverb は内部区切りで、UI では "Fx / Reverb" と出す。</summary>
+    public static string TipVstCategoryPipe => Get(
+        "「Fx|Reverb」などは VST の種別タグです。メニューでは「Fx / Reverb」と表示します。",
+        "Tags like Fx|Reverb are VST category labels; the menu shows them as Fx / Reverb.");
+    public static string TooltipVstInsertSlotFilled => Get(
+        "クリックで UI / 右クリックでメニュー / Ctrl+クリックでバイパス",
+        "Click for UI / right-click for menu / Ctrl+click to bypass");
+    public static string ErrorVstInsertLoadFailed => Get(
+        "プラグインを読み込めませんでした。",
+        "Could not load the plug-in.");
+    public static string ErrorVstInsertAltiverbNeedsExeLaunch => Get(
+        "Altiverb など一部のプラグインは、Cursor / Visual Studio のデバッガ付きプロセスでは読み込めません（iLok）。\n起動構成「MGA Sonic Anvil (デバッガなし)」で F5 すると、デバッガ無しの exe が起動します。",
+        "Some plug-ins (e.g. Altiverb / iLok) cannot load in a Cursor/Visual Studio debugged process.\nUse launch config “MGA Sonic Anvil (no debugger)” — F5 starts the exe without a debugger.");
+    public static string ErrorVstInsertEditorFailed => Get(
+        "プラグインの UI を開けませんでした。音声処理は使える場合があります。",
+        "Could not open the plug-in UI. Audio processing may still work.");
+    public static string LabelVstInsertWaveShell => Get(
+        "Waves（Shell 展開）",
+        "Waves (Shell expanded)");
     public static string LabelUiColorSettings => Get("色設定", "Color settings");
     public static string HintUiColorSettings => Get(
         "波形や UI の配色を編集します。開いたままメイン画面を見ながら変更できます。",
@@ -416,6 +449,104 @@ internal static partial class UiStrings
     public static string InfoLibraryCatalogCleared => Get(
         "ライブラリ索引を消去しました。",
         "Cleared the library catalog.");
+    public static string LabelVstUseSteinbergHostCache => Get(
+        "Cubase / Nuendo のプラグインキャッシュを使う（検索フォルダの追加は不要）",
+        "Use Cubase / Nuendo plug-in cache (no need to add search folders)");
+    public static string LabelVst3SearchPaths => Get(
+        "VST3 検索フォルダ（空なら既定のフォルダ）",
+        "VST3 search folders (empty = default folders)");
+    public static string TitleVst3SearchPathAdd => Get("VST3 フォルダを追加", "Add VST3 folder");
+    public static string LabelVstPluginList => Get("見つかったプラグイン", "Discovered plug-ins");
+    public static string HintVstInstrumentsAutoExcluded => Get(
+        "Instrument 系（シンセ・サンプラーなど）はスキャン時に自動で「認識しない」側へ振り分けます。",
+        "Instrument plug-ins (synths, samplers, and so on) are moved to \"Not recognized\" automatically on scan.");
+    public static string ButtonVstScan => Get("スキャン", "Scan");
+    public static string ButtonVstScanning => Get("スキャン中…", "Scanning…");
+    public static string ButtonVstClear => Get("一覧をクリア", "Clear list");
+    public static string ConfirmVstClear => Get(
+        "VST プラグイン一覧を消去しますか？ 再度スキャンするまで一覧は空になります。",
+        "Clear the VST plug-in list? The list stays empty until you scan again.");
+    public static string InfoVstScanned(int count, int failed, int instruments = 0)
+    {
+        var lines = new List<string>
+        {
+            Format(
+                "{0} 件の VST3 プラグインが見つかりました。",
+                "Found {0} VST3 plug-in(s).",
+                count),
+        };
+        if (failed > 0)
+        {
+            lines.Add(Format(
+                "認識に失敗した {0} 件は「認識しない」側へ移しました。",
+                "{0} plug-in(s) could not be recognized and were moved to \"Not recognized\".",
+                failed));
+        }
+
+        if (instruments > 0)
+        {
+            lines.Add(Format(
+                "楽器（Instrument）{0} 件は本アプリでは使わないため「認識しない」側へ移しました。",
+                "{0} instrument plug-in(s) were moved to \"Not recognized\" because this app does not use them.",
+                instruments));
+        }
+
+        return string.Join("\n", lines);
+    }
+    public static string LabelVstExcluded(int count) => Format("認識しない（{0}）", "Not recognized ({0})", count);
+    public static string LabelVstRecognized(int count) => Format("認識する（{0}）", "Recognized ({0})", count);
+    public static string ButtonVstPluginAdd => Get("追加 >>", "Add >>");
+    public static string ButtonVstPluginRemove => Get("<< 除外", "<< Exclude");
+    public static string ColumnVstName => Get("名前", "Name");
+    public static string ColumnVstVendor => Get("ブランド", "Brand");
+    public static string ColumnVstCategory => Get("種別", "Category");
+    public static string ColumnVstStatus => Get("状態", "Status");
+    public static string LabelVstStatusManual => Get("手動", "Manual");
+    public static string LabelVstStatusFailed => Get("認識失敗", "Failed");
+    public static string LabelVstStatusInstrument => Get("楽器", "Instrument");
+    public static string LabelVstFailureReason(string? code) => code switch
+    {
+        "missing" => Get("ファイルが見つかりません。", "The file was not found."),
+        "empty-bundle" => Get(
+            "バンドル内にバイナリも moduleinfo.json もありません。",
+            "The bundle contains neither a binary nor moduleinfo.json."),
+        "moduleinfo-corrupt" => Get(
+            "moduleinfo.json が壊れていて、バイナリもありません。",
+            "moduleinfo.json is corrupt and no binary was found."),
+        "unreadable" => Get("フォルダまたはファイルを読めません。", "The folder or file could not be read."),
+        null or "" => string.Empty,
+        _ => code,
+    };
+    public static string TooltipVstManual => Get(
+        "手動で「認識しない」にしたプラグインです。「追加 >>」で戻せます。",
+        "Excluded manually. Use \"Add >>\" to recognize it again.");
+    public static string TooltipVstInstrument => Get(
+        "楽器（Instrument）プラグインのため、本アプリでは認識しません。「追加 >>」で強制的に認識させることもできます（次のスキャンで再判定）。",
+        "Instrument plug-ins are excluded in this app. You can force recognition with \"Add >>\" (re-checked on the next scan).");
+    public static string TooltipVstFailed(string reason) => Format(
+        "認識に失敗しました: {0}\n「追加 >>」で強制的に認識させることもできます（次のスキャンで再判定）。",
+        "Recognition failed: {0}\nYou can force it with \"Add >>\" (re-checked on the next scan).",
+        reason);
+    public static string InfoVstCleared => Get(
+        "VST プラグイン一覧を消去しました。",
+        "Cleared the VST plug-in list.");
+    public static string ErrorVstScanFailed(string detail) => Format(
+        "VST3 のスキャンに失敗しました。\n{0}",
+        "VST3 scan failed.\n{0}",
+        detail);
+    public static string ErrorVstListSaveFailed => Get(
+        "VST プラグイン一覧を保存できませんでした。",
+        "Could not save the VST plug-in list.");
+    public static string LabelVstNotScanned => Get(
+        "未スキャン（「スキャン」を押すと一覧を取得します）",
+        "Not scanned yet (press Scan to build the list)");
+    public static string LabelVstScanStatus(int count, int recognized, int failed, DateTimeOffset scannedAtUtc) => Format(
+        "{0} 件（認識 {1} ・ 認識失敗 {2}） ・ 最終スキャン {3}",
+        "{0} plug-in(s) (recognized {1} · failed {2}) · Last scanned {3}",
+        count,
+        recognized,
+        failed,
+        scannedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture));
     public static string LabelSettingsInput => Get("録音", "Recording");
     public static string LabelSettingsOutput => Get("再生", "Playback");
     public static string LabelSpeaker => Get("スピーカー", "Speakers");
@@ -1000,6 +1131,9 @@ internal static partial class UiStrings
         "All selected files are already MP3.");
     public static string OverlaySampleRateConvert => Get("サンプリングレート変換", "Sample rate conversion");
     public static string OverlayPitchShift => Get("ピッチシフト", "Pitch shift");
+    public static string OverlayVstScan => Get("VST プラグインをスキャンしています", "Scanning VST plug-ins");
+    public static string OverlayVstScanProgress(int current, int total) =>
+        Get($"VST プラグインをスキャンしています（{current}/{total}）", $"Scanning VST plug-ins ({current}/{total})");
     public static string OverlayPasteHistory => Get("編集履歴を貼り付けています", "Pasting edit history");
     public static string OverlayApplySelected => Get("選択したファイルへ適用しています", "Applying to the selected files");
     public static string OverlayMerge => Get("タブをバウンスしています", "Bouncing tabs");
