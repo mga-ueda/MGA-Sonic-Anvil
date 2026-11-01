@@ -31,6 +31,13 @@ internal enum LayoutTransportToolbarDock
     Bottom,
 }
 
+/// <summary>ツールバーのボタン列の横位置。</summary>
+internal enum LayoutTransportToolbarAlign
+{
+    Left,
+    Center,
+}
+
 /// <summary>F9–F12 各スロットの表示内容。ワークスペース項目は持たない。</summary>
 internal sealed class WindowLayoutPreset
 {
@@ -69,6 +76,9 @@ internal sealed class WindowLayoutPreset
     /// Top＝メニュー直下、Bottom＝ステータスバー上。スロット（F9–F12）ごとに独立。
     /// </summary>
     public string TransportToolbarDock { get; set; } = nameof(LayoutTransportToolbarDock.Top);
+
+    /// <summary>Left / Center。スロット（F9–F12）ごとに独立。</summary>
+    public string TransportToolbarAlign { get; set; } = nameof(LayoutTransportToolbarAlign.Center);
 
     /// <summary>右列ピークレベルメーター。ゴニオの表示は ShowAnalyzerArea。</summary>
     public bool ShowLevelMeter { get; set; } = true;
@@ -110,6 +120,14 @@ internal sealed class WindowLayoutPreset
     public void ApplyTransportToolbarDock(LayoutTransportToolbarDock dock) =>
         TransportToolbarDock = dock == LayoutTransportToolbarDock.Bottom ? "Bottom" : "Top";
 
+    public LayoutTransportToolbarAlign ResolvedTransportToolbarAlign() =>
+        string.Equals(TransportToolbarAlign?.Trim(), "Left", StringComparison.OrdinalIgnoreCase)
+            ? LayoutTransportToolbarAlign.Left
+            : LayoutTransportToolbarAlign.Center;
+
+    public void ApplyTransportToolbarAlign(LayoutTransportToolbarAlign align) =>
+        TransportToolbarAlign = align == LayoutTransportToolbarAlign.Left ? "Left" : "Center";
+
     /// <summary>
     /// 別スロットへ切替えたときの全画面初期値。
     /// Toggle はセッション初回のみ（呼び出し側が記憶を持たないとき）。
@@ -132,6 +150,7 @@ internal sealed class WindowLayoutPreset
             ShowAnalyzerArea = ShowAnalyzerArea,
             AnalyzerDock = AnalyzerDock,
             TransportToolbarDock = TransportToolbarDock,
+            TransportToolbarAlign = TransportToolbarAlign,
             ShowLevelMeter = ShowLevelMeter,
             ShowStatusBar = ShowStatusBar,
         };

@@ -10,7 +10,7 @@
   <!-- グループは丸みベール単位。幅が足りないときはその単位で折り返す。 -->
   <WrapPanel x:Name="ItemsHost"
              Orientation="Horizontal"
-             HorizontalAlignment="Left"
+             HorizontalAlignment="Center"
              VerticalAlignment="Top"
              Margin="8,2,8,2" />
 </UserControl>
