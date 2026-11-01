@@ -125,6 +125,8 @@
     <SolidColorBrush x:Key="ProjectBarBackBrush" Color="#FF1A1B26" />
     <SolidColorBrush x:Key="OverviewOutsideFillBrush" Color="#98000000" />
     <SolidColorBrush x:Key="TransportBackBrush" Color="#FF1A1B26" />
+    <!-- ツールバーのグループ区切り。ChromeBorder より明るく、色設定から変更可。 -->
+    <SolidColorBrush x:Key="TransportToolbarSeparatorBrush" Color="#FF787880" />
     <SolidColorBrush x:Key="TransportForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="RecordLatchForeBrush" Color="#FFE24B4A" />
     <SolidColorBrush x:Key="TransportDisabledForeBrush" Color="#FF5B5B5B" />

@@ -81,6 +81,7 @@ internal static class UiThemePalette
         "ProjectBarBackBrush",
         "OverviewOutsideFillBrush",
         "TransportBackBrush",
+        "TransportToolbarSeparatorBrush",
         "TransportForeBrush",
         "TransportDisabledForeBrush",
         "TransportHoverBackBrush",
