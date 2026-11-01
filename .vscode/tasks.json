@@ -3,24 +3,29 @@
   "tasks": [
     {
       "label": "build",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/MgaSonicAnvil.sln",
-        "-c",
-        "Debug",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary;ForceNoAlign"
-      ],
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}/.vscode/build-debug.ps1\"",
       "group": {
         "kind": "build",
         "isDefault": true
       },
       "presentation": {
-        "reveal": "silent"
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
       },
-      "problemMatcher": "$msCompile"
+      "problemMatcher": []
+    },
+    {
+      "label": "f5-handoff-exe",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}/.vscode/f5-handoff.ps1\"",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
     },
     {
       "label": "publish",
@@ -42,7 +47,7 @@
       "presentation": {
         "reveal": "always"
       },
-      "problemMatcher": "$msCompile"
+      "problemMatcher": []
     },
     {
       "label": "Excel: モード別能力表を開く",

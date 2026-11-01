@@ -2,7 +2,22 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "MGA Sonic Anvil",
+      "name": "MGA Sonic Anvil (デバッガなし)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "f5-handoff-exe",
+      "program": "${workspaceFolder}/bin/Debug/net8.0-windows10.0.17763.0/MGA Sonic Anvil.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/bin/Debug/net8.0-windows10.0.17763.0",
+      "console": "internalConsole",
+      "stopAtEntry": false,
+      "noDebug": true,
+      "env": {
+        "MGA_F5_HANDOFF_EXE": "1"
+      }
+    },
+    {
+      "name": "MGA Sonic Anvil (デバッガ付き)",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
