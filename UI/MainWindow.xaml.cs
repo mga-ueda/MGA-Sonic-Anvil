@@ -886,7 +886,7 @@ public partial class MainWindow : Window
         Transport.ApplyLocalizedText();
         Transport.SetMaximizeMode(_waveformMaximizeMode, _activeLayoutSlot);
         RefreshCrossfadeLocalizedText();
-        SpeakerMenuLabel.Text = UiStrings.LabelStatusSpeaker;
+        SpeakerMenuIcon.ApplyLocalizedText();
         RefreshSpeakerMenu();
         if (_waapiToggle is not null)
         {
