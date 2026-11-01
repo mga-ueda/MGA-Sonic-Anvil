@@ -191,6 +191,7 @@ public partial class MainWindow : Window
         LibraryBrowser.SessionPlayRequested += LibraryBrowser_SessionPlayRequested;
         LibraryBrowser.PlaylistVisualEnded += LibraryBrowser_PlaylistVisualEnded;
         LibraryBrowser.PlaylistVisualOpened += LibraryBrowser_PlaylistVisualOpened;
+        LibraryBrowser.PlaylistVisualOpenFailed += LibraryBrowser_PlaylistVisualOpenFailed;
         LibraryBrowser.PlaylistVisualStateChanged += (_, _) => SyncPlaylistVideoChromeFade();
         LibraryBrowser.VisibleColumnPresetsChanged += LibraryBrowser_VisibleColumnPresetsChanged;
         LibraryBrowser.GroupChanged += LibraryBrowser_GroupChanged;

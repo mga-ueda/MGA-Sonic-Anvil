@@ -7822,6 +7822,27 @@ public partial class MainWindow
         return true;
     }
 
+    private async void LibraryBrowser_PlaylistVisualOpenFailed(object? sender, string message)
+    {
+        // 引数起動ではクローク中に開く。クローク中の ShowDialog は操作できないので、出てから知らせる。
+        for (var i = 0; i < 100 && WindowPaintReveal.IsPending(this); i++)
+        {
+            await Task.Delay(100).ConfigureAwait(true);
+        }
+
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        OwnerCenteredMessageBox.Show(
+            this,
+            message,
+            UiStrings.AppName,
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
     private void LibraryBrowser_PlaylistVisualOpened(object? sender, TimeSpan duration)
     {
         if (_videoLaunchPlacement

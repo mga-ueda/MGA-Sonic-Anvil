@@ -337,7 +337,7 @@
           <li>
             <p><strong>ムービー</strong> …… 再生用プロキシと ffmpeg の設定です。</p>
             <ul>
-              <li>FFmpeg パス（利用推奨。プロキシ生成に使う）</li>
+              <li>FFmpeg パス（利用推奨。プロキシ生成と、Windows で読めない動画のプロキシなし再生に使う）</li>
               <li>プロキシを自動生成しない（既定オフ。F8／関連付け・引数起動ではオフでも自動生成しません。自動生成は F9／F10 の本再生時だけ）</li>
               <li>プレイリスト／本再生／ミニでは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> で強制生成できます（設定や F8 抑止を無視。複数選択は順に一括。現行のプロキシは再利用）</li>
               <li>未使用プロキシの保存日数（動画ごと。選択肢 1／7／14／30 日。既定 7。起動だけでは未使用はリセットされない。再生・波形・サムネ参照も「使用」）</li>
@@ -436,7 +436,8 @@
             <p>設定の<span class="ui">プレイリストに載せる書類・動画</span>でオンにした種類がリストに載ります（PDF / MOV / MP4 / AVI / MKV / WebM / MPG。PDF 既定オン、動画既定オフ。AVI / MKV / WebM / MPG は ffmpeg があるときだけ）。</p>
             <ul>
               <li>動画は音楽と同じく連続再生と単独再生ができます。音声はメーター／スペクトラム／ラウドネスへ通し、波形も出します。</li>
-              <li><strong>プロキシ</strong> …… MOV / MP4 / AVI はコーデックを調べ、MJPEG / Photo JPEG ならそのまま。それ以外（ProRes など）と MKV / WebM / MPG は ffmpeg で再生用プロキシ（元と同じ fps の MJPEG AVI）を作ってから再生します。生成中はすりガラス（Esc で中断）。ffmpeg は同梱せず、設定の「書き出し・パス」を使います。空欄や無効ならプロキシなしで原ファイルを試します（エラーは出しません）。</li>
+              <li><strong>プロキシ</strong> …… MOV / MP4 / AVI はコーデックを調べ、MJPEG / Photo JPEG ならそのまま。それ以外（ProRes など）と MKV / WebM / MPG は ffmpeg で再生用プロキシ（元と同じ fps の MJPEG AVI）を作ってから再生します。生成中はすりガラス（Esc で中断）。ffmpeg は同梱せず、設定の「書き出し・パス」を使います。空欄や無効ならプロキシなしで原ファイルを試します。</li>
+              <li><strong>プロキシなしの再生</strong> …… プロキシが無いとき（関連付け／引数起動・<kbd>F8</kbd> ミニなど）は原ファイルをそのまま読みます。まず Windows（Media Foundation）の GPU デコードで読み、4K などは 1920×1080 に収まる大きさへ GPU で縮めます（iPhone の縦撮りは縦のまま）。Windows で読めない形式（ProRes など）や GPU で読めない大きな動画は、設定の ffmpeg.exe があれば ffmpeg で読みます（ファイルは作りません。シークはやや遅め）。それでも読めないときは、理由（映像形式、必要な Microsoft Store の拡張機能、ffmpeg の設定やエラー）をダイアログで知らせます（同じファイルは 1 回だけ）。</li>
               <li><strong>いつプロキシを作るか</strong> …… 自動生成は F9／F10 の本再生時だけ。関連付け／引数起動と <kbd>F8</kbd> ミニでは自動では作りません。<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> ならプレイリスト／本再生／ミニで強制生成できます（複数選択は順に一括。進捗は n / m。現行のプロキシがあるものは再利用し、全部そろっていればその旨を出して終わり）。関連付け／引数では前面 UI なしで起動します。</li>
               <li><strong>保存</strong> …… 未使用のまま設定の日数を超えると消します（既定 7 日。起動だけでは未使用はリセットされない。再生・波形・サムネも「使用」）。</li>
               <li>
@@ -1708,7 +1709,7 @@
         <li><strong>Wwise®</strong>／<strong>Audiokinetic®</strong> は Audiokinetic Inc. の商標です。本ツールは非公式です。WAAPI には有効な Wwise ライセンスが必要です。</li>
         <li>本アプリは <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/LICENSE">MIT License</a> で公開しています。</li>
         <li><strong>LAME</strong> は LAME project の名称です。このアプリには入っていません。設定で指定した <code>lame.exe</code> を呼び出すだけです。入手とライセンスの確認は利用者側です。</li>
-        <li><strong>FFmpeg</strong> は FFmpeg プロジェクトの名称です。このアプリには入っていません。設定で指定した <code>ffmpeg.exe</code> を呼び出すだけです。空欄や無効なら動画プロキシは作りません。入手とライセンスの確認は利用者側です。</li>
+        <li><strong>FFmpeg</strong> は FFmpeg プロジェクトの名称です。このアプリには入っていません。設定で指定した <code>ffmpeg.exe</code> を呼び出すだけです。空欄や無効なら動画プロキシは作らず、Windows で読めない動画は再生できません。入手とライセンスの確認は利用者側です。</li>
         <li><strong>Signalsmith Stretch</strong>（Signalsmith Audio、MIT）はピッチ変更に同梱しています。MIT 全文は <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にあります。</li>
         <li><strong>EffeTune</strong>（Copyright © 2025–2026 Yoshiyuki Kobayashi、MIT）の Rhythm Analyzer DSP を、BPM／ビート解析に利用します（モニター列の BPM がオンのとき）。画面上のテンポ数値は、EffeTune が返す半／倍テンポの候補値ではなく、検出した拍の間隔（ミリ秒）から <code>60000 ÷ 間隔</code> で再計算した値です。オン時のクリックも同じ拍タイミングに合わせます。コードと学習済み重みは MIT のもとで同梱し、学習用の音声データそのものは同梱しません。MIT 全文と学習データ由来の帰属（Slakh2100-redux／Groove MIDI など CC BY 4.0、および T48M 学習セット名）は同梱およびリポジトリの <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>（メニューの<span class="ui">その他</span> → <span class="ui">ライセンス</span>）にあります。<span class="ui">バージョン</span>の <span class="ui">EffeTune</span> は上流 GitHub を開きます。上流プロジェクトは <a href="https://github.com/Frieve-A/effetune">Frieve-A/effetune</a> です。</li>
         <li><strong>WinBlur</strong>（Copyright © 2022 Pronner、MIT）の Acrylic（DWM すりガラス）実装方針を、ダイアログ・メニュー・履歴などの表示に利用しています。MIT 全文は同梱およびリポジトリの <a href="https://github.com/mga-ueda/MGA-Sonic-Anvil/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> にあります。<span class="ui">バージョン</span>の <span class="ui">WinBlur</span> は上流 GitHub を開きます。上流は <a href="https://github.com/xauuzd/WinBlur">xauuzd/WinBlur</a> です。</li>
