@@ -114,8 +114,15 @@ internal sealed class AppSettings
 
     /// <summary>
     /// ツールバーで隠すコマンド名（<c>TransportCommand</c> の名前）。空は全表示。
+    /// <see cref="TransportToolbarLayout"/> があるときはそこから同期する互換フィールド。
     /// </summary>
     public string[] HiddenTransportToolbarCommands { get; set; } = [];
+
+    /// <summary>
+    /// ツールバーの並び。コマンド名と <c>|</c>（セパレータ）。空は既定（カタログ順＋旧グループ境界）。
+    /// ここに無いコマンドは非表示。
+    /// </summary>
+    public string[] TransportToolbarLayout { get; set; } = [];
 
     /// <summary>F9 レイアウトプリセット。欠落時は <see cref="WindowLayoutPreset.CreateDefault"/>。</summary>
     public WindowLayoutPreset? LayoutPresetF9 { get; set; }

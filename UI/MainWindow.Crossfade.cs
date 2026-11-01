@@ -34,6 +34,11 @@ public partial class MainWindow
             or TransportCommand.NextMarker
             or TransportCommand.NextPage
             or TransportCommand.GoToEnd
+            or TransportCommand.SeekViewLeft
+            or TransportCommand.SeekViewRight
+            or TransportCommand.LoopPlay
+            or TransportCommand.Restart
+            or TransportCommand.Preroll
             or TransportCommand.TimeZoomIn
             or TransportCommand.TimeZoomOut
             or TransportCommand.TimeZoomMax
@@ -43,13 +48,18 @@ public partial class MainWindow
             or TransportCommand.AmpZoomMax
             or TransportCommand.AmpZoomReset
             or TransportCommand.CenterPlayhead
+            or TransportCommand.ViewWaveform
             or TransportCommand.ToggleLoudnessView
+            or TransportCommand.ToggleMinimalChrome
+            or TransportCommand.MaximizeWaveform
+            or TransportCommand.AlwaysOnTop
             or TransportCommand.OpenManual
             or TransportCommand.OpenSettings
             or TransportCommand.OpenColorPanel
             or TransportCommand.Save
             or TransportCommand.SaveAs
-            or TransportCommand.SaveMp3;
+            or TransportCommand.SaveMp3
+            or TransportCommand.ExportWave;
 
     private void HookCrossfadePanel()
     {

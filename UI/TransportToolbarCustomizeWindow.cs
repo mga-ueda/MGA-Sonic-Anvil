@@ -1,0 +1,952 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using MgaSonicAnvil.Domain;
+
+namespace MgaSonicAnvil.UI;
+
+/// <summary>ツールバーの並び・境界を Excel 風に調整する専用ダイアログ。</summary>
+internal sealed class TransportToolbarCustomizeWindow : Window
+{
+    private readonly ListBox _availableList = CreateList();
+    private readonly ListBox _currentList = CreateList();
+    private readonly RoundedButton _addButton;
+    private readonly RoundedButton _removeButton;
+    private readonly RoundedButton _upButton;
+    private readonly RoundedButton _downButton;
+    private readonly RoundedButton _separatorButton;
+    private readonly TextBlock _descriptionText;
+    private readonly WrapPanel _iconStatesPanel;
+    private readonly Action<string[]>? _preview;
+    private readonly string[] _openedAt;
+    private LayoutRow? _hoveredRow;
+    private bool _ready;
+
+    public string[] SelectedLayout { get; private set; }
+
+    public static string[]? Show(
+        Window owner,
+        IEnumerable<string>? layout,
+        IEnumerable<string>? hidden,
+        Action<string[]>? preview = null)
+    {
+        var initial = TransportToolbarCatalog.ResolveLayout(layout, hidden);
+        var dialog = new TransportToolbarCustomizeWindow(initial, preview)
+        {
+            Owner = owner,
+        };
+        WindowPaintReveal.EnsureRevealedForDialog(owner);
+        return AcrylicDialogChrome.ShowDialog(dialog) == true
+            ? dialog.SelectedLayout
+            : null;
+    }
+
+    private TransportToolbarCustomizeWindow(string[] initial, Action<string[]>? preview)
+    {
+        _preview = preview;
+        _openedAt = [.. initial];
+        SelectedLayout = [.. initial];
+        Title = UiStrings.DialogTransportToolbarCustomizeTitle;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        MinWidth = 640;
+        MinHeight = 420;
+        Width = 720;
+        Height = 480;
+        Foreground = (Brush)FindResource("PrimaryForeBrush");
+        AcrylicDialogChrome.Prepare(
+            this,
+            ResizeMode.CanResizeWithGrip,
+            SizeToContent.Manual);
+
+        _addButton = CreateActionButton(
+            UiStrings.ButtonTransportToolbarAdd,
+            AddSelected,
+            new Thickness(0, 0, 0, 8));
+        _removeButton = CreateActionButton(
+            UiStrings.ButtonTransportToolbarRemove,
+            RemoveSelected,
+            new Thickness(0, 0, 0, 0));
+        _upButton = CreateActionButton(
+            UiStrings.ButtonLibraryExplorerRootUp,
+            () => MoveSelected(-1),
+            new Thickness(0, 0, 0, 8));
+        _downButton = CreateActionButton(
+            UiStrings.ButtonLibraryExplorerRootDown,
+            () => MoveSelected(1),
+            new Thickness(0, 0, 0, 0));
+        _separatorButton = CreateActionButton(
+            UiStrings.ButtonTransportToolbarInsertSeparator,
+            InsertSeparator,
+            new Thickness(0, 0, 8, 0));
+        var resetButton = CreateActionButton(
+            UiStrings.ButtonTransportToolbarResetLayout,
+            ResetToDefault,
+            new Thickness(0, 0, 0, 0));
+
+        _descriptionText = new TextBlock
+        {
+            Text = UiStrings.LabelTransportToolbarDescriptionHint,
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 11,
+            MinHeight = 36,
+            Margin = new Thickness(0, 0, 0, 10),
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        _descriptionText.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
+        _iconStatesPanel = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, -4, 0, 10),
+            // 説明の切替でリストの高さが揺れないよう、アイコンが 1 種類の項目でも行の高さを確保する。
+            MinHeight = 22,
+            Visibility = Visibility.Hidden,
+        };
+
+        _availableList.MouseDoubleClick += (_, _) => AddSelected();
+        _currentList.MouseDoubleClick += (_, e) =>
+        {
+            if (_currentList.SelectedItem is LayoutRow { IsSeparator: false, IsCategoryHeader: false })
+            {
+                RemoveSelected();
+            }
+
+            e.Handled = true;
+        };
+        WireDescriptionHover(_availableList);
+        WireDescriptionHover(_currentList);
+        _availableList.SelectionChanged += (_, _) =>
+        {
+            if (_availableList.SelectedItem is not null)
+            {
+                _currentList.SelectedItem = null;
+            }
+
+            RefreshButtons();
+            RefreshDescription();
+        };
+        _currentList.SelectionChanged += (_, _) =>
+        {
+            if (_currentList.SelectedItem is not null)
+            {
+                _availableList.SelectedItem = null;
+            }
+
+            RefreshButtons();
+            RefreshDescription();
+        };
+
+        ActionButtonLooks.ApplyClear(_addButton);
+        ActionButtonLooks.ApplyClear(_removeButton);
+        ActionButtonLooks.ApplyClear(_upButton);
+        ActionButtonLooks.ApplyClear(_downButton);
+        ActionButtonLooks.ApplyClear(_separatorButton);
+        ActionButtonLooks.ApplyClear(resetButton);
+
+        var ok = CreateDialogButton(UiStrings.ButtonOk, accept: true, accent: true, isDefault: true);
+        var cancel = CreateDialogButton(UiStrings.ButtonCancel, accept: false, isCancel: true);
+
+        var midButtons = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 12, 0),
+        };
+        midButtons.Children.Add(_addButton);
+        midButtons.Children.Add(_removeButton);
+
+        var orderButtons = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(8, 0, 0, 0),
+        };
+        orderButtons.Children.Add(_upButton);
+        orderButtons.Children.Add(_downButton);
+
+        var lists = new Grid();
+        lists.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        lists.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        lists.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        lists.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        lists.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        lists.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var availableHeader = CreateHeader(UiStrings.LabelTransportToolbarAvailable);
+        var currentHeader = CreateHeader(UiStrings.LabelTransportToolbarCurrent);
+        Grid.SetRow(availableHeader, 0);
+        Grid.SetColumn(availableHeader, 0);
+        Grid.SetRow(currentHeader, 0);
+        Grid.SetColumn(currentHeader, 2);
+        Grid.SetRow(_availableList, 1);
+        Grid.SetColumn(_availableList, 0);
+        Grid.SetRow(midButtons, 1);
+        Grid.SetColumn(midButtons, 1);
+        Grid.SetRow(_currentList, 1);
+        Grid.SetColumn(_currentList, 2);
+        Grid.SetRow(orderButtons, 1);
+        Grid.SetColumn(orderButtons, 3);
+        lists.Children.Add(availableHeader);
+        lists.Children.Add(currentHeader);
+        lists.Children.Add(_availableList);
+        lists.Children.Add(midButtons);
+        lists.Children.Add(_currentList);
+        lists.Children.Add(orderButtons);
+
+        var bottomLeft = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        bottomLeft.Children.Add(_separatorButton);
+        bottomLeft.Children.Add(resetButton);
+
+        var bottomRight = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        bottomRight.Children.Add(ok);
+        bottomRight.Children.Add(cancel);
+
+        var bottomButtons = new Grid();
+        bottomButtons.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        bottomButtons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(bottomLeft, 0);
+        Grid.SetColumn(bottomRight, 1);
+        bottomButtons.Children.Add(bottomLeft);
+        bottomButtons.Children.Add(bottomRight);
+
+        var bottom = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+        bottom.Children.Add(_descriptionText);
+        bottom.Children.Add(_iconStatesPanel);
+        bottom.Children.Add(bottomButtons);
+
+        var root = new DockPanel();
+        DockPanel.SetDock(bottom, Dock.Bottom);
+        root.Children.Add(bottom);
+        root.Children.Add(lists);
+        AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
+        AppDialogKeys.Attach(this, Close);
+
+        LoadLayout(initial);
+        _ready = true;
+        RefreshDescription();
+        NotifyPreview();
+    }
+
+    private void Accept()
+    {
+        SelectedLayout = ReadLayout();
+        DialogResult = true;
+        Close();
+    }
+
+    private void LoadLayout(IEnumerable<string> layout)
+    {
+        var normalized = TransportToolbarCatalog.NormalizeLayout(layout);
+        var placed = new HashSet<TransportCommand>();
+        _currentList.Items.Clear();
+        foreach (var entry in normalized)
+        {
+            if (TransportToolbarCatalog.IsSeparator(entry))
+            {
+                _currentList.Items.Add(LayoutRow.Separator());
+                continue;
+            }
+
+            if (!TransportToolbarCatalog.TryGetItem(entry, out var item))
+            {
+                continue;
+            }
+
+            placed.Add(item.Command);
+            _currentList.Items.Add(LayoutRow.ForCommand(item));
+        }
+
+        RebuildAvailableList(placed);
+        RefreshButtons();
+    }
+
+    private void RebuildAvailableList(HashSet<TransportCommand> placed)
+    {
+        _availableList.Items.Clear();
+        string? currentGroup = null;
+        foreach (var item in TransportToolbarCatalog.All)
+        {
+            if (placed.Contains(item.Command))
+            {
+                continue;
+            }
+
+            var group = item.GroupTitle();
+            if (!string.Equals(currentGroup, group, StringComparison.Ordinal))
+            {
+                currentGroup = group;
+                _availableList.Items.Add(LayoutRow.Category(group));
+            }
+
+            _availableList.Items.Add(LayoutRow.ForCommand(item));
+        }
+    }
+
+    private HashSet<TransportCommand> ReadPlacedCommands()
+    {
+        var placed = new HashSet<TransportCommand>();
+        foreach (var row in _currentList.Items.OfType<LayoutRow>())
+        {
+            if (!row.IsSeparator && !row.IsCategoryHeader)
+            {
+                placed.Add(row.Command);
+            }
+        }
+
+        return placed;
+    }
+
+    private string[] ReadLayout()
+    {
+        var entries = new List<string>();
+        foreach (var row in _currentList.Items.OfType<LayoutRow>())
+        {
+            entries.Add(row.IsSeparator
+                ? TransportToolbarCatalog.SeparatorToken
+                : row.Command.ToString());
+        }
+
+        return TransportToolbarCatalog.NormalizeLayout(entries);
+    }
+
+    private void AddSelected()
+    {
+        var selected = _availableList.SelectedItems.OfType<LayoutRow>()
+            .Where(row => !row.IsSeparator && !row.IsCategoryHeader)
+            .ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        var insertAt = _currentList.SelectedIndex;
+        if (insertAt < 0)
+        {
+            insertAt = _currentList.Items.Count;
+        }
+        else
+        {
+            insertAt++;
+        }
+
+        LayoutRow? last = null;
+        foreach (var row in selected)
+        {
+            _currentList.Items.Insert(insertAt++, row);
+            last = row;
+        }
+
+        RebuildAvailableList(ReadPlacedCommands());
+        _currentList.SelectedItems.Clear();
+        if (last is not null)
+        {
+            _currentList.SelectedItem = last;
+            _currentList.ScrollIntoView(last);
+        }
+
+        RefreshButtons();
+        NotifyPreview();
+    }
+
+    private void RemoveSelected()
+    {
+        var selected = _currentList.SelectedItems.OfType<LayoutRow>().ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        var index = _currentList.SelectedIndex;
+        foreach (var row in selected)
+        {
+            _currentList.Items.Remove(row);
+        }
+
+        RebuildAvailableList(ReadPlacedCommands());
+        if (_currentList.Items.Count > 0)
+        {
+            _currentList.SelectedIndex = Math.Clamp(index, 0, _currentList.Items.Count - 1);
+        }
+
+        RefreshButtons();
+        NotifyPreview();
+    }
+
+    private void InsertSeparator()
+    {
+        var insertAt = _currentList.SelectedIndex;
+        if (insertAt < 0)
+        {
+            insertAt = _currentList.Items.Count;
+        }
+        else
+        {
+            insertAt++;
+        }
+
+        var row = LayoutRow.Separator();
+        _currentList.Items.Insert(insertAt, row);
+        _currentList.SelectedItem = row;
+        _currentList.ScrollIntoView(row);
+        RefreshButtons();
+        NotifyPreview();
+    }
+
+    private void MoveSelected(int direction)
+    {
+        var items = _currentList.Items.OfType<LayoutRow>().ToList();
+        var selected = _currentList.SelectedItems.OfType<LayoutRow>().ToHashSet();
+        if (selected.Count == 0)
+        {
+            return;
+        }
+
+        if (direction < 0)
+        {
+            for (var i = 1; i < items.Count; i++)
+            {
+                if (!selected.Contains(items[i]) || selected.Contains(items[i - 1]))
+                {
+                    continue;
+                }
+
+                (items[i - 1], items[i]) = (items[i], items[i - 1]);
+            }
+        }
+        else
+        {
+            for (var i = items.Count - 2; i >= 0; i--)
+            {
+                if (!selected.Contains(items[i]) || selected.Contains(items[i + 1]))
+                {
+                    continue;
+                }
+
+                (items[i + 1], items[i]) = (items[i], items[i + 1]);
+            }
+        }
+
+        _currentList.Items.Clear();
+        foreach (var item in items)
+        {
+            _currentList.Items.Add(item);
+        }
+
+        _currentList.SelectedItems.Clear();
+        foreach (var item in selected)
+        {
+            _currentList.SelectedItems.Add(item);
+        }
+
+        if (_currentList.SelectedItem is LayoutRow focus)
+        {
+            _currentList.ScrollIntoView(focus);
+        }
+
+        RefreshButtons();
+        NotifyPreview();
+    }
+
+    private void ResetToDefault()
+    {
+        LoadLayout(TransportToolbarCatalog.CreateDefaultLayout());
+        NotifyPreview();
+    }
+
+    private void RefreshButtons()
+    {
+        _addButton.IsEnabled = _availableList.SelectedItems.OfType<LayoutRow>()
+            .Any(row => !row.IsSeparator && !row.IsCategoryHeader);
+        _removeButton.IsEnabled = _currentList.SelectedItems.Count > 0;
+        var selected = _currentList.SelectedItems.OfType<LayoutRow>().ToHashSet();
+        var min = int.MaxValue;
+        var max = -1;
+        for (var i = 0; i < _currentList.Items.Count; i++)
+        {
+            if (_currentList.Items[i] is not LayoutRow row || !selected.Contains(row))
+            {
+                continue;
+            }
+
+            min = Math.Min(min, i);
+            max = Math.Max(max, i);
+        }
+
+        _upButton.IsEnabled = selected.Count > 0 && min > 0;
+        _downButton.IsEnabled = selected.Count > 0 && max >= 0 && max < _currentList.Items.Count - 1;
+        _separatorButton.IsEnabled = true;
+    }
+
+    private void WireDescriptionHover(ListBox list)
+    {
+        list.MouseMove += (_, e) =>
+        {
+            var row = FindDescribableRow(list, e.GetPosition(list));
+            if (ReferenceEquals(_hoveredRow, row))
+            {
+                return;
+            }
+
+            _hoveredRow = row;
+            RefreshDescription();
+        };
+        list.MouseLeave += (_, _) =>
+        {
+            if (_hoveredRow is null)
+            {
+                return;
+            }
+
+            _hoveredRow = null;
+            RefreshDescription();
+        };
+    }
+
+    private static LayoutRow? FindDescribableRow(ListBox list, Point position)
+    {
+        if (list.InputHitTest(position) is not DependencyObject hit)
+        {
+            return null;
+        }
+
+        for (var current = hit; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is ListBoxItem { DataContext: LayoutRow row })
+            {
+                return row.IsCategoryHeader ? null : row;
+            }
+
+            if (ReferenceEquals(current, list))
+            {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    private void RefreshDescription()
+    {
+        var row = _hoveredRow
+            ?? _currentList.SelectedItem as LayoutRow
+            ?? _availableList.SelectedItem as LayoutRow;
+        if (row is null || row.IsCategoryHeader)
+        {
+            _descriptionText.Text = UiStrings.LabelTransportToolbarDescriptionHint;
+            ShowIconStates([]);
+            return;
+        }
+
+        _descriptionText.Text = row.IsSeparator
+            ? UiStrings.LabelTransportToolbarSeparatorDescription
+            : row.Description;
+        ShowIconStates(row.Variants);
+    }
+
+    private void ShowIconStates(IReadOnlyList<TransportToolbarCatalog.IconVariant> variants)
+    {
+        _iconStatesPanel.Children.Clear();
+        if (variants.Count == 0)
+        {
+            _iconStatesPanel.Visibility = Visibility.Hidden;
+            return;
+        }
+
+        var header = new TextBlock
+        {
+            Text = UiStrings.LabelTransportToolbarIconStates,
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0),
+        };
+        header.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
+        _iconStatesPanel.Children.Add(header);
+        foreach (var variant in variants)
+        {
+            var item = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 14, 0),
+            };
+            item.Children.Add(new ToolbarListIcon
+            {
+                Icon = variant.Icon,
+                IsPlaying = variant.Playing,
+                IsLatched = variant.Latched,
+                Width = 22,
+                Height = 22,
+                Margin = new Thickness(0, 0, 4, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            var state = new TextBlock
+            {
+                Text = variant.StateText,
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            state.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+            item.Children.Add(state);
+            _iconStatesPanel.Children.Add(item);
+        }
+
+        _iconStatesPanel.Visibility = Visibility.Visible;
+    }
+
+    private void NotifyPreview()
+    {
+        if (!_ready || _preview is null)
+        {
+            return;
+        }
+
+        _preview(ReadLayout());
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (DialogResult != true && _preview is not null)
+        {
+            _preview([.. _openedAt]);
+        }
+
+        base.OnClosed(e);
+    }
+
+    private RoundedButton CreateActionButton(string text, Action action, Thickness margin)
+    {
+        var button = new RoundedButton
+        {
+            Content = text,
+            Height = DesignMetrics.AudioInputHeight,
+            MinWidth = 88,
+            Padding = new Thickness(10, 0, 10, 0),
+            Margin = margin,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        button.Click += (_, _) => action();
+        return button;
+    }
+
+    private RoundedButton CreateDialogButton(
+        string text,
+        bool accept,
+        bool accent = false,
+        bool isDefault = false,
+        bool isCancel = false)
+    {
+        var button = new RoundedButton
+        {
+            Content = text,
+            MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
+            Height = DesignMetrics.AudioDialogButtonHeight,
+            Margin = new Thickness(8, 0, 0, 0),
+        };
+        AppDialogKeys.PrepareActionButton(button, isDefault, isCancel);
+        if (accent)
+        {
+            ActionButtonLooks.ApplyAccent(button);
+        }
+        else
+        {
+            ActionButtonLooks.ApplyClear(button);
+        }
+
+        button.Click += (_, _) =>
+        {
+            if (accept)
+            {
+                Accept();
+            }
+            else
+            {
+                Close();
+            }
+        };
+        return button;
+    }
+
+    private static TextBlock CreateHeader(string text) =>
+        new()
+        {
+            Text = text,
+            FontWeight = FontWeights.Bold,
+            FontSize = 11.333,
+            Margin = new Thickness(0, 0, 0, 6),
+        };
+
+    private static ListBox CreateList()
+    {
+        var list = new ListBox
+        {
+            FontSize = 11,
+            Padding = new Thickness(2),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            SelectionMode = SelectionMode.Extended,
+            BorderThickness = new Thickness(1),
+        };
+        list.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        list.SetResourceReference(Control.BackgroundProperty, "DialogInputBackBrush");
+        list.SetResourceReference(Control.BorderBrushProperty, "ChromeBorderBrush");
+        ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+        ScrollViewer.SetVerticalScrollBarVisibility(list, ScrollBarVisibility.Auto);
+        ScrollViewer.SetCanContentScroll(list, false);
+
+        var highlight = WpfControlHelpers.FrozenBrush(Theme.Get("MenuHighlightBackBrush"));
+        var fore = WpfControlHelpers.FrozenBrush(Theme.Get("PrimaryForeBrush"));
+        list.Resources[SystemColors.HighlightBrushKey] = highlight;
+        list.Resources[SystemColors.HighlightTextBrushKey] = fore;
+        list.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = highlight;
+        list.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = fore;
+        list.Resources[SystemColors.ControlBrushKey] = Brushes.Transparent;
+
+        var itemStyle = new Style(typeof(ListBoxItem));
+        itemStyle.Setters.Add(new Setter(
+            Control.ForegroundProperty,
+            new DynamicResourceExtension("PrimaryForeBrush")));
+        itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(6, 3, 6, 3)));
+        // 境界行は中身が空なので、Stretch しないと罫線の幅が 0 になる。
+        itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+        var categoryTrigger = new DataTrigger
+        {
+            Binding = new System.Windows.Data.Binding(nameof(LayoutRow.IsCategoryHeader)),
+            Value = true,
+        };
+        categoryTrigger.Setters.Add(new Setter(UIElement.FocusableProperty, false));
+        categoryTrigger.Setters.Add(new Setter(UIElement.IsHitTestVisibleProperty, false));
+        categoryTrigger.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(6, 8, 6, 2)));
+        itemStyle.Triggers.Add(categoryTrigger);
+        list.ItemContainerStyle = itemStyle;
+
+        var root = new FrameworkElementFactory(typeof(Grid));
+        root.SetValue(FrameworkElement.MinHeightProperty, 22d);
+        root.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+
+        var category = new FrameworkElementFactory(typeof(TextBlock));
+        category.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(LayoutRow.Label)));
+        category.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
+        category.SetValue(TextBlock.FontSizeProperty, 10.5d);
+        category.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        category.SetValue(
+            TextBlock.ForegroundProperty,
+            new DynamicResourceExtension("MutedForeBrush"));
+        category.SetBinding(
+            UIElement.VisibilityProperty,
+            new System.Windows.Data.Binding(nameof(LayoutRow.CategoryVisibility)));
+        root.AppendChild(category);
+
+        var commandPanel = new FrameworkElementFactory(typeof(StackPanel));
+        commandPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        commandPanel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        commandPanel.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+        commandPanel.SetBinding(
+            UIElement.VisibilityProperty,
+            new System.Windows.Data.Binding(nameof(LayoutRow.CommandVisibility)));
+
+        var icon = new FrameworkElementFactory(typeof(ToolbarListIcon));
+        icon.SetBinding(ToolbarListIcon.IconProperty, new System.Windows.Data.Binding(nameof(LayoutRow.Icon)));
+        icon.SetValue(FrameworkElement.WidthProperty, 20d);
+        icon.SetValue(FrameworkElement.HeightProperty, 20d);
+        icon.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 8, 0));
+        icon.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        commandPanel.AppendChild(icon);
+
+        var label = new FrameworkElementFactory(typeof(TextBlock));
+        label.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(LayoutRow.Label)));
+        label.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        label.SetValue(
+            TextBlock.ForegroundProperty,
+            new DynamicResourceExtension("PrimaryForeBrush"));
+        commandPanel.AppendChild(label);
+
+        var otherIconsPanel = new FrameworkElementFactory(typeof(StackPanel));
+        otherIconsPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        var otherIcon = new FrameworkElementFactory(typeof(ToolbarListIcon));
+        otherIcon.SetBinding(ToolbarListIcon.IconProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Icon)));
+        otherIcon.SetBinding(ToolbarListIcon.IsPlayingProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Playing)));
+        otherIcon.SetBinding(ToolbarListIcon.IsLatchedProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Latched)));
+        otherIcon.SetBinding(FrameworkElement.ToolTipProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.StateText)));
+        otherIcon.SetValue(FrameworkElement.WidthProperty, 16d);
+        otherIcon.SetValue(FrameworkElement.HeightProperty, 16d);
+        otherIcon.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 0, 0, 0));
+        otherIcon.SetValue(UIElement.OpacityProperty, 0.85);
+        var otherIcons = new FrameworkElementFactory(typeof(ItemsControl));
+        otherIcons.SetBinding(ItemsControl.ItemsSourceProperty, new System.Windows.Data.Binding(nameof(LayoutRow.OtherVariants)));
+        otherIcons.SetValue(ItemsControl.ItemsPanelProperty, new ItemsPanelTemplate(otherIconsPanel));
+        otherIcons.SetValue(ItemsControl.ItemTemplateProperty, new DataTemplate { VisualTree = otherIcon });
+        otherIcons.SetValue(FrameworkElement.MarginProperty, new Thickness(4, 0, 0, 0));
+        otherIcons.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        otherIcons.SetValue(UIElement.FocusableProperty, false);
+        commandPanel.AppendChild(otherIcons);
+        root.AppendChild(commandPanel);
+
+        var rule = new FrameworkElementFactory(typeof(SeparatorRule));
+        rule.SetValue(FrameworkElement.HeightProperty, 22d);
+        rule.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+        rule.SetBinding(
+            UIElement.VisibilityProperty,
+            new System.Windows.Data.Binding(nameof(LayoutRow.SeparatorVisibility)));
+        root.AppendChild(rule);
+
+        list.ItemTemplate = new DataTemplate(typeof(LayoutRow)) { VisualTree = root };
+        return list;
+    }
+
+    private sealed class LayoutRow
+    {
+        private LayoutRow(
+            bool separator,
+            bool category,
+            TransportCommand command,
+            TransportIcon icon,
+            string label,
+            string description)
+        {
+            IsSeparator = separator;
+            IsCategoryHeader = category;
+            Command = command;
+            Icon = icon;
+            Label = label;
+            Description = description;
+            Variants = separator || category
+                ? []
+                : TransportToolbarCatalog.IconVariants(command);
+        }
+
+        /// <summary>状態で絵柄が変わるときの全アイコン。先頭は通常時で、行の主アイコンと同じ。</summary>
+        public IReadOnlyList<TransportToolbarCatalog.IconVariant> Variants { get; }
+        public IReadOnlyList<TransportToolbarCatalog.IconVariant> OtherVariants => [.. Variants.Skip(1)];
+
+        public bool IsSeparator { get; }
+        public bool IsCategoryHeader { get; }
+        public TransportCommand Command { get; }
+        public TransportIcon Icon { get; }
+        public string Label { get; }
+        public string Description { get; }
+        public Visibility CategoryVisibility =>
+            IsCategoryHeader ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility CommandVisibility =>
+            IsSeparator || IsCategoryHeader ? Visibility.Collapsed : Visibility.Visible;
+        public Visibility SeparatorVisibility =>
+            IsSeparator ? Visibility.Visible : Visibility.Collapsed;
+
+        public static LayoutRow Separator() =>
+            new(
+                true,
+                false,
+                default,
+                TransportIcon.PlayPause,
+                string.Empty,
+                UiStrings.LabelTransportToolbarSeparatorDescription);
+
+        public static LayoutRow Category(string title) =>
+            new(
+                false,
+                true,
+                default,
+                TransportIcon.PlayPause,
+                title,
+                string.Empty);
+
+        public static LayoutRow ForCommand(TransportToolbarCatalog.Item item) =>
+            new(false, false, item.Command, item.Icon, item.Label(), TransportToolbarCatalog.Describe(item));
+    }
+
+    private sealed class ToolbarListIcon : FrameworkElement
+    {
+        public static readonly DependencyProperty IconProperty = DependencyProperty.Register(
+            nameof(Icon),
+            typeof(TransportIcon),
+            typeof(ToolbarListIcon),
+            new FrameworkPropertyMetadata(TransportIcon.PlayPause, FrameworkPropertyMetadataOptions.AffectsRender));
+
+        public static readonly DependencyProperty IsPlayingProperty = DependencyProperty.Register(
+            nameof(IsPlaying),
+            typeof(bool),
+            typeof(ToolbarListIcon),
+            new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
+
+        public static readonly DependencyProperty IsLatchedProperty = DependencyProperty.Register(
+            nameof(IsLatched),
+            typeof(bool),
+            typeof(ToolbarListIcon),
+            new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
+
+        public TransportIcon Icon
+        {
+            get => (TransportIcon)GetValue(IconProperty);
+            set => SetValue(IconProperty, value);
+        }
+
+        public bool IsPlaying
+        {
+            get => (bool)GetValue(IsPlayingProperty);
+            set => SetValue(IsPlayingProperty, value);
+        }
+
+        public bool IsLatched
+        {
+            get => (bool)GetValue(IsLatchedProperty);
+            set => SetValue(IsLatchedProperty, value);
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            var bounds = new Rect(RenderSize);
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+            {
+                return;
+            }
+
+            var fore = Theme.Get("PrimaryForeBrush");
+            TransportIconDrawing.Draw(
+                dc,
+                Icon,
+                bounds,
+                fore,
+                IsPlaying,
+                UiThemeService.Current,
+                accent: true,
+                latched: IsLatched);
+        }
+    }
+
+    /// <summary>リスト内のカテゴリ境界。幅いっぱいに 1px の横線を描く。</summary>
+    private sealed class SeparatorRule : FrameworkElement
+    {
+        public SeparatorRule()
+        {
+            SnapsToDevicePixels = true;
+            MinWidth = 24;
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            var width = RenderSize.Width;
+            var height = RenderSize.Height;
+            if (width <= 0 || height <= 0)
+            {
+                return;
+            }
+
+            var y = Math.Floor(height * 0.5) + 0.5;
+            var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush")), 1)
+            {
+                StartLineCap = PenLineCap.Flat,
+                EndLineCap = PenLineCap.Flat,
+            };
+            pen.Freeze();
+            dc.DrawLine(pen, new Point(4, y), new Point(Math.Max(4, width - 4), y));
+        }
+    }
+}

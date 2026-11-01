@@ -71,7 +71,7 @@ public partial class MainWindow
     {
         ApplyTransportToolbarDock();
         var settings = AppStorage.Settings;
-        Transport.ApplyVisibilityFromSettings(settings);
+        Transport.ApplyLayoutFromSettings(settings);
         var show = settings.ShowTransportToolbar
             && Transport.HasVisibleCommands
             && !IsVideoMiniPlayerActive();
@@ -265,10 +265,51 @@ public partial class MainWindow
         }
 
         var hit = CaptureMenuBarHit();
-        WaveformContextMenuBuilder.Populate(
-            MainMenuBar.Items,
-            WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit), includeHere: false),
-            ExecuteWaveMenu);
+        var entries = WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit), includeHere: false);
+        if (TryRefreshMainMenuRootsInPlace(entries))
+        {
+            return;
+        }
+
+        WaveformContextMenuBuilder.Populate(MainMenuBar.Items, entries, ExecuteWaveMenu);
+    }
+
+    /// <summary>
+    /// 見出しの並びが同じなら、ルートを作り直さず有効状態だけ更新する。
+    /// 再生／停止のクローム同期からも呼ばれ、作り直すとメニューバー全体が点滅する。
+    /// 子項目は開くたびに <see cref="RefreshMainMenuRootChildren"/> で組み直すので古くてよい。
+    /// </summary>
+    private bool TryRefreshMainMenuRootsInPlace(IReadOnlyList<WaveMenuEntry> entries)
+    {
+        var items = MainMenuBar.Items;
+        if (items.Count == 0 || items.Count != entries.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < entries.Count; i++)
+        {
+            switch (entries[i], items[i])
+            {
+                case (WaveMenuSeparatorEntry, Separator):
+                    continue;
+                case (WaveMenuItemEntry { Command: null, Children.Count: > 0 } entry, MenuItem { HasItems: true } item)
+                    when string.Equals(item.Header as string, entry.Header, StringComparison.Ordinal):
+                    continue;
+                default:
+                    return false;
+            }
+        }
+
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (entries[i] is WaveMenuItemEntry entry && items[i] is MenuItem item)
+            {
+                item.IsEnabled = entry.Enabled;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>上部メニューのドロップダウンが開いている。</summary>
