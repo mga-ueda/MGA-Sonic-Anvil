@@ -273,8 +273,10 @@ internal sealed class LoopSpliceView : FrameworkElement
         var half = VisibleHalfFrames();
         if (_dragKind == DragKind.Pan)
         {
-            // パンは内容が指に追従する向き
-            var panDelta = (long)Math.Round(-dx / halfWidth * half);
+            // End 側は +pan で内容が右へ、Start 側は +pan で左へ動く。
+            // どちらもドラッグ方向に内容が追従するよう符号を分ける。
+            var followDx = _dragLeftSide ? dx : -dx;
+            var panDelta = (long)Math.Round(followDx / halfWidth * half);
             var next = _dragStartPan + panDelta;
             if (_dragLeftSide)
             {
@@ -292,8 +294,8 @@ internal sealed class LoopSpliceView : FrameworkElement
             return;
         }
 
-        // 右へドラッグ＝時間を後ろへ（エンド／スタートが増える）
-        var deltaFrames = (long)Math.Round(dx / halfWidth * half);
+        // 継ぎ目固定で波形を掴む向き: 左へドラッグ＝内容も左（S/E は後ろへ）。
+        var deltaFrames = (long)Math.Round(-dx / halfWidth * half);
         var frames = _document.FrameCount;
         var target = _dragStartLoopFrame + deltaFrames;
         if (_dragLeftSide)
