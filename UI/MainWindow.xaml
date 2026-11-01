@@ -300,6 +300,7 @@
             <Border x:Name="MeterTopSlot"
                     DockPanel.Dock="Top"
                     Height="{x:Static ui:DesignMetrics.ProjectBarHeight}"
+                    Margin="{x:Static ui:DesignMetrics.WaapiToPeakLampGapMargin}"
                     Background="Transparent" />
             <ui:LevelMeterView x:Name="LevelMeter"
                                VerticalAlignment="Stretch"

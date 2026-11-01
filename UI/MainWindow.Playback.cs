@@ -3386,16 +3386,13 @@ public partial class MainWindow
         VectorScope.LayoutTransform = meterTransform;
         Spectrum.LayoutTransform = meterTransform;
         MonitorToggles.LayoutTransform = meterTransform;
-        // WAAPI トグルも同じ窓比例／F12 倍率。スロット高は変換後の見た目に合わせる。
+        // WAAPI トグルも同じ窓比例／F12 倍率。スロット高・下余白は変換後の見た目に合わせる。
         if (_waapiToggle is not null)
         {
             _waapiToggle.LayoutTransform = meterTransform;
         }
 
-        if (IsLibraryMaximized && MeterTopSlot.Visibility == Visibility.Visible)
-        {
-            MeterTopSlot.Height = DesignMetrics.ProjectBarHeight * meterScale;
-        }
+        ApplyMeterTopSlotScale(meterScale);
 
         ApplyLevelMeterHeightCap(meterScale);
 
@@ -3461,6 +3458,22 @@ public partial class MainWindow
         ApplyMeterColumnWidth(_meterColumnPreferred);
         ApplyAnalyzerBottomFlush(scale);
         ScheduleLibraryWaveformPaint();
+    }
+
+    /// <summary>
+    /// WAAPI スロット高とピーク LED までの下余白を倍率に合わせる。
+    /// 動画ミニは Height=NaN（Auto）のまま余白だけ更新する。
+    /// </summary>
+    private void ApplyMeterTopSlotScale(double meterScale)
+    {
+        var scale = Math.Max(meterScale, 1e-6);
+        MeterTopSlot.Margin = new Thickness(0, 0, 0, DesignMetrics.WaapiToPeakLampGap * scale);
+        if (_videoLaunchPlacement || MeterTopSlot.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        MeterTopSlot.Height = DesignMetrics.ProjectBarHeight * scale;
     }
 
     /// <summary>
@@ -3780,6 +3793,7 @@ public partial class MainWindow
         }
 
         MeterTopSlot.Height = DesignMetrics.ProjectBarHeight;
+        MeterTopSlot.Margin = DesignMetrics.WaapiToPeakLampGapMargin;
         MeterColumn.ClearValue(UIElement.ClipToBoundsProperty);
         TransportChromeHost.ClearValue(UIElement.ClipToBoundsProperty);
         WorkGrid.ClearValue(UIElement.ClipToBoundsProperty);

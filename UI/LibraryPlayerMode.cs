@@ -1531,7 +1531,9 @@ internal static class LibraryPlayerMode
         var aspectColumnH = meterColumnHeight + windowWidth * 9d / 16d - windowHeight;
         var cappedColumn = Math.Min(meterColumnHeight, Math.Max(0, aspectColumnH));
         var reservedVisual =
-            (DesignMetrics.ProjectBarHeight + DesignMetrics.VectorScopeHeight) * s;
+            (DesignMetrics.ProjectBarHeight
+                + DesignMetrics.WaapiToPeakLampGap
+                + DesignMetrics.VectorScopeHeight) * s;
         var availableVisual = cappedColumn - reservedVisual;
         return availableVisual > 0 ? availableVisual / s : 0;
     }
