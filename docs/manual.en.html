@@ -147,13 +147,13 @@
         <p>You can save an open file as Wave or MP3. Right-click a tab to write the current edits to another file.</p>
         <p>New file: <kbd>Ctrl</kbd>+<kbd>N</kbd>. After opening, record with <kbd>Ctrl</kbd>+<kbd>R</kbd>. Before recording, you are always asked whether to use Silent Skip (skip silence). Recording uses the current file format and overwrites from the playhead (Undo restores it). It does not start if no file is open.</p>
         <p>Recording stays as raw audio. MP3 is only when you save or export. Unsaved work in tabs that were still open comes back on the next launch. A closed tab can be reopened with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> until you quit the app.</p>
-        <p>Speaker layouts (mono through Atmos) and which channels play are switched in Settings and the <span class="ui">SPEAKER</span> menu at the bottom of the window.</p>
+        <p>Speaker layouts (mono through Atmos) and which channels play are switched in Settings and the speaker list at the bottom of the window.</p>
       </div>
 
       <h2 id="quickstart">2. Quick start</h2>
       <ol>
         <li>Drop a Wave / AIFF / MP3, or press <kbd>Ctrl</kbd>+<kbd>O</kbd>. M4A is player-only. In the player, PDF / MOV / MP4 / AVI / MKV / WebM / MPG are listed too when that setting is on (PDF on by default; video types off by default; AVI / MKV / WebM / MPG only when ffmpeg is available; they cannot be opened in the editor). Several files open as tabs. Dropping a folder adds every supported file inside it (unsupported types are skipped). The status bar shows progress. <kbd>Esc</kbd> stops a multi-file load and keeps files already opened. The Open dialog remembers its last folder, separate from save / export. <kbd>Ctrl</kbd>+<kbd>N</kbd> opens an empty tab. Choose the format each time; the last choice is remembered. Channels are the speakers you enabled, plus Mono.</li>
-        <li>Listen, cut, fade, and place markers or a loop on the waveform. For files with many channels, enable layouts on Settings → Shown first, then pick one with <span class="ui">SPEAKER</span> at the bottom. Record with <kbd>Ctrl</kbd>+<kbd>R</kbd> (a prompt asks whether to use Silent Skip).</li>
+        <li>Listen, cut, fade, and place markers or a loop on the waveform. For files with many channels, enable layouts on Settings → Shown first, then pick one in the speaker list at the bottom. Record with <kbd>Ctrl</kbd>+<kbd>R</kbd> (a prompt asks whether to use Silent Skip).</li>
         <li>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> as Wave or MP3 (you cannot write AIFF). With several tabs selected, Save and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) act on every selected file. Save overwrites files that already have a location; unsaved or AIFF files ask for a folder and write Wave. Save As asks for a folder, writes each file as Wave, and the tabs then point at those files (unlike Export, the tab follows the new file). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> is MP3-only: it writes a file and keeps the current tab (the written MP3 is not opened). MP3 is rebuilt from 16-bit audio. Three or more channels, or a remapped speaker, write the same stereo mix you hear now (see <a href="#mp3-downmix">MP3 downmix</a>; no prompt). A valid LAME location in Settings is used (blank options mean <code>-V2 --noreplaygain</code>); empty or invalid uses Windows (default 192 kbps). Markers are not written to MP3.</li>
         <li>To send it to Wwise, turn on <span class="ui">WAAPI</span> above the level meter, pick a destination, and press <span class="ui">EXPORT</span>.</li>
       </ol>
@@ -173,7 +173,7 @@
         <a href="#layout-scroll">Scrollbar</a>
         <a href="#layout-tabs">Tabs</a>
         <a href="#layout-tile">Tiling</a>
-        <a href="#layout-transport">Transport</a>
+        <a href="#layout-transport">Toolbar</a>
         <a href="#layout-silent">Silent Skip</a>
         <a href="#layout-gapless">Gapless</a>
         <a href="#layout-single-loop">Single Loop</a>
@@ -186,7 +186,7 @@
 
       <article class="part" id="layout-color">
         <h3>Color settings</h3>
-        <p class="where">Overlapping-circles button in VIEW, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></p>
+        <p class="where">Color button on the toolbar (overlapping circles), or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></p>
         <p>Tune the app colors (dark UI; no light/dark switch).</p>
         <ul>
           <li>Pick a color in the list on the left (<span class="ui">Search</span> filters it) and edit it on the right.</li>
@@ -200,7 +200,7 @@
 
       <article class="part" id="layout-settings">
         <h3>Settings</h3>
-        <p class="where">Gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd></p>
+        <p class="where">Gear on the toolbar, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd></p>
         <ul>
           <li>In Settings, New, and save-confirm dialogs, <kbd>Tab</kbd> also moves to the buttons.</li>
           <li><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd> goes to the next tab, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd> to the previous (wraps from the end to the start; key-repeat pauses at the ends). <kbd>Esc</kbd> closes it.</li>
@@ -214,6 +214,7 @@
           <li><strong>Startup mode</strong> — <span class="ui">F09: Player mode 1</span> (compact playlist + waveform) / <span class="ui">F10: Player mode 2</span> / <span class="ui">F11: Editor mode 1</span> / <span class="ui">F12: Editor mode 2</span>. Default is F12. Used only when no file is passed and nothing is restored from the previous session. Opening a file from an argument or a file association, or restoring previous tabs, does not use it. Applies on the next launch. Customize each mode’s chrome on the Layout tab.</li>
           <li><strong>Parallel job count</strong> — parallelism for export and destructive edits (default Auto = a quarter of the CPU cores; dropdown max is half the cores).</li>
           <li><strong>Wallpaper</strong> — An image laid over the animated background. None by default. Browse for a JPEG, PNG, BMP, GIF, or TIFF, or clear the path to remove it. A path that cannot be read shows nothing. The window updates as soon as you set a path or change the opacity. Cancel restores what was showing when Settings opened. Opacity is 0–100% (default 10%). ↑ / ↓ and the mouse wheel over the box change it by 1%. The image keeps its aspect ratio, stays centered, and covers the window (overflow is cropped; it is not tiled). Video or PDF on the back sits in front of it.</li>
+          <li><strong>Background color animation</strong> — slowly drifts the background colors. Off by default. <span class="ui">Speed</span> is 100–400% (100 is the slowest) and is locked while the animation is off. Applies as soon as you change it; Cancel restores it.</li>
           <li>
             <p><strong>File associations</strong> — Choose which types open with this app. Changes apply immediately. <span class="ui">All on</span> and <span class="ui">All off</span> set every type you can currently change (video types dimmed because FFmpeg is missing are left as they are).</p>
             <ul>
@@ -228,11 +229,22 @@
         <h4>Layout</h4>
         <ul>
           <li><strong>Show menu bar</strong> — on by default. Top-of-window menu (same tree as the waveform right-click, without Here; playhead-based). Off hides it. Applies as soon as you change it; Cancel restores it. Always hidden during F9 minimal chrome, regardless of this setting. With the bar visible, <kbd>Alt</kbd>+letter opens a top-level menu (app toggles use <kbd>Alt</kbd>+<kbd>Shift</kbd>+letter; see <a href="#shortcuts-accesskeys">Shortcuts</a>).</li>
-          <li><strong>F9–F12 presets</strong> — per mode, remember fullscreen (Off / On / Toggle) / Toggle’s first-time fullscreen / waveform (player chrome only; always on in the editor) / level meter / status bar / analyzers (dock). The library column is not editable here; it stays at the slot default (F9 off / F10 on / F11–F12 off). <span class="ui">Reset to defaults</span> restores that mode only. Default snapshot: F9 = waveform on, others off, fullscreen Off / F10 = full player chrome on, fullscreen Off / F11 = analyzers off (level meter and status bar stay on), fullscreen Toggle (starts on) / F12 = analyzers on, fullscreen Toggle (starts off). These are the chrome baselines for Startup mode and the <kbd>F9</kbd>–<kbd>F12</kbd> keys (key fullscreen behavior is described separately).</li>
+          <li><strong>Show toolbar</strong> — on by default. Off hides the toolbar. Applies as soon as you change it; Cancel restores it.</li>
+          <li><strong>Customize toolbar…</strong> — choose which buttons appear (unavailable while the toolbar is off). <span class="ui">Add</span> from the left list, <span class="ui">Remove</span> from the right (double-click works too). Order and separators are automatic (see <a href="#layout-transport">Toolbar</a>). Selecting an item shows its description below. <span class="ui">Reset to default</span> brings back every button. Changes show on the toolbar right away; Cancel restores it.</li>
+          <li>
+            <p><strong>F9–F12 presets</strong> — per-mode chrome, used when you enter a mode via Startup mode or the <kbd>F9</kbd>–<kbd>F12</kbd> keys.</p>
+            <ul>
+              <li>Each mode remembers: fullscreen (Off / On / Toggle) and Toggle’s first state, waveform (player only; always on in the editor), analyzers (top / bottom), toolbar (top / bottom, left / center), level meter, and status bar.</li>
+              <li>Toolbar “top” is under the menu bar; “bottom” is above the status bar. “Left / center” aligns the buttons. Every mode defaults to top, center.</li>
+              <li>The library column is not editable here (on only in F10).</li>
+              <li>Defaults at a glance: F9 = waveform only, fullscreen Off / F10 = full player chrome, fullscreen Off / F11 = analyzers off, fullscreen Toggle (starts on) / F12 = analyzers on, fullscreen Toggle (starts off).</li>
+              <li><span class="ui">Reset to defaults</span> restores that mode only.</li>
+            </ul>
+          </li>
         </ul>
         <h4>Shown</h4>
         <ul>
-          <li><strong>Speaker definitions</strong> — checklist of definitions to enable. Stereo only by default. The definition in use stays listed until you switch away. At least one must stay enabled. The status-bar SPEAKER menu uses the same list.</li>
+          <li><strong>Speaker definitions</strong> — checklist of definitions to enable. Stereo only by default. The definition in use stays listed until you switch away. At least one must stay enabled. The status-bar speaker list uses the same list.</li>
           <li>
             <p><strong>Documents and video in the playlist</strong> — PDF / MOV / MP4 / AVI / MKV / WebM / MPG as separate checks.</p>
             <ul>
@@ -260,7 +272,7 @@
         </ul>
         <h4>Color</h4>
         <ul>
-          <li><strong>Color settings</strong> — opens the app color panel (same as the overlapping-circles button in VIEW, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>; see <a href="#layout-color">Color settings</a>).</li>
+          <li><strong>Color settings</strong> — opens the app color panel (same as the toolbar color button, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>; see <a href="#layout-color">Color settings</a>).</li>
           <li><strong>Filename colors</strong> — a vertical marker is drawn at the start of a filename when the name contains the text. The first match from the top wins. Matching ignores letter case. Empty text and out-of-range colors are dropped when settings are saved. The same color may be used more than once. The 28 colors match Wwise. ▲ / ▼ reorder a row, and Add stays directly under the list. A color set by hand on a file wins over these rules. Where the marker appears, and how a manual color is kept, is under <a href="#layout-filename-color">Filename colors</a>.</li>
         </ul>
         <h4>Audio</h4>
@@ -327,8 +339,8 @@
         </ul>
         <h4>Fullscreen</h4>
         <ul>
-          <li><kbd>F11</kbd> — waveform area fullscreen, like a browser. Hides tabs, transport, meters, WAAPI, channel names, the dB scale, the window frame, and the taskbar. Keeps the overview and status bar. Works while tiled. <kbd>F11</kbd> again restores. Stays in front only while this window is active (switching away restores the taskbar and does not keep covering other apps; see <a href="#layout-top">Always on Top</a>). Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
-          <li><kbd>F12</kbd> — fullscreen with only the title bar hidden. Tabs, transport, meters, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale. Works while tiled. <kbd>F12</kbd> again restores. Frontmost only while active, same as <kbd>F11</kbd>. Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
+          <li><kbd>F11</kbd> — waveform area fullscreen, like a browser. Hides WAAPI, channel names, the dB scale, the window frame, and the taskbar. Keeps tabs, the toolbar, and the overview. Analyzers, level meter, and status bar follow the Layout tab preset (by default only the analyzers are off; the level meter is 1.5×, same as F12). Works while tiled. <kbd>F11</kbd> again restores. Stays in front only while this window is active (switching away restores the taskbar and does not keep covering other apps; see <a href="#layout-top">Always on Top</a>). Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
+          <li><kbd>F12</kbd> — fullscreen with only the title bar hidden. Tabs, toolbar, meters, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale. Works while tiled. <kbd>F12</kbd> again restores. Frontmost only while active, same as <kbd>F11</kbd>. Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
         </ul>
       </article>
 
@@ -336,7 +348,7 @@
         <h3>Player mode</h3>
         <p class="where"><kbd>F10</kbd> on the waveform. Not fullscreen. Pressing <kbd>F10</kbd> again does not leave the player (it only re-applies chrome). Return to the editor with <kbd>F11</kbd> / <kbd>F12</kbd>. When entering from the editor, unsaved files show a dialog and you cannot switch to the player until they are resolved (see below).</p>
         <div class="note">
-          <p>Terms used here: <strong>front chrome</strong> — the playlist, transport, and other controls shown in front of the video. <strong>Dim preview</strong> — video / PDF shown dimmed behind the front chrome, which stays usable (video loops silently at 1/3 speed). <strong>Real playback</strong> — front chrome hidden, video shown bright and full-stage with sound (for PDF, the “bright view”).</p>
+          <p>Terms used here: <strong>front chrome</strong> — the playlist, toolbar, and other controls shown in front of the video. <strong>Dim preview</strong> — video / PDF shown dimmed behind the front chrome, which stays usable (video loops silently at 1/3 speed). <strong>Real playback</strong> — front chrome hidden, video shown bright and full-stage with sound (for PDF, the “bright view”).</p>
         </div>
         <h4>Screen</h4>
         <ul>
@@ -344,7 +356,7 @@
           <li>Groups default to parent folder, with a jacket beside each group. Video / PDF show a per-row thumbnail when available (no placeholder when art is missing). Playback and skip do not rebuild the list.</li>
           <li>While the playlist is empty, every list column stays hidden (clearing a visible list fades the headers in 1 second), and the level meter, spectrum, loudness, gonio, and surround meter stay hidden (they start hidden when you enter player). An empty playlist focuses the library (folder tree).</li>
           <li>
-            <p><kbd>F8</kbd> — video / PDF mini player (no playlist / transport chrome).</p>
+            <p><kbd>F8</kbd> — video / PDF mini player (no playlist / toolbar chrome).</p>
             <ul>
               <li>The window starts from the video / PDF page’s native size, but the main-window floor is 960×540 in every mode (smaller pictures letterbox). <kbd>+</kbd> / <kbd>-</kbd> (keyboard and numpad) always land on 25% steps (after a free border drag, the next key snaps to the nearest 25%; pause at native size; 25–300%; aspect locked; scale remembered until you leave F8).</li>
               <li>Drag the window border for continuous resize (not 25% steps; aspect locked; no mouse-wheel resize).</li>
@@ -359,7 +371,7 @@
           </li>
           <li><kbd>F9</kbd> shows only the playlist and waveform (to save desktop space; from any mode).
             <ul>
-              <li>The menu bar, Library, Favorites, meters, analyzers, transport, and status bar stay hidden. Alt+Shift S / T / L and the monitor toggles still work while chrome is hidden; Alt+Shift R / N / P also work while in the player.</li>
+              <li>The menu bar, Library, Favorites, meters, analyzers, and status bar stay hidden (the toolbar follows its setting). Alt+Shift S / T / L and the monitor toggles still work while chrome is hidden; Alt+Shift R / N / P also work while in the player.</li>
               <li>Pressing <kbd>F9</kbd> again does not leave to the editor (it only re-applies chrome). Return to the editor with <kbd>F11</kbd> / <kbd>F12</kbd> (stops playback, then keeps only the selected files and clears tab multi-selection).</li>
               <li><kbd>F10</kbd> switches to the normal player and keeps playback going.</li>
             </ul>
@@ -370,7 +382,7 @@
         <ul>
           <li>Entering selects and plays the first track (the same when you start the app with files).</li>
           <li>
-            <p><kbd>Space</kbd> or transport Play plays that track only and stops when it ends.</p>
+            <p><kbd>Space</kbd> or toolbar Play plays that track only and stops when it ends.</p>
             <ul>
               <li>Starts from the seek bar / playhead, or the same video’s dim preview position.</li>
               <li>While playing, returns to the start (audio and similar). During real video playback, pauses in place without showing the playlist, and resumes on the next press.</li>
@@ -555,7 +567,7 @@
         <ul>
           <li>Jacket / thumbnail images appear only when a file actually has art (including video and PDF thumbs). Rows without art stay blank with no placeholder. If the playlist has none, the jacket area is hidden.</li>
           <li>Drop an image on the jacket to replace it on MP3 only (written into the file). WAVE / AIFF / M4A cannot be replaced.</li>
-          <li>When a jacket is set, it is stretched to fill the whole player window (aspect may change) and used as a heavily blurred background, including the transport, meters, and status bar.</li>
+          <li>When a jacket is set, it is stretched to fill the whole player window (aspect may change) and used as a heavily blurred background, including the toolbar, meters, and status bar.</li>
         </ul>
         <h4>Entering and leaving</h4>
         <ul>
@@ -671,17 +683,22 @@
       </article>
 
       <article class="part" id="layout-transport">
-        <h3>Transport</h3>
+        <h3>Toolbar</h3>
+        <p class="where">Under the menu bar (each mode can move it above the status bar)</p>
+        <p>Icon buttons for the main menu commands. Hover a button to see its name and shortcut.</p>
         <ul>
-          <li>Top row is playback and zoom. Second row is fade / normalize / delete / new / save / MP3 output, and manual <span class="ui">?</span>. Transport buttons show a short tooltip (with the shortcut). For full details, see this manual.</li>
-          <li><span class="ui">Marker click</span> (<kbd>Q</kbd>) — plays clicks at marker / region edges. Uses the selection when present, otherwise the whole file. Toggle with the button or <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player, <kbd>Q</kbd> is a Back key instead of marker click: real video playback, frame pause, and bright PDF view go back to the dim preview; the F8 / argument mini goes back to the playlist.</li>
-          <li>The company logo and license are not shown on the transport. Other → Version opens a frosted-glass about dialog with the app icon, name, version, and rights links. GitHub opens the repository, MIT License this app’s full text, and LAME / FFmpeg / EffeTune / WinBlur each open their project site (browser). The Wwise® / Audiokinetic® trademark line is included. Other → License shows the bundled <code>THIRD_PARTY_NOTICES.md</code> (same trademarks, EffeTune / WinBlur, and more) in a frosted-glass dialog. See <a href="#trademarks">Trademarks and license</a>.</li>
+          <li><strong>Order</strong> — buttons are grouped by menu category, with the playback group first and the rest in menu order. Each group sits on a rounded backdrop; thin lines inside a group mark the menu’s separators and submenu breaks. The bar wraps when the window is narrow.</li>
+          <li><strong>Buttons shown</strong> — all of them by default. Remove some in Settings → Layout → <span class="ui">Customize toolbar…</span>. The order cannot be changed.</li>
+          <li><strong>Position</strong> — top (under the menu bar) / bottom (above the status bar) and left / center, chosen per F9–F12 mode (Settings → Layout presets; default top, center).</li>
+          <li><strong>Unavailable buttons</strong> — buttons that cannot be used right now are dimmed (for example editor-only commands in the player). Previous / next marker and marker delete are dimmed when there are no markers. A group with no usable button is hidden entirely.</li>
+          <li><strong>When it is hidden</strong> — when turned off in Settings, in the <kbd>F8</kbd> video mini, and during real video playback (it hides with the front chrome).</li>
+          <li>The company logo and license are not shown on the toolbar. Other → Version opens a frosted-glass about dialog with the app icon, name, version, and rights links. GitHub opens the repository, MIT License this app’s full text, and LAME / FFmpeg / EffeTune / WinBlur each open their project site (browser). The Wwise® / Audiokinetic® trademark line is included. Other → License shows the bundled <code>THIRD_PARTY_NOTICES.md</code> (same trademarks, EffeTune / WinBlur, and more) in a frosted-glass dialog. See <a href="#trademarks">Trademarks and license</a>.</li>
         </ul>
       </article>
 
       <article class="part" id="layout-silent">
         <h3>Silent Skip</h3>
-        <p class="where">Status bar, left of <span class="ui">SPEAKER</span>. <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>. Off by default.</p>
+        <p class="where">Status bar, left of the speaker icon. <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>. Off by default.</p>
         <ul>
           <li>Skips silent stretches during playback, and while recording writes only audio above the threshold.</li>
           <li>Each recorded burst gets a short fade from the Editing tab in Settings (default 20 ms) at both ends so it does not click.</li>
@@ -720,7 +737,7 @@
 
       <article class="part" id="layout-top">
         <h3>Always on Top</h3>
-        <p class="where">Right of <span class="ui">Single Loop</span>, left of <span class="ui">SPEAKER</span></p>
+        <p class="where">Right of <span class="ui">Single Loop</span>, left of the speaker icon</p>
         <p>Keeps the window in front. Toggle with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>. Fullscreen (<kbd>F</kbd> / <kbd>F11</kbd> / <kbd>F12</kbd>) stays in front only while this window is active. Switching to another app stops covering it (Always on Top still pins the window when that toggle is on).</p>
       </article>
 
@@ -777,8 +794,8 @@
         <ul>
           <li><strong>File position</strong> — with two or more files open, the front shows the position and count, e.g. <code>1 / 10 Files</code>.</li>
           <li><strong>Format</strong> — name is on the tab. Sample rate / bit depth / channels turn red after conversion until you save. MP3 / M4A also show bit rate. Size is MB (MiB / B), and turns red as an estimate after conversion or a range delete that changes length.</li>
-          <li><strong>Silent Skip / Single Loop / Always on Top</strong> — left of <span class="ui">SPEAKER</span>, in that order. Silent Skip is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, <span class="ui">Single Loop</span> is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>, Always on Top is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>. Silent Skip skips silence on playback and records only above the threshold (threshold in Settings). See <a href="#layout-single-loop">Single Loop</a> for that toggle.</li>
-          <li><strong><span class="ui">SPEAKER</span></strong> — switches the speaker layout. Same list as Shown. The definition in use stays listed until you switch away. Auto speaker selection, off by default, switches to a matching enabled definition.</li>
+          <li><strong>Silent Skip / Single Loop / Always on Top</strong> — left of the speaker icon, in that order. Silent Skip is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, <span class="ui">Single Loop</span> is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>, Always on Top is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>. Silent Skip skips silence on playback and records only above the threshold (threshold in Settings). See <a href="#layout-single-loop">Single Loop</a> for that toggle.</li>
+          <li><strong>Speaker</strong> — the list right of the speaker icon switches the speaker layout. Same list as Shown. The definition in use stays listed until you switch away. Auto speaker selection, off by default, switches to a matching enabled definition.</li>
           <li><strong>Times</strong> — current / selection start / selection length / selection end / total. All but total are editable. Wheel / ↑↓ nudge: time by 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min, samples by 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Right-click switches time and samples (kept across launches).</li>
         </ul>
       </article>
@@ -790,7 +807,7 @@
 
       <h2 id="playback">4. Playback</h2>
       <ul>
-        <li><kbd>Space</kbd> — play / stop. Stop returns to the start position. During real video playback it starts when stopped, pauses while playing, and resumes on the next press (playlist chrome stays hidden; does not drop to the dim preview; Escape / Q returns to the 1/3-speed background; in the F8 / argument-launch mini, Escape / Q return to the playlist (Escape clears In/Out and stays when In/Out is set); resuming from that preview continues from the current position). In player mode, plays only the selected track and stops when it ends (does not continue the playlist; from the same video’s dim preview, resumes at the current position). If you select a waveform range and then start playback, that range plays once and stops at the end (see <a href="#layout-single-loop">Single Loop</a>). During bright PDF view, Escape / Q returns to the dim preview (Space / Enter do not leave). Transport Play is the same.</li>
+        <li><kbd>Space</kbd> — play / stop. Stop returns to the start position. During real video playback it starts when stopped, pauses while playing, and resumes on the next press (playlist chrome stays hidden; does not drop to the dim preview; Escape / Q returns to the 1/3-speed background; in the F8 / argument-launch mini, Escape / Q return to the playlist (Escape clears In/Out and stays when In/Out is set); resuming from that preview continues from the current position). In player mode, plays only the selected track and stops when it ends (does not continue the playlist; from the same video’s dim preview, resumes at the current position). If you select a waveform range and then start playback, that range plays once and stops at the end (see <a href="#layout-single-loop">Single Loop</a>). During bright PDF view, Escape / Q returns to the dim preview (Space / Enter do not leave). Toolbar Play is the same.</li>
         <li><kbd>Enter</kbd> — pause in place. While stopped, video / PDF match Space (real playback / bright view). During real video playback it pauses in place without showing the playlist.</li>
         <li>← / → — while stopped, seek (about 1 px of the view; 1 sample when dots are shown). Hold during playback for 3× shuttle at the original pitch (−4 dB while held). Release restores speed and volume. Silent Skip does not run while you hold. Player mode does not shuttle with the arrows (<kbd>,</kbd> / <kbd>.</kbd>). During real video playback or frame pause, ← / → pause and step one frame (hold repeats after an initial wait).</li>
         <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> — preroll from 3 seconds earlier only when the waveform has focus (not used on the playlist).</li>
@@ -807,7 +824,7 @@
         <li><kbd>Z</kbd> or numpad <kbd>.</kbd> — center. Toggles center-lock while playing; clears it when stopped (the <kbd>.</kbd> key is fast-forward).</li>
         <li><kbd>L</kbd> — jump to 3 seconds before the end of the selection (or the sample loop / <code>-L</code>) and loop forever (while stopped or while playing).</li>
         <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> — toggle <span class="ui">Single Loop</span> (status bar; same toggle in the editor; in the player the sample loop is ignored and playback restarts at the end; selection / A-B take priority; see <a href="#layout-single-loop">Single Loop</a>).</li>
-        <li><kbd>Q</kbd> — in the editor, marker click. Plays clicks at marker / region edges (selection when present, otherwise the whole file). Toggle with the button or <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player it is a Back key (real video playback, frame pause, bright PDF view → dim preview; F8 / argument mini → playlist).</li>
+        <li><kbd>Q</kbd> — in the editor, marker click. Plays clicks at marker / region edges (selection when present, otherwise the whole file). Toggle with <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player it is a Back key (real video playback, frame pause, bright PDF view → dim preview; F8 / argument mini → playlist).</li>
         <li><kbd>Tab</kbd> — solo a channel. Other lanes go gray and stay muted. Again moves to the next channel; <kbd>Shift</kbd>+<kbd>Tab</kbd> goes backward. Past the last clears solo. Click a channel name on the left to solo (click the same name again to clear; <kbd>Ctrl</kbd>+click adds; <kbd>Shift</kbd>+click mutes / unmutes). The time selection does not change. Waveform edits apply only to that channel. Works while playing or stopped.</li>
         <li><kbd>Ctrl</kbd>+<kbd>N</kbd> — new file. Opens an empty tab. Choose the format each time (the last choice is remembered). Channels are the speakers enabled on Shown, plus Mono (always available).</li>
         <li><kbd>Ctrl</kbd>+<kbd>R</kbd> — record. A prompt appears every time asking whether to turn Silent Skip on (the checkbox starts from the status-bar switch; OK updates it; the prompt shows the current threshold and silence insert duration, changeable in Settings; the region checkbox is enabled only when Silent Skip is on; off by default; remembered). Records in the current file format from the seek bar. Audio after that point is overwritten (Undo restores it; audio past the take stays; a longer take extends the file). It does not start if no file is open (create one with <kbd>Ctrl</kbd>+<kbd>N</kbd> or open a file first). Recording stays as raw audio; MP3 is only on save / export. An unsaved take left open is kept as a working copy and comes back on the next launch. A closed tab can be reopened with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> in this launch only. Press again, or Space / Enter / Esc, to stop. While recording, the waveform background turns reddish. New audio appears immediately as a rough waveform, then settles into the usual drawing. With Silent Skip on, only audio above the threshold is written. Each recorded burst gets a short fade from the Editing tab in Settings (default 20 ms) at both ends. Silence is inserted when the level falls, up to the silence length set in Settings (default 500 ms). Checking the region box adds a region to each recorded stretch separated by silence when you stop; the silence itself gets none.</li>
@@ -1003,11 +1020,11 @@
       <ul>
         <li><strong>Open</strong> — <kbd>Shift</kbd>+<kbd>X</kbd>, or waveform right-click → Audio → Fade Adjust Tool. Not available while the player is maximized.</li>
         <li><strong>Defaults</strong> — uses the selection when present, otherwise the existing sample loop for Start / End. Pre-crossfade starts at 0; Post remembers the last value from the tool.</li>
-        <li><strong>Preview</strong> — use the main transport (sample loop as the play window, including playback from before Start). The left seam preview is left=End side / right=Start side. “Show crossfade” below toggles the baked blend in that view (off by default).</li>
-        <li><strong>Values</strong> — Start (S) / End (E) / Pre (<kbd>X</kbd> / <kbd>F</kbd> / <kbd>Alt</kbd>+<kbd>P</kbd>) / Post (<kbd>P</kbd> / <kbd>Alt</kbd>+<kbd>T</kbd>). <kbd>Alt</kbd>+<kbd>S</kbd> / <kbd>E</kbd> / <kbd>P</kbd> / <kbd>T</kbd> also moves to that field (works while a value box is focused). Default is time (this window only; switch via Time/Samples next to the Loop header, or right-click a value box; not linked to the status bar / transport). ↑↓ / wheel nudge on hover without focus (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Values update the loop / flags live while typing. Each field’s 0 button snaps to a nearby zero-crossing.</li>
+        <li><strong>Preview</strong> — use the main transport (sample loop as the play window, including playback from before Start). The left seam preview is left=End side / right=Start side. “Show crossfade” below toggles the baked blend in that view (on by default; the last state is remembered).</li>
+        <li><strong>Values</strong> — Start (S) / End (E) / Pre (<kbd>X</kbd> / <kbd>F</kbd> / <kbd>Alt</kbd>+<kbd>P</kbd>) / Post (<kbd>P</kbd> / <kbd>Alt</kbd>+<kbd>T</kbd>). <kbd>Alt</kbd>+<kbd>S</kbd> / <kbd>E</kbd> / <kbd>P</kbd> / <kbd>T</kbd> also moves to that field (works while a value box is focused). Default is time (switch via Time/Samples next to the Loop header, or right-click a value box; remembered separately from the status bar). ↑↓ / wheel nudge on hover without focus (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; samples: 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000). Values update the loop / flags live while typing. Each field’s 0 button snaps to a nearby zero-crossing.</li>
         <li><strong>Auto-search</strong> — Find Start, Find End, Shift Start and End. Keeps searching toward a better-matching seam.</li>
         <li><strong>Multiples of 28</strong> — when on, Start and End move only on 28-sample steps.</li>
-        <li><strong>Truncate outside</strong> — on OK, deletes audio before Start and after End (End-side is used as material, then trimmed).</li>
+        <li><strong>Delete before/after loop / Delete after loop</strong> — on OK, deletes audio before Start and after End, or only after End (the End side is used as material, then trimmed). Both are off by default and remember the last state.</li>
         <li><strong>OK / Cancel</strong> — OK (Enter) bakes, commits the sample loop, and closes (undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel (Esc) discards changes and clears overlays. Destructive edits outside are blocked while the tool is open.</li>
         <li>Position and size are remembered. The default size is also the minimum.</li>
       </ul>
@@ -1078,11 +1095,11 @@
       </div>
 
       <h2 id="settings">10. Settings and language</h2>
-      <p>Settings are the gear at the top left, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
+      <p>Settings are the gear on the toolbar, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
       <ul>
         <li>Language is on General. The default is <span class="ui">Auto</span> (Japanese if the PC is Japanese, otherwise English). The Japanese UI may still show some English labels.</li>
         <li>Wallpaper is also on General. None by default. It covers the window over the animated background while keeping its aspect ratio. Details are under <a href="#layout-settings">Layout → Settings</a>.</li>
-        <li>The manual is <span class="ui">?</span>, or in the browser. It follows the UI language.</li>
+        <li>The manual opens from the toolbar <span class="ui">?</span>, or in the browser. It follows the UI language.</li>
         <li>Settings and open tabs are stored in this PC’s user folder (<code>%LocalAppData%\MGA\MGA Sonic Anvil\</code>). Nothing is written next to the app.</li>
         <li>MP3 uses LAME when the path in Settings is valid (blank options mean <code>-V2 --noreplaygain</code>); otherwise Windows writes it (128–320 kbps, default 192). It writes the stereo mix you hear now (see <a href="#mp3-downmix">details</a>). The written MP3 is not opened in the current tab. LAME is not included with this app.</li>
         <li>Closing the app remembers open tabs and window position. Player and editor sizes are separate. Unsaved edits come back on the next launch. Quitting in player mode does not remember the playlist.</li>
@@ -1118,7 +1135,7 @@
         <li><kbd>A</kbd> switches spectrogram and overlay. With the loudness curve up, <kbd>A</kbd> goes to the spectrogram (not a three-way cycle).</li>
         <li><kbd>V</kbd> shows the loudness analysis (Short Term curve) and opens volume.</li>
         <li><kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>A</kbd>, or <kbd>Shift</kbd>+<kbd>V</kbd> returns to the normal waveform from any of these views. <kbd>Esc</kbd> clears open prompts, the selection, and the pen cursor first. Closing the volume popup alone leaves the curve up.</li>
-        <li>The VIEW loudness button toggles the view only.</li>
+        <li>The toolbar loudness button toggles the view only.</li>
         <li><kbd>L</kbd> jumps to 3 seconds before the end of the selection (or the sample loop / <code>-L</code>) and loops forever (while stopped or while playing).</li>
       </ul>
       <h3>Loudness curve</h3>
@@ -1209,7 +1226,7 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Space</kbd></td><td>Play / stop (stop returns to the start; transport Play is the same). In the player, plays that track only and stops at its end. During real video playback it pauses / resumes and does not drop to the dim preview (<kbd>Escape</kbd> / <kbd>Q</kbd> do that). See the “Player / layout keys” table below</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Play / stop (stop returns to the start; toolbar Play is the same). In the player, plays that track only and stops at its end. During real video playback it pauses / resumes and does not drop to the dim preview (<kbd>Escape</kbd> / <kbd>Q</kbd> do that). See the “Player / layout keys” table below</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Pause in place (while stopped, video / PDF match Space — real playback / bright view; during real video playback, pauses in place without showing the playlist; while stopped in the editor, does nothing)</td></tr>
           <tr><td>← / →</td><td>Hold during playback for 3× shuttle (original pitch; −4 dB while held; Silent Skip pauses). Seek when stopped. Player mode does not shuttle with the arrows (<kbd>,</kbd> / <kbd>.</kbd>). During real video playback or frame pause, ← / → pause and step one frame (hold repeats after an initial wait)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>With waveform focus only: play from 3 seconds earlier (preroll; not used on the playlist)</td></tr>
@@ -1249,11 +1266,11 @@
           <tr><td>Wheel</td><td>Time zoom (around the playhead; same on the overview)</td></tr>
           <tr><td><kbd>Shift</kbd>+wheel</td><td>Pan (on the waveform)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Amplitude zoom (on the waveform)</td></tr>
-          <tr><td><kbd>F8</kbd></td><td>Video / PDF mini player (toggle; no playlist / transport chrome; <kbd>Escape</kbd> / <kbd>Q</kbd> return to the playlist; details under Per screen)</td></tr>
+          <tr><td><kbd>F8</kbd></td><td>Video / PDF mini player (toggle; no playlist / toolbar chrome; <kbd>Escape</kbd> / <kbd>Q</kbd> return to the playlist; details under Per screen)</td></tr>
           <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (from any mode; pressing <kbd>F9</kbd> again does not leave to the editor; Alt+Shift S / T / L / monitor still work while chrome is hidden, and R / N / P while in the player; details under Per screen / <a href="#layout-player">Player mode</a>)</td></tr>
           <tr><td><kbd>F10</kbd></td><td>Player mode. Not fullscreen. Pressing <kbd>F10</kbd> again does not leave the player (re-applies chrome only). Return to the editor with <kbd>F11</kbd> / <kbd>F12</kbd>. Entering from the editor with unsaved files shows a dialog; you cannot switch until nothing remains unsaved (Save / Don’t Save / Cancel; see <a href="#layout-player">Player mode</a>). During video / PDF real playback or video frame pause, stays in the player, drops to the dim background preview, and restores front chrome = the playlist. Screen, playback, library, and jacket are under the same section.</td></tr>
-          <tr><td><kbd>F11</kbd></td><td>Fullscreen / restore the waveform area (hides the taskbar, like a browser; also hides channel names and the dB scale; keeps the overview and status bar; works while tiled; <kbd>F11</kbd> again restores; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
-          <tr><td><kbd>F12</kbd></td><td>Fullscreen / restore with only the title bar hidden (tabs, transport, meters, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale; works while tiled; <kbd>F12</kbd> again restores; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
+          <tr><td><kbd>F11</kbd></td><td>Fullscreen / restore the waveform area (hides the taskbar, like a browser; also hides WAAPI, channel names, and the dB scale; keeps tabs, the toolbar, and the overview; meters and status bar follow the preset; works while tiled; <kbd>F11</kbd> again restores; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
+          <tr><td><kbd>F12</kbd></td><td>Fullscreen / restore with only the title bar hidden (tabs, toolbar, meters, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale; works while tiled; <kbd>F12</kbd> again restores; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Cycle the tile arrangement (side by side → stacked → grid → off; identical-looking or too-cramped arrangements are skipped; if side-by-side or stacked would not fit, grid is tried; if grid would not fit either, it does nothing; two or more tabs)</td></tr>
           <tr><td><kbd>A</kbd></td><td>Switch spectrogram / overlay (from loudness, goes to spectrogram; not a three-way cycle)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>Return to the waveform (from any view)</td></tr>
@@ -1508,7 +1525,7 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>F8</kbd></td><td>Video / PDF mini player (toggle). Available when a video or PDF is on the back stage and the playlist has something to play (association / argument video launch enters it automatically). <kbd>+</kbd> / <kbd>-</kbd> step 25% (25–300%); drag the border for free resize. <kbd>F8</kbd> again returns to the normal player (playback continues); <kbd>Escape</kbd> / <kbd>Q</kbd> and <kbd>F9</kbd> / <kbd>F10</kbd> return to the playlist. See <a href="#layout-player">Player mode → Screen</a></td></tr>
-          <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (off by default; for when you want to save desktop space). Available from any mode (listed here with other layout keys; not only after F10). The menu bar, library, Favorites, level meters, analyzers, transport, and status bar stay hidden. Alt+Shift S / T / L and the monitor toggles still work while chrome is hidden; Alt+Shift R / N / P also work while in the player. Pressing <kbd>F9</kbd> again does not leave to the editor (re-applies chrome only). Return to the editor with <kbd>F11</kbd> / <kbd>F12</kbd> (stops playback, then keeps only the selected files and clears tab multi-selection). <kbd>F10</kbd> switches to the normal F10 player and keeps playback going. Each mode remembers its own window position and size</td></tr>
+          <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (off by default; for when you want to save desktop space). Available from any mode (listed here with other layout keys; not only after F10). The menu bar, library, Favorites, level meters, analyzers, and status bar stay hidden (the toolbar follows its setting). Alt+Shift S / T / L and the monitor toggles still work while chrome is hidden; Alt+Shift R / N / P also work while in the player. Pressing <kbd>F9</kbd> again does not leave to the editor (re-applies chrome only). Return to the editor with <kbd>F11</kbd> / <kbd>F12</kbd> (stops playback, then keeps only the selected files and clears tab multi-selection). <kbd>F10</kbd> switches to the normal F10 player and keeps playback going. Each mode remembers its own window position and size</td></tr>
           <tr><td><kbd>F1</kbd> / <kbd>F3</kbd></td><td>Unassigned (they no longer focus the tree, Favorites, or the playlist)</td></tr>
           <tr><td><kbd>F2</kbd></td><td>Rename. Tree: the selected folder. Favorites: the selected folder on disk. Playlist: the selected file. Full paths in the catalog are rewritten; <kbd>Ctrl</kbd>+<kbd>F5</kbd> is not required. Separate from Rename File in the editor</td></tr>
           <tr><td><kbd>F7</kbd></td><td>Tree only. Create a new folder directly under the selection, with the name you type. No-op in Favorites and on the playlist</td></tr>
@@ -1543,7 +1560,7 @@
           <tr><td>Tree / Favorites <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>Append recursively without clearing (does not play)</td></tr>
           <tr><td>Tree double-click</td><td>Expand / collapse only (does not add to the playlist; use Enter to add)</td></tr>
           <tr><td>Drop folder onto list</td><td>Same modifiers as Enter (none = clear + shallow, Ctrl = clear + recursive, Shift = append + shallow, Ctrl+Shift = append + recursive)</td></tr>
-          <tr><td><kbd>Space</kbd></td><td>Play only the selected track and stop at its end (whether it advances is Auto Next / <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>). While playing, stops and returns to the start. From the same video’s dim preview, plays from the current position. During real video playback it pauses / resumes, keeps the playlist hidden, and does not drop to the dim preview. <kbd>Escape</kbd> / <kbd>Q</kbd> go back from real playback and bright PDF view. Transport Play is the same</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Play only the selected track and stop at its end (whether it advances is Auto Next / <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>). While playing, stops and returns to the start. From the same video’s dim preview, plays from the current position. During real video playback it pauses / resumes, keeps the playlist hidden, and does not drop to the dim preview. <kbd>Escape</kbd> / <kbd>Q</kbd> go back from real playback and bright PDF view. Toolbar Play is the same</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>Toggle shuffle (<span class="ui">Random</span>; works on an empty playlist; off by default; does not repeat a track until the playlist has played once; the last state is saved across mode switches and the next launch)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td>Toggle <span class="ui">Auto Play</span> (on by default; whether clear-and-add plays the first track; remembers the last state in settings; plain <kbd>P</kbd> is previous track)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>Toggle auto next (<span class="ui">Auto Next</span>; works on an empty playlist; off by default; when on, advances at the end and gapless-prefetches; the last state is saved across mode switches and the next launch; plain <kbd>N</kbd> still steps to the next track)</td></tr>
