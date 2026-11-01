@@ -463,6 +463,9 @@ internal sealed class AppSettings
     /// <summary>ステータスバーの時間をサンプル数で表示。</summary>
     public bool StatusShowSamples { get; set; }
 
+    /// <summary>ループ調整ウィンドウの時間をサンプル数で表示。ステータスバーとは別。</summary>
+    public bool CrossfadeShowSamples { get; set; }
+
     /// <summary>「今は開かない」にしたリモート版。同じ版では再通知しない。</summary>
     public string SkippedUpdateVersion { get; set; } = string.Empty;
 
