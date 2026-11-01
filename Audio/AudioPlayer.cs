@@ -9,6 +9,7 @@ namespace MgaSonicAnvil.Audio;
 internal sealed class AudioPlayer : IDisposable
 {
     private readonly PlaybackSampleProvider _provider = new();
+    private readonly VstInsertEngine _vstInserts = new();
     private IWavePlayer? _output;
     private AudioOutputSettings _settings = AudioOutputSettings.Default;
     private int[] _outputMap = [];
@@ -34,9 +35,16 @@ internal sealed class AudioPlayer : IDisposable
     private long _smoothStampTicks;
     private double _smoothSpeed = 1;
 
+    public AudioPlayer()
+    {
+        _provider.SetVstInsertEngine(_vstInserts);
+    }
+
     public event EventHandler<int>? PlaybackEnded;
 
     public event EventHandler<string>? Diagnostic;
+
+    public VstInsertEngine VstInserts => _vstInserts;
 
     public bool IsPlaying => _playing;
 
@@ -914,6 +922,8 @@ internal sealed class AudioPlayer : IDisposable
             FlushStopOutput();
             _provider.ClearGaplessNext();
             _provider.DisposePlaybackPitch();
+            _provider.SetVstInsertEngine(null);
+            _vstInserts.Dispose();
         }
         finally
         {

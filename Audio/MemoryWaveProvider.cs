@@ -63,6 +63,7 @@ internal sealed class Pcm16WaveProvider : IWaveProvider, IDisposable
 internal sealed partial class PlaybackSampleProvider : ISampleProvider
 {
     private readonly object _gate = new();
+    private VstInsertEngine? _vstInserts;
     private float[] _samples = [];
     private int _usedSamples;
     private int _channels = 2;
@@ -272,15 +273,31 @@ internal sealed partial class PlaybackSampleProvider : ISampleProvider
 
     public bool Ended { get; private set; }
 
+    public void SetVstInsertEngine(VstInsertEngine? engine)
+    {
+        lock (_gate)
+        {
+            _vstInserts = engine;
+        }
+    }
+
     public void SetDeviceSampleRate(int sampleRate)
     {
+        VstInsertEngine? engine;
+        int rate;
+        int channels;
         lock (_gate)
         {
             _deviceRate = Math.Clamp(sampleRate, 1000, 384000);
             WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_deviceRate, Math.Max(1, _outputChannels));
             _rangeClicks.SetDeviceRate(_deviceRate);
             _bpmClicks.SetDeviceRate(_deviceRate);
+            engine = _vstInserts;
+            rate = _deviceRate;
+            channels = Math.Max(1, _outputChannels);
         }
+
+        engine?.Reconfigure(rate, 512, channels);
     }
 
     /// <summary>テスト用。本番は Low / High.wav を <see cref="EnsureRangeClickSamples"/> で読む。</summary>
