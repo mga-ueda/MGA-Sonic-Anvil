@@ -104,6 +104,16 @@ internal sealed class AppSettings
 
     public double WallpaperOpacity { get; set; } = WallpaperOpacityDefault;
 
+    /// <summary>動的背景色（ジャケットウォッシュ）のドリフト／回転アニメ。既定オン。</summary>
+    public bool EnableBackgroundAnimation { get; set; } = true;
+
+    /// <summary>背景色アニメの速度（％）。100（既定）が最遅。大きいほど速い。</summary>
+    public const int BackgroundAnimationSpeedPercentDefault = 100;
+    public const int BackgroundAnimationSpeedPercentMin = BackgroundAnimationSpeedPercentDefault;
+    public const int BackgroundAnimationSpeedPercentMax = 400;
+
+    public int BackgroundAnimationSpeedPercent { get; set; } = BackgroundAnimationSpeedPercentDefault;
+
     public bool AlwaysOnTop { get; set; }
 
     /// <summary>ウィンドウ上部のメニューバーを出す。既定オン。波形右クリックと同じ内容。</summary>
@@ -826,6 +836,37 @@ internal sealed class AppSettings
         string.IsNullOrWhiteSpace(WallpaperPath) ? string.Empty : WallpaperPath.Trim();
 
     public double ResolvedWallpaperOpacity() => ClampWallpaperOpacity(WallpaperOpacity);
+
+    public int ResolvedBackgroundAnimationSpeedPercent() =>
+        ClampBackgroundAnimationSpeedPercent(BackgroundAnimationSpeedPercent);
+
+    /// <summary>1.0 が既定速度。大きいほど速い。</summary>
+    public double ResolvedBackgroundAnimationSpeed() =>
+        ResolvedBackgroundAnimationSpeedPercent() / 100d;
+
+    /// <summary>基準秒数を速度で割る（速いほど短く）。</summary>
+    public double ScaleBackgroundAnimationSeconds(double baseSeconds) =>
+        baseSeconds / Math.Max(0.01, ResolvedBackgroundAnimationSpeed());
+
+    public static int ClampBackgroundAnimationSpeedPercent(int percent) =>
+        Math.Clamp(percent, BackgroundAnimationSpeedPercentMin, BackgroundAnimationSpeedPercentMax);
+
+    public static string FormatBackgroundAnimationSpeedPercent(int percent) =>
+        ClampBackgroundAnimationSpeedPercent(percent)
+            .ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>速度（%）を 5 刻みで動かし、範囲に収める。</summary>
+    public static int NudgeBackgroundAnimationSpeedPercent(int currentPercent, int direction)
+    {
+        var current = ClampBackgroundAnimationSpeedPercent(currentPercent);
+        if (direction == 0)
+        {
+            return current;
+        }
+
+        const int step = 5;
+        return ClampBackgroundAnimationSpeedPercent(current + (direction > 0 ? step : -step));
+    }
 
     public static double ClampWallpaperOpacity(double opacity) =>
         double.IsFinite(opacity) ? Math.Clamp(opacity, 0, 1) : WallpaperOpacityDefault;

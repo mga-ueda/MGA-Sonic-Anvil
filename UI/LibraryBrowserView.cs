@@ -32,8 +32,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     internal const double GlowDriftXSeconds = 9;
     internal const double GlowDriftYSeconds = 13;
     internal const int GlowDriftFrameRate = 16;
-    /// <summary>全画面ウォッシュのキャッシュ解像度。1 だとクロスフェードのたびに巨大ビットマップを作り直す。</summary>
-    internal const double GlowCacheRenderAtScale = 0.35;
+    /// <summary>
+    /// 全画面ウォッシュのキャッシュ解像度。1 だとクロスフェードのたびに巨大ビットマップを作り直す。
+    /// 上げると階調の帯が減るが、ピクセル数は二乗で増える。
+    /// </summary>
+    internal const double GlowCacheRenderAtScale = 0.5;
     /// <summary>
     /// ウォッシュのレイアウト寸法。ウィンドウサイズには追従させない。
     /// 追従すると BitmapCache がモード切替（F11／F12 → F10／F9）のたびに全面を描き直す。
@@ -9197,7 +9200,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     private void ApplyGlowVeil()
     {
         var veil = PlayerChrome.Get("PlayerGlowVeilBrush");
-        var brush = WpfControlHelpers.FrozenBrush(Color.FromRgb(veil.R, veil.G, veil.B));
+        var brush = CreateDitheredVeilBrush(veil);
         _veil.Background = brush;
         _waveVeil.Background = brush;
         var opacity = veil.A / 255d;
@@ -9659,12 +9662,33 @@ internal sealed partial class LibraryBrowserView : UserControl
         _glowDriftStartCount++;
     }
 
-    private static void AnimateGlowDrift(ScaleTransform scale, TranslateTransform translate)
+    private void AnimateGlowDrift(ScaleTransform scale, TranslateTransform translate)
     {
-        scale.BeginAnimation(ScaleTransform.ScaleXProperty, CreateGlowDriftPulse(GlowDriftScaleFrom, GlowDriftScaleTo, GlowDriftScaleSeconds));
-        scale.BeginAnimation(ScaleTransform.ScaleYProperty, CreateGlowDriftPulse(GlowDriftScaleFrom, GlowDriftScaleTo, GlowDriftScaleSeconds));
-        translate.BeginAnimation(TranslateTransform.XProperty, CreateGlowDriftPulse(-GlowDriftX, GlowDriftX, GlowDriftXSeconds));
-        translate.BeginAnimation(TranslateTransform.YProperty, CreateGlowDriftPulse(-GlowDriftY, GlowDriftY, GlowDriftYSeconds));
+        var settings = AppStorage.Settings;
+        scale.BeginAnimation(
+            ScaleTransform.ScaleXProperty,
+            CreateGlowDriftPulse(
+                GlowDriftScaleFrom,
+                GlowDriftScaleTo,
+                settings.ScaleBackgroundAnimationSeconds(GlowDriftScaleSeconds)));
+        scale.BeginAnimation(
+            ScaleTransform.ScaleYProperty,
+            CreateGlowDriftPulse(
+                GlowDriftScaleFrom,
+                GlowDriftScaleTo,
+                settings.ScaleBackgroundAnimationSeconds(GlowDriftScaleSeconds)));
+        translate.BeginAnimation(
+            TranslateTransform.XProperty,
+            CreateGlowDriftPulse(
+                -GlowDriftX,
+                GlowDriftX,
+                settings.ScaleBackgroundAnimationSeconds(GlowDriftXSeconds)));
+        translate.BeginAnimation(
+            TranslateTransform.YProperty,
+            CreateGlowDriftPulse(
+                -GlowDriftY,
+                GlowDriftY,
+                settings.ScaleBackgroundAnimationSeconds(GlowDriftYSeconds)));
     }
 
     private void StopGlowDrift()
@@ -9689,7 +9713,29 @@ internal sealed partial class LibraryBrowserView : UserControl
     }
 
     private bool GlowAnimationAlive() =>
-        IsLoaded && (IsVisible || (_extendGlow && _waveGlowHost is { Visibility: Visibility.Visible }));
+        AppStorage.Settings.EnableBackgroundAnimation
+        && IsLoaded
+        && (IsVisible || (_extendGlow && _waveGlowHost is { Visibility: Visibility.Visible }));
+
+    /// <summary>設定の背景色アニメ ON/OFF・速度をドリフトとウォッシュ回転へ反映する。</summary>
+    internal void ApplyBackgroundAnimationSetting()
+    {
+        // 速度変更時は動き中でも付け直す（Duration は作り直しが必要）。
+        if (_glowDriftRunning)
+        {
+            StopGlowDrift();
+        }
+
+        SyncGlowDrift();
+        if (_artworkGlow && GlowAnimationAlive() && _washTurns.Length > 1)
+        {
+            StartWashTurns();
+        }
+        else
+        {
+            StopWashTurns();
+        }
+    }
 
     private void SyncWashTurns()
     {
@@ -9712,7 +9758,8 @@ internal sealed partial class LibraryBrowserView : UserControl
     private void StartWashTurns()
     {
         _washTurnTimer.Stop();
-        _washTurnTimer.Interval = TimeSpan.FromSeconds(GlowWashTurnSeconds);
+        _washTurnTimer.Interval = TimeSpan.FromSeconds(
+            AppStorage.Settings.ScaleBackgroundAnimationSeconds(GlowWashTurnSeconds));
         _washTurnTimer.Start();
     }
 
@@ -9726,7 +9773,9 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         _washTurn = (_washTurn + 1) % _washTurns.Length;
-        CrossfadeGlowWash(_washTurns[_washTurn], GlowWashTurnFadeSeconds);
+        CrossfadeGlowWash(
+            _washTurns[_washTurn],
+            AppStorage.Settings.ScaleBackgroundAnimationSeconds(GlowWashTurnFadeSeconds));
     }
 
     internal static DoubleAnimation CreateGlowDriftPulse(double from, double to, double seconds)
@@ -9893,12 +9942,74 @@ internal sealed partial class LibraryBrowserView : UserControl
             RadiusY = radius * 0.88,
             MappingMode = BrushMappingMode.RelativeToBoundingBox,
         };
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(alpha, color.R, color.G, color.B), 0));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(alpha * 0.45), color.R, color.G, color.B), 0.45));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, color.R, color.G, color.B), 1));
+        // 折れ線だと傾きの折れ目が輪（マッハバンド）に見えるので、滑らかな減衰を細かい停止点で近似する。
+        for (var i = 0; i <= WashFalloffStops; i++)
+        {
+            var t = i / (double)WashFalloffStops;
+            var a = (byte)Math.Round(alpha * WashFalloff(t));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(a, color.R, color.G, color.B), t));
+        }
+
         brush.Freeze();
         group.Children.Add(new GeometryDrawing(brush, null, new RectangleGeometry(new Rect(0, 0, 1, 1))));
     }
+    internal const int WashFalloffStops = 10;
+
+    /// <summary>色だまりの減衰（中心 1、端 0）。端で傾き 0 になり、途中に折れ目が無い。</summary>
+    internal static double WashFalloff(double t)
+    {
+        t = Math.Clamp(t, 0, 1);
+        var u = 1 - t;
+        var smooth = 1 - (t * t * (3 - (2 * t)));
+        return (0.5 * u * u) + (0.5 * smooth);
+    }
+
+    internal const int VeilDitherTileSize = 64;
+
+    /// <summary>ヴェール色の ±この値（8bit）で揺らす。ヴェール不透明度を掛けた分が実際の揺れ幅。</summary>
+    internal const int VeilDitherAmplitude = 4;
+
+    private static readonly Dictionary<Color, Brush> VeilDitherBrushes = [];
+
+    /// <summary>
+    /// ヴェール色に微小な三角分布ノイズを混ぜたタイル。暗いグラデーションの 8bit の帯を崩す。
+    /// 全面に塗っている単色をタイル画像に替えるだけなので、合成の手間はほぼ変わらない。
+    /// </summary>
+    internal static Brush CreateDitheredVeilBrush(Color veil)
+    {
+        var key = Color.FromRgb(veil.R, veil.G, veil.B);
+        if (VeilDitherBrushes.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        const int size = VeilDitherTileSize;
+        var pixels = new byte[size * size * 4];
+        var random = new Random(0x5A17);
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            var noise = (int)Math.Round((random.NextDouble() + random.NextDouble() - 1) * VeilDitherAmplitude);
+            pixels[i] = (byte)Math.Clamp(key.B + noise, 0, 255);
+            pixels[i + 1] = (byte)Math.Clamp(key.G + noise, 0, 255);
+            pixels[i + 2] = (byte)Math.Clamp(key.R + noise, 0, 255);
+            pixels[i + 3] = 255;
+        }
+
+        var bitmap = BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
+        bitmap.Freeze();
+        var brush = new ImageBrush(bitmap)
+        {
+            TileMode = TileMode.Tile,
+            Stretch = Stretch.None,
+            Viewport = new Rect(0, 0, size, size),
+            ViewportUnits = BrushMappingMode.Absolute,
+        };
+        RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.NearestNeighbor);
+        brush.Freeze();
+        VeilDitherBrushes[key] = brush;
+        return brush;
+    }
+
     /// <summary>彩度の高いピクセルから特徴色を最大 count 色取り出す。</summary>
     internal static Color[] SampleArtworkColors(BitmapSource source, int count)
     {
