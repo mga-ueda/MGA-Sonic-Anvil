@@ -1455,6 +1455,12 @@ public partial class MainWindow
             return true;
         }
 
+        // エディタ: Ctrl+Shift+1–8＝VST インサート（空き＝選択／使用中＝GUI）。
+        if (!IsLibraryMaximized && TryHandleVstInsertSlotShortcut(key, modifiers))
+        {
+            return true;
+        }
+
         // エディタ: 上段 無修飾＝割合、Shift＝マーカー番号、Ctrl＝リージョン番号。
         // テンキーは再生操作（Alt＋テンキーは割合、Ctrl＋テンキーはマーカー番号）。
         if (!IsLibraryMaximized && TryHandleEditorDigitJump(key, modifiers))
@@ -1463,6 +1469,20 @@ public partial class MainWindow
         }
 
         return false;
+    }
+
+    /// <summary>Ctrl+Shift+上段 1–8。空き＝挿入、使用中＝GUI 開閉トグル。</summary>
+    private bool TryHandleVstInsertSlotShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (!IsVstInsertUiEnabled()
+            || BlocksOutsideFadeToolActions
+            || modifiers != (ModifierKeys.Control | ModifierKeys.Shift)
+            || key is < Key.D1 or > Key.D8)
+        {
+            return false;
+        }
+
+        return TryToggleVstInsertSlotShortcut(key - Key.D1);
     }
 
     /// <summary>F8–F12、ステータス／モニター列など、モード横断のトグル。</summary>
@@ -2492,7 +2512,17 @@ public partial class MainWindow
 
         if (key == Key.B && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            if (!IsRecording && ResolveBatchEditTargets().Length >= 2)
+            if (CanBounceSelectedVstInserts())
+            {
+                _ = BakeVstInsertsAsync();
+            }
+
+            return true;
+        }
+
+        if (key == Key.X && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            if (CanMergeSelectedTabs())
             {
                 MergeSelectedTabs();
             }

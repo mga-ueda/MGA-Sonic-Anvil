@@ -329,8 +329,13 @@ internal sealed class RoundedButton : Button
             };
         }
 
-        var textX = Padding.Left + stroke
-            + Math.Max(0d, (innerW - formatted.Width) / 2d);
+        var alignPad = HorizontalContentAlignment switch
+        {
+            HorizontalAlignment.Left => 0d,
+            HorizontalAlignment.Right => Math.Max(0d, innerW - formatted.Width),
+            _ => Math.Max(0d, (innerW - formatted.Width) / 2d),
+        };
+        var textX = Padding.Left + stroke + alignPad;
         var textY = (ActualHeight - formatted.Height) / 2d;
         dc.DrawText(formatted, new Point(textX, textY));
     }
@@ -409,6 +414,30 @@ internal static class ActionButtonLooks
             Theme.Get("ExportButtonHoverBackBrush"),
             Theme.Get("ExportButtonPressedBackBrush"),
             Theme.Get("ExportButtonForeBrush"));
+
+    public static void ApplyVstInsertEmpty(RoundedButton button) =>
+        Apply(
+            button,
+            Theme.Get("VstInsertSlotEmptyFillBrush"),
+            Theme.Get("VstInsertSlotEmptyFocusFillBrush"),
+            Theme.Get("VstInsertSlotEmptyHoverFillBrush"),
+            Theme.Get("VstInsertSlotEmptyBackBrush"),
+            Theme.Get("VstInsertSlotEmptyHoverBackBrush"),
+            Theme.Get("VstInsertSlotEmptyPressedBackBrush"),
+            Theme.Get("VstInsertSlotEmptyForeBrush"),
+            borderSize: 1);
+
+    public static void ApplyVstInsertPersist(RoundedButton button) =>
+        Apply(
+            button,
+            Theme.Get("VstInsertSlotPersistFillBrush"),
+            Theme.Get("VstInsertSlotPersistFocusFillBrush"),
+            Theme.Get("VstInsertSlotPersistHoverFillBrush"),
+            Theme.Get("VstInsertSlotPersistBackBrush"),
+            Theme.Get("VstInsertSlotPersistHoverBackBrush"),
+            Theme.Get("VstInsertSlotPersistPressedBackBrush"),
+            Theme.Get("VstInsertSlotPersistForeBrush"),
+            borderSize: 1);
 
     public static void ApplyStatusExport(RoundedButton button)
     {

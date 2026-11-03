@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -10,6 +11,9 @@ namespace MgaSonicAnvil.UI;
 /// <summary>
 /// VST3 IPlugView ホスト。クライアント領域＝プラグイン getSize（ピクセル）。
 /// resizeView → 窓サイズ変更 → onSize。ユーザーリサイズも canResize / checkSizeConstraint 経由。
+/// ContentScale API は使わない（OS DPI と二重になり Softube 等で巨大化するため）。
+/// 同一サイズの MoveWindow / SetWindowPos / onSize はスキップする（ネイティブ
+/// プリセット・コンボが親の再レイアウトで即閉じるのを防ぐ）。
 /// </summary>
 internal sealed class VstPluginEditorWindow : Window
 {
@@ -20,6 +24,10 @@ internal sealed class VstPluginEditorWindow : Window
     private bool _syncingFromUser;
     private DispatcherTimer? _sizePollTimer;
     private int _sizePollRemaining;
+    private int _appliedClientW;
+    private int _appliedClientH;
+    private bool _userMoved;
+    private bool _ignoreLocationChanged;
 
     public VstPluginEditorWindow(Window? owner, Vst3EditorSession session)
     {
@@ -27,9 +35,7 @@ internal sealed class VstPluginEditorWindow : Window
         Title = session.Title;
         Owner = owner;
         ShowInTaskbar = false;
-        WindowStartupLocation = owner is null
-            ? WindowStartupLocation.CenterScreen
-            : WindowStartupLocation.CenterOwner;
+        WindowStartupLocation = WindowStartupLocation.Manual;
         Background = Brushes.Black;
         SizeToContent = SizeToContent.Manual;
         ResizeMode = ResizeMode.CanResize;
@@ -47,9 +53,13 @@ internal sealed class VstPluginEditorWindow : Window
         Content = _host;
 
         session.ResizeFromPlugin += OnPluginResize;
-        SourceInitialized += (_, _) => ApplyPluginPixelSize(w, h, notifyPlugin: false);
+        SourceInitialized += (_, _) => SyncFromPluginSize(notifyPlugin: false);
         SizeChanged += OnHostSizeChanged;
+        LocationChanged += OnLocationChanged;
         Loaded += OnLoaded;
+        // WPF 側に残ったフォーカスが描画タイミングで戻ると、プラグインの
+        // ネイティブ・ポップアップがフォーカスを失って閉じることがある。
+        Activated += (_, _) => Keyboard.ClearFocus();
         Closed += (_, _) =>
         {
             StopSizePoll();
@@ -62,7 +72,16 @@ internal sealed class VstPluginEditorWindow : Window
         };
     }
 
-    public int SlotIndex { get; init; } = -1;
+    public int SlotIndex { get; set; } = -1;
+
+    /// <summary>配置の基準（MainWindow）。Owner は付けないが中央寄せに使う。</summary>
+    public Window? PlacementOwner { get; set; }
+
+    /// <summary>true のあいだはサイズ確定のたびに PlacementOwner 中央へ寄せ直す。</summary>
+    public bool RecenterUntilUserMoves { get; set; }
+
+    /// <summary>セッション内で復元する左上（DIP）。無ければ初回中央。</summary>
+    public Point? RememberedTopLeft { get; set; }
 
     /// <summary>
     /// false のとき Closed で音声サスペンドを戻さない（差し替え破棄中のデッドロック防止）。
@@ -166,9 +185,51 @@ internal sealed class VstPluginEditorWindow : Window
                 return;
             }
 
-            SyncFromPluginSize(notifyPlugin: true);
+            SyncFromPluginSize(notifyPlugin: false);
+            ApplyPlacement();
             StartSizePoll();
         }, DispatcherPriority.Loaded);
+    }
+
+    private void OnLocationChanged(object? sender, EventArgs e)
+    {
+        if (_closing || _ignoreLocationChanged || _applyingSize || !IsLoaded)
+        {
+            return;
+        }
+
+        _userMoved = true;
+        RecenterUntilUserMoves = false;
+    }
+
+    /// <summary>初回はアプリ中央、再表示は記憶位置。いずれも作業領域内へ収める。</summary>
+    public void ApplyPlacement()
+    {
+        if (_closing)
+        {
+            return;
+        }
+
+        _ignoreLocationChanged = true;
+        try
+        {
+            if (RecenterUntilUserMoves && !_userMoved)
+            {
+                WindowPlacement.PlaceFloating(this, PlacementOwner, rememberedTopLeft: null);
+            }
+            else if (RememberedTopLeft is { } remembered && !_userMoved)
+            {
+                WindowPlacement.PlaceFloating(this, PlacementOwner, remembered);
+            }
+            else
+            {
+                WindowPlacement.EnsureOnScreen(this);
+            }
+        }
+        finally
+        {
+            _ignoreLocationChanged = false;
+        }
     }
 
     /// <summary>Altiverb 等は attach 直後の getSize が小さく、後から resizeView / getSize が変わる。</summary>
@@ -188,7 +249,7 @@ internal sealed class VstPluginEditorWindow : Window
                 return;
             }
 
-            SyncFromPluginSize(notifyPlugin: true);
+            SyncFromPluginSize(notifyPlugin: false);
         };
         _sizePollTimer.Start();
     }
@@ -208,10 +269,10 @@ internal sealed class VstPluginEditorWindow : Window
     {
         try
         {
-            var after = _session.GetSize();
-            if (after.Width > 0 && after.Height > 0)
+            var size = _session.GetSize();
+            if (size.Width > 0 && size.Height > 0)
             {
-                ApplyPluginPixelSize(after.Width, after.Height, notifyPlugin);
+                ApplyPluginPixelSize(size.Width, size.Height, notifyPlugin);
             }
         }
         catch
@@ -221,6 +282,7 @@ internal sealed class VstPluginEditorWindow : Window
 
     private void OnPluginResize(Vst3HostNative.ViewRect rect)
     {
+        // 音声処理中に resizeView が連打されても、同一サイズなら Apply 側で無視する。
         Dispatcher.BeginInvoke(() =>
         {
             if (_closing)
@@ -228,9 +290,8 @@ internal sealed class VstPluginEditorWindow : Window
                 return;
             }
 
-            // VST3: resizeView 受理後はホストが窓を変え、続けて onSize を呼ぶ
             ApplyPluginPixelSize(rect.Width, rect.Height, notifyPlugin: true);
-        });
+        }, DispatcherPriority.Background);
     }
 
     private void OnHostSizeChanged(object sender, SizeChangedEventArgs e)
@@ -245,7 +306,6 @@ internal sealed class VstPluginEditorWindow : Window
             return;
         }
 
-        // プラグイン起因の適用中以外＝ユーザー／システムによる枠変更
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero || !GetClientRect(hwnd, out var client))
         {
@@ -254,9 +314,14 @@ internal sealed class VstPluginEditorWindow : Window
 
         var pixelW = Math.Max(1, client.Right - client.Left);
         var pixelH = Math.Max(1, client.Bottom - client.Top);
+        // こちらが Apply した直後の SizeChanged や、DIP 丸めの揺らぎは無視する。
+        if (pixelW == _appliedClientW && pixelH == _appliedClientH)
+        {
+            return;
+        }
+
         if (!_session.CanResize())
         {
-            // リサイズ不可ならプラグイン希望サイズへ戻す
             SyncFromPluginSize(notifyPlugin: false);
             return;
         }
@@ -294,6 +359,12 @@ internal sealed class VstPluginEditorWindow : Window
             return;
         }
 
+        // 同一サイズの再適用はネイティブ・コンボを閉じる（MoveWindow / onSize）。
+        if (pixelW == _appliedClientW && pixelH == _appliedClientH)
+        {
+            return;
+        }
+
         _applyingSize = true;
         try
         {
@@ -302,6 +373,8 @@ internal sealed class VstPluginEditorWindow : Window
             _host.Height = pixelH / dipScale;
             _host.ResizeTo(pixelW, pixelH);
             FitWindowToClientPixels(pixelW, pixelH);
+            _appliedClientW = pixelW;
+            _appliedClientH = pixelH;
 
             if (notifyPlugin)
             {
@@ -313,6 +386,9 @@ internal sealed class VstPluginEditorWindow : Window
                     Bottom = pixelH,
                 });
             }
+
+            // getSize が後から大きくなると見切れるので、サイズ確定のたびに配置を直す。
+            ApplyPlacement();
         }
         finally
         {
@@ -357,6 +433,14 @@ internal sealed class VstPluginEditorWindow : Window
         var chromeH = (window.Bottom - window.Top) - (client.Bottom - client.Top);
         var targetW = Math.Max(1, clientW + chromeW);
         var targetH = Math.Max(1, clientH + chromeH);
+        var currentW = window.Right - window.Left;
+        var currentH = window.Bottom - window.Top;
+        if (currentW == targetW && currentH == targetH
+            && client.Right - client.Left == clientW
+            && client.Bottom - client.Top == clientH)
+        {
+            return;
+        }
 
         Width = targetW / scale;
         Height = targetH / scale;
@@ -377,13 +461,13 @@ internal sealed class VstPluginEditorWindow : Window
         private IntPtr _child;
         private int _pixelW;
         private int _pixelH;
+        private System.Windows.Rect _lastWindowPos;
 
         public VstHwndHost(Vst3EditorSession session, int pixelW, int pixelH)
         {
             _session = session;
             _pixelW = Math.Max(1, pixelW);
             _pixelH = Math.Max(1, pixelH);
-            // 初期はピクセル＝DIP 近似。親が ApplyPluginPixelSize で DPI 補正する。
             Width = _pixelW;
             Height = _pixelH;
             HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -392,12 +476,34 @@ internal sealed class VstPluginEditorWindow : Window
 
         public void ResizeTo(int pixelW, int pixelH)
         {
-            _pixelW = Math.Max(1, pixelW);
-            _pixelH = Math.Max(1, pixelH);
+            pixelW = Math.Max(1, pixelW);
+            pixelH = Math.Max(1, pixelH);
+            if (pixelW == _pixelW && pixelH == _pixelH && _child != IntPtr.Zero)
+            {
+                return;
+            }
+
+            _pixelW = pixelW;
+            _pixelH = pixelH;
             if (_child != IntPtr.Zero)
             {
                 MoveWindow(_child, 0, 0, _pixelW, _pixelH, true);
             }
+        }
+
+        /// <summary>
+        /// WPF の LayoutUpdated 経路は同一矩形でも MoveWindow し、
+        /// プラグイン内コンボを閉じることがある。変化時だけ親実装へ渡す。
+        /// </summary>
+        protected override void OnWindowPositionChanged(System.Windows.Rect rcBoundingBox)
+        {
+            if (rcBoundingBox == _lastWindowPos)
+            {
+                return;
+            }
+
+            _lastWindowPos = rcBoundingBox;
+            base.OnWindowPositionChanged(rcBoundingBox);
         }
 
         protected override HandleRef BuildWindowCore(HandleRef hwndParent)
@@ -476,48 +582,14 @@ internal sealed class VstPluginEditorWindow : Window
 
             _child = IntPtr.Zero;
         }
-
-        private const int WsChild = 0x40000000;
-        private const int WsVisible = 0x10000000;
-        private const int WsClipChildren = 0x02000000;
-        private const int WsClipSiblings = 0x04000000;
-        private const int WmEraseBkgnd = 0x0014;
-        private const int WmSize = 0x0005;
-
-        [DllImport("user32", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern IntPtr CreateWindowEx(
-            int dwExStyle,
-            string lpClassName,
-            string lpWindowName,
-            int dwStyle,
-            int x,
-            int y,
-            int nWidth,
-            int nHeight,
-            IntPtr hWndParent,
-            IntPtr hMenu,
-            IntPtr hInstance,
-            IntPtr lpParam);
-
-        [DllImport("user32", SetLastError = true)]
-        private static extern bool DestroyWindow(IntPtr hWnd);
-
-        [DllImport("user32", SetLastError = true)]
-        private static extern bool MoveWindow(IntPtr hWnd, int x, int y, int nWidth, int nHeight, bool bRepaint);
-
-        [DllImport("user32", SetLastError = true)]
-        private static extern bool GetClientRect(IntPtr hWnd, out NativeRect lpRect);
-
-        [DllImport("gdi32", SetLastError = true)]
-        private static extern IntPtr CreateSolidBrush(int colorRef);
-
-        [DllImport("gdi32", SetLastError = true)]
-        private static extern bool DeleteObject(IntPtr hObject);
-
-        [DllImport("user32", SetLastError = true)]
-        private static extern int FillRect(IntPtr hDC, ref NativeRect lprc, IntPtr hbr);
     }
 
+    private const int WmSize = 0x0005;
+    private const int WmEraseBkgnd = 0x0014;
+    private const int WsChild = 0x40000000;
+    private const int WsVisible = 0x10000000;
+    private const int WsClipChildren = 0x02000000;
+    private const int WsClipSiblings = 0x04000000;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpNoCopyBits = 0x0100;
@@ -531,13 +603,34 @@ internal sealed class VstPluginEditorWindow : Window
         public int Bottom;
     }
 
-    [DllImport("user32", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CreateWindowEx(
+        int dwExStyle,
+        string lpClassName,
+        string lpWindowName,
+        int dwStyle,
+        int x,
+        int y,
+        int nWidth,
+        int nHeight,
+        IntPtr hWndParent,
+        IntPtr hMenu,
+        IntPtr hInstance,
+        IntPtr lpParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool MoveWindow(IntPtr hWnd, int x, int y, int nWidth, int nHeight, bool bRepaint);
+
+    [DllImport("user32.dll")]
     private static extern bool GetClientRect(IntPtr hWnd, out NativeRect lpRect);
 
-    [DllImport("user32", SetLastError = true)]
+    [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect lpRect);
 
-    [DllImport("user32", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(
         IntPtr hWnd,
         IntPtr hWndInsertAfter,
@@ -546,4 +639,13 @@ internal sealed class VstPluginEditorWindow : Window
         int cx,
         int cy,
         uint uFlags);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateSolidBrush(int color);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr hObject);
+
+    [DllImport("user32.dll")]
+    private static extern int FillRect(IntPtr hDC, ref NativeRect lprc, IntPtr hbr);
 }

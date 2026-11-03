@@ -429,6 +429,152 @@ internal static class WindowPlacement
         window.Top = bounds.Y;
     }
 
+    /// <summary>
+    /// フローティング窓の配置矩形。記憶位置があればそこへ、無ければオーナー中央。
+    /// 最後に作業領域へ押し込む（サイズは切らず位置だけ）。
+    /// </summary>
+    public static Rect ResolveFloatingPlacement(
+        double width,
+        double height,
+        Rect? ownerBounds,
+        Point? rememberedTopLeft,
+        Rect workArea)
+    {
+        width = Math.Max(1, width);
+        height = Math.Max(1, height);
+        Rect bounds;
+        if (rememberedTopLeft is { } pos)
+        {
+            bounds = new Rect(pos.X, pos.Y, width, height);
+        }
+        else if (ownerBounds is { } owner && owner.Width > 1 && owner.Height > 1)
+        {
+            bounds = CenteredOn(owner, width, height);
+        }
+        else
+        {
+            bounds = CenteredOn(workArea, width, height);
+        }
+
+        var clamped = ClampRectToWorkArea(bounds, workArea);
+        // VST 等は外寸をプラグインが決めるので、はみ出し補正は位置だけ返す。
+        return new Rect(clamped.X, clamped.Y, width, height);
+    }
+
+    /// <summary>
+    /// オーナー中央（または記憶位置）へ置き、作業領域からはみ出さないよう位置だけ動かす。
+    /// </summary>
+    public static void PlaceFloating(Window window, Window? owner, Point? rememberedTopLeft)
+    {
+        var width = window.ActualWidth > 1 ? window.ActualWidth : window.Width;
+        var height = window.ActualHeight > 1 ? window.ActualHeight : window.Height;
+        if (width <= 1)
+        {
+            width = Math.Max(window.MinWidth, 1);
+        }
+
+        if (height <= 1)
+        {
+            height = Math.Max(window.MinHeight, 1);
+        }
+
+        if (rememberedTopLeft is { } pos)
+        {
+            var probe = new Rect(pos.X, pos.Y, width, height);
+            if (!IsVisibleOnAnyScreen(probe))
+            {
+                rememberedTopLeft = null;
+            }
+        }
+
+        Rect? ownerBounds = null;
+        if (owner is not null)
+        {
+            var ownerWidth = owner.ActualWidth > 1 ? owner.ActualWidth : owner.Width;
+            var ownerHeight = owner.ActualHeight > 1 ? owner.ActualHeight : owner.Height;
+            ownerBounds = new Rect(
+                owner.Left,
+                owner.Top,
+                Math.Max(1, ownerWidth),
+                Math.Max(1, ownerHeight));
+        }
+
+        var work = ResolveFloatingWorkArea(window, owner, rememberedTopLeft, ownerBounds);
+        var placed = ResolveFloatingPlacement(width, height, ownerBounds, rememberedTopLeft, work);
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = placed.X;
+        window.Top = placed.Y;
+    }
+
+    /// <summary>現在の外寸のまま、作業領域内へ位置だけ押し込む。</summary>
+    public static void EnsureOnScreen(Window window)
+    {
+        var width = window.ActualWidth > 1 ? window.ActualWidth : window.Width;
+        var height = window.ActualHeight > 1 ? window.ActualHeight : window.Height;
+        if (width <= 1)
+        {
+            width = Math.Max(window.MinWidth, 1);
+        }
+
+        if (height <= 1)
+        {
+            height = Math.Max(window.MinHeight, 1);
+        }
+
+        var bounds = new Rect(window.Left, window.Top, width, height);
+        if (!TryGetWorkAreaDipForPoint(
+                bounds.X + bounds.Width * 0.5,
+                bounds.Y + bounds.Height * 0.5,
+                out var work)
+            && !TryGetContainingMonitorWorkDip(window, out work))
+        {
+            work = SystemParameters.WorkArea;
+        }
+
+        var clamped = ClampRectToWorkArea(bounds, work);
+        if (Math.Abs(clamped.X - window.Left) < 0.5 && Math.Abs(clamped.Y - window.Top) < 0.5)
+        {
+            return;
+        }
+
+        window.Left = clamped.X;
+        window.Top = clamped.Y;
+    }
+
+    private static Rect ResolveFloatingWorkArea(
+        Window window,
+        Window? owner,
+        Point? rememberedTopLeft,
+        Rect? ownerBounds)
+    {
+        if (rememberedTopLeft is { } pos
+            && TryGetWorkAreaDipForPoint(pos.X, pos.Y, out var rememberedWork))
+        {
+            return rememberedWork;
+        }
+
+        if (ownerBounds is { } ownerRect
+            && TryGetWorkAreaDipForPoint(
+                ownerRect.X + ownerRect.Width * 0.5,
+                ownerRect.Y + ownerRect.Height * 0.5,
+                out var ownerWork))
+        {
+            return ownerWork;
+        }
+
+        if (owner is not null && TryGetContainingMonitorWorkDip(owner, out var ownerMonitor))
+        {
+            return ownerMonitor;
+        }
+
+        if (TryGetContainingMonitorWorkDip(window, out var windowWork))
+        {
+            return windowWork;
+        }
+
+        return SystemParameters.WorkArea;
+    }
+
     /// <summary>アンカーがあるディスプレイの中央へ置く。位置の保存があるときは呼ばない。</summary>
     public static void CenterOnContainingMonitor(Window window, Window? anchor)
     {

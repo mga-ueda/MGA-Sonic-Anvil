@@ -75,6 +75,7 @@ public partial class MainWindow
         HistoryStrip.InvalidateVisual();
         HistoryOverlay.RefreshAppearance();
         RefreshHistoryOverlay();
+        VstInsertRack.ApplyTheme();
         LoudnessMeter.ApplyValueColors();
         Transport.RefreshAppearance();
         TimeScrollStrip.RefreshAppearance();
