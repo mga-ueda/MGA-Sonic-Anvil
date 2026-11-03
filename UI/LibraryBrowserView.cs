@@ -6195,10 +6195,44 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
-        if (sender is TreeViewItem item)
+        if (sender is not TreeViewItem item)
         {
-            LoadChildren(item);
-            RememberExplorerExpanded(item, expanded: true);
+            return;
+        }
+
+        LoadChildren(item);
+        RememberExplorerExpanded(item, expanded: true);
+        if (_treeExpansionBusy)
+        {
+            return;
+        }
+
+        // 子のレイアウト後に、展開した行がビューポート先頭へ来るよう寄せる。
+        Dispatcher.BeginInvoke(
+            () => ScrollExplorerItemToTop(item),
+            DispatcherPriority.Loaded);
+    }
+
+    private void ScrollExplorerItemToTop(TreeViewItem item)
+    {
+        if (_treeExpansionBusy || !item.IsExpanded || !item.IsVisible)
+        {
+            return;
+        }
+
+        if (FindDescendantScrollViewer(_folderTree) is not { } scroll)
+        {
+            return;
+        }
+
+        try
+        {
+            item.UpdateLayout();
+            var top = item.TransformToAncestor(scroll).Transform(new Point(0, 0)).Y;
+            scroll.ScrollToVerticalOffset(Math.Max(0, scroll.VerticalOffset + top));
+        }
+        catch (InvalidOperationException)
+        {
         }
     }
 

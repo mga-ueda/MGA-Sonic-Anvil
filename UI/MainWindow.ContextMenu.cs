@@ -1106,7 +1106,8 @@ public partial class MainWindow
             CanCloseOtherTabs = hasDoc && !busy && !recording && _sessions.Count > 1,
             CanCloseTabsToRight = CanCloseTabsFromActive(rightSide: true, hasDoc, busy, recording),
             CanCloseTabsToLeft = CanCloseTabsFromActive(rightSide: false, hasDoc, busy, recording),
-            CanMergeTabs = !busy && !recording && ResolveBatchEditTargets().Length >= 2,
+            CanMergeTabs = CanMergeSelectedTabs(),
+            CanBounce = CanBounceSelectedVstInserts(),
             HasSelectedTabs = IsLibraryMaximized
                 ? LibraryBrowser.SelectedSessions.Length > 0
                 : selectedTabs.Length > 0,

@@ -24,6 +24,7 @@ public partial class MainWindow
                 if (IsLibraryMaximized)
                 {
                     Waveform.TryRemovePlayerScratchMarkers(_waveMenuHit.MarkerFrames);
+                    RefreshTransportCommandsEnabled();
                 }
                 else
                 {
@@ -48,7 +49,10 @@ public partial class MainWindow
                 if (IsLibraryMaximized)
                 {
                     SyncPlayerScratchEnabled();
-                    Waveform.TryAddPlayerScratchMarker(_waveMenuHit.Frame);
+                    if (Waveform.TryAddPlayerScratchMarker(_waveMenuHit.Frame))
+                    {
+                        RefreshTransportCommandsEnabled();
+                    }
                 }
                 else
                 {
@@ -458,6 +462,9 @@ public partial class MainWindow
                 break;
             case WaveMenuCommand.MergeTabs:
                 MergeSelectedTabs();
+                break;
+            case WaveMenuCommand.Bounce:
+                _ = BakeVstInsertsAsync();
                 break;
             case WaveMenuCommand.DeleteFile:
                 if (HasTabSelection)

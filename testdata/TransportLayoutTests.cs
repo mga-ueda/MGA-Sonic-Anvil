@@ -23,7 +23,7 @@ public sealed class TransportLayoutTests
     [Fact]
     public void TransportRowHeight_CoversOneButtonRow()
     {
-        var oneRow = DesignMetrics.From96(4) + DesignMetrics.TransportButtonSide;
+        var oneRow = DesignMetrics.From96(2) + DesignMetrics.TransportButtonSide;
         Assert.Equal(oneRow, DesignMetrics.TransportRowHeight);
     }
 

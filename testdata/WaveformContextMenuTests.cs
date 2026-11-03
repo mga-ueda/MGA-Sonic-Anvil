@@ -250,7 +250,10 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.DuplicateFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Equal("Ctrl+Shift+D", Find(tree, WaveMenuCommand.DuplicateFile)?.Gesture);
             Assert.Contains(WaveMenuCommand.MergeTabs, CommandsIn(tree, UiStrings.WaveMenuCatExport));
-            Assert.Equal("Ctrl+Shift+B", Find(tree, WaveMenuCommand.MergeTabs)?.Gesture);
+            Assert.Equal("Ctrl+Shift+X", Find(tree, WaveMenuCommand.MergeTabs)?.Gesture);
+            Assert.Contains(WaveMenuCommand.Bounce, CommandsIn(tree, UiStrings.WaveMenuCatExport));
+            Assert.Equal("Ctrl+Shift+B", Find(tree, WaveMenuCommand.Bounce)?.Gesture);
+            Assert.DoesNotContain(WaveMenuCommand.Bounce, CommandsIn(tree, UiStrings.WaveMenuCatAudio));
             Assert.Contains(WaveMenuCommand.DeleteFile, CommandsIn(tree, UiStrings.WaveMenuCatFile));
             Assert.Contains(WaveMenuCommand.CloseTab, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Contains(WaveMenuCommand.CloseOthers, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
@@ -424,6 +427,7 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(ready, WaveMenuCommand.CopyFilePath)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.DuplicateFile)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.MergeTabs)?.Enabled);
+        Assert.False(Find(ready, WaveMenuCommand.Bounce)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.DeleteFile)?.Enabled);
         var canMerge = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {
@@ -431,6 +435,12 @@ public sealed class WaveformContextMenuTests
             CanMergeTabs = true,
         });
         Assert.True(Find(canMerge, WaveMenuCommand.MergeTabs)?.Enabled);
+        var canBounce = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanBounce = true,
+        });
+        Assert.True(Find(canBounce, WaveMenuCommand.Bounce)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.PlayExit)?.Enabled);
         var recording = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {
@@ -470,6 +480,9 @@ public sealed class WaveformContextMenuTests
             HasSelection = true,
             HasMarkers = true,
             AllowsRegionsAndLoops = true,
+            SelectedTabsHaveMarkers = true,
+            SelectedTabsHaveRegions = true,
+            SelectedTabsHaveSampleLoop = true,
         });
         Assert.False(Find(tree, WaveMenuCommand.Undo)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.FadeIn)?.Enabled);
@@ -517,7 +530,7 @@ public sealed class WaveformContextMenuTests
         Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.Channels)?.Gesture));
         Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.InsertSilence)?.Gesture));
         Assert.True(string.IsNullOrEmpty(Find(tree, WaveMenuCommand.DetectSilence)?.Gesture));
-        Assert.Equal("Ctrl+Shift+B", Find(tree, WaveMenuCommand.MergeTabs)?.Gesture);
+        Assert.Equal("Ctrl+Shift+X", Find(tree, WaveMenuCommand.MergeTabs)?.Gesture);
         var mp3Only = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {
             HasDocument = true,

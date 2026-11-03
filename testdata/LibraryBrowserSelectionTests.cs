@@ -1095,7 +1095,7 @@ public sealed class LibraryBrowserSelectionTests
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[1]).InputGestureText));
             Assert.True(string.IsNullOrEmpty(((MenuItem)listFormat.Items[2]).InputGestureText));
             Assert.Equal("Ctrl+Shift+M", ((MenuItem)listExport.Items[1]).InputGestureText);
-            Assert.Equal("Ctrl+Shift+B", ((MenuItem)listExport.Items[2]).InputGestureText);
+            Assert.Equal("Ctrl+Shift+X", ((MenuItem)listExport.Items[2]).InputGestureText);
             // コピー／エクスプローラーは例外でその他の先頭。
             Assert.Equal(UiStrings.LibraryMenuCopyFileName, (string)((MenuItem)listOther.Items[0]).Header);
             Assert.Equal(UiStrings.LibraryMenuCopyFilePath, (string)((MenuItem)listOther.Items[1]).Header);

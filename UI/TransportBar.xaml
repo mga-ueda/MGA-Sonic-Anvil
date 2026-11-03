@@ -12,5 +12,5 @@
              Orientation="Horizontal"
              HorizontalAlignment="Center"
              VerticalAlignment="Top"
-             Margin="8,2,8,2" />
+             Margin="8,1,8,1" />
 </UserControl>

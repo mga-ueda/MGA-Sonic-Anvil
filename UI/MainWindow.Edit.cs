@@ -2428,23 +2428,25 @@ public partial class MainWindow
                 saveAfter: IsLibraryMaximized,
                 ensurePcm: IsLibraryMaximized,
                 warnIfSkipped: !IsLibraryMaximized);
+            // 捨てマーカーは即消えている。バッチ完了前でもボタンを落とす。
+            RefreshTransportCommandsEnabled();
             return;
         }
 
-        if (_document is null || _document.Markers.Count == 0)
+        if (_document is not null && _document.Markers.Count > 0)
         {
-            return;
+            var command = ProcessEdits.ClearAllMarkers(_document);
+            if (command is not null)
+            {
+                _history.Do(_document, command);
+                Waveform.ClearMarkerSelection();
+                AfterMarkerEdit();
+                return;
+            }
         }
 
-        var command = ProcessEdits.ClearAllMarkers(_document);
-        if (command is null)
-        {
-            return;
-        }
-
-        _history.Do(_document, command);
-        Waveform.ClearMarkerSelection();
-        AfterMarkerEdit();
+        // ドキュメント側にマーカーが無くても（捨てマーカーのみ等）無効化する。
+        RefreshTransportCommandsEnabled();
     }
 
     private void ApplyDeleteAllRegions()
@@ -2462,23 +2464,26 @@ public partial class MainWindow
                     return ProcessEdits.ClearAllRegions(document);
                 }))
         {
+            // バッチ完了前でも、今のタブは既に消えている場合があるのでボタンを落とす。
+            RefreshTransportCommandsEnabled();
             return;
         }
 
-        if (_document is null || !_document.AllowsRegionsAndLoops || _document.Regions.Count == 0)
+        if (_document is not null
+            && _document.AllowsRegionsAndLoops
+            && _document.Regions.Count > 0)
         {
-            return;
+            var command = ProcessEdits.ClearAllRegions(_document);
+            if (command is not null)
+            {
+                _history.Do(_document, command);
+                Waveform.ClearMarkerSelection();
+                AfterMarkerEdit();
+                return;
+            }
         }
 
-        var command = ProcessEdits.ClearAllRegions(_document);
-        if (command is null)
-        {
-            return;
-        }
-
-        _history.Do(_document, command);
-        Waveform.ClearMarkerSelection();
-        AfterMarkerEdit();
+        RefreshTransportCommandsEnabled();
     }
 
     private void ClearMarkers(IReadOnlyList<long> frames)
@@ -2674,7 +2679,13 @@ public partial class MainWindow
             return false;
         }
 
-        return Waveform.TryAddPlayerScratchMarker(Waveform.PlayheadFrame);
+        if (!Waveform.TryAddPlayerScratchMarker(Waveform.PlayheadFrame))
+        {
+            return false;
+        }
+
+        RefreshTransportCommandsEnabled();
+        return true;
     }
 
     /// <summary>
@@ -2718,6 +2729,7 @@ public partial class MainWindow
         if (Waveform.HasSelectedMarkers)
         {
             Waveform.TryRemovePlayerScratchMarkers(Waveform.SelectedMarkerFrames.ToArray());
+            RefreshTransportCommandsEnabled();
         }
     }
 
@@ -3125,6 +3137,8 @@ public partial class MainWindow
         SyncViewChrome();
         RefreshStatus();
         RefreshHistoryStrip();
+        // 追加／削除のあと「すべてのマーカーを削除」などが押せる状態へ更新する。
+        RefreshTransportCommandsEnabled();
     }
 
     private void UndoOrRedoPlayerScratch(bool redo)
@@ -3134,6 +3148,7 @@ public partial class MainWindow
         if (ok)
         {
             SyncPlayWindowFromDocument();
+            RefreshTransportCommandsEnabled();
         }
     }
 
@@ -3485,6 +3500,7 @@ public partial class MainWindow
         RefreshStatus();
         RefreshHistoryStrip();
         RefreshLibraryBrowser();
+        RefreshTransportCommandsEnabled();
         if (_document.Channels != _autoSpeakerSeenChannels)
         {
             TryApplyAutoSpeaker();

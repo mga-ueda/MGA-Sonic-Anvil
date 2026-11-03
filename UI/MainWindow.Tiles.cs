@@ -1128,7 +1128,9 @@ public partial class MainWindow
     }
 
     private bool IsLiveWaveform(object? sender) =>
-        !_bindingWorkspace && !_tileLayoutBusy && ReferenceEquals(sender, Waveform);
+        !_bindingWorkspace
+        && !_tileLayoutBusy
+        && (ReferenceEquals(sender, Waveform) || ReferenceEquals(sender, PrimaryWaveform));
 
     private void OnWaveformAnalysisViewChanged(object? sender, EventArgs e)
     {

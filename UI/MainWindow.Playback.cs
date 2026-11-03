@@ -280,6 +280,9 @@ public partial class MainWindow
             case TransportCommand.MergeTabs:
                 MergeSelectedTabs();
                 break;
+            case TransportCommand.Bounce:
+                _ = BakeVstInsertsAsync();
+                break;
             case TransportCommand.CopyFileName:
                 CopySessionPathTexts(fullPath: false);
                 break;
@@ -1297,6 +1300,7 @@ public partial class MainWindow
 
         Overview.InvalidateVisual();
         RefreshStatus();
+        RefreshTransportCommandsEnabled();
         if (_document is null || !IsPlaybackActive())
         {
             _ = Waveform.TakePendingSelectionPrerollJump();
@@ -2263,22 +2267,22 @@ public partial class MainWindow
                     return ProcessEdits.SetSampleLoop(document, WaveSelection.Empty);
                 }))
         {
+            RefreshTransportCommandsEnabled();
             return;
         }
 
-        if (_document is null || _document.SampleLoop.IsEmpty)
+        if (_document is not null && !_document.SampleLoop.IsEmpty)
         {
-            return;
+            var command = ProcessEdits.SetSampleLoop(_document, WaveSelection.Empty);
+            if (command is not null)
+            {
+                _history.Do(_document, command);
+                AfterMarkerEdit();
+                return;
+            }
         }
 
-        var command = ProcessEdits.SetSampleLoop(_document, WaveSelection.Empty);
-        if (command is null)
-        {
-            return;
-        }
-
-        _history.Do(_document, command);
-        AfterMarkerEdit();
+        RefreshTransportCommandsEnabled();
     }
 
     private bool TrySetRegionFromSelection(bool quiet = false)

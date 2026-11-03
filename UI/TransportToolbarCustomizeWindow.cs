@@ -492,7 +492,7 @@ internal sealed class TransportToolbarCustomizeWindow : Window
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 0, 14, 0),
             };
-            item.Children.Add(new ToolbarListIcon
+            item.Children.Add(new TransportIconGlyph
             {
                 Icon = variant.Icon,
                 IsPlaying = variant.Playing,
@@ -669,8 +669,8 @@ internal sealed class TransportToolbarCustomizeWindow : Window
             UIElement.VisibilityProperty,
             new System.Windows.Data.Binding(nameof(LayoutRow.CommandVisibility)));
 
-        var icon = new FrameworkElementFactory(typeof(ToolbarListIcon));
-        icon.SetBinding(ToolbarListIcon.IconProperty, new System.Windows.Data.Binding(nameof(LayoutRow.Icon)));
+        var icon = new FrameworkElementFactory(typeof(TransportIconGlyph));
+        icon.SetBinding(TransportIconGlyph.IconProperty, new System.Windows.Data.Binding(nameof(LayoutRow.Icon)));
         icon.SetValue(FrameworkElement.WidthProperty, 20d);
         icon.SetValue(FrameworkElement.HeightProperty, 20d);
         icon.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 8, 0));
@@ -687,10 +687,10 @@ internal sealed class TransportToolbarCustomizeWindow : Window
 
         var otherIconsPanel = new FrameworkElementFactory(typeof(StackPanel));
         otherIconsPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-        var otherIcon = new FrameworkElementFactory(typeof(ToolbarListIcon));
-        otherIcon.SetBinding(ToolbarListIcon.IconProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Icon)));
-        otherIcon.SetBinding(ToolbarListIcon.IsPlayingProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Playing)));
-        otherIcon.SetBinding(ToolbarListIcon.IsLatchedProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Latched)));
+        var otherIcon = new FrameworkElementFactory(typeof(TransportIconGlyph));
+        otherIcon.SetBinding(TransportIconGlyph.IconProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Icon)));
+        otherIcon.SetBinding(TransportIconGlyph.IsPlayingProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Playing)));
+        otherIcon.SetBinding(TransportIconGlyph.IsLatchedProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.Latched)));
         otherIcon.SetBinding(FrameworkElement.ToolTipProperty, new System.Windows.Data.Binding(nameof(TransportToolbarCatalog.IconVariant.StateText)));
         otherIcon.SetValue(FrameworkElement.WidthProperty, 16d);
         otherIcon.SetValue(FrameworkElement.HeightProperty, 16d);
@@ -785,65 +785,6 @@ internal sealed class TransportToolbarCustomizeWindow : Window
 
         public static LayoutRow ForCommand(TransportToolbarCatalog.Item item) =>
             new(false, false, item.Command, item.Icon, item.Label(), TransportToolbarCatalog.Describe(item));
-    }
-
-    private sealed class ToolbarListIcon : FrameworkElement
-    {
-        public static readonly DependencyProperty IconProperty = DependencyProperty.Register(
-            nameof(Icon),
-            typeof(TransportIcon),
-            typeof(ToolbarListIcon),
-            new FrameworkPropertyMetadata(TransportIcon.PlayPause, FrameworkPropertyMetadataOptions.AffectsRender));
-
-        public static readonly DependencyProperty IsPlayingProperty = DependencyProperty.Register(
-            nameof(IsPlaying),
-            typeof(bool),
-            typeof(ToolbarListIcon),
-            new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
-
-        public static readonly DependencyProperty IsLatchedProperty = DependencyProperty.Register(
-            nameof(IsLatched),
-            typeof(bool),
-            typeof(ToolbarListIcon),
-            new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
-
-        public TransportIcon Icon
-        {
-            get => (TransportIcon)GetValue(IconProperty);
-            set => SetValue(IconProperty, value);
-        }
-
-        public bool IsPlaying
-        {
-            get => (bool)GetValue(IsPlayingProperty);
-            set => SetValue(IsPlayingProperty, value);
-        }
-
-        public bool IsLatched
-        {
-            get => (bool)GetValue(IsLatchedProperty);
-            set => SetValue(IsLatchedProperty, value);
-        }
-
-        protected override void OnRender(DrawingContext dc)
-        {
-            var bounds = new Rect(RenderSize);
-            if (bounds.Width <= 0 || bounds.Height <= 0)
-            {
-                return;
-            }
-
-            var fore = Theme.Get("PrimaryForeBrush");
-            TransportIconDrawing.Draw(
-                dc,
-                Icon,
-                bounds,
-                fore,
-                IsPlaying,
-                UiThemeService.Current,
-                accent: true,
-                latched: IsLatched);
-        }
     }
 
     /// <summary>リスト内のカテゴリ境界。幅いっぱいに 1px の横線を描く。</summary>
