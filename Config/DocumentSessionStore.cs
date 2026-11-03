@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
@@ -60,6 +61,9 @@ internal sealed class OpenDocumentSnapshot
 
     public string HistoryFileName { get; set; } = string.Empty;
 
+    /// <summary>VST インサート構成（doc-N-inserts.json）。空なら無し。</summary>
+    public string InsertsFileName { get; set; } = string.Empty;
+
     /// <summary>未保存の録音。保存すると false。</summary>
     public bool CanContinueRecording { get; set; }
 
@@ -94,6 +98,8 @@ internal static class DocumentSessionStore
 
     public static string HistoryFileNameForClosedIndex(int index) => $"closed-{Math.Max(0, index)}-history.json";
 
+    public static string InsertsFileNameForIndex(int index) => $"doc-{Math.Max(0, index)}-inserts.json";
+
     public static string? SanitizeSidecarName(string? fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName))
@@ -114,6 +120,12 @@ internal static class DocumentSessionStore
         }
 
         if (name.EndsWith("-history.json", StringComparison.OrdinalIgnoreCase)
+            && IsManagedSessionStem(name))
+        {
+            return name;
+        }
+
+        if (name.EndsWith("-inserts.json", StringComparison.OrdinalIgnoreCase)
             && IsManagedSessionStem(name))
         {
             return name;
@@ -281,6 +293,11 @@ internal static class DocumentSessionStore
         OpenDocumentSnapshot snap,
         ICollection<string> keep)
     {
+        if (SanitizeSidecarName(snap.InsertsFileName) is { } inserts)
+        {
+            keep.Add(inserts);
+        }
+
         if (NeedsHistoryReplay(rootDirectory, snap))
         {
             if (SanitizeSidecarName(snap.OriginFileName) is { } origin)
@@ -459,6 +476,395 @@ internal static class DocumentSessionStore
         {
             return false;
         }
+    }
+
+    public static VstInsertChainSnapshot CaptureInserts(VstInsertChain chain)
+    {
+        var slots = new VstInsertSlotSnapshot[VstInsertChain.MaxSlots];
+        for (var i = 0; i < slots.Length; i++)
+        {
+            var src = i < chain.Slots.Length ? chain.Slots[i] : new VstInsertSlot();
+            slots[i] = new VstInsertSlotSnapshot
+            {
+                PluginPath = src.PluginPath,
+                ClassId = src.ClassId,
+                DisplayName = src.DisplayName,
+                Bypassed = src.Bypassed,
+                StateBase64 = src.StateBlob is { Length: > 0 }
+                    ? Convert.ToBase64String(src.StateBlob)
+                    : null,
+            };
+        }
+
+        return new VstInsertChainSnapshot { Slots = slots };
+    }
+
+    public static void ApplyInserts(VstInsertChain chain, VstInsertChainSnapshot? snapshot)
+    {
+        chain.Clear();
+        if (snapshot?.Slots is null || snapshot.Slots.Length == 0)
+        {
+            return;
+        }
+
+        var n = Math.Min(chain.Slots.Length, snapshot.Slots.Length);
+        for (var i = 0; i < n; i++)
+        {
+            var src = snapshot.Slots[i];
+            if (src is null || string.IsNullOrWhiteSpace(src.PluginPath))
+            {
+                continue;
+            }
+
+            var dst = chain.Slots[i];
+            dst.PluginPath = src.PluginPath;
+            dst.ClassId = src.ClassId;
+            dst.DisplayName = src.DisplayName;
+            dst.Bypassed = src.Bypassed;
+            dst.Faulted = false;
+            dst.StateBlob = null;
+            if (!string.IsNullOrWhiteSpace(src.StateBase64))
+            {
+                try
+                {
+                    dst.StateBlob = Convert.FromBase64String(src.StateBase64);
+                }
+                catch
+                {
+                    dst.StateBlob = null;
+                }
+            }
+        }
+    }
+
+    public static bool TryWriteInserts(string path, VstInsertChainSnapshot snapshot)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(snapshot, VstInsertChainJsonContext.Default.VstInsertChainSnapshot);
+            File.WriteAllText(path, json);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool TryReadInserts(string path, out VstInsertChainSnapshot snapshot)
+    {
+        snapshot = null!;
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return false;
+            }
+
+            var loaded = JsonSerializer.Deserialize(
+                File.ReadAllText(path),
+                VstInsertChainJsonContext.Default.VstInsertChainSnapshot);
+            if (loaded?.Slots is null || loaded.Slots.Length == 0)
+            {
+                return false;
+            }
+
+            var any = false;
+            for (var i = 0; i < loaded.Slots.Length; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(loaded.Slots[i]?.PluginPath))
+                {
+                    any = true;
+                    break;
+                }
+            }
+
+            if (!any)
+            {
+                return false;
+            }
+
+            snapshot = loaded;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool ChainHasAnyPlugin(VstInsertChain chain)
+    {
+        for (var i = 0; i < chain.Slots.Length; i++)
+        {
+            if (!chain.Slots[i].IsEmpty)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool SnapshotHasAnyPlugin(VstInsertSlotSnapshot[]? slots)
+    {
+        if (slots is null || slots.Length == 0)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < slots.Length; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(slots[i]?.PluginPath))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool SnapshotHasPluginAt(VstInsertSlotSnapshot[]? slots, int index)
+    {
+        if (slots is null || (uint)index >= (uint)slots.Length)
+        {
+            return false;
+        }
+
+        return !string.IsNullOrWhiteSpace(slots[index]?.PluginPath);
+    }
+
+    public static VstInsertSlotSnapshot CaptureSlot(VstInsertSlot slot)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        return new VstInsertSlotSnapshot
+        {
+            PluginPath = slot.PluginPath,
+            ClassId = slot.ClassId,
+            DisplayName = slot.DisplayName,
+            Bypassed = slot.Bypassed,
+            StateBase64 = slot.StateBlob is { Length: > 0 }
+                ? Convert.ToBase64String(slot.StateBlob)
+                : null,
+        };
+    }
+
+    /// <summary>スロット内容が永続スナップショットと一致するか（パス／ClassId／バイパス）。</summary>
+    public static bool SlotMatchesPersisted(VstInsertSlotSnapshot[]? defaults, int index, VstInsertSlot slot)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        if (!SnapshotHasPluginAt(defaults, index) || slot.IsEmpty)
+        {
+            return false;
+        }
+
+        var snap = defaults![index];
+        return string.Equals(snap.PluginPath, slot.PluginPath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(snap.ClassId ?? string.Empty, slot.ClassId ?? string.Empty, StringComparison.Ordinal)
+            && snap.Bypassed == slot.Bypassed;
+    }
+
+    /// <summary>既定インサート配列を MaxSlots に揃えて返す（不足分は空）。</summary>
+    public static VstInsertSlotSnapshot[] NormalizeDefaultInserts(VstInsertSlotSnapshot[]? slots)
+    {
+        var result = new VstInsertSlotSnapshot[VstInsertChain.MaxSlots];
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = i < (slots?.Length ?? 0) && slots![i] is { } src
+                ? new VstInsertSlotSnapshot
+                {
+                    PluginPath = src.PluginPath,
+                    ClassId = src.ClassId,
+                    DisplayName = src.DisplayName,
+                    Bypassed = src.Bypassed,
+                    StateBase64 = src.StateBase64,
+                }
+                : new VstInsertSlotSnapshot();
+        }
+
+        return result;
+    }
+
+    public static void SetDefaultInsertSlot(AppSettings settings, int index, VstInsertSlotSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if ((uint)index >= VstInsertChain.MaxSlots)
+        {
+            return;
+        }
+
+        var slots = NormalizeDefaultInserts(settings.DefaultVstInserts);
+        slots[index] = snapshot;
+        settings.DefaultVstInserts = SnapshotHasAnyPlugin(slots) ? slots : [];
+    }
+
+    public static void ClearDefaultInsertSlot(AppSettings settings, int index)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if ((uint)index >= VstInsertChain.MaxSlots)
+        {
+            return;
+        }
+
+        if (!SnapshotHasAnyPlugin(settings.DefaultVstInserts))
+        {
+            settings.DefaultVstInserts = [];
+            return;
+        }
+
+        var slots = NormalizeDefaultInserts(settings.DefaultVstInserts);
+        slots[index] = new VstInsertSlotSnapshot();
+        settings.DefaultVstInserts = SnapshotHasAnyPlugin(slots) ? slots : [];
+    }
+
+    /// <summary>
+    /// 永続インサートもスロット移動／入れ替えに追従させる（from が未永続なら何もしない）。
+    /// </summary>
+    public static void MoveDefaultInsertSlot(AppSettings settings, int from, int to)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if ((uint)from >= VstInsertChain.MaxSlots
+            || (uint)to >= VstInsertChain.MaxSlots
+            || from == to)
+        {
+            return;
+        }
+
+        if (!SnapshotHasAnyPlugin(settings.DefaultVstInserts))
+        {
+            return;
+        }
+
+        var slots = NormalizeDefaultInserts(settings.DefaultVstInserts);
+        if (string.IsNullOrWhiteSpace(slots[from].PluginPath))
+        {
+            return;
+        }
+
+        (slots[from], slots[to]) = (slots[to], slots[from]);
+        settings.DefaultVstInserts = SnapshotHasAnyPlugin(slots) ? slots : [];
+    }
+
+    /// <summary>
+    /// 永続化中スロットなら、今刺さっている内容（パス／state／バイパス）で上書きする。
+    /// </summary>
+    public static bool TrySyncDefaultInsertFromSlot(AppSettings settings, int index, VstInsertSlot slot)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(slot);
+        if (!SnapshotHasPluginAt(settings.DefaultVstInserts, index) || slot.IsEmpty)
+        {
+            return false;
+        }
+
+        SetDefaultInsertSlot(settings, index, CaptureSlot(slot));
+        return true;
+    }
+
+    /// <summary>
+    /// 既定があるスロットのバイパスを現在値に合わせる。未設定なら何もしない。
+    /// </summary>
+    public static bool TrySyncDefaultInsertBypass(AppSettings settings, int index, bool bypassed)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!SnapshotHasPluginAt(settings.DefaultVstInserts, index))
+        {
+            return false;
+        }
+
+        var slots = NormalizeDefaultInserts(settings.DefaultVstInserts);
+        if (slots[index].Bypassed == bypassed)
+        {
+            return false;
+        }
+
+        slots[index].Bypassed = bypassed;
+        settings.DefaultVstInserts = slots;
+        return true;
+    }
+
+    /// <summary>
+    /// 永続化した「スロット番号＋プラグイン＋バイパス」をチェーンへ載せる。
+    /// 永続スロットは全タブ共通のため、空き／使用中を問わず上書きする（未永続スロットは触らない）。
+    /// </summary>
+    /// <returns>1 つでも変えたら true。</returns>
+    public static bool ApplyPersistedInserts(VstInsertChain chain, VstInsertSlotSnapshot[]? defaults)
+    {
+        ArgumentNullException.ThrowIfNull(chain);
+        if (!SnapshotHasAnyPlugin(defaults))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeDefaultInserts(defaults);
+        var changed = false;
+        var n = Math.Min(chain.Slots.Length, normalized.Length);
+        for (var i = 0; i < n; i++)
+        {
+            var src = normalized[i];
+            if (src is null || string.IsNullOrWhiteSpace(src.PluginPath))
+            {
+                continue;
+            }
+
+            byte[]? state = null;
+            if (!string.IsNullOrWhiteSpace(src.StateBase64))
+            {
+                try
+                {
+                    state = Convert.FromBase64String(src.StateBase64);
+                }
+                catch
+                {
+                    state = null;
+                }
+            }
+
+            var dst = chain.Slots[i];
+            var same =
+                string.Equals(dst.PluginPath, src.PluginPath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(dst.ClassId ?? string.Empty, src.ClassId ?? string.Empty, StringComparison.Ordinal)
+                && dst.Bypassed == src.Bypassed
+                && StateBlobEquals(dst.StateBlob, state);
+            if (same)
+            {
+                continue;
+            }
+
+            dst.PluginPath = src.PluginPath;
+            dst.ClassId = src.ClassId;
+            dst.DisplayName = src.DisplayName;
+            dst.Bypassed = src.Bypassed;
+            dst.Faulted = false;
+            dst.StateBlob = state is null ? null : (byte[])state.Clone();
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static bool StateBlobEquals(byte[]? a, byte[]? b)
+    {
+        if (ReferenceEquals(a, b))
+        {
+            return true;
+        }
+
+        if (a is null || b is null || a.Length != b.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < a.Length; i++)
+        {
+            if (a[i] != b[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static string? SanitizeSessionFileName(string? fileName)
@@ -789,3 +1195,27 @@ internal static class DocumentSessionStore
         return regions;
     }
 }
+
+internal sealed class VstInsertSlotSnapshot
+{
+    public string? PluginPath { get; set; }
+
+    public string? ClassId { get; set; }
+
+    public string? DisplayName { get; set; }
+
+    public bool Bypassed { get; set; }
+
+    public string? StateBase64 { get; set; }
+}
+
+internal sealed class VstInsertChainSnapshot
+{
+    public VstInsertSlotSnapshot[] Slots { get; set; } = [];
+}
+
+[JsonSerializable(typeof(VstInsertChainSnapshot))]
+[JsonSerializable(typeof(VstInsertSlotSnapshot))]
+[JsonSerializable(typeof(VstInsertSlotSnapshot[]))]
+[JsonSourceGenerationOptions(WriteIndented = false)]
+internal partial class VstInsertChainJsonContext : JsonSerializerContext;

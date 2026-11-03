@@ -324,6 +324,7 @@ public sealed class HistorySessionTests
     {
         Assert.Equal("doc-2-origin.wav", DocumentSessionStore.SanitizeSidecarName(@"..\session\doc-2-origin.wav"));
         Assert.Equal("doc-2-history.json", DocumentSessionStore.SanitizeSidecarName("doc-2-history.json"));
+        Assert.Equal("doc-2-inserts.json", DocumentSessionStore.SanitizeSidecarName("doc-2-inserts.json"));
         Assert.Null(DocumentSessionStore.SanitizeSidecarName("doc-2.wav"));
         Assert.Null(DocumentSessionStore.SanitizeSidecarName("notes.json"));
     }

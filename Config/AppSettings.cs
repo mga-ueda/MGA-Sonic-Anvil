@@ -99,8 +99,8 @@ internal sealed class AppSettings
     /// <summary>壁紙画像のフルパス。空は壁紙なし。</summary>
     public string WallpaperPath { get; set; } = string.Empty;
 
-    /// <summary>壁紙の不透明度。0 で透明、1 で不透明。既定は 10%。</summary>
-    public const double WallpaperOpacityDefault = 0.10;
+    /// <summary>壁紙の不透明度。0 で透明、1 で不透明。既定は 20%。</summary>
+    public const double WallpaperOpacityDefault = 0.20;
 
     public double WallpaperOpacity { get; set; } = WallpaperOpacityDefault;
 
@@ -541,6 +541,22 @@ internal sealed class AppSettings
     /// Cubase / Nuendo の vst3plugins.xml を種別取得に使うか。既定オフ（無い環境と同じ経路で確認できるようにする）。
     /// </summary>
     public bool Vst3UseSteinbergHostCache { get; set; }
+
+    /// <summary>
+    /// VST インサート選択ツリーの手繰り方。<c>vendor</c>（メーカー）／<c>category</c>（種別）。空は vendor。
+    /// </summary>
+    public string VstInsertPickerGroupBy { get; set; } = "vendor";
+
+    /// <summary>
+    /// 旧「Tab／Tabs」スコープ設定。右クリックのインサート選択に置き換えたため未使用。読み書きのみ互換で残す。
+    /// </summary>
+    public string VstInsertScope { get; set; } = "tab";
+
+    /// <summary>
+    /// 永続化した「スロット番号＋プラグイン＋パラメータ」（最大 8。空要素は未設定）。
+    /// タブを閉じても、別波形を新規オープンしたとき同じスロットに同じプラグイン／パラメータが有効になる。
+    /// </summary>
+    public VstInsertSlotSnapshot[] DefaultVstInserts { get; set; } = [];
 
     /// <summary>F10 左のフォルダツリー幅。0 以下は既定。</summary>
     public double LibraryExplorerWidth { get; set; }
@@ -1155,5 +1171,7 @@ internal sealed class AppSettings
 [JsonSerializable(typeof(FileNameColorAssignment[]))]
 [JsonSerializable(typeof(OpenDocumentSnapshot))]
 [JsonSerializable(typeof(OpenDocumentSnapshot[]))]
+[JsonSerializable(typeof(VstInsertSlotSnapshot))]
+[JsonSerializable(typeof(VstInsertSlotSnapshot[]))]
 [JsonSourceGenerationOptions(WriteIndented = true)]
 internal partial class AppSettingsJsonContext : JsonSerializerContext;

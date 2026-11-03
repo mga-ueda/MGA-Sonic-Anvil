@@ -56,9 +56,18 @@ public partial class MainWindow
             AudioFileKind.Wave,
             null);
         var session = new DocumentSession(document);
+        ApplyDefaultVstInserts(session);
         _sessions.Add(session);
         return session;
     }
+
+    /// <summary>
+    /// 永続化した「スロット＋プラグイン＋バイパス」を載せる（全タブ共通・上書き）。
+    /// </summary>
+    private static bool ApplyDefaultVstInserts(DocumentSession session) =>
+        DocumentSessionStore.ApplyPersistedInserts(
+            session.VstInserts,
+            AppStorage.Settings.DefaultVstInserts);
 
     private void OpenFromDialog()
     {
@@ -357,6 +366,7 @@ public partial class MainWindow
                 {
                     var document = await Task.Run(() => AudioCodec.Load(path)).ConfigureAwait(true);
                     var session = new DocumentSession(document);
+                    ApplyDefaultVstInserts(session);
                     _sessions.Add(session);
                     added++;
                     opened ??= session;
@@ -1612,6 +1622,7 @@ public partial class MainWindow
 
         _tabMergeBusy = true;
         RefreshExportEnabled();
+        RefreshTransportCommandsEnabled();
         try
         {
             ShowBusyGlass(UiStrings.OverlayMerge);
@@ -1672,6 +1683,7 @@ public partial class MainWindow
         {
             _tabMergeBusy = false;
             RefreshExportEnabled();
+            RefreshTransportCommandsEnabled();
         }
     }
 
@@ -2499,6 +2511,15 @@ public partial class MainWindow
                 return;
             }
 
+            // アクティブタブのライブ state をチェーンへ戻してから保存する。
+            try
+            {
+                _player.VstInserts.CaptureAppliedStates();
+            }
+            catch
+            {
+            }
+
             var snapshots = new OpenDocumentSnapshot[_sessions.Count];
             var keep = new List<string>();
             Directory.CreateDirectory(AppStorage.SessionDirectory);
@@ -2510,6 +2531,7 @@ public partial class MainWindow
                     DocumentSessionStore.FileNameForIndex(i),
                     DocumentSessionStore.OriginFileNameForIndex(i),
                     DocumentSessionStore.HistoryFileNameForIndex(i),
+                    DocumentSessionStore.InsertsFileNameForIndex(i),
                     keep);
                 snapshots[i].IsActive = ReferenceEquals(_sessions[i], _activeSession);
             }
@@ -2715,6 +2737,7 @@ public partial class MainWindow
                 LoopEnabled = snap.LoopEnabled,
             };
             RememberPersistedSessionFiles(session, snap, fromSession);
+            TryRestoreSessionInserts(session, snap);
             return session;
         }
         catch
@@ -2749,6 +2772,7 @@ public partial class MainWindow
         string audioName,
         string originName,
         string historyName,
+        string insertsName,
         List<string> keep)
     {
         var view = new SessionViewState(
@@ -2824,6 +2848,8 @@ public partial class MainWindow
             }
         }
 
+        TrySaveSessionInserts(session, snap, insertsName, keep);
+
         if (!DocumentSessionStore.ShouldPersistHistorySidecars(hasSessionAudio, snap.Dirty, snap.SourcePath))
         {
             snap.OriginFileName = string.Empty;
@@ -2833,6 +2859,53 @@ public partial class MainWindow
 
         TrySaveSessionHistory(session, snap, originName, historyName, keep);
         return snap;
+    }
+
+    private static void TrySaveSessionInserts(
+        DocumentSession session,
+        OpenDocumentSnapshot snap,
+        string insertsName,
+        List<string> keep)
+    {
+        snap.InsertsFileName = string.Empty;
+        if (!DocumentSessionStore.ChainHasAnyPlugin(session.VstInserts))
+        {
+            return;
+        }
+
+        try
+        {
+            var name = DocumentSessionStore.SanitizeSidecarName(insertsName)
+                ?? DocumentSessionStore.InsertsFileNameForIndex(0);
+            var payload = DocumentSessionStore.CaptureInserts(session.VstInserts);
+            if (!DocumentSessionStore.TryWriteInserts(AppStorage.SessionSidecarPath(name), payload))
+            {
+                return;
+            }
+
+            snap.InsertsFileName = name;
+            keep.Add(name);
+        }
+        catch
+        {
+            snap.InsertsFileName = string.Empty;
+        }
+    }
+
+    private static void TryRestoreSessionInserts(DocumentSession session, OpenDocumentSnapshot snap)
+    {
+        var name = DocumentSessionStore.SanitizeSidecarName(snap.InsertsFileName);
+        if (name is not null)
+        {
+            var path = AppStorage.SessionSidecarPath(name);
+            if (DocumentSessionStore.TryReadInserts(path, out var loaded))
+            {
+                DocumentSessionStore.ApplyInserts(session.VstInserts, loaded);
+            }
+        }
+
+        // サイドカーが無い／空なら永続インサート（別波形を開いたときと同じ）。
+        ApplyDefaultVstInserts(session);
     }
 
     private static void TrySaveSessionHistory(
@@ -2954,6 +3027,7 @@ public partial class MainWindow
                 LoopEnabled = snap.LoopEnabled,
             };
             RememberPersistedSessionFiles(session, snap, fromSessionAudio: false);
+            TryRestoreSessionInserts(session, snap);
             return session;
         }
         catch

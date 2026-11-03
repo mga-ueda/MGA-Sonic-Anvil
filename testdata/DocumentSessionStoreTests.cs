@@ -319,6 +319,13 @@ public sealed class DocumentSessionStoreTests
             DocumentSessionStore.CollectReferencedSessionFiles(root, dirtyWithSession, keep);
             Assert.Equal(["doc-0.wav"], keep);
 
+            dirtyWithSession.InsertsFileName = "doc-0-inserts.json";
+            File.WriteAllText(Path.Combine(sessionDir, "doc-0-inserts.json"), "{}");
+            keep.Clear();
+            DocumentSessionStore.CollectReferencedSessionFiles(root, dirtyWithSession, keep);
+            Assert.Contains("doc-0.wav", keep);
+            Assert.Contains("doc-0-inserts.json", keep);
+
             var cleanNamed = new OpenDocumentSnapshot
             {
                 SourcePath = sourcePath,
@@ -451,6 +458,146 @@ public sealed class DocumentSessionStoreTests
         Assert.False(DocumentSessionStore.ShouldPersistOpenDocuments(libraryPlayer: true, sessionCount: 0));
         Assert.False(DocumentSessionStore.ShouldPersistOpenDocuments(libraryPlayer: false, sessionCount: 0));
         Assert.True(DocumentSessionStore.ShouldPersistOpenDocuments(libraryPlayer: false, sessionCount: 1));
+    }
+
+    [Fact]
+    public void InsertsSidecar_RoundTripsPluginPathAndState()
+    {
+        var root = NewTempDir("inserts");
+        try
+        {
+            var path = Path.Combine(root, DocumentSessionStore.InsertsFileNameForIndex(0));
+            var chain = new VstInsertChain();
+            chain.Slots[0].PluginPath = @"C:\Plugins\FabFilter Pro-Q 3.vst3";
+            chain.Slots[0].ClassId = "abcd";
+            chain.Slots[0].DisplayName = "Pro-Q 3";
+            chain.Slots[0].Bypassed = true;
+            chain.Slots[0].StateBlob = [1, 2, 3, 4];
+            chain.Slots[2].PluginPath = @"D:\SoftLimit.vst3";
+            chain.Slots[2].DisplayName = "Soft Limit";
+
+            var snap = DocumentSessionStore.CaptureInserts(chain);
+            Assert.True(DocumentSessionStore.TryWriteInserts(path, snap));
+            Assert.True(DocumentSessionStore.TryReadInserts(path, out var loaded));
+
+            var restored = new VstInsertChain();
+            DocumentSessionStore.ApplyInserts(restored, loaded);
+            Assert.Equal(chain.Slots[0].PluginPath, restored.Slots[0].PluginPath);
+            Assert.Equal(chain.Slots[0].ClassId, restored.Slots[0].ClassId);
+            Assert.Equal(chain.Slots[0].DisplayName, restored.Slots[0].DisplayName);
+            Assert.True(restored.Slots[0].Bypassed);
+            Assert.Equal(chain.Slots[0].StateBlob, restored.Slots[0].StateBlob);
+            Assert.Equal(chain.Slots[2].PluginPath, restored.Slots[2].PluginPath);
+            Assert.True(restored.Slots[1].IsEmpty);
+            Assert.Equal("doc-0-inserts.json", DocumentSessionStore.SanitizeSidecarName("doc-0-inserts.json"));
+            Assert.Null(DocumentSessionStore.SanitizeSidecarName("notes-inserts.json"));
+        }
+        finally
+        {
+            TryDeleteDir(root);
+        }
+    }
+
+    [Fact]
+    public void DefaultInserts_PersistBypassAndClearPerSlot()
+    {
+        var settings = new AppSettings();
+        var slot = new VstInsertSlot
+        {
+            PluginPath = @"C:\Plugins\EQ.vst3",
+            ClassId = "cid",
+            DisplayName = "EQ",
+            Bypassed = true,
+            StateBlob = [9, 8],
+        };
+
+        DocumentSessionStore.SetDefaultInsertSlot(
+            settings,
+            1,
+            DocumentSessionStore.CaptureSlot(slot));
+        Assert.True(DocumentSessionStore.SnapshotHasPluginAt(settings.DefaultVstInserts, 1));
+        Assert.False(DocumentSessionStore.SnapshotHasPluginAt(settings.DefaultVstInserts, 0));
+
+        var applied = new VstInsertChain();
+        applied.Slots[0].PluginPath = @"C:\Keep.vst3";
+        applied.Slots[0].DisplayName = "Keep";
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(applied, settings.DefaultVstInserts));
+        Assert.Equal(@"C:\Keep.vst3", applied.Slots[0].PluginPath);
+        Assert.Equal(slot.PluginPath, applied.Slots[1].PluginPath);
+        Assert.True(applied.Slots[1].Bypassed);
+        Assert.Equal(slot.StateBlob, applied.Slots[1].StateBlob);
+        Assert.False(DocumentSessionStore.ApplyPersistedInserts(applied, settings.DefaultVstInserts));
+
+        // 永続スロットは使用中でも上書き（全タブ共通）。
+        applied.Slots[1].PluginPath = @"C:\Other.vst3";
+        applied.Slots[1].DisplayName = "Other";
+        applied.Slots[1].Bypassed = false;
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(applied, settings.DefaultVstInserts));
+        Assert.Equal(slot.PluginPath, applied.Slots[1].PluginPath);
+        Assert.True(applied.Slots[1].Bypassed);
+
+        // パラメータ更新が StateBase64 として残り、再適用で再現されること。
+        slot.StateBlob = [1, 2, 3, 9];
+        Assert.True(DocumentSessionStore.TrySyncDefaultInsertFromSlot(settings, 1, slot));
+        var restored = new VstInsertChain();
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(restored, settings.DefaultVstInserts));
+        Assert.Equal(new byte[] { 1, 2, 3, 9 }, restored.Slots[1].StateBlob);
+
+        Assert.True(DocumentSessionStore.TrySyncDefaultInsertBypass(settings, 1, bypassed: false));
+        Assert.False(settings.DefaultVstInserts[1].Bypassed);
+        Assert.False(DocumentSessionStore.TrySyncDefaultInsertBypass(settings, 1, bypassed: false));
+
+        // バイパス変更は Apply で他チェーンにも載る。
+        restored.Slots[1].Bypassed = true;
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(restored, settings.DefaultVstInserts));
+        Assert.False(restored.Slots[1].Bypassed);
+
+        slot.Bypassed = false;
+        slot.PluginPath = @"C:\Plugins\Comp.vst3";
+        slot.DisplayName = "Comp";
+        Assert.True(DocumentSessionStore.TrySyncDefaultInsertFromSlot(settings, 1, slot));
+        Assert.Equal(@"C:\Plugins\Comp.vst3", settings.DefaultVstInserts[1].PluginPath);
+        Assert.True(DocumentSessionStore.SlotMatchesPersisted(settings.DefaultVstInserts, 1, slot));
+
+        DocumentSessionStore.MoveDefaultInsertSlot(settings, 1, 3);
+        Assert.False(DocumentSessionStore.SnapshotHasPluginAt(settings.DefaultVstInserts, 1));
+        Assert.True(DocumentSessionStore.SnapshotHasPluginAt(settings.DefaultVstInserts, 3));
+        Assert.False(settings.DefaultVstInserts[3].Bypassed);
+        // 移動前に記憶した StateBase64 もスロット番号ごと移る。
+        Assert.Equal(Convert.ToBase64String([1, 2, 3, 9]), settings.DefaultVstInserts[3].StateBase64);
+
+        DocumentSessionStore.ClearDefaultInsertSlot(settings, 3);
+        Assert.False(DocumentSessionStore.SnapshotHasAnyPlugin(settings.DefaultVstInserts));
+        Assert.Empty(settings.DefaultVstInserts);
+    }
+
+    [Fact]
+    public void DefaultInserts_ParameterChange_AppliesToAllChains()
+    {
+        var settings = new AppSettings();
+        var slot = new VstInsertSlot
+        {
+            PluginPath = @"C:\Plugins\EQ.vst3",
+            ClassId = "cid",
+            DisplayName = "EQ",
+            StateBlob = [1],
+        };
+        DocumentSessionStore.SetDefaultInsertSlot(settings, 0, DocumentSessionStore.CaptureSlot(slot));
+
+        var tabA = new VstInsertChain();
+        var tabB = new VstInsertChain();
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(tabA, settings.DefaultVstInserts));
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(tabB, settings.DefaultVstInserts));
+        Assert.Equal(new byte[] { 1 }, tabA.Slots[0].StateBlob);
+        Assert.Equal(new byte[] { 1 }, tabB.Slots[0].StateBlob);
+
+        // 途中でパラメータを変えたら、記憶を更新して他タブへ載せる。
+        tabA.Slots[0].StateBlob = [7, 7, 7];
+        Assert.True(DocumentSessionStore.TrySyncDefaultInsertFromSlot(settings, 0, tabA.Slots[0]));
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(tabB, settings.DefaultVstInserts));
+        Assert.Equal(new byte[] { 7, 7, 7 }, tabB.Slots[0].StateBlob);
+        Assert.False(DocumentSessionStore.ApplyPersistedInserts(tabA, settings.DefaultVstInserts));
+        Assert.Equal(new byte[] { 7, 7, 7 }, tabA.Slots[0].StateBlob);
     }
 
     [Fact]
