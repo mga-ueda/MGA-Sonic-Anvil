@@ -923,7 +923,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Ctrl+Shift+1–8。空きなら選択、使用中なら GUI を開く／既に開いていれば閉じる。
+    /// Ctrl+Shift+1–8。空き＝選択。使用中＝バイパス解除／GUI 表示／GUI 表示中なら閉じる。
     /// </summary>
     private bool TryToggleVstInsertSlotShortcut(int slotIndex)
     {
@@ -932,9 +932,15 @@ public partial class MainWindow
             return false;
         }
 
-        if (_activeSession.VstInserts.Slots[slotIndex].IsEmpty)
+        var slot = _activeSession.VstInserts.Slots[slotIndex];
+        if (slot.IsEmpty)
         {
             return VstInsertRack.ActivateSlot(slotIndex);
+        }
+
+        if (slot.Bypassed)
+        {
+            return VstInsertRack.ClearBypassIfSet(slotIndex);
         }
 
         if (_vstEditors.TryGetValue(slotIndex, out var existing) && existing.IsVisible)
