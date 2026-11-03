@@ -1,6 +1,6 @@
 namespace MgaSonicAnvil.Audio;
 
-/// <summary>文書ごとの VST インサート 1 スロット。永続化はしない（セッション寿命）。</summary>
+/// <summary>文書ごとの VST インサート 1 スロット。終了時は session sidecar に残す。</summary>
 internal sealed class VstInsertSlot
 {
     public string? PluginPath { get; set; }
@@ -78,6 +78,24 @@ internal sealed class VstInsertChain
         }
     }
 
+    /// <summary>焼き込み対象があるか（空き・バイパス・fault 以外が 1 つでもあれば true）。</summary>
+    public bool HasProcessableSlot
+    {
+        get
+        {
+            for (var i = 0; i < Slots.Length; i++)
+            {
+                var slot = Slots[i];
+                if (!slot.IsEmpty && !slot.Bypassed && !slot.Faulted)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
     public string StructuralKey
     {
         get
@@ -121,6 +139,23 @@ internal sealed class VstInsertChain
         return copy;
     }
 
+    /// <summary>スロット内容を上書きコピー（インスタンスは維持）。</summary>
+    public void CopyFrom(VstInsertChain source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        for (var i = 0; i < Slots.Length; i++)
+        {
+            var from = source.Slots[i];
+            var to = Slots[i];
+            to.PluginPath = from.PluginPath;
+            to.ClassId = from.ClassId;
+            to.DisplayName = from.DisplayName;
+            to.Bypassed = from.Bypassed;
+            to.StateBlob = from.StateBlob is null ? null : (byte[])from.StateBlob.Clone();
+            to.Faulted = from.Faulted;
+        }
+    }
+
     public void Clear()
     {
         for (var i = 0; i < Slots.Length; i++)
@@ -145,5 +180,23 @@ internal sealed class VstInsertChain
         slot.StateBlob = null;
         slot.Bypassed = false;
         slot.Faulted = false;
+    }
+
+    /// <summary>
+    /// <paramref name="from"/> を <paramref name="to"/> へ移す。
+    /// to が空なら移動（from が空く）。to が使用中なら入れ替え。
+    /// 配列要素の参照を入れ替えるだけなので、空への移動も同じ経路でよい。
+    /// </summary>
+    public void MoveSlot(int from, int to)
+    {
+        if ((uint)from >= (uint)Slots.Length
+            || (uint)to >= (uint)Slots.Length
+            || from == to
+            || Slots[from].IsEmpty)
+        {
+            return;
+        }
+
+        (Slots[from], Slots[to]) = (Slots[to], Slots[from]);
     }
 }
