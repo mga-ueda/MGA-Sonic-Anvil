@@ -400,7 +400,7 @@ public partial class MainWindow
     /// <summary>
     /// 設定上の永続スナップショットを、開いている全タブのチェーンへコピーする（エンジンは触らない）。
     /// </summary>
-    private void PropagatePersistedInsertSnapshotsToAllSessions()
+    private void PropagatePersistedInsertSnapshotsToAllSessions(bool applyBypass = true)
     {
         var defaults = AppStorage.Settings.DefaultVstInserts;
         if (!DocumentSessionStore.SnapshotHasAnyPlugin(defaults))
@@ -410,7 +410,7 @@ public partial class MainWindow
 
         foreach (var session in _sessions)
         {
-            DocumentSessionStore.ApplyPersistedInserts(session.VstInserts, defaults);
+            DocumentSessionStore.ApplyPersistedInserts(session.VstInserts, defaults, applyBypass);
         }
     }
 
@@ -647,9 +647,14 @@ public partial class MainWindow
                 await Dispatcher.Yield(DispatcherPriority.Background);
             }
 
+            // 全ターゲット焼き終わり後に、永続スロットのバイパスを記憶へ載せて全タブへ揃える。
+            // 途中で載せると未焼成タブまでバイパスされ、オフラインが dry になる。
+            SyncBakeBypassIntoPersistedDefaults(targets);
+
             if (activeBefore is not null && ReferenceEquals(_activeSession, activeBefore))
             {
                 ApplyVstInsertsOnUiThread(activeBefore, activeBefore.VstInserts, playerBypass: IsLibraryMaximized);
+                _player.VstInserts.UnloadBypassedLiveSlots();
                 VstInsertRack.Refresh();
             }
 
@@ -820,13 +825,69 @@ public partial class MainWindow
 
     private void SyncVstBypassAfterBake(DocumentSession session)
     {
-        if (!ReferenceEquals(_activeSession, session))
+        // オフライン直前に ResetProcessing したライブをバイパスのまま残すと、
+        // 未保存タブ閉じの Capture／Dispose でネイティブが落ちることがある。
+        // アクティブ以外の選択タブでも、今付けているオーナーなら必ず捨てる。
+        _player.VstInserts.CaptureAppliedStates();
+        ApplyVstInsertsOnUiThread(session, session.VstInserts, playerBypass: IsLibraryMaximized);
+        _player.VstInserts.UnloadBypassedLiveSlots();
+        if (ReferenceEquals(_activeSession, session))
+        {
+            VstInsertRack.Refresh();
+        }
+    }
+
+    /// <summary>
+    /// バウンスで付けたバイパスを永続スロットへ書き、開いている全タブへ揃える。
+    /// 手動バイパス（SyncPersistedBypass）と同じ「永続＝全タブ共通」に合わせる。
+    /// </summary>
+    private void SyncBakeBypassIntoPersistedDefaults(IReadOnlyList<DocumentSession> baked)
+    {
+        var settings = AppStorage.Settings;
+        if (!DocumentSessionStore.SnapshotHasAnyPlugin(settings.DefaultVstInserts) || baked.Count == 0)
         {
             return;
         }
 
-        ApplyVstInsertsOnUiThread(session, session.VstInserts, playerBypass: IsLibraryMaximized);
-        VstInsertRack.Refresh();
+        var changed = false;
+        for (var i = 0; i < VstInsertChain.MaxSlots; i++)
+        {
+            if (!DocumentSessionStore.SnapshotHasPluginAt(settings.DefaultVstInserts, i))
+            {
+                continue;
+            }
+
+            var anyBypassed = false;
+            for (var t = 0; t < baked.Count; t++)
+            {
+                var slot = baked[t].VstInserts.Slots[i];
+                if (!slot.IsEmpty && slot.Bypassed)
+                {
+                    anyBypassed = true;
+                    break;
+                }
+            }
+
+            if (anyBypassed
+                && DocumentSessionStore.TrySyncDefaultInsertBypass(settings, i, bypassed: true))
+            {
+                changed = true;
+            }
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        AppStorage.Save();
+        PropagatePersistedInsertSnapshotsToAllSessions(applyBypass: true);
+        if (_activeSession is not null)
+        {
+            ApplyVstInsertsOnUiThread(_activeSession, _activeSession.VstInserts, playerBypass: IsLibraryMaximized);
+            _player.VstInserts.UnloadBypassedLiveSlots();
+            VstInsertRack.Refresh();
+        }
     }
 
     private void OnVstInsertOpenEditorRequested(int slotIndex)
@@ -1179,10 +1240,10 @@ public partial class MainWindow
                 continue;
             }
 
-            DocumentSessionStore.SetDefaultInsertSlot(
-                settings,
-                i,
-                DocumentSessionStore.CaptureSlot(slot));
+            // パラメータだけ更新。バウンス後の自動バイパスを永続既定へ書かない。
+            var captured = DocumentSessionStore.CaptureSlot(slot);
+            captured.Bypassed = snap.Bypassed;
+            DocumentSessionStore.SetDefaultInsertSlot(settings, i, captured);
             changed = true;
         }
 
@@ -1192,6 +1253,7 @@ public partial class MainWindow
         }
 
         AppStorage.Save();
-        PropagatePersistedInsertSnapshotsToAllSessions();
+        // バイパスは各タブ（バウンス結果）を残し、実体／state だけ揃える。
+        PropagatePersistedInsertSnapshotsToAllSessions(applyBypass: false);
     }
 }
