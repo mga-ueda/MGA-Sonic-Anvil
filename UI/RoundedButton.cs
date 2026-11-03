@@ -69,6 +69,9 @@ internal sealed class RoundedButton : Button
         Background = Brushes.Transparent;
         BorderThickness = new Thickness(0);
         Padding = new Thickness(8, 2, 8, 2);
+        // OverridesDefaultStyle のため Button 既定スタイルの Center が来ない。Control 既定の Left を打ち消す。
+        HorizontalContentAlignment = HorizontalAlignment.Center;
+        VerticalContentAlignment = VerticalAlignment.Center;
         Cursor = Cursors.Hand;
         FontWeight = FontWeights.Bold;
         FontSize = 12;
