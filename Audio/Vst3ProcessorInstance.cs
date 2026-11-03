@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace MgaSonicAnvil.Audio;
@@ -9,6 +10,9 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
     private readonly Vst3Module _module;
     private readonly Vst3HostApplication _host;
     private readonly Vst3ComponentHandler _componentHandler = new();
+    private readonly Vst3ParameterChanges _inputParamChanges = new();
+    private readonly Vst3ParameterChanges _outputParamChanges = new();
+    private readonly List<(uint Id, double Value)> _outputParamScratch = new();
     private IntPtr _component;
     private IntPtr _processor;
     private IntPtr _controller;
@@ -19,6 +23,8 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
     private int _maxBlock = 512;
     private int _channels = 2;
     private int _pluginChannels = 2;
+    private int _pluginInChannels = 2;
+    private int _pluginOutChannels = 2;
     private bool _active;
     private bool _disposed;
     private bool _faulted;
@@ -32,6 +38,14 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
     private GCHandle _outPtrsHandle;
     private IntPtr _busIn = IntPtr.Zero;
     private IntPtr _busOut = IntPtr.Zero;
+    /// <summary>ProcessData.inputs / outputs 用。バス数分の AudioBusBuffers 連続領域。</summary>
+    private IntPtr _inputsBusArray = IntPtr.Zero;
+    private IntPtr _outputsBusArray = IntPtr.Zero;
+    private int _numInputBuses = 1;
+    private int _numOutputBuses = 1;
+    private IntPtr _processContext = IntPtr.Zero;
+    private long _projectTimeSamples;
+    private long _continuousTimeSamples;
 
     private Vst3ProcessorInstance(
         Vst3Module module,
@@ -52,6 +66,7 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         PluginPath = pluginPath;
         ClassId = classId;
         DisplayName = displayName;
+        _componentHandler.ParameterEdited = (id, value) => _inputParamChanges.QueueEdit(id, value);
         Reconfigure(sampleRate, maxBlock, channels);
     }
 
@@ -60,6 +75,30 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
     public string? ClassId { get; }
 
     public string DisplayName { get; }
+
+    /// <summary>セットアップ後のプラグイン主バス入力チャンネル数。</summary>
+    public int PluginInChannels
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _pluginInChannels;
+            }
+        }
+    }
+
+    /// <summary>セットアップ後のプラグイン主バス出力チャンネル数。</summary>
+    public int PluginOutChannels
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _pluginOutChannels;
+            }
+        }
+    }
 
     public bool Faulted
     {
@@ -336,21 +375,35 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
                 return true;
             }
 
-            var frameOffset = 0;
-            while (frameOffset < frames)
+            try
             {
-                var n = Math.Min(_maxBlock, frames - frameOffset);
-                var sampleOffset = offset + frameOffset * channels;
-                if (!ProcessBlockNoLock(buffer, sampleOffset, n, channels))
+                var frameOffset = 0;
+                while (frameOffset < frames)
                 {
-                    _faulted = true;
-                    return false;
+                    var n = Math.Min(_maxBlock, frames - frameOffset);
+                    var sampleOffset = offset + frameOffset * channels;
+                    if (!ProcessBlockNoLock(buffer, sampleOffset, n, channels))
+                    {
+                        _faulted = true;
+                        return false;
+                    }
+
+                    frameOffset += n;
                 }
 
-                frameOffset += n;
+                return true;
             }
-
-            return true;
+            catch (AccessViolationException)
+            {
+                // iZotope Trash 等: UI と process の競合でネイティブが壊れることがある。スロットを落としてアプリは生かす。
+                _faulted = true;
+                return false;
+            }
+            catch (SEHException)
+            {
+                _faulted = true;
+                return false;
+            }
         }
     }
 
@@ -559,6 +612,8 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
             }
 
             _componentHandler.Dispose();
+            _inputParamChanges.Dispose();
+            _outputParamChanges.Dispose();
             _host.Dispose();
             _module.Dispose();
         }
@@ -566,9 +621,11 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
     private bool SetupNoLock()
     {
-        EnsureScratchNoLock();
-        var arrangement = _channels >= 2 ? Vst3HostNative.SpeakerStereo : Vst3HostNative.SpeakerMono;
-        _pluginChannels = _channels >= 2 ? 2 : 1;
+        _numInputBuses = Math.Max(1, GetAudioBusCount(_component, Vst3HostNative.BusDirectionInput));
+        _numOutputBuses = Math.Max(1, GetAudioBusCount(_component, Vst3HostNative.BusDirectionOutput));
+        // プラグイン既定のバス構成を先に読む（Waves Mono / 5.1 / PS22 Mono→Stereo 等）。
+        ApplyPreferredBusArrangementsNoLock();
+        EnsureScratchNoLock(force: true);
 
         unsafe
         {
@@ -576,15 +633,15 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
             // 拒否されても setupProcessing で再判定するプラグインがあるので、ここでは落とさない
             var canSize = Marshal.GetDelegateForFunctionPointer<CanProcessSampleSizeFn>(vt[5]);
             canSize(_processor, Vst3HostNative.SymbolicSampleSize32);
-
-            var setBus = Marshal.GetDelegateForFunctionPointer<SetBusArrangementsFn>(vt[3]);
-            var inputs = arrangement;
-            var outputs = arrangement;
-            // 失敗しても既定バスで進むプラグインがある
-            setBus(_processor, &inputs, 1, &outputs, 1);
         }
 
         ActivateMainBuses(_component);
+        // Activate 後にバス数が変わることは稀だが、ProcessData 長はここで確定させる。
+        _numInputBuses = Math.Max(1, GetAudioBusCount(_component, Vst3HostNative.BusDirectionInput));
+        _numOutputBuses = Math.Max(1, GetAudioBusCount(_component, Vst3HostNative.BusDirectionOutput));
+        // Activate 後に getBusArrangement が確定する実装向けに再読込。
+        RefreshPluginChannelCountsNoLock();
+        EnsureScratchNoLock(force: true);
 
         var setup = new Vst3HostNative.ProcessSetup
         {
@@ -605,6 +662,285 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// ホストがステレオでも、プラグイン既定が Mono / 5.1 ならそちらを採用する。
+    /// Flux 等は不正な setBus で AV するため、既定が取れたら極力 setBus を呼ばない。
+    /// </summary>
+    private void ApplyPreferredBusArrangementsNoLock()
+    {
+        var hostArr = Vst3HostNative.SpeakerArrangementForChannelCount(_channels);
+        var hintArr = GuessArrangementFromName(DisplayName, ClassId);
+        var defaultIn = TryGetBusArrangement(_processor, Vst3HostNative.BusDirectionInput, 0, out var din)
+            ? din
+            : 0UL;
+        var defaultOut = TryGetBusArrangement(_processor, Vst3HostNative.BusDirectionOutput, 0, out var dout)
+            ? dout
+            : 0UL;
+
+        var chosenIn = defaultIn != 0 ? defaultIn : hostArr;
+        var chosenOut = defaultOut != 0 ? defaultOut : hostArr;
+        var needSet = true;
+
+        // 既定がホスト（またはヒント）と一致／妥当なら setBus 省略（TraxSf 等の AV 回避）。
+        if (defaultIn != 0 && defaultOut != 0)
+        {
+            var defInCh = Vst3HostNative.SpeakerChannelCount(defaultIn);
+            var defOutCh = Vst3HostNative.SpeakerChannelCount(defaultOut);
+            var hostWantsMono = _channels <= 1;
+            var defIsUsable = defInCh >= 1 && defOutCh >= 1 && defInCh <= 16 && defOutCh <= 16;
+            var hostMismatchMono = hostWantsMono && defInCh > 1;
+            if (defIsUsable && !hostMismatchMono)
+            {
+                chosenIn = defaultIn;
+                chosenOut = defaultOut;
+                needSet = false;
+            }
+        }
+
+        if (needSet)
+        {
+            var inCandidates = new ulong[10];
+            var outCandidates = new ulong[10];
+            var nCand = 0;
+            if (LooksLikeMonoToStereoName(DisplayName, ClassId))
+            {
+                nCand = AddBusCandidate(
+                    inCandidates,
+                    outCandidates,
+                    nCand,
+                    Vst3HostNative.SpeakerMono,
+                    Vst3HostNative.SpeakerStereo);
+            }
+            else if (hintArr != 0)
+            {
+                nCand = AddBusCandidate(inCandidates, outCandidates, nCand, hintArr, hintArr);
+            }
+
+            if (defaultIn != 0 || defaultOut != 0)
+            {
+                nCand = AddBusCandidate(
+                    inCandidates,
+                    outCandidates,
+                    nCand,
+                    defaultIn != 0 ? defaultIn : hostArr,
+                    defaultOut != 0 ? defaultOut : hostArr);
+            }
+
+            nCand = AddBusCandidate(inCandidates, outCandidates, nCand, hostArr, hostArr);
+            if (_channels <= 1)
+            {
+                nCand = AddBusCandidate(
+                    inCandidates,
+                    outCandidates,
+                    nCand,
+                    Vst3HostNative.SpeakerMono,
+                    Vst3HostNative.SpeakerMono);
+            }
+
+            // Waves Mono: 既定が取れずホストがステレオのときだけ Mono を試す。
+            if (hintArr == Vst3HostNative.SpeakerMono)
+            {
+                nCand = AddBusCandidate(
+                    inCandidates,
+                    outCandidates,
+                    nCand,
+                    Vst3HostNative.SpeakerMono,
+                    Vst3HostNative.SpeakerMono);
+            }
+
+            if (hintArr == Vst3HostNative.Speaker51 || hintArr == Vst3HostNative.Speaker50)
+            {
+                nCand = AddBusCandidate(inCandidates, outCandidates, nCand, hintArr, hintArr);
+            }
+
+            for (var c = 0; c < nCand; c++)
+            {
+                if (TrySetAllBusArrangementsNoLock(inCandidates[c], outCandidates[c]))
+                {
+                    chosenIn = inCandidates[c];
+                    chosenOut = outCandidates[c];
+                    break;
+                }
+            }
+        }
+
+        // setBus 後（または省略後）の実値を優先。
+        if (TryGetBusArrangement(_processor, Vst3HostNative.BusDirectionInput, 0, out din) && din != 0)
+        {
+            chosenIn = din;
+        }
+
+        if (TryGetBusArrangement(_processor, Vst3HostNative.BusDirectionOutput, 0, out dout) && dout != 0)
+        {
+            chosenOut = dout;
+        }
+
+        _pluginInChannels = Math.Max(1, Math.Min(16, Vst3HostNative.SpeakerChannelCount(chosenIn)));
+        _pluginOutChannels = Math.Max(1, Math.Min(16, Vst3HostNative.SpeakerChannelCount(chosenOut)));
+        // Flux Epure 等は 16ch 既定のまま Process する（setBus で絞ると AV する実装がある）。
+        _pluginChannels = Math.Max(_pluginInChannels, _pluginOutChannels);
+    }
+
+    private void RefreshPluginChannelCountsNoLock()
+    {
+        if (TryGetBusArrangement(_processor, Vst3HostNative.BusDirectionInput, 0, out var din)
+            && din != 0)
+        {
+            _pluginInChannels = Math.Max(1, Vst3HostNative.SpeakerChannelCount(din));
+        }
+
+        if (TryGetBusArrangement(_processor, Vst3HostNative.BusDirectionOutput, 0, out var dout)
+            && dout != 0)
+        {
+            _pluginOutChannels = Math.Max(1, Vst3HostNative.SpeakerChannelCount(dout));
+        }
+
+        _pluginChannels = Math.Max(1, Math.Max(_pluginInChannels, _pluginOutChannels));
+    }
+
+    private static int AddBusCandidate(
+        ulong[] inCandidates,
+        ulong[] outCandidates,
+        int count,
+        ulong inn,
+        ulong outt)
+    {
+        if (inn == 0 || outt == 0 || count >= inCandidates.Length)
+        {
+            return count;
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            if (inCandidates[i] == inn && outCandidates[i] == outt)
+            {
+                return count;
+            }
+        }
+
+        inCandidates[count] = inn;
+        outCandidates[count] = outt;
+        return count + 1;
+    }
+
+    private bool TrySetAllBusArrangementsNoLock(ulong mainIn, ulong mainOut)
+    {
+        try
+        {
+            unsafe
+            {
+                var vt = *(IntPtr**)_processor;
+                var setBus = Marshal.GetDelegateForFunctionPointer<SetBusArrangementsFn>(vt[3]);
+                var inArr = stackalloc ulong[_numInputBuses];
+                var outArr = stackalloc ulong[_numOutputBuses];
+                for (var i = 0; i < _numInputBuses; i++)
+                {
+                    // サイドチェイン等はメインと同じ並びを渡す（iZotope）。拒否時は次候補へ。
+                    inArr[i] = mainIn;
+                }
+
+                for (var i = 0; i < _numOutputBuses; i++)
+                {
+                    outArr[i] = mainOut;
+                }
+
+                return setBus(_processor, inArr, _numInputBuses, outArr, _numOutputBuses)
+                    == Vst3HostNative.KResultOk;
+            }
+        }
+        catch (AccessViolationException)
+        {
+            // Flux TraxSf 等: 非対応 arrangement で AV する。次候補／既定へ。
+            return false;
+        }
+        catch (SEHException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryGetBusArrangement(IntPtr processor, int direction, int index, out ulong arrangement)
+    {
+        arrangement = 0;
+        if (processor == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            unsafe
+            {
+                var vt = *(IntPtr**)processor;
+                var getBus = Marshal.GetDelegateForFunctionPointer<GetBusArrangementFn>(vt[4]);
+                ulong arr = 0;
+                if (getBus(processor, direction, index, &arr) != Vst3HostNative.KResultOk || arr == 0)
+                {
+                    return false;
+                }
+
+                arrangement = arr;
+                return true;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static ulong GuessArrangementFromName(string? displayName, string? classId)
+    {
+        var text = ((displayName ?? string.Empty) + " " + DecodeClassIdAscii(classId)).ToLowerInvariant();
+        if (LooksLikeMonoToStereoName(displayName, classId))
+        {
+            return 0;
+        }
+
+        if (text.Contains("5.1", StringComparison.Ordinal))
+        {
+            return Vst3HostNative.Speaker51;
+        }
+
+        if (text.Contains("5.0", StringComparison.Ordinal))
+        {
+            return Vst3HostNative.Speaker50;
+        }
+
+        if (text.Contains("mono", StringComparison.Ordinal))
+        {
+            return Vst3HostNative.SpeakerMono;
+        }
+
+        return 0;
+    }
+
+    private static bool LooksLikeMonoToStereoName(string? displayName, string? classId)
+    {
+        var text = ((displayName ?? string.Empty) + " " + DecodeClassIdAscii(classId)).ToLowerInvariant();
+        return text.Contains("mono/stereo", StringComparison.Ordinal)
+            || text.Contains("mono to stereo", StringComparison.Ordinal)
+            || text.Contains("xsplit", StringComparison.Ordinal);
+    }
+
+    private static string DecodeClassIdAscii(string? classIdBase64)
+    {
+        if (string.IsNullOrWhiteSpace(classIdBase64))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var bytes = Convert.FromBase64String(classIdBase64);
+            return System.Text.Encoding.ASCII.GetString(bytes);
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     private bool ActivateNoLock()
@@ -631,6 +967,8 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
             setProcessing(_processor, 1);
         }
 
+        _projectTimeSamples = 0;
+        _continuousTimeSamples = 0;
         _active = true;
         return true;
     }
@@ -673,53 +1011,85 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
     {
         EnsureScratchNoLock();
         var pc = _pluginChannels;
+        var pin = Math.Max(1, _pluginInChannels);
+        var pout = Math.Max(1, _pluginOutChannels);
+        var hostCh = Math.Max(1, channels);
 
-        // 多くの VST3 は in-place（入出力同一バッファ）前提。別バッファにすると無音のままになる。
+        // 入出力は別バッファ。iZotope Trash 等は in-place（同一ポインタ）だと AccessViolation する。
         for (var c = 0; c < pc; c++)
         {
-            var plane = _planarIn[c];
-            if (c < channels)
-            {
-                for (var i = 0; i < frames; i++)
-                {
-                    plane[i] = buffer[offset + i * channels + c];
-                }
-            }
-            else
-            {
-                Array.Clear(plane, 0, frames);
-            }
-
-            var ptr = Marshal.UnsafeAddrOfPinnedArrayElement(plane, 0);
-            _inPtrs[c] = ptr;
-            _outPtrs[c] = ptr;
+            Array.Clear(_planarIn[c], 0, frames);
+            Array.Clear(_planarOut[c], 0, frames);
+            _inPtrs[c] = Marshal.UnsafeAddrOfPinnedArrayElement(_planarIn[c], 0);
+            _outPtrs[c] = Marshal.UnsafeAddrOfPinnedArrayElement(_planarOut[c], 0);
         }
 
+        // ホスト interleaved → プラグイン planar（Mono 専用はステレオをダウンミックス）
+        if (pin == 1 && hostCh >= 2)
+        {
+            var plane = _planarIn[0];
+            for (var i = 0; i < frames; i++)
+            {
+                var baseIdx = offset + i * hostCh;
+                plane[i] = 0.5f * (buffer[baseIdx] + buffer[baseIdx + 1]);
+            }
+        }
+        else
+        {
+            var copy = Math.Min(pin, hostCh);
+            for (var c = 0; c < copy; c++)
+            {
+                var plane = _planarIn[c];
+                for (var i = 0; i < frames; i++)
+                {
+                    plane[i] = buffer[offset + i * hostCh + c];
+                }
+            }
+        }
+
+        // メインバス＋非アクティブな追加バス（サイドチェイン等）。バス配列長は getBusCount と一致させる。
         var busIn = new Vst3HostNative.AudioBusBuffers
         {
-            NumChannels = pc,
+            NumChannels = pin,
             SilenceFlags = 0,
             ChannelBuffers = _inPtrsHandle.AddrOfPinnedObject(),
         };
         var busOut = new Vst3HostNative.AudioBusBuffers
         {
-            NumChannels = pc,
+            NumChannels = pout,
             SilenceFlags = 0,
             ChannelBuffers = _outPtrsHandle.AddrOfPinnedObject(),
         };
+        var inactive = new Vst3HostNative.AudioBusBuffers
+        {
+            NumChannels = 0,
+            SilenceFlags = 0,
+            ChannelBuffers = IntPtr.Zero,
+        };
 
+        WriteBusArray(_inputsBusArray, _numInputBuses, busIn, inactive);
+        WriteBusArray(_outputsBusArray, _numOutputBuses, busOut, inactive);
+        // 互換: 単一バス用ポインタもメインと同じ内容にしておく。
         Marshal.StructureToPtr(busIn, _busIn, false);
         Marshal.StructureToPtr(busOut, _busOut, false);
+
+        // UI（performEdit）→ このブロックの IParameterChanges へ
+        _inputParamChanges.BeginProcessBlock();
+        _outputParamChanges.BeginOutputBlock();
+        WriteProcessContextNoLock();
 
         var data = new Vst3HostNative.ProcessData
         {
             ProcessMode = Vst3HostNative.ProcessModeRealtime,
             SymbolicSampleSize = Vst3HostNative.SymbolicSampleSize32,
             NumSamples = frames,
-            NumInputs = 1,
-            NumOutputs = 1,
-            Inputs = _busIn,
-            Outputs = _busOut,
+            NumInputs = _numInputBuses,
+            NumOutputs = _numOutputBuses,
+            Inputs = _inputsBusArray,
+            Outputs = _outputsBusArray,
+            InputParameterChanges = _inputParamChanges.ComPtr,
+            OutputParameterChanges = _outputParamChanges.ComPtr,
+            ProcessContext = _processContext,
         };
 
         unsafe
@@ -730,29 +1100,124 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
             process(_processor, &data);
         }
 
-        for (var i = 0; i < frames; i++)
+        ForwardOutputParamsToControllerNoLock();
+        _projectTimeSamples += frames;
+        _continuousTimeSamples += frames;
+
+        // プラグイン planar → ホスト interleaved（Mono 出力は L/R に複製）
+        if (pout == 1 && hostCh >= 2)
         {
-            for (var c = 0; c < channels; c++)
+            var mono = _planarOut[0];
+            for (var i = 0; i < frames; i++)
             {
-                buffer[offset + i * channels + c] = c < pc ? _planarIn[c][i] : 0f;
+                var baseIdx = offset + i * hostCh;
+                var s = mono[i];
+                buffer[baseIdx] = s;
+                buffer[baseIdx + 1] = s;
+                for (var c = 2; c < hostCh; c++)
+                {
+                    buffer[baseIdx + c] = 0f;
+                }
+            }
+        }
+        else
+        {
+            var copy = Math.Min(pout, hostCh);
+            for (var i = 0; i < frames; i++)
+            {
+                var baseIdx = offset + i * hostCh;
+                for (var c = 0; c < copy; c++)
+                {
+                    buffer[baseIdx + c] = _planarOut[c][i];
+                }
+
+                for (var c = copy; c < hostCh; c++)
+                {
+                    buffer[baseIdx + c] = 0f;
+                }
             }
         }
 
         return true;
     }
 
-    private void EnsureScratchNoLock()
+    private void WriteProcessContextNoLock()
     {
-        var pc = Math.Max(1, _channels >= 2 ? 2 : 1);
-        if (_planarIn.Length == pc
+        // FabFilter 等のスペアナは ProcessContext（再生時刻）無しだと描画を止めることがある。
+        // 音声バッファ自体は通っていても（EQ は効く）スペアナだけ欠ける。
+        var ctx = new Vst3HostNative.ProcessContext
+        {
+            State = unchecked((uint)(
+                Vst3HostNative.ProcessContextPlaying
+                | Vst3HostNative.ProcessContextSystemTimeValid
+                | Vst3HostNative.ProcessContextContTimeValid
+                | Vst3HostNative.ProcessContextTempoValid
+                | Vst3HostNative.ProcessContextTimeSigValid)),
+            SampleRate = _sampleRate > 0 ? _sampleRate : 48000,
+            ProjectTimeSamples = _projectTimeSamples,
+            SystemTime = (long)(Stopwatch.GetTimestamp() * (1_000_000_000.0 / Stopwatch.Frequency)),
+            ContinousTimeSamples = _continuousTimeSamples,
+            Tempo = 120,
+            TimeSigNumerator = 4,
+            TimeSigDenominator = 4,
+        };
+        Marshal.StructureToPtr(ctx, _processContext, false);
+    }
+
+    private void ForwardOutputParamsToControllerNoLock()
+    {
+        if (_controller == IntPtr.Zero)
+        {
+            return;
+        }
+
+        _outputParamChanges.CollectLastValues(_outputParamScratch);
+        if (_outputParamScratch.Count == 0)
+        {
+            return;
+        }
+
+        unsafe
+        {
+            var vt = *(IntPtr**)_controller;
+            // IEditController::setParamNormalized = index 14
+            var setParam = Marshal.GetDelegateForFunctionPointer<SetParamNormalizedFn>(vt[14]);
+            foreach (var (id, value) in _outputParamScratch)
+            {
+                try
+                {
+                    setParam(_controller, id, value);
+                }
+                catch
+                {
+                }
+            }
+        }
+    }
+
+    private void EnsureScratchNoLock(bool force = false)
+    {
+        var pc = Math.Max(
+            1,
+            Math.Max(
+                Math.Max(_pluginInChannels, _pluginOutChannels),
+                Math.Max(_pluginChannels, _channels >= 1 ? Math.Min(_channels, 8) : 1)));
+        _pluginChannels = pc;
+        var inBuses = Math.Max(1, _numInputBuses);
+        var outBuses = Math.Max(1, _numOutputBuses);
+        if (!force
+            && _planarIn.Length == pc
             && _planarIn[0].Length >= _maxBlock
-            && _busIn != IntPtr.Zero)
+            && _busIn != IntPtr.Zero
+            && _inputsBusArray != IntPtr.Zero
+            && _outputsBusArray != IntPtr.Zero)
         {
             return;
         }
 
         FreeBusBuffersNoLock();
-        _pluginChannels = pc;
+        _numInputBuses = inBuses;
+        _numOutputBuses = outBuses;
         _planarIn = new float[pc][];
         _planarOut = new float[pc][];
         for (var c = 0; c < pc; c++)
@@ -765,8 +1230,40 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         _outPtrs = new IntPtr[pc];
         _inPtrsHandle = GCHandle.Alloc(_inPtrs, GCHandleType.Pinned);
         _outPtrsHandle = GCHandle.Alloc(_outPtrs, GCHandleType.Pinned);
-        _busIn = Marshal.AllocHGlobal(Marshal.SizeOf<Vst3HostNative.AudioBusBuffers>());
-        _busOut = Marshal.AllocHGlobal(Marshal.SizeOf<Vst3HostNative.AudioBusBuffers>());
+        var busSize = Marshal.SizeOf<Vst3HostNative.AudioBusBuffers>();
+        _busIn = Marshal.AllocHGlobal(busSize);
+        _busOut = Marshal.AllocHGlobal(busSize);
+        _inputsBusArray = Marshal.AllocHGlobal(busSize * inBuses);
+        _outputsBusArray = Marshal.AllocHGlobal(busSize * outBuses);
+        _processContext = Marshal.AllocHGlobal(Marshal.SizeOf<Vst3HostNative.ProcessContext>());
+    }
+
+    private static void WriteBusArray(
+        IntPtr array,
+        int busCount,
+        Vst3HostNative.AudioBusBuffers main,
+        Vst3HostNative.AudioBusBuffers inactive)
+    {
+        var size = Marshal.SizeOf<Vst3HostNative.AudioBusBuffers>();
+        for (var i = 0; i < busCount; i++)
+        {
+            Marshal.StructureToPtr(i == 0 ? main : inactive, array + (i * size), false);
+        }
+    }
+
+    private static int GetAudioBusCount(IntPtr component, int direction)
+    {
+        if (component == IntPtr.Zero)
+        {
+            return 1;
+        }
+
+        unsafe
+        {
+            var vt = *(IntPtr**)component;
+            var getBusCount = Marshal.GetDelegateForFunctionPointer<GetBusCountFn>(vt[7]);
+            return Math.Max(0, getBusCount(component, Vst3HostNative.MediaTypeAudio, direction));
+        }
     }
 
     private void FreeBusBuffersNoLock()
@@ -791,6 +1288,24 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         {
             Marshal.FreeHGlobal(_busOut);
             _busOut = IntPtr.Zero;
+        }
+
+        if (_inputsBusArray != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(_inputsBusArray);
+            _inputsBusArray = IntPtr.Zero;
+        }
+
+        if (_outputsBusArray != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(_outputsBusArray);
+            _outputsBusArray = IntPtr.Zero;
+        }
+
+        if (_processContext != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(_processContext);
+            _processContext = IntPtr.Zero;
         }
     }
 
@@ -1164,11 +1679,23 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
     private static int InitializeComponentResult(IntPtr component, IntPtr hostContext)
     {
-        unsafe
+        try
         {
-            var vt = *(IntPtr**)component;
-            var init = Marshal.GetDelegateForFunctionPointer<InitializeFn>(vt[3]);
-            return init(component, hostContext);
+            unsafe
+            {
+                var vt = *(IntPtr**)component;
+                var init = Marshal.GetDelegateForFunctionPointer<InitializeFn>(vt[3]);
+                return init(component, hostContext);
+            }
+        }
+        catch (AccessViolationException)
+        {
+            // Flux Trax 等: initialize でネイティブ AV。ロード失敗として扱う。
+            return unchecked((int)0x80004005);
+        }
+        catch (SEHException)
+        {
+            return unchecked((int)0x80004005);
         }
     }
 
@@ -1217,11 +1744,35 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         unsafe
         {
             var vt = *(IntPtr**)component;
+            var getBusCount = Marshal.GetDelegateForFunctionPointer<GetBusCountFn>(vt[7]);
             var activateBus = Marshal.GetDelegateForFunctionPointer<ActivateBusFn>(vt[10]);
-            activateBus(component, Vst3HostNative.MediaTypeAudio, Vst3HostNative.BusDirectionInput, 0, 1);
-            activateBus(component, Vst3HostNative.MediaTypeAudio, Vst3HostNative.BusDirectionOutput, 0, 1);
+            var nIn = Math.Max(1, getBusCount(component, Vst3HostNative.MediaTypeAudio, Vst3HostNative.BusDirectionInput));
+            var nOut = Math.Max(1, getBusCount(component, Vst3HostNative.MediaTypeAudio, Vst3HostNative.BusDirectionOutput));
+            // メインのみ有効。FabFilter 等のサイドチェインは無効化。
+            for (var i = 0; i < nIn; i++)
+            {
+                activateBus(
+                    component,
+                    Vst3HostNative.MediaTypeAudio,
+                    Vst3HostNative.BusDirectionInput,
+                    i,
+                    i == 0 ? 1 : 0);
+            }
+
+            for (var i = 0; i < nOut; i++)
+            {
+                activateBus(
+                    component,
+                    Vst3HostNative.MediaTypeAudio,
+                    Vst3HostNative.BusDirectionOutput,
+                    i,
+                    i == 0 ? 1 : 0);
+            }
         }
     }
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate int GetBusCountFn(IntPtr self, int type, int dir);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int InitializeFn(IntPtr self, IntPtr context);
@@ -1243,6 +1794,10 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         IntPtr self, ulong* inputs, int numIns, ulong* outputs, int numOuts);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private unsafe delegate int GetBusArrangementFn(
+        IntPtr self, int direction, int index, ulong* arrangement);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int CanProcessSampleSizeFn(IntPtr self, int symbolicSampleSize);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -1253,6 +1808,9 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private unsafe delegate int ProcessFn(IntPtr self, Vst3HostNative.ProcessData* data);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate int SetParamNormalizedFn(IntPtr self, uint id, double value);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private unsafe delegate int GetControllerClassIdFn(IntPtr self, byte* classId);
