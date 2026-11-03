@@ -133,11 +133,7 @@ internal sealed partial class PlaybackSampleProvider : ISampleProvider
     private int _meterWrite;
     private int _meterCount;
     private int _meterSourceChannels = 2;
-    private int _sourceMeterThisRead;
-    private float[] _sourceMeterScratch = [];
     private float[] _speakerScratch = [];
-    private int _sourceMeterScratchFrames;
-    private int _sourceMeterScratchChannels = 1;
     private readonly float[] _monitorRing = new float[SpectrumAnalyzer.FftSize];
     private long _monitorWriteCount;
     private readonly object _monitorGate = new();

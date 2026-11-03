@@ -181,6 +181,46 @@ public sealed class LevelMeterEngineTests
     }
 
     [Fact]
+    public void PlaybackProvider_MetersFollowVstInsertGain()
+    {
+        var frames = 4;
+        var samples = new float[frames * 2];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 2] = 0.5f;
+            samples[i * 2 + 1] = 0.25f;
+        }
+
+        var document = new AudioDocument(samples, 48000, 2, 24, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(2, null);
+        provider.Bind(document, 0, null, loop: false);
+
+        var factory = new MeterGainFactory(2f);
+        using var engine = new VstInsertEngine(factory);
+        var owner = new object();
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Gain.vst3";
+        chain.Slots[0].DisplayName = "Gain";
+        chain.Slots[0].ClassId = "gain";
+        engine.Apply(owner, chain, playerBypass: false);
+        provider.SetVstInsertEngine(engine);
+
+        var buffer = new float[samples.Length];
+        Assert.Equal(samples.Length, provider.Read(buffer, 0, buffer.Length));
+        Assert.Equal(1f, buffer[0], 5);
+        Assert.Equal(0.5f, buffer[1], 5);
+
+        Assert.True(provider.TakeMeterInterval(out var peakL, out _, out var peakR, out _));
+        Assert.Equal(1f, peakL, 5);
+        Assert.Equal(0.5f, peakR, 5);
+
+        var dest = new float[frames];
+        Assert.Equal(frames, provider.CopyRecentOutputSamples(dest));
+        Assert.All(dest, sample => Assert.Equal(0.75f, sample, 5));
+    }
+
+    [Fact]
     public void PlaybackProvider_CopyRecentOutputSamples_IsMonoMixTail()
     {
         var frames = 8;
@@ -501,5 +541,64 @@ public sealed class LevelMeterEngineTests
         var expected = ChannelMix.Mid([0f, 0f, 0f, 0f, 0f, 0.7f]);
         Assert.All(dest, sample => Assert.Equal(expected, sample, 5));
         Assert.True(Math.Abs(expected) > 0.1f);
+    }
+
+    private sealed class MeterGainFactory(float gain) : IVstSlotProcessorFactory
+    {
+        public IVstSlotProcessor? TryCreate(VstInsertSlot slot, double sampleRate, int maxBlockSize, int channels) =>
+            new MeterGainProcessor(slot.PluginPath!, gain);
+    }
+
+    private sealed class MeterGainProcessor : IVstSlotProcessor
+    {
+        private readonly float _gain;
+
+        public MeterGainProcessor(string path, float gain)
+        {
+            PluginPath = path;
+            _gain = gain;
+        }
+
+        public string PluginPath { get; }
+
+        public string? ClassId => "gain";
+
+        public string DisplayName => PluginPath;
+
+        public bool Faulted => false;
+
+        public void Reconfigure(double sampleRate, int maxBlockSize, int channels)
+        {
+        }
+
+        public void ApplyState(byte[]? stateBlob)
+        {
+        }
+
+        public byte[]? CaptureState() => null;
+
+        public bool Process(float[] buffer, int offset, int sampleCount, int channels)
+        {
+            for (var i = 0; i < sampleCount; i++)
+            {
+                buffer[offset + i] *= _gain;
+            }
+
+            return true;
+        }
+
+        public void ResetProcessing()
+        {
+        }
+
+        public Vst3EditorSession? TryOpenEditor() => null;
+
+        public void ResetEditor()
+        {
+        }
+
+        public void Dispose()
+        {
+        }
     }
 }
