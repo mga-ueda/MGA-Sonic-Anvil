@@ -582,6 +582,8 @@ internal sealed class VstInsertEngine : IDisposable
     /// <summary>
     /// 再生コールバックを止めつつ、現在のライブチェーンで interleaved をその場処理する。
     /// バイパス／fault スロットは通さない。呼び出し側で再生停止と CaptureState を済ませること。
+    /// 直前タブの wet 残留を落とすため、処理前に DSP リセット＋短い無音フラッシュを行う
+    /// （ライブ再生の温存経路は通らない）。
     /// </summary>
     public async Task ProcessOfflineAsync(
         float[] interleaved,
@@ -615,6 +617,10 @@ internal sealed class VstInsertEngine : IDisposable
                 maxBlock = Math.Max(16, _maxBlockSize);
             }
 
+            // 共有ライブのまま直列バウンスするため、ファイルごとに残留を捨てる。
+            PrepareLiveSlotsForOffline(channels, maxBlock);
+            cancellationToken.ThrowIfCancellationRequested();
+
             var frames = interleaved.Length / channels;
             var block = maxBlock;
             for (var frame = 0; frame < frames; frame += block)
@@ -639,6 +645,73 @@ internal sealed class VstInsertEngine : IDisposable
         finally
         {
             EndExclusiveLoad();
+        }
+    }
+
+    /// <summary>
+    /// オフライン直前専用。ライブ Process は呼ばない。
+    /// setProcessing トグル後、約 0.5 秒の無音を捨てバッファへ通して残響を吐き切る。
+    /// </summary>
+    private void PrepareLiveSlotsForOffline(int channels, int maxBlock)
+    {
+        channels = Math.Max(1, channels);
+        maxBlock = Math.Max(16, maxBlock);
+
+        var toReset = new List<IVstSlotProcessor>(VstInsertChain.MaxSlots);
+        int flushFrames;
+        lock (_gate)
+        {
+            if (_disposed || _playerBypass)
+            {
+                return;
+            }
+
+            for (var i = 0; i < _live.Length; i++)
+            {
+                if (_uiSuspended[i] || _bypass[i] || _faulted[i] || _live[i] is null)
+                {
+                    continue;
+                }
+
+                toReset.Add(_live[i]!);
+            }
+
+            if (toReset.Count == 0)
+            {
+                return;
+            }
+
+            flushFrames = Math.Max(maxBlock * 2, (int)Math.Ceiling(_sampleRate * 0.5));
+        }
+
+        foreach (var live in toReset)
+        {
+            try
+            {
+                live.ResetProcessing();
+            }
+            catch
+            {
+            }
+        }
+
+        var silence = new float[maxBlock * channels];
+        var remaining = flushFrames;
+        while (remaining > 0)
+        {
+            var n = Math.Min(maxBlock, remaining);
+            Array.Clear(silence, 0, n * channels);
+            Interlocked.Increment(ref _processUsers);
+            try
+            {
+                ProcessActiveSlots(silence, 0, n * channels, channels);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _processUsers);
+            }
+
+            remaining -= n;
         }
     }
 
@@ -722,6 +795,35 @@ internal sealed class VstInsertEngine : IDisposable
         lock (_gate)
         {
             return (uint)index < (uint)_live.Length ? _live[index] : null;
+        }
+    }
+
+    /// <summary>
+    /// バイパス中のライブを破棄して deferred に戻す。
+    /// バウンス直後など、オフライン処理で触ったインスタンスを閉じ経路へ残さないため。
+    /// バイパス解除時は既存の遅延ロード／EnsureSlotLoaded で再生成する。
+    /// </summary>
+    public void UnloadBypassedLiveSlots()
+    {
+        List<IVstSlotProcessor>? toDispose = null;
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            for (var i = 0; i < _live.Length; i++)
+            {
+                if (!_bypass[i] || _live[i] is null)
+                {
+                    continue;
+                }
+
+                toDispose ??= new List<IVstSlotProcessor>(VstInsertChain.MaxSlots);
+                DetachSlotNoLock(i, toDispose);
+            }
+        }
+
+        if (toDispose is not null)
+        {
+            ScheduleDispose(toDispose);
         }
     }
 
