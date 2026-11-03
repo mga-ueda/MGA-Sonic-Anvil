@@ -787,9 +787,14 @@ internal static class DocumentSessionStore
     /// <summary>
     /// 永続化した「スロット番号＋プラグイン＋バイパス」をチェーンへ載せる。
     /// 永続スロットは全タブ共通のため、空き／使用中を問わず上書きする（未永続スロットは触らない）。
+    /// <paramref name="applyBypass"/> が false のときはパラメータ／実体だけ同期し、各タブのバイパスは残す
+    /// （バウンス後の自動バイパスを flush で潰さないため）。
     /// </summary>
     /// <returns>1 つでも変えたら true。</returns>
-    public static bool ApplyPersistedInserts(VstInsertChain chain, VstInsertSlotSnapshot[]? defaults)
+    public static bool ApplyPersistedInserts(
+        VstInsertChain chain,
+        VstInsertSlotSnapshot[]? defaults,
+        bool applyBypass = true)
     {
         ArgumentNullException.ThrowIfNull(chain);
         if (!SnapshotHasAnyPlugin(defaults))
@@ -822,12 +827,13 @@ internal static class DocumentSessionStore
             }
 
             var dst = chain.Slots[i];
-            var same =
+            var samePlugin =
                 string.Equals(dst.PluginPath, src.PluginPath, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(dst.ClassId ?? string.Empty, src.ClassId ?? string.Empty, StringComparison.Ordinal)
-                && dst.Bypassed == src.Bypassed
                 && StateBlobEquals(dst.StateBlob, state);
-            if (same)
+            var sameBypass = !applyBypass || dst.Bypassed == src.Bypassed;
+            if (samePlugin && sameBypass
+                && string.Equals(dst.DisplayName ?? string.Empty, src.DisplayName ?? string.Empty, StringComparison.Ordinal))
             {
                 continue;
             }
@@ -835,7 +841,11 @@ internal static class DocumentSessionStore
             dst.PluginPath = src.PluginPath;
             dst.ClassId = src.ClassId;
             dst.DisplayName = src.DisplayName;
-            dst.Bypassed = src.Bypassed;
+            if (applyBypass)
+            {
+                dst.Bypassed = src.Bypassed;
+            }
+
             dst.Faulted = false;
             dst.StateBlob = state is null ? null : (byte[])state.Clone();
             changed = true;

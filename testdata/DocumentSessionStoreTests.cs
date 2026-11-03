@@ -601,6 +601,43 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
+    public void ApplyPersistedInserts_WithoutBypass_KeepsSessionBypass()
+    {
+        // flush 経路: 既定はバイパスオフのまま、バウンス済みタブのバイパスは残す。
+        var settings = new AppSettings();
+        var slot = new VstInsertSlot
+        {
+            PluginPath = @"C:\Plugins\Hall.vst3",
+            DisplayName = "Hall",
+            Bypassed = false,
+            StateBlob = [1],
+        };
+        DocumentSessionStore.SetDefaultInsertSlot(settings, 0, DocumentSessionStore.CaptureSlot(slot));
+
+        var baked = new VstInsertChain();
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(baked, settings.DefaultVstInserts));
+        baked.Slots[0].Bypassed = true;
+
+        slot.StateBlob = [9, 9];
+        var captured = DocumentSessionStore.CaptureSlot(slot);
+        captured.Bypassed = false;
+        DocumentSessionStore.SetDefaultInsertSlot(settings, 0, captured);
+
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(
+            baked,
+            settings.DefaultVstInserts,
+            applyBypass: false));
+        Assert.True(baked.Slots[0].Bypassed);
+        Assert.Equal(new byte[] { 9, 9 }, baked.Slots[0].StateBlob);
+
+        Assert.True(DocumentSessionStore.ApplyPersistedInserts(
+            baked,
+            settings.DefaultVstInserts,
+            applyBypass: true));
+        Assert.False(baked.Slots[0].Bypassed);
+    }
+
+    [Fact]
     public void HasRestorableOpenDocuments_TrueWhenSourceExists()
     {
         var root = NewTempDir("has-restorable");
