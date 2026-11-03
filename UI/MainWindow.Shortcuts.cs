@@ -1455,7 +1455,12 @@ public partial class MainWindow
             return true;
         }
 
-        // エディタ: Ctrl+Shift+1–8＝VST インサート（空き＝選択／使用中＝GUI）。
+        // エディタ: Alt+Shift+I＝Include Tail。Ctrl+Shift+1–8＝VST インサート（空き＝選択／使用中＝GUI）。
+        if (!IsLibraryMaximized && TryHandleVstBounceIncludeTailShortcut(key, modifiers))
+        {
+            return true;
+        }
+
         if (!IsLibraryMaximized && TryHandleVstInsertSlotShortcut(key, modifiers))
         {
             return true;
@@ -1469,6 +1474,22 @@ public partial class MainWindow
         }
 
         return false;
+    }
+
+    /// <summary>Alt+Shift+I。バウンス時の Include Tail をトグル。</summary>
+    private bool TryHandleVstBounceIncludeTailShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (!IsVstInsertUiEnabled()
+            || BlocksOutsideFadeToolActions
+            || modifiers != LibraryPlayerMode.AltShift
+            || key != Key.I
+            || VstInsertRack.Visibility != Visibility.Visible)
+        {
+            return false;
+        }
+
+        VstInsertRack.ToggleIncludeTail();
+        return true;
     }
 
     /// <summary>Ctrl+Shift+上段 1–8。空き＝挿入、使用中＝GUI 開閉トグル。</summary>

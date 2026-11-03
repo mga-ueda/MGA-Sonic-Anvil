@@ -317,7 +317,7 @@ public sealed class VstInsertEngineTests
     }
 
     [Fact]
-    public void UnloadBypassedLiveSlots_DetachesBypassedKeepsActive()
+    public void UnloadBypassedLiveSlots_ParksBypassedKeepsActive()
     {
         var factory = new CountingFactory();
         using var engine = new VstInsertEngine(factory);
@@ -328,6 +328,7 @@ public sealed class VstInsertEngineTests
         engine.Apply(owner, chain, playerBypass: false);
         Assert.NotNull(engine.TryGetLive(0));
         Assert.NotNull(engine.TryGetLive(1));
+        var bypassedLive = engine.TryGetLive(0);
 
         chain.Slots[0].Bypassed = true;
         engine.Apply(owner, chain, playerBypass: false);
@@ -338,10 +339,37 @@ public sealed class VstInsertEngineTests
         Assert.Null(engine.TryGetLive(0));
         Assert.NotNull(engine.TryGetLive(1));
         Assert.True(engine.IsSlotBypassed(0));
+        Assert.True(((MockProcessor)bypassedLive!).ResetProcessingCount >= 1);
 
-        engine.EnsureSlotLoaded(0);
+        // バイパス解除は park から復帰し、再 create しない（バウンス Undo 相当）。
+        chain.Slots[0].Bypassed = false;
+        engine.Apply(owner, chain, playerBypass: false);
         Assert.NotNull(engine.TryGetLive(0));
-        Assert.Equal(3, factory.CreateCount);
+        Assert.Same(bypassedLive, engine.TryGetLive(0));
+        Assert.Equal(2, factory.CreateCount);
+        Assert.False(engine.IsSlotBypassed(0));
+    }
+
+    [Fact]
+    public void UnloadBypassedLiveSlots_WithoutOwner_Disposes()
+    {
+        var factory = new CountingFactory();
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\A.vst3";
+        // owner null は通常使わないが、破棄経路の保険。
+        engine.Apply(owner: null, chain, playerBypass: false);
+        Assert.NotNull(engine.TryGetLive(0));
+
+        chain.Slots[0].Bypassed = true;
+        engine.Apply(owner: null, chain, playerBypass: false);
+        engine.UnloadBypassedLiveSlots();
+        Assert.Null(engine.TryGetLive(0));
+
+        chain.Slots[0].Bypassed = false;
+        engine.Apply(owner: null, chain, playerBypass: false);
+        Assert.NotNull(engine.TryGetLive(0));
+        Assert.Equal(2, factory.CreateCount);
     }
 
     [Fact]
@@ -606,6 +634,40 @@ public sealed class VstInsertEngineTests
         Assert.True(factory.Last.ResetProcessingCount >= 1);
         Assert.Equal(0f, second[0]);
         Assert.Equal(0f, factory.Last.Bleed);
+    }
+
+    [Fact]
+    public async Task ProcessOffline_IncludeTail_ExtendsPastSourceUntilQuiet()
+    {
+        var factory = new CountingFactory { LeaveBleed = true };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Reverb.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var source = new float[] { 1f, 0f, 0f, 0f };
+        var baked = await engine.ProcessOfflineAsync(source, channels: 1, includeTail: true);
+        Assert.True(baked.Length > source.Length);
+        Assert.Equal(source.Length + 1, baked.Length);
+        Assert.Equal(1f, baked[0]);
+        Assert.True(Math.Abs(baked[^1]) > 0.5f);
+        // 元配列は触らない。
+        Assert.Equal(1f, source[0]);
+    }
+
+    [Fact]
+    public async Task ProcessOffline_IncludeTailOff_KeepsLength()
+    {
+        var factory = new CountingFactory { LeaveBleed = true };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Reverb.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var buffer = new float[] { 1f, 0f, 0f, 0f };
+        var baked = await engine.ProcessOfflineAsync(buffer, channels: 1, includeTail: false);
+        Assert.Same(buffer, baked);
+        Assert.Equal(4, baked.Length);
     }
 
     [Fact]

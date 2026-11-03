@@ -350,12 +350,14 @@ internal static class DesignMetrics
     /// <summary>スペアナ左のラウドネスメーター幅。列はキャプション／値／単位の最大幅の合計。</summary>
     public static double LoudnessMeterWidth => From96(240);
 
-    /// <summary>ラウドネス左の VST インサートラック幅（スロット 4+4 列）。</summary>
-    public static double VstInsertRackWidth => VstInsertSlotColumnWidth * 2;
+    /// <summary>ラウドネス左の VST インサートラック幅（Include Tail ＋スロット 4+4 列）。</summary>
+    public static double VstInsertRackWidth => VstInsertTailColumnWidth + (VstInsertSlotColumnWidth * 2);
+
+    /// <summary>インサート左の Include Tail チェック列。</summary>
+    public static double VstInsertTailColumnWidth => From96(56);
 
     /// <summary>スロット 1 列の幅（左右に 4 段ずつ）。</summary>
     public static double VstInsertSlotColumnWidth => From96(150);
-
     /// <summary>各インサートスロットの四方マージン。</summary>
     public static double VstInsertSlotMargin => From96(3);
 

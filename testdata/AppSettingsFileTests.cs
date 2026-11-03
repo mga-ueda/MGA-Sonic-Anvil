@@ -302,6 +302,7 @@ public sealed class AppSettingsFileTests
             Assert.Equal(@"D:\exports", settings.LastExportFolder);
             Assert.Equal(@"D:\exports\Bounce.wav", settings.LastBouncePath);
             Assert.True(settings.AlwaysOnTop);
+            Assert.True(settings.ResolveVstBounceIncludeTail());
             Assert.Equal(AppSettings.CurrentGeneration, settings.SettingsGeneration);
         }
         finally

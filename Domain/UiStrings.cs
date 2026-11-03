@@ -201,6 +201,11 @@ internal static partial class UiStrings
     public static string TooltipVstInsertBake => Get(
         "選択タブ（無ければアクティブ）のインサートを波形へバウンスし、スロットをバイパスします (Ctrl+Shift+B)",
         "Bounce inserts on the selected tabs (or the active tab if none), then bypass those slots (Ctrl+Shift+B)");
+    /// <summary>インサートラック左の Include Tail チェック。</summary>
+    public static string LabelVstBounceIncludeTail => Get("Include Tail", "Include Tail");
+    public static string TooltipVstBounceIncludeTail => Get(
+        "オン：バウンス時に残響が消えるまで波形を伸ばします\nオフ：元の長さのまま切ります (Alt+Shift+I)",
+        "On: when bouncing, extend the waveform until effect tails die out\nOff: keep the original length (Alt+Shift+I)");
     public static string OverlayVstInsertBake => Get("インサートをバウンス中", "Bouncing inserts");
     public static string OverlayVstInsertBakeFile(string name) => Format(
         "バウンス中: {0}",

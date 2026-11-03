@@ -5,6 +5,7 @@ namespace MgaSonicAnvil.Editing;
 
 /// <summary>
 /// 波形置換に加え、バイパス副作用を Apply／Revert に載せる（アンドゥで自動バイパスだけ戻す）。
+/// Include Tail で after が長いときは文書末尾を伸ばす。
 /// </summary>
 internal sealed class BakeVstInsertsCommand : IEditCommand
 {
@@ -39,7 +40,7 @@ internal sealed class BakeVstInsertsCommand : IEditCommand
         _cursorAfter = cursorAfter;
         _applyBypass = applyBypass;
         _revertBypass = revertBypass;
-        _samplesChanged = !before.AsSpan().SequenceEqual(after);
+        _samplesChanged = before.Length != after.Length || !before.AsSpan().SequenceEqual(after);
         Name = "Bounce Inserts";
         Summary = summary;
     }
@@ -56,7 +57,7 @@ internal sealed class BakeVstInsertsCommand : IEditCommand
     {
         if (_samplesChanged)
         {
-            document.ReplaceRange(_startFrame, _after);
+            WriteSamples(document, _before, _after);
             document.Selection = _selectionAfter;
             document.CursorFrame = _cursorAfter;
         }
@@ -68,11 +69,24 @@ internal sealed class BakeVstInsertsCommand : IEditCommand
     {
         if (_samplesChanged)
         {
-            document.ReplaceRange(_startFrame, _before);
+            WriteSamples(document, _after, _before);
             document.Selection = _selectionBefore;
             document.CursorFrame = _cursorBefore;
         }
 
         _revertBypass();
+    }
+
+    private void WriteSamples(AudioDocument document, float[] current, float[] next)
+    {
+        var channels = Math.Max(1, document.Channels);
+        var currentFrames = current.Length / channels;
+        if (current.Length == next.Length)
+        {
+            document.ReplaceRange(_startFrame, next);
+            return;
+        }
+
+        document.SpliceRange(_startFrame, currentFrames, next);
     }
 }

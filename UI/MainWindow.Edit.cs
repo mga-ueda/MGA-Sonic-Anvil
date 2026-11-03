@@ -3269,7 +3269,7 @@ public partial class MainWindow
     private void UndoEdit()
     {
         // フェード調整中はドラフトと履歴が食い違うので Undo しない（閉じたあと再開可）。
-        if (IsCrossfadeEditMode)
+        if (IsCrossfadeEditMode || IsUiBusy)
         {
             return;
         }
@@ -3316,7 +3316,7 @@ public partial class MainWindow
     private void RedoEdit()
     {
         // Undo と同様、フェード調整中は履歴操作しない。
-        if (IsCrossfadeEditMode)
+        if (IsCrossfadeEditMode || IsUiBusy)
         {
             return;
         }
@@ -3416,7 +3416,7 @@ public partial class MainWindow
 
     private void UndoOrRedoSelectedSessions(IReadOnlyList<DocumentSession> sessions, bool redo)
     {
-        if (sessions.Count == 0)
+        if (sessions.Count == 0 || IsUiBusy)
         {
             return;
         }
