@@ -56,18 +56,18 @@ public sealed class AppSettingsFileTests
     }
 
     [Fact]
-    public void Wallpaper_DefaultsToNoneAtTenPercent()
+    public void Wallpaper_DefaultsToNoneAtTwentyPercent()
     {
         var settings = AppSettings.CreateDefault();
         Assert.Equal(string.Empty, settings.ResolvedWallpaperPath());
-        Assert.Equal(0.10, settings.ResolvedWallpaperOpacity());
-        Assert.Equal("10", AppSettings.FormatWallpaperOpacityPercent(settings.WallpaperOpacity));
-        Assert.True(AppSettings.TryParseWallpaperOpacityPercent("10", out var opacity));
-        Assert.Equal(0.10, opacity);
+        Assert.Equal(0.20, settings.ResolvedWallpaperOpacity());
+        Assert.Equal("20", AppSettings.FormatWallpaperOpacityPercent(settings.WallpaperOpacity));
+        Assert.True(AppSettings.TryParseWallpaperOpacityPercent("20", out var opacity));
+        Assert.Equal(0.20, opacity);
         Assert.False(AppSettings.TryParseWallpaperOpacityPercent("101", out _));
         Assert.Equal(1, AppSettings.ClampWallpaperOpacity(2));
-        Assert.Equal(11, AppSettings.NudgeWallpaperOpacityPercent(10, 1));
-        Assert.Equal(9, AppSettings.NudgeWallpaperOpacityPercent(10, -1));
+        Assert.Equal(21, AppSettings.NudgeWallpaperOpacityPercent(20, 1));
+        Assert.Equal(19, AppSettings.NudgeWallpaperOpacityPercent(20, -1));
         Assert.Equal(0, AppSettings.NudgeWallpaperOpacityPercent(0, -1));
         Assert.Equal(100, AppSettings.NudgeWallpaperOpacityPercent(100, 1));
         Assert.Equal(AppSettings.WallpaperOpacityDefault, AppSettings.ClampWallpaperOpacity(double.NaN));
@@ -78,12 +78,12 @@ public sealed class AppSettingsFileTests
     {
         var settings = AppSettings.CreateDefault();
         settings.WallpaperPath = @"D:\Pictures\lake.jpg";
-        settings.WallpaperOpacity = 0.10;
+        settings.WallpaperOpacity = 0.20;
         var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
         var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
         Assert.NotNull(back);
         Assert.Equal(@"D:\Pictures\lake.jpg", back!.ResolvedWallpaperPath());
-        Assert.Equal(0.10, back.ResolvedWallpaperOpacity());
+        Assert.Equal(0.20, back.ResolvedWallpaperOpacity());
     }
 
     [Fact]
