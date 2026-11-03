@@ -7,7 +7,7 @@ internal static partial class ProcessEdits
 {
     /// <summary>
     /// VST インサート通過後のサンプルで文書全体を置き換え、バイパス副作用も履歴に載せる。
-    /// <paramref name="after"/> は interleaved・文書と同じ長さであること。
+    /// <paramref name="after"/> は interleaved。元と同じ長さ、または Include Tail で長くなったもの。
     /// </summary>
     public static IEditCommand? BakeVstInserts(
         AudioDocument document,
@@ -24,14 +24,20 @@ internal static partial class ProcessEdits
         }
 
         var channels = Math.Max(1, document.Channels);
-        var expected = checked((int)(document.FrameCount * channels));
-        if (after.Length != expected)
+        if (after.Length % channels != 0)
+        {
+            return null;
+        }
+
+        var afterFrames = after.Length / channels;
+        if (afterFrames < document.FrameCount)
         {
             return null;
         }
 
         var before = document.CopyRange(0, document.FrameCount);
         var afterCopy = (float[])after.Clone();
+        var endFrame = afterFrames;
         var command = new BakeVstInsertsCommand(
             before,
             afterCopy,
@@ -43,13 +49,19 @@ internal static partial class ProcessEdits
                 UiStrings.EditHistoryName("Bounce Inserts"),
                 document.SampleRate,
                 0,
-                document.FrameCount),
+                endFrame),
             applyBypass,
             revertBypass);
         // 再適用はサンプル直書き（VST／バイパスは再現しない）。セッション復元も Record 相当。
         command.Replay = target =>
         {
-            if (afterCopy.Length != checked((int)(target.FrameCount * Math.Max(1, target.Channels))))
+            var targetChannels = Math.Max(1, target.Channels);
+            if (afterCopy.Length == 0 || afterCopy.Length % targetChannels != 0)
+            {
+                return null;
+            }
+
+            if (afterCopy.Length / targetChannels < target.FrameCount)
             {
                 return null;
             }

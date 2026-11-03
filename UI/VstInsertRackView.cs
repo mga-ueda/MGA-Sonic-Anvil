@@ -17,6 +17,8 @@ namespace MgaSonicAnvil.UI;
 internal sealed class VstInsertRackView : Grid
 {
     private readonly RoundedButton[] _slots = new RoundedButton[VstInsertChain.MaxSlots];
+    private readonly CheckBox _includeTailBox;
+    private readonly TextBlock _includeTailLabel;
     private DocumentSession? _session;
     private Action? _onChanged;
     private Action<int>? _openEditor;
@@ -87,14 +89,56 @@ internal sealed class VstInsertRackView : Grid
         };
         Panel.SetZIndex(_dragGhost, 100);
 
-        // スロット 1–4 | スロット 5–8（各列 4 段）。Bounce はメニュー／ツールバー／ショートカット。
+        // Include Tail | スロット 1–4 | スロット 5–8（各列 4 段）。Bounce はメニュー／ツールバー／ショートカット。
         const int slotRows = VstInsertChain.MaxSlots / 2;
+        const int slotColumnOffset = 1;
+        ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(DesignMetrics.VstInsertTailColumnWidth),
+        });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         for (var i = 0; i < slotRows; i++)
         {
             RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         }
+
+        _includeTailBox = new CheckBox
+        {
+            IsChecked = AppStorage.Settings.ResolveVstBounceIncludeTail(),
+            Focusable = false,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = UiStrings.TooltipVstBounceIncludeTail,
+        };
+        _includeTailBox.SetResourceReference(StyleProperty, "DarkCheckBoxStyle");
+        _includeTailBox.Checked += (_, _) => PersistIncludeTail(true);
+        _includeTailBox.Unchecked += (_, _) => PersistIncludeTail(false);
+
+        _includeTailLabel = new TextBlock
+        {
+            Text = UiStrings.LabelVstBounceIncludeTail,
+            FontSize = 9,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 2, 0, 0),
+            IsHitTestVisible = false,
+        };
+
+        var includeTailHost = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = UiStrings.TooltipVstBounceIncludeTail,
+        };
+        includeTailHost.Children.Add(_includeTailBox);
+        includeTailHost.Children.Add(_includeTailLabel);
+        SetColumn(includeTailHost, 0);
+        SetRow(includeTailHost, 0);
+        SetRowSpan(includeTailHost, slotRows);
+        Children.Add(includeTailHost);
 
         var slotMargin = DesignMetrics.VstInsertSlotMargin;
         for (var i = 0; i < VstInsertChain.MaxSlots; i++)
@@ -114,7 +158,7 @@ internal sealed class VstInsertRackView : Grid
             button.MouseRightButtonUp += Slot_MouseRightButtonUp;
             _slots[i] = button;
             // 左列 0–3、右列 4–7。四方に余白を付けてつめつめを避ける。
-            SetColumn(button, i < slotRows ? 0 : 1);
+            SetColumn(button, (i < slotRows ? 0 : 1) + slotColumnOffset);
             SetRow(button, i % slotRows);
             button.Margin = new Thickness(slotMargin);
 
@@ -122,13 +166,41 @@ internal sealed class VstInsertRackView : Grid
         }
 
         // 掴んだプラグイン名をポインタに追従させるゴースト。
-        SetColumn(_dragGhost, 0);
+        SetColumn(_dragGhost, slotColumnOffset);
         SetColumnSpan(_dragGhost, 2);
         SetRow(_dragGhost, 0);
         SetRowSpan(_dragGhost, slotRows);
         Children.Add(_dragGhost);
 
         ApplyTheme();
+    }
+
+    private static void PersistIncludeTail(bool includeTail)
+    {
+        if (AppStorage.Settings.VstBounceIncludeTail == includeTail)
+        {
+            return;
+        }
+
+        AppStorage.Settings.VstBounceIncludeTail = includeTail;
+        AppStorage.Save();
+    }
+
+    private void SyncIncludeTailFromSettings()
+    {
+        var on = AppStorage.Settings.ResolveVstBounceIncludeTail();
+        if (_includeTailBox.IsChecked == on)
+        {
+            return;
+        }
+
+        _includeTailBox.IsChecked = on;
+    }
+
+    /// <summary>Alt+Shift+I。Include Tail をトグルして設定へ保存する。</summary>
+    public void ToggleIncludeTail()
+    {
+        _includeTailBox.IsChecked = _includeTailBox.IsChecked != true;
     }
 
     public void SetSession(
@@ -308,7 +380,14 @@ internal sealed class VstInsertRackView : Grid
         && session.VstInserts.HasProcessableSlot
         && session.Document.FrameCount > 0;
 
-    public void ApplyTheme() => Refresh();
+    public void ApplyTheme()
+    {
+        SyncIncludeTailFromSettings();
+        _includeTailBox.ToolTip = UiStrings.TooltipVstBounceIncludeTail;
+        _includeTailLabel.Text = UiStrings.LabelVstBounceIncludeTail;
+        _includeTailLabel.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+        Refresh();
+    }
 
     /// <summary>
     /// ショートカット用。空きならインサートメニュー、使用中ならエディタを開く（Ctrl+クリックのバイパスはしない）。

@@ -579,23 +579,35 @@ internal sealed class VstInsertEngine : IDisposable
         }
     }
 
+    /// <summary>テール検出の無音しきい値（dBFS）。残響がこれ未満で Hold 分続けば打ち切る。</summary>
+    public const double OfflineTailThresholdDb = -90;
+
+    /// <summary>しきい値未満がこの時間続けばテール終了とみなす。</summary>
+    public const int OfflineTailHoldMs = 100;
+
+    /// <summary>テール延長の上限（秒）。無限残響プラグインへの保険。</summary>
+    public const double OfflineTailMaxSeconds = 60;
+
     /// <summary>
-    /// 再生コールバックを止めつつ、現在のライブチェーンで interleaved をその場処理する。
+    /// 再生コールバックを止めつつ、現在のライブチェーンで interleaved を処理する。
     /// バイパス／fault スロットは通さない。呼び出し側で再生停止と CaptureState を済ませること。
     /// 直前タブの wet 残留を落とすため、処理前に DSP リセット＋短い無音フラッシュを行う
     /// （ライブ再生の温存経路は通らない）。
+    /// <paramref name="includeTail"/> が true のときは無音を足して残響を鳴らし切り、
+    /// 元配列より長い新しい配列を返す（元配列は変更しない）。false ならその場処理して同じ配列を返す。
     /// </summary>
-    public async Task ProcessOfflineAsync(
+    public async Task<float[]> ProcessOfflineAsync(
         float[] interleaved,
         int channels,
         IProgress<double>? progress = null,
+        bool includeTail = false,
         CancellationToken cancellationToken = default)
     {
         channels = Math.Max(1, channels);
         if (interleaved.Length < channels)
         {
             progress?.Report(1);
-            return;
+            return interleaved;
         }
 
         BeginExclusiveLoad();
@@ -605,47 +617,201 @@ internal sealed class VstInsertEngine : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
 
             int maxBlock;
+            double sampleRate;
             lock (_gate)
             {
                 ObjectDisposedException.ThrowIf(_disposed, this);
                 if (_playerBypass)
                 {
                     progress?.Report(1);
-                    return;
+                    return interleaved;
                 }
 
                 maxBlock = Math.Max(16, _maxBlockSize);
+                sampleRate = _sampleRate > 0 ? _sampleRate : 48000;
             }
 
             // 共有ライブのまま直列バウンスするため、ファイルごとに残留を捨てる。
             PrepareLiveSlotsForOffline(channels, maxBlock);
             cancellationToken.ThrowIfCancellationRequested();
 
-            var frames = interleaved.Length / channels;
-            var block = maxBlock;
-            for (var frame = 0; frame < frames; frame += block)
+            if (!includeTail)
+            {
+                ProcessOfflineRange(
+                    interleaved,
+                    frameOffset: 0,
+                    frameCount: interleaved.Length / channels,
+                    channels,
+                    maxBlock,
+                    progress,
+                    progressStart: 0,
+                    progressEnd: 1,
+                    cancellationToken);
+                progress?.Report(1);
+                return interleaved;
+            }
+
+            var sourceFrames = interleaved.Length / channels;
+            var maxTailFrames = Math.Max(
+                maxBlock,
+                (int)Math.Ceiling(sampleRate * OfflineTailMaxSeconds));
+            var holdFrames = Math.Max(
+                1,
+                (int)Math.Ceiling(sampleRate * OfflineTailHoldMs / 1000.0));
+            var threshold = SilentSkip.LinearFromDb(OfflineTailThresholdDb);
+
+            // 本体はその場用コピー。テールはブロック単位で足してから結合する。
+            var body = (float[])interleaved.Clone();
+            ProcessOfflineRange(
+                body,
+                frameOffset: 0,
+                frameCount: sourceFrames,
+                channels,
+                maxBlock,
+                progress,
+                progressStart: 0,
+                progressEnd: 0.85,
+                cancellationToken);
+
+            var silence = new float[maxBlock * channels];
+            // テールは可変長。無音ホールド分も含めて溜め、最後に可聴末尾へ切り詰める。
+            var tail = new float[Math.Min(maxTailFrames, maxBlock * 8) * channels];
+            var tailFrames = 0;
+            var lastAudibleTailFrame = -1;
+            var quietRun = 0;
+            var tailFramesDone = 0;
+            var tailDone = false;
+            while (!tailDone && tailFramesDone < maxTailFrames)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var n = Math.Min(block, frames - frame);
+                var n = Math.Min(maxBlock, maxTailFrames - tailFramesDone);
+                Array.Clear(silence, 0, n * channels);
+
                 Interlocked.Increment(ref _processUsers);
                 try
                 {
-                    ProcessActiveSlots(interleaved, frame * channels, n * channels, channels);
+                    ProcessActiveSlots(silence, 0, n * channels, channels);
                 }
                 finally
                 {
                     Interlocked.Decrement(ref _processUsers);
                 }
 
-                progress?.Report((frame + n) / (double)frames);
+                EnsureTailCapacity(ref tail, (tailFrames + n) * channels);
+                Array.Copy(silence, 0, tail, tailFrames * channels, n * channels);
+
+                for (var i = 0; i < n; i++)
+                {
+                    var peak = PeakAbsInBlock(silence, i, channels);
+                    if (peak >= threshold)
+                    {
+                        quietRun = 0;
+                        lastAudibleTailFrame = tailFrames + i;
+                        continue;
+                    }
+
+                    quietRun++;
+                    if (quietRun >= holdFrames)
+                    {
+                        tailDone = true;
+                        // ホールド突入以降は捨てるので、ここまでのフレーム数は後で切り詰める。
+                        break;
+                    }
+                }
+
+                tailFrames += n;
+                tailFramesDone += n;
+                var tailRatio = tailFramesDone / (double)maxTailFrames;
+                progress?.Report(0.85 + (0.15 * Math.Clamp(tailRatio, 0, 1)));
             }
 
+            var keepTailFrames = lastAudibleTailFrame + 1;
+            if (keepTailFrames <= 0)
+            {
+                progress?.Report(1);
+                return body;
+            }
+
+            var combined = new float[checked((sourceFrames + keepTailFrames) * channels)];
+            Array.Copy(body, 0, combined, 0, body.Length);
+            Array.Copy(tail, 0, combined, body.Length, keepTailFrames * channels);
             progress?.Report(1);
+            return combined;
         }
         finally
         {
             EndExclusiveLoad();
         }
+    }
+
+    private static void EnsureTailCapacity(ref float[] tail, int neededSamples)
+    {
+        if (neededSamples <= tail.Length)
+        {
+            return;
+        }
+
+        var next = tail.Length;
+        while (next < neededSamples)
+        {
+            next = checked(next * 2);
+        }
+
+        Array.Resize(ref tail, next);
+    }
+
+    private void ProcessOfflineRange(
+        float[] interleaved,
+        int frameOffset,
+        int frameCount,
+        int channels,
+        int maxBlock,
+        IProgress<double>? progress,
+        double progressStart,
+        double progressEnd,
+        CancellationToken cancellationToken)
+    {
+        if (frameCount <= 0)
+        {
+            return;
+        }
+
+        var block = Math.Max(16, maxBlock);
+        var span = Math.Max(1e-9, progressEnd - progressStart);
+        for (var i = 0; i < frameCount; i += block)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var n = Math.Min(block, frameCount - i);
+            var frame = frameOffset + i;
+            Interlocked.Increment(ref _processUsers);
+            try
+            {
+                ProcessActiveSlots(interleaved, frame * channels, n * channels, channels);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _processUsers);
+            }
+
+            var ratio = (i + n) / (double)frameCount;
+            progress?.Report(progressStart + (span * Math.Clamp(ratio, 0, 1)));
+        }
+    }
+
+    private static float PeakAbsInBlock(float[] interleaved, int frameInBlock, int channels)
+    {
+        var offset = frameInBlock * channels;
+        var peak = 0f;
+        for (var ch = 0; ch < channels; ch++)
+        {
+            var abs = Math.Abs(interleaved[offset + ch]);
+            if (abs > peak)
+            {
+                peak = abs;
+            }
+        }
+
+        return peak;
     }
 
     /// <summary>
@@ -799,13 +965,15 @@ internal sealed class VstInsertEngine : IDisposable
     }
 
     /// <summary>
-    /// バイパス中のライブを破棄して deferred に戻す。
-    /// バウンス直後など、オフライン処理で触ったインスタンスを閉じ経路へ残さないため。
-    /// バイパス解除時は既存の遅延ロード／EnsureSlotLoaded で再生成する。
+    /// バイパス中のライブをライブ経路から外す。
+    /// オーナーがあれば park（Undo／バイパス解除で再生成せず復帰）。無ければ破棄。
+    /// バウンス直後など、オフラインで触ったインスタンスをライブ＋バイパスのまま残さないため
+    /// （その組み合わせはタブ閉じの Capture／Dispose で落ちることがある）。
+    /// park 前に ResetProcessing し、復帰後の再生頭が残響末尾にならないようにする。
     /// </summary>
     public void UnloadBypassedLiveSlots()
     {
-        List<IVstSlotProcessor>? toDispose = null;
+        var toPark = new List<(int Index, IVstSlotProcessor Live)>(VstInsertChain.MaxSlots);
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -816,8 +984,51 @@ internal sealed class VstInsertEngine : IDisposable
                     continue;
                 }
 
+                toPark.Add((i, _live[i]!));
+            }
+        }
+
+        if (toPark.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var (_, live) in toPark)
+        {
+            try
+            {
+                live.ResetProcessing();
+            }
+            catch
+            {
+            }
+        }
+
+        List<IVstSlotProcessor>? toDispose = null;
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            var owner = _owner;
+            foreach (var (index, live) in toPark)
+            {
+                if (!ReferenceEquals(_live[index], live) || !_bypass[index])
+                {
+                    continue;
+                }
+
                 toDispose ??= new List<IVstSlotProcessor>(VstInsertChain.MaxSlots);
-                DetachSlotNoLock(i, toDispose);
+                if (owner is not null)
+                {
+                    ParkSlotNoLock(owner, index, toDispose);
+                }
+                else
+                {
+                    DetachSlotNoLock(index, toDispose);
+                }
             }
         }
 

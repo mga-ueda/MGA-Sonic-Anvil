@@ -778,8 +778,13 @@ public partial class MainWindow
         await Dispatcher.Yield(DispatcherPriority.Background);
 
         var channels = Math.Max(1, document.Channels);
-        var after = (float[])document.Interleaved.Clone();
-        await _player.VstInserts.ProcessOfflineAsync(after, channels, progress).ConfigureAwait(true);
+        var includeTail = AppStorage.Settings.ResolveVstBounceIncludeTail();
+        var source = includeTail
+            ? document.Interleaved
+            : (float[])document.Interleaved.Clone();
+        var after = await _player.VstInserts
+            .ProcessOfflineAsync(source, channels, progress, includeTail)
+            .ConfigureAwait(true);
         if (!IsLoaded)
         {
             return false;
@@ -825,9 +830,9 @@ public partial class MainWindow
 
     private void SyncVstBypassAfterBake(DocumentSession session)
     {
-        // オフライン直前に ResetProcessing したライブをバイパスのまま残すと、
-        // 未保存タブ閉じの Capture／Dispose でネイティブが落ちることがある。
-        // アクティブ以外の選択タブでも、今付けているオーナーなら必ず捨てる。
+        // オフライン後のライブをバイパスのまま残すと、タブ閉じの Capture／Dispose で
+        // 落ちることがある。破棄ではなく owner へ park し、Undo のバイパス解除で復帰する
+        // （再ロードしない）。UnloadBypassedLiveSlots 内で ResetProcessing も行う。
         _player.VstInserts.CaptureAppliedStates();
         ApplyVstInsertsOnUiThread(session, session.VstInserts, playerBypass: IsLibraryMaximized);
         _player.VstInserts.UnloadBypassedLiveSlots();
