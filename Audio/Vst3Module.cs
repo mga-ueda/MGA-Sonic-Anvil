@@ -38,8 +38,35 @@ internal sealed class Vst3Module : IDisposable
 
     public static Vst3Module? TryAcquire(string pluginPath)
     {
+        LastAcquireFailure = null;
+        var acquired = TryAcquireResolved(pluginPath);
+        if (acquired is not null)
+        {
+            return acquired;
+        }
+
+        // 認識リストが x86 パスでも、64bit ホストでは Program Files 側を試す（Stutter Edit 等）。
+        if (TryMapX86CommonFilesToProgramFiles(pluginPath, out var alt64)
+            && !string.Equals(alt64, pluginPath, StringComparison.OrdinalIgnoreCase))
+        {
+            var previous = LastAcquireFailure;
+            acquired = TryAcquireResolved(alt64);
+            if (acquired is not null)
+            {
+                return acquired;
+            }
+
+            LastAcquireFailure = previous ?? LastAcquireFailure;
+        }
+
+        return null;
+    }
+
+    private static Vst3Module? TryAcquireResolved(string pluginPath)
+    {
         if (!Vst3FactoryProbe.TryResolveBinary(pluginPath, out var binary))
         {
+            LastAcquireFailure = "resolve-binary";
             return null;
         }
 
@@ -51,7 +78,6 @@ internal sealed class Vst3Module : IDisposable
             return existing;
         }
 
-        LastAcquireFailure = null;
         // セッション復元経由でも Altiverb をデバッガ下で読むと InitDll から戻らない
         if (Vst3DebuggerLoadGuard.ShouldRefuseUnderDebugger(key))
         {
@@ -76,6 +102,32 @@ internal sealed class Vst3Module : IDisposable
         var created = new Vst3Module(key, module, factory);
         Cache[key] = created;
         return created;
+    }
+
+    /// <summary>
+    /// <c>Program Files (x86)\Common Files\VST3\...</c> を
+    /// <c>Program Files\Common Files\VST3\...</c> に写す。
+    /// </summary>
+    internal static bool TryMapX86CommonFilesToProgramFiles(string pluginPath, out string mapped)
+    {
+        mapped = string.Empty;
+        if (string.IsNullOrWhiteSpace(pluginPath))
+        {
+            return false;
+        }
+
+        const string marker = @"\Program Files (x86)\Common Files\VST3";
+        var idx = pluginPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0)
+        {
+            return false;
+        }
+
+        mapped = string.Concat(
+            pluginPath.AsSpan(0, idx),
+            @"\Program Files\Common Files\VST3",
+            pluginPath.AsSpan(idx + marker.Length));
+        return File.Exists(mapped) || Directory.Exists(mapped);
     }
 
     /// <summary>直近の TryAcquire 失敗理由（診断用）。</summary>
@@ -342,9 +394,10 @@ internal sealed class Vst3Module : IDisposable
                     continue;
                 }
 
-                // Instrument はアプリ側で認識除外済みでも、保険でスキップ
-                if (info.SubCategories.Contains("Instrument", StringComparison.OrdinalIgnoreCase)
-                    && !info.SubCategories.Contains("Fx", StringComparison.OrdinalIgnoreCase))
+                // Instrument / OnlyARA はアプリ側で認識除外済みでも、保険でスキップ
+                // （Instrument|Fx も楽器扱い。旧判定の「Fx を含むなら通す」は使わない）
+                if (Vst3PluginMetadata.IsInstrumentCategory(info.SubCategories)
+                    || Vst3PluginMetadata.IsOnlyAraCategory(info.SubCategories))
                 {
                     continue;
                 }

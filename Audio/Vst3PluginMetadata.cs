@@ -46,8 +46,9 @@ internal sealed record Vst3PluginMetadata(
     public bool IsFailed => FailureReason is not null;
 
     /// <summary>
-    /// Steinberg の大分類 Instrument（Instrument|Synth など含む）。
+    /// Steinberg の大分類 Instrument（Instrument|Synth、Instrument|Fx など含む）。
     /// Fx|Instrument はエフェクト側なので対象外。
+    /// MergeSubCategories の「Instrument · Fx」や表示寄りの「Instrument - Fx」も楽器扱い。
     /// </summary>
     public static bool IsInstrumentCategory(string? category)
     {
@@ -57,8 +58,55 @@ internal sealed record Vst3PluginMetadata(
         }
 
         var trimmed = category.Trim();
-        return trimmed.Equals("Instrument", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("Instrument|", StringComparison.OrdinalIgnoreCase);
+        // Fx 起点（Fx|Instrument 含む）はエフェクト。
+        if (StartsWithCategoryRoot(trimmed, "Fx"))
+        {
+            return false;
+        }
+
+        return StartsWithCategoryRoot(trimmed, "Instrument");
+    }
+
+    /// <summary>大分類が root、または root + 区切り（| / · / -）で始まるか。</summary>
+    private static bool StartsWithCategoryRoot(string category, string root)
+    {
+        if (category.Equals(root, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        ReadOnlySpan<string> separators = ["|", " · ", " - ", " / "];
+        foreach (var sep in separators)
+        {
+            if (category.StartsWith(root + sep, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Steinberg の OnlyARA（単独または SubCategories の区切り要素）。
+    /// 本アプリは ARA 非対応のため認識対象外にする。
+    /// </summary>
+    public static bool IsOnlyAraCategory(string? category)
+    {
+        if (string.IsNullOrWhiteSpace(category))
+        {
+            return false;
+        }
+
+        foreach (var part in category.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (part.Equals("OnlyARA", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static readonly string[] BinaryFolders = ["x86_64-win", "arm64x-win", "arm64ec-win", "arm64-win", "x86-win"];

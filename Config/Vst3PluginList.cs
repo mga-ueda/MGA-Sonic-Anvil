@@ -19,6 +19,9 @@ internal enum Vst3RecognitionKind
 
     /// <summary>楽器（Instrument）。本アプリではスキャン時に認識させない側へ送る。</summary>
     InstrumentExcluded = 3,
+
+    /// <summary>OnlyARA。本アプリでは ARA 非対応のためスキャン時に認識させない側へ送る。</summary>
+    AraExcluded = 4,
 }
 
 internal sealed class Vst3PluginEntry
@@ -177,7 +180,9 @@ internal static class Vst3PluginList
                     ? Vst3RecognitionKind.Failed
                     : Vst3PluginMetadata.IsInstrumentCategory(meta.Category)
                         ? Vst3RecognitionKind.InstrumentExcluded
-                        : Vst3RecognitionKind.Recognized;
+                        : Vst3PluginMetadata.IsOnlyAraCategory(meta.Category)
+                            ? Vst3RecognitionKind.AraExcluded
+                            : Vst3RecognitionKind.Recognized;
             merged.Add(new Vst3PluginEntry
             {
                 Name = string.IsNullOrWhiteSpace(meta.Name) ? plugin.Info.Name : meta.Name,

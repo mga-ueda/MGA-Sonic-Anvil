@@ -246,11 +246,75 @@ public sealed class Vst3PluginScannerTests : IDisposable
     [InlineData("", false)]
     [InlineData("Fx|Reverb", false)]
     [InlineData("Fx|Instrument", false)]
+    [InlineData("Fx · Instrument", false)]
     [InlineData("Instrument", true)]
     [InlineData("Instrument|Synth", true)]
     [InlineData("instrument|drum", true)]
+    [InlineData("Instrument|Fx", true)]
+    [InlineData("Instrument · Fx", true)]
+    [InlineData("Instrument - Fx", true)]
+    [InlineData("Instrument / Fx", true)]
     public void IsInstrumentCategory_MatchesSteinbergInstrumentRoot(string? category, bool expected) =>
         Assert.Equal(expected, Vst3PluginMetadata.IsInstrumentCategory(category));
+
+    [Fact]
+    public void MergeScan_ExcludesInstrumentFxAsInstrument()
+    {
+        var merged = Vst3PluginList.MergeScan(
+            null,
+            [
+                Scanned("InstFx", @"C:\VST3\InstFx.vst3", category: "Instrument|Fx"),
+                Scanned("FxInst", @"C:\VST3\FxInst.vst3", category: "Fx|Instrument"),
+            ],
+            DateTimeOffset.UtcNow);
+
+        var byName = merged.Plugins.ToDictionary(p => p.Name);
+        Assert.Equal(Vst3RecognitionKind.InstrumentExcluded, byName["InstFx"].Recognition);
+        Assert.Equal(Vst3RecognitionKind.Recognized, byName["FxInst"].Recognition);
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("Fx|Reverb", false)]
+    [InlineData("OnlyARA", true)]
+    [InlineData("onlyara", true)]
+    [InlineData("Fx|OnlyARA", true)]
+    [InlineData("OnlyARA|Fx", true)]
+    public void IsOnlyAraCategory_MatchesSteinbergOnlyAra(string? category, bool expected) =>
+        Assert.Equal(expected, Vst3PluginMetadata.IsOnlyAraCategory(category));
+
+    [Fact]
+    public void MergeScan_ExcludesOnlyAraCategories()
+    {
+        var previous = new Vst3PluginListDocument
+        {
+            Plugins =
+            [
+                new Vst3PluginEntry
+                {
+                    Name = "ForcedAra",
+                    Path = @"C:\VST3\ForcedAra.vst3",
+                    Recognition = Vst3RecognitionKind.Recognized,
+                    Category = "OnlyARA",
+                },
+            ],
+        };
+
+        var merged = Vst3PluginList.MergeScan(
+            previous,
+            [
+                Scanned("ForcedAra", @"C:\VST3\ForcedAra.vst3", category: "OnlyARA"),
+                Scanned("NestedAra", @"C:\VST3\NestedAra.vst3", category: "Fx|OnlyARA"),
+                Scanned("Reverb", @"C:\VST3\Reverb.vst3", category: "Fx|Reverb"),
+            ],
+            DateTimeOffset.UtcNow);
+
+        var byName = merged.Plugins.ToDictionary(p => p.Name);
+        Assert.Equal(Vst3RecognitionKind.AraExcluded, byName["ForcedAra"].Recognition);
+        Assert.Equal(Vst3RecognitionKind.AraExcluded, byName["NestedAra"].Recognition);
+        Assert.Equal(Vst3RecognitionKind.Recognized, byName["Reverb"].Recognition);
+    }
 
     [Fact]
     public void SetRecognized_DistinguishesManualFromFailedAndClearsReasonOnOverride()
