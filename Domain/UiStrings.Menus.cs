@@ -197,8 +197,10 @@ internal static partial class UiStrings
     public static string WaveMenuCopyFilePathSelected => Get("選択ファイルのフルパスをコピー(_P)", "Copy Selected Full _Paths");
     public static string WaveMenuDuplicateFile => Get("ファイルを複製(_U)", "D_uplicate File");
     public static string WaveMenuDuplicateFileSelected => Get("選択ファイルを複製(_U)", "D_uplicate Selected Files");
-    /// <summary>書き出しカテゴリへ移動。J は既存の Wave／MP3／セパレートと重ならない。</summary>
-    public static string WaveMenuMergeTabs => Get("選択ファイルをバウンス(_J)", "Bounce Selected Files (_J)");
+    /// <summary>書き出しカテゴリ。X は Wave／MP3／セパレートと重ならない。ショートカットは Ctrl+Shift+X。</summary>
+    public static string WaveMenuMergeTabs => Get("ミックスダウン(_X)", "Mi_xdown");
+    /// <summary>選択タブ（無ければアクティブ）をバウンス。ショートカットは Ctrl+Shift+B。</summary>
+    public static string WaveMenuBounce => Get("選択ファイルをバウンス(_B)", "Bounce Selected (_B)");
     public static string WaveMenuDeleteFile => Get("ファイルを削除(_D)", "_Delete File");
     public static string WaveMenuDeleteFileSelected => Get("選択ファイルを削除(_D)", "_Delete Selected Files");
     /// <summary>タブカテゴリ。閉じる(S) や全選択(A) と重ならない I。</summary>

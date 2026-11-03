@@ -35,7 +35,9 @@ internal partial class AudioSettingsWindow
     private static bool VstTabEnabled => VstFeature.IsEnabled;
 
     /// <summary>コンストラクタから。Release ではタブごと外す。</summary>
-    private void InitializeVstTab(IEnumerable<string>? vst3SearchPaths, bool useSteinbergHostCache)
+    private void InitializeVstTab(
+        IEnumerable<string>? vst3SearchPaths,
+        bool useSteinbergHostCache)
     {
         SelectedVst3SearchPaths = Vst3SearchPathList.Resolve(vst3SearchPaths);
         SelectedVst3UseSteinbergHostCache = useSteinbergHostCache;
@@ -406,7 +408,8 @@ internal partial class AudioSettingsWindow
         var scanned = UiStrings.InfoVstScanned(
             document.Plugins.Length,
             document.Plugins.Count(p => p.Recognition == Vst3RecognitionKind.Failed),
-            document.Plugins.Count(p => p.Recognition == Vst3RecognitionKind.InstrumentExcluded));
+            document.Plugins.Count(p => p.Recognition == Vst3RecognitionKind.InstrumentExcluded),
+            document.Plugins.Count(p => p.Recognition == Vst3RecognitionKind.AraExcluded));
         OwnerCenteredMessageBox.Show(
             this,
             saved
@@ -702,12 +705,14 @@ internal partial class AudioSettingsWindow
             Entry.Category.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
         public bool IsFailed => Entry.Recognition is Vst3RecognitionKind.Failed
-            or Vst3RecognitionKind.InstrumentExcluded;
+            or Vst3RecognitionKind.InstrumentExcluded
+            or Vst3RecognitionKind.AraExcluded;
 
         public string StatusLabel => Entry.Recognition switch
         {
             Vst3RecognitionKind.Failed => UiStrings.LabelVstStatusFailed,
             Vst3RecognitionKind.InstrumentExcluded => UiStrings.LabelVstStatusInstrument,
+            Vst3RecognitionKind.AraExcluded => UiStrings.LabelVstStatusAra,
             Vst3RecognitionKind.ManualExcluded => UiStrings.LabelVstStatusManual,
             _ => string.Empty,
         };
@@ -729,6 +734,9 @@ internal partial class AudioSettingsWindow
                         break;
                     case Vst3RecognitionKind.InstrumentExcluded:
                         lines.Add(UiStrings.TooltipVstInstrument);
+                        break;
+                    case Vst3RecognitionKind.AraExcluded:
+                        lines.Add(UiStrings.TooltipVstAra);
                         break;
                     case Vst3RecognitionKind.ManualExcluded:
                         lines.Add(UiStrings.TooltipVstManual);

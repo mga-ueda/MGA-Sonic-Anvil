@@ -1220,8 +1220,7 @@
                                 Click="VstScanButton_Click" />
               <ui:RoundedButton x:Name="VstClearButton"
                                 Content="{x:Static domain:UiStrings.ButtonVstClear}"
-                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                MinWidth="96"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"                                MinWidth="96"
                                 Padding="12,0"
                                 Click="VstClearButton_Click" />
             </StackPanel>

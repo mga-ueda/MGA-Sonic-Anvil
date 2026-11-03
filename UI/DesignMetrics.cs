@@ -121,9 +121,9 @@ internal static class DesignMetrics
             ? Math.Max(0, (DbScaleWidth - SpectrogramBoostLabelReserve(width) - SpectrogramBoostThumbSize) * 0.5)
             : Math.Max(0, (DbScaleWidth - SpectrogramBoostThumbSize) * 0.5);
 
-    /// <summary>ツールバー1行分（上下余白 2+2 + ボタン）。折り返しで行が増える。</summary>
+    /// <summary>ツールバー1行分（上下余白 1+1 + ボタン）。折り返しで行が増える。</summary>
     public static double TransportRowHeight =>
-        From96(4) + TransportButtonSide;
+        From96(2) + TransportButtonSide;
 
     /// <summary>バージョン情報ダイアログなどの権利表記フォント。</summary>
     public static double BrandLicenseFontSize => From96(8);
@@ -143,7 +143,7 @@ internal static class DesignMetrics
     /// <summary>ウィンドウ枠（リサイズ辺）。</summary>
     public static double WindowFramePad => From96(24);
 
-    public static double TransportButtonSide => Dip(45);
+    public static double TransportButtonSide => Dip(40);
 
     public static double TransportWaapiButtonWidth => From96(56);
 
@@ -350,8 +350,14 @@ internal static class DesignMetrics
     /// <summary>スペアナ左のラウドネスメーター幅。列はキャプション／値／単位の最大幅の合計。</summary>
     public static double LoudnessMeterWidth => From96(240);
 
-    /// <summary>ラウドネス左の VST インサートラック幅（8 スロット縦並び）。</summary>
-    public static double VstInsertRackWidth => From96(112);
+    /// <summary>ラウドネス左の VST インサートラック幅（スロット 4+4 列）。</summary>
+    public static double VstInsertRackWidth => VstInsertSlotColumnWidth * 2;
+
+    /// <summary>スロット 1 列の幅（左右に 4 段ずつ）。</summary>
+    public static double VstInsertSlotColumnWidth => From96(150);
+
+    /// <summary>各インサートスロットの四方マージン。</summary>
+    public static double VstInsertSlotMargin => From96(3);
 
     /// <summary>インサート 1 スロットの高さ。</summary>
     public static double VstInsertSlotHeight => From96(14);

@@ -308,7 +308,7 @@ public partial class MainWindow
         int timeoutMs,
         Action<string> log)
     {
-        var task = AssignVstPluginAsync(slot, entry);
+        var task = AssignVstPluginAsync(slot, entry, allTabs: false);
         if (!ReferenceEquals(await Task.WhenAny(task, Task.Delay(timeoutMs)), task))
         {
             log("FAIL Assign " + entry.Name + " timed out " + timeoutMs + "ms (HANG)");

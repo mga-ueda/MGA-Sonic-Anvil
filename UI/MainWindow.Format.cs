@@ -14,6 +14,7 @@ public partial class MainWindow
     private bool _formatConvertBusy;
     private bool _pitchShiftBusy;
     private bool _timeStretchBusy;
+    private bool _vstBakeBusy;
     private bool _tabExportBusy;
     private bool _openBusy;
     private bool _openCancelRequested;
@@ -28,6 +29,7 @@ public partial class MainWindow
         _formatConvertBusy
         || _pitchShiftBusy
         || _timeStretchBusy
+        || _vstBakeBusy
         || _tabExportBusy
         || _openBusy
         || _exportBusy

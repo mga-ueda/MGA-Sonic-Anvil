@@ -198,26 +198,49 @@ internal static partial class UiStrings
     public static string LabelSettingsTabExport => Get("書き出し・パス", "Export · Paths");
     public static string LabelSettingsTabWwise => Get("Wwise", "Wwise");
     public static string LabelSettingsTabVst => Get("VST", "VST");
-    public static string LabelVstInsertRack => Get("Insert", "Insert");
-    public static string LabelVstInsertEmpty => Get("+", "+");
-    public static string LabelVstInsertBypass => Get("バイパス", "Bypass");
-    public static string LabelVstInsertRemove => Get("削除", "Remove");
-    public static string LabelVstInsertOpenEditor => Get("エディタを開く", "Open editor");
-    public static string LabelVstInsertPickPlugin => Get("プラグインを選ぶ", "Choose plug-in");
+    public static string TooltipVstInsertBake => Get(
+        "選択タブ（無ければアクティブ）のインサートを波形へバウンスし、スロットをバイパスします (Ctrl+Shift+B)",
+        "Bounce inserts on the selected tabs (or the active tab if none), then bypass those slots (Ctrl+Shift+B)");
+    public static string OverlayVstInsertBake => Get("インサートをバウンス中", "Bouncing inserts");
+    public static string OverlayVstInsertBakeFile(string name) => Format(
+        "バウンス中: {0}",
+        "Bouncing: {0}",
+        name);
+    public static string LabelToolbarBounce => WithoutAccessKey(WaveMenuBounce);
+    public static string TooltipBounce => TooltipVstInsertBake;
+    public static string LabelVstInsert => Get("インサート(_I)", "_Insert");
+    public static string LabelVstInsertAllTabs => Get("全てのタブにインサート(_A)", "Insert to _All Tabs");
+    public static string LabelVstInsertBypass => Get("バイパス(_B)", "_Bypass");
+    public static string LabelVstInsertPersist => Get("永続化(_P)", "_Persist");
+    public static string LabelVstInsertPersistClear => Get("永続化を解除(_C)", "_Release persistence");
+    public static string LabelVstInsertRemove => Get("削除(_D)", "Remove(_D)");
+    public static string LabelVstInsertRemoveAllTabs => Get("全てのタブから削除(_T)", "Remove from All _Tabs");
+    public static string LabelVstInsertRemoveAll => Get("すべて削除(_A)", "Remove _All");
+    public static string LabelVstInsertOpenEditor => Get("エディタを開く(_O)", "_Open editor");
+    public static string TooltipVstInsertPersist => Get(
+        "このスロットと、今刺さっているプラグインとパラメータを記憶します。タブを閉じても、別の波形を開くと同じスロットに同じ設定で有効になります",
+        "Remember this slot, plug-in, and its parameters. After you close the tab, opening any other waveform restores the same slot with the same settings");
+    public static string TooltipVstInsertPersistClear => Get(
+        "このスロットとプラグインの組の記憶を消します。以降に開く波形には入りません",
+        "Forget this slot and plug-in pair. Later waveforms won’t get it");
+    public static string LabelVstInsertPickerTitle => Get("インサート", "Insert");
+    public static string LabelVstInsertPickerGroupVendor => Get("メーカー名(_M)", "Vendor(_M)");
+    public static string LabelVstInsertPickerGroupCategory => Get("種別(_T)", "Category(_T)");
     public static string LabelVstInsertNoneRecognized => Get(
         "認識済みプラグインがありません（設定 → VST）",
         "No recognized plug-ins (Settings → VST)");
     public static string LabelVstInsertVendorUnknown => Get("（メーカー不明）", "(Unknown vendor)");
+    public static string LabelVstInsertCategoryUnknown => Get("Other", "Other");
     public static string TooltipVstInsertSlot => Get(
-        "クリックでプラグイン選択（メーカーにマウスを乗せると開く） / Ctrl+クリックでバイパス",
-        "Click to choose plug-in (hover vendor to open) / Ctrl+click to bypass");
-    /// <summary>カテゴリ表記。VST の Fx|Reverb は内部区切りで、UI では "Fx / Reverb" と出す。</summary>
+        "クリックでインサート／全てのタブにインサート / Ctrl+Shift+1–8 でも操作",
+        "Click for Insert / Insert to All Tabs / also Ctrl+Shift+1–8");
+    /// <summary>カテゴリ表記。VST の Fx|Reverb は内部区切りで、UI では入れ子／"Fx / Reverb" と出す。</summary>
     public static string TipVstCategoryPipe => Get(
-        "「Fx|Reverb」などは VST の種別タグです。メニューでは「Fx / Reverb」と表示します。",
-        "Tags like Fx|Reverb are VST category labels; the menu shows them as Fx / Reverb.");
+        "「Fx|Reverb」などは VST の種別タグです。選択ウィンドウでは入れ子、または「Fx / Reverb」と表示します。",
+        "Tags like Fx|Reverb are VST category labels; the picker nests them or shows Fx / Reverb.");
     public static string TooltipVstInsertSlotFilled => Get(
-        "クリックで UI / 右クリックでメニュー / Ctrl+クリックでバイパス",
-        "Click for UI / right-click for menu / Ctrl+click to bypass");
+        "クリックで UI / 空きスロットへドラッグで移動（使用中どうしは入れ替え） / 右クリックでメニュー / Ctrl+クリックでバイパス / Ctrl+Shift+1–8 でも操作",
+        "Click for UI / drag to an empty slot to move (swap if occupied) / right-click for menu / Ctrl+click to bypass / also Ctrl+Shift+1–8");
     public static string ErrorVstInsertLoadFailed => Get(
         "プラグインを読み込めませんでした。",
         "Could not load the plug-in.");
@@ -458,15 +481,15 @@ internal static partial class UiStrings
     public static string TitleVst3SearchPathAdd => Get("VST3 フォルダを追加", "Add VST3 folder");
     public static string LabelVstPluginList => Get("見つかったプラグイン", "Discovered plug-ins");
     public static string HintVstInstrumentsAutoExcluded => Get(
-        "Instrument 系（シンセ・サンプラーなど）はスキャン時に自動で「認識しない」側へ振り分けます。",
-        "Instrument plug-ins (synths, samplers, and so on) are moved to \"Not recognized\" automatically on scan.");
+        "Instrument 系（シンセ・サンプラーなど）と OnlyARA はスキャン時に自動で「認識しない」側へ振り分けます。",
+        "Instrument plug-ins (synths, samplers, and so on) and OnlyARA plug-ins are moved to \"Not recognized\" automatically on scan.");
     public static string ButtonVstScan => Get("スキャン", "Scan");
     public static string ButtonVstScanning => Get("スキャン中…", "Scanning…");
     public static string ButtonVstClear => Get("一覧をクリア", "Clear list");
     public static string ConfirmVstClear => Get(
         "VST プラグイン一覧を消去しますか？ 再度スキャンするまで一覧は空になります。",
         "Clear the VST plug-in list? The list stays empty until you scan again.");
-    public static string InfoVstScanned(int count, int failed, int instruments = 0)
+    public static string InfoVstScanned(int count, int failed, int instruments = 0, int ara = 0)
     {
         var lines = new List<string>
         {
@@ -491,6 +514,14 @@ internal static partial class UiStrings
                 instruments));
         }
 
+        if (ara > 0)
+        {
+            lines.Add(Format(
+                "OnlyARA {0} 件は本アプリでは使えないため「認識しない」側へ移しました。",
+                "{0} OnlyARA plug-in(s) were moved to \"Not recognized\" because this app does not support ARA.",
+                ara));
+        }
+
         return string.Join("\n", lines);
     }
     public static string LabelVstExcluded(int count) => Format("認識しない（{0}）", "Not recognized ({0})", count);
@@ -504,6 +535,7 @@ internal static partial class UiStrings
     public static string LabelVstStatusManual => Get("手動", "Manual");
     public static string LabelVstStatusFailed => Get("認識失敗", "Failed");
     public static string LabelVstStatusInstrument => Get("楽器", "Instrument");
+    public static string LabelVstStatusAra => Get("OnlyARA", "OnlyARA");
     public static string LabelVstFailureReason(string? code) => code switch
     {
         "missing" => Get("ファイルが見つかりません。", "The file was not found."),
@@ -523,6 +555,9 @@ internal static partial class UiStrings
     public static string TooltipVstInstrument => Get(
         "楽器（Instrument）プラグインのため、本アプリでは認識しません。「追加 >>」で強制的に認識させることもできます（次のスキャンで再判定）。",
         "Instrument plug-ins are excluded in this app. You can force recognition with \"Add >>\" (re-checked on the next scan).");
+    public static string TooltipVstAra => Get(
+        "OnlyARA プラグインのため、本アプリでは認識しません。「追加 >>」で強制的に認識させることもできます（次のスキャンで再判定）。",
+        "OnlyARA plug-ins are excluded in this app. You can force recognition with \"Add >>\" (re-checked on the next scan).");
     public static string TooltipVstFailed(string reason) => Format(
         "認識に失敗しました: {0}\n「追加 >>」で強制的に認識させることもできます（次のスキャンで再判定）。",
         "Recognition failed: {0}\nYou can force it with \"Add >>\" (re-checked on the next scan).",
@@ -1014,11 +1049,11 @@ internal static partial class UiStrings
     public static string ErrorDeleteFailed => Get("ファイルの削除に失敗しました。", "Failed to delete the file.");
     public static string ErrorDuplicateFailed => Get("ファイルの複製に失敗しました。", "Failed to duplicate the file.");
     public static string ErrorMergeFailed => Get(
-        "タブのバウンスに失敗しました。",
-        "Failed to bounce the tabs.");
+        "ミックスダウンに失敗しました。",
+        "Failed to mix down the tabs.");
     public static string ErrorMergeFormatMismatch(string firstFile, string mismatches) => Format(
-        "フォーマットが違うファイルがあるため、バウンスを中止しました。サンプルレート、チャンネル数、ビット深度は変換しません。\n先頭: {0}\n一致しないファイル:\n{1}",
-        "Bounce was cancelled because some files do not match the first file. Sample rate, channel count, and bit depth were not converted.\nFirst file: {0}\nFiles that do not match:\n{1}",
+        "フォーマットが違うファイルがあるため、ミックスダウンを中止しました。サンプルレート、チャンネル数、ビット深度は変換しません。\n先頭: {0}\n一致しないファイル:\n{1}",
+        "Mixdown was cancelled because some files do not match the first file. Sample rate, channel count, and bit depth were not converted.\nFirst file: {0}\nFiles that do not match:\n{1}",
         firstFile,
         mismatches);
     public static string MergeFormatFile(string name, int sampleRate, int channels, int bits) => Format(
@@ -1033,11 +1068,11 @@ internal static partial class UiStrings
         "The stroke goes above 0 dBFS and may distort.\n\nOK: lower the whole stroke to stay within 0 dBFS\nCancel: discard this stroke and draw it again");
 
     public static string WarnMergeClip(string overDb) => Format(
-        "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nOK: ミックス全体を {0} dB 下げてバウンスする\nCancel: バウンスを中止する",
-        "The summed mix is {0} dB over 0 dBFS. Writing 16-bit or 24-bit would truncate the excess.\n\nOK: lower the entire mix by {0} dB and bounce\nCancel: cancel the bounce",
+        "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nOK: ミックス全体を {0} dB 下げてミックスダウンする\nCancel: ミックスダウンを中止する",
+        "The summed mix is {0} dB over 0 dBFS. Writing 16-bit or 24-bit would truncate the excess.\n\nOK: lower the entire mix by {0} dB and mix down\nCancel: cancel the mixdown",
         overDb);
-    /// <summary>バウンスの保存ダイアログのタイトル。</summary>
-    public static string TitleMergeTabs => Get("選択ファイルをバウンス", "Bounce Selected Files");
+    /// <summary>ミックスダウンの保存ダイアログのタイトル。</summary>
+    public static string TitleMergeTabs => Get("ミックスダウン", "Mixdown");
     public static string ErrorFileNameEmpty => Get("ファイル名を入力してください。", "Enter a file name.");
     public static string ErrorFileNameInvalid => Get("使えないファイル名です。", "That file name is not allowed.");
     public static string ErrorFileNameExists => Get("同じ名前のファイルがあります。", "A file with that name already exists.");
@@ -1136,7 +1171,7 @@ internal static partial class UiStrings
         Get($"VST プラグインをスキャンしています（{current}/{total}）", $"Scanning VST plug-ins ({current}/{total})");
     public static string OverlayPasteHistory => Get("編集履歴を貼り付けています", "Pasting edit history");
     public static string OverlayApplySelected => Get("選択したファイルへ適用しています", "Applying to the selected files");
-    public static string OverlayMerge => Get("タブをバウンスしています", "Bouncing tabs");
+    public static string OverlayMerge => Get("ミックスダウンしています", "Mixing down");
     public static string OverlayOpening => Get("読み込んでいます（Esc で中断）", "Opening (Esc to stop)");
     public static string OverlayExportWave => Get("Wave を書き出しています", "Exporting Wave");
     public static string OverlayExportMp3 => Get("MP3 を書き出しています", "Exporting MP3");
@@ -1686,6 +1721,8 @@ internal static partial class UiStrings
         "Normalize" => Get("ノーマライズ", "Normalize"),
         "Normalize Per Region" => Get("リージョン毎にノーマライズ", "Normalize per Region"),
         "Volume" => Get("音量", "Volume"),
+        "Bake Inserts" => Get("インサート・バウンス", "Bounce Inserts"),
+        "Bounce Inserts" => Get("インサート・バウンス", "Bounce Inserts"),
         "Pen" => Get("ペン", "Pen"),
         "Pitch Shift" => Get("ピッチ", "Pitch Shift"),
         "Time Stretch" => Get("タイムストレッチ", "Time Stretch"),

@@ -126,7 +126,7 @@
     <SolidColorBrush x:Key="OverviewOutsideFillBrush" Color="#98000000" />
     <SolidColorBrush x:Key="TransportBackBrush" Color="#FF1A1B26" />
     <!-- ツールバーのグループ背景ベール。半透明でカテゴリのかたまりを示す。 -->
-    <SolidColorBrush x:Key="TransportToolbarGroupVeilBrush" Color="#16686870" />
+    <SolidColorBrush x:Key="TransportToolbarGroupVeilBrush" Color="#10EDEDFF" />
     <!-- グループ内の区切り線。メニューのサブメニュー／区切りに対応する。 -->
     <SolidColorBrush x:Key="TransportToolbarSectionSeparatorBrush" Color="#40EBEBEB" />
     <SolidColorBrush x:Key="TransportForeBrush" Color="#FFEBEBEB" />
@@ -139,6 +139,22 @@
     <SolidColorBrush x:Key="HistoryStripCurrentForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="HistoryStripPastForeBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="HistoryStripFutureForeBrush" Color="#FF484848" />
+    <!-- VST インサート。空き＝グレー、永続化＝オレンジ、通常使用中／Bounce＝Export。ドロップ時のみ専用色。 -->
+    <SolidColorBrush x:Key="VstInsertSlotDropBackBrush" Color="#994A9EFF" />
+    <SolidColorBrush x:Key="VstInsertSlotEmptyFillBrush" Color="#FF2A2A2E" />
+    <SolidColorBrush x:Key="VstInsertSlotEmptyFocusFillBrush" Color="#FF3A3A40" />
+    <SolidColorBrush x:Key="VstInsertSlotEmptyHoverFillBrush" Color="#FF35353A" />
+    <SolidColorBrush x:Key="VstInsertSlotEmptyBackBrush" Color="#FF6E6E76" />
+    <SolidColorBrush x:Key="VstInsertSlotEmptyHoverBackBrush" Color="#FF8A8A92" />
+    <SolidColorBrush x:Key="VstInsertSlotEmptyPressedBackBrush" Color="#FF585860" />
+    <SolidColorBrush x:Key="VstInsertSlotEmptyForeBrush" Color="#FFB0B0B0" />
+    <SolidColorBrush x:Key="VstInsertSlotPersistFillBrush" Color="#FF2D1A0C" />
+    <SolidColorBrush x:Key="VstInsertSlotPersistFocusFillBrush" Color="#FF4A2A10" />
+    <SolidColorBrush x:Key="VstInsertSlotPersistHoverFillBrush" Color="#FF3A2210" />
+    <SolidColorBrush x:Key="VstInsertSlotPersistBackBrush" Color="#FFE8891C" />
+    <SolidColorBrush x:Key="VstInsertSlotPersistHoverBackBrush" Color="#FFFF9A2E" />
+    <SolidColorBrush x:Key="VstInsertSlotPersistPressedBackBrush" Color="#FFC46E12" />
+    <SolidColorBrush x:Key="VstInsertSlotPersistForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="WaapiToggleOffBackBrush" Color="#FF2A2A2E" />
     <SolidColorBrush x:Key="WaapiToggleOffHoverBackBrush" Color="#FF3A3A40" />
     <SolidColorBrush x:Key="WaapiToggleOffForeBrush" Color="#FF9A9A9A" />

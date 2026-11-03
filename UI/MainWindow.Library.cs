@@ -65,6 +65,11 @@ public partial class MainWindow
     private readonly Dictionary<AudioDocument, CancellationTokenSource> _libraryPeakJobCts = [];
     private int _libraryPeakGeneration;
     private int _libraryWavePaintTicket;
+    /// <summary>
+    /// エディタ復帰中。波形／再生を先に通すため SyncVstInsertEngine を一時抑止する。
+    /// </summary>
+    private bool _deferVstInsertSyncForEditorEnter;
+    private int _editorEnterBackgroundTicket;
     private CancellationTokenSource _libraryPeakCts = new();
     private int _libraryFolderShowGeneration;
     private int _libraryArtworkShowGeneration;
@@ -645,9 +650,11 @@ public partial class MainWindow
         }
 
         ApplyLibraryPlayerHost(show);
-        SyncVstInsertEngine();
         if (show)
         {
+            // プレイヤー入りはすぐアンロード。退出時の後追い復元はキャンセル。
+            _editorEnterBackgroundTicket++;
+            SyncVstInsertEngine();
             ProbeLibraryTags();
             if (_libraryPlayFirstPending)
             {
@@ -2836,6 +2843,7 @@ public partial class MainWindow
     /// <summary>
     /// プレイヤー退出。再生は先に止めてからクロームを戻し、そのあとフル PCM へ昇格する。
     /// 133px 帯のままだとタイルが収まらず 1 本に落ちるので、レイアウト後に並べ直す。
+    /// 優先: アクティブ PCM → 波形表示 →（再生可能）→ 他タブ昇格／プラグイン復元は後追い。
     /// </summary>
     private async Task LeaveLibraryMaximizeAsync()
     {
@@ -2848,38 +2856,96 @@ public partial class MainWindow
             active.Document.CursorFrame = Waveform.PlayheadFrame;
         }
 
-        // レイアウトと波形の初回描画を、フルデコードより先に通す。
-        await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Loaded);
-        if (IsLibraryMaximized)
+        _deferVstInsertSyncForEditorEnter = true;
+        try
         {
-            return;
-        }
-
-        if (active is not null
-            && ReferenceEquals(active, _activeSession)
-            && LibraryPlayerMode.NeedsEditorPcmUpgrade(active.Document))
-        {
-            await EnsureLibrarySessionLoadedAsync(active).ConfigureAwait(true);
+            // レイアウトと波形の初回描画を、フルデコードより先に通す。
+            await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Loaded);
             if (IsLibraryMaximized)
             {
                 return;
             }
+
+            // 音が出るために必要なアクティブだけ先にフル PCM へ。
+            if (active is not null
+                && ReferenceEquals(active, _activeSession)
+                && LibraryPlayerMode.NeedsEditorPcmUpgrade(active.Document))
+            {
+                await EnsureLibrarySessionLoadedAsync(active).ConfigureAwait(true);
+                if (IsLibraryMaximized)
+                {
+                    return;
+                }
+            }
+
+            RestoreLibrarySuspendedTileArrange();
+            UpgradeLibraryPeaksForEditor();
+
+            // タイル構築やウィンドウ寸法の復元よりピーク完了が先だと、空の Primary へ描いて終わることがある。
+            // アクティブを載せ直してから、レイアウト確定後にもう一度描く。
+            RebindActiveWaveformAfterLibraryLeave();
+            ForEachWaveform(view => view.Refresh());
+            Overview.Refresh();
+            ScheduleEditorWaveformPaint();
+
+            // 波形描画を通し、スペース等で再生できる状態を先に作る。
+            await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.ContextIdle);
+            if (IsLibraryMaximized)
+            {
+                return;
+            }
+
+            // ラック表示用のメタだけ先に載せる（エンジン load はしない）。
+            foreach (var session in _sessions)
+            {
+                ApplyDefaultVstInserts(session);
+            }
+        }
+        finally
+        {
+            _deferVstInsertSyncForEditorEnter = false;
         }
 
-        RestoreLibrarySuspendedTileArrange();
-        await UpgradeKeptLibrarySessionsForEditorAsync(active).ConfigureAwait(true);
-        if (IsLibraryMaximized)
+        if (!IsLibraryMaximized)
+        {
+            // 他タブ PCM とプラグイン実体は再生を妨げないよう後ろへ。
+            ScheduleEditorEnterBackgroundWork(active);
+        }
+    }
+
+    /// <summary>
+    /// エディタ復帰後の後追い仕事。入力／再生を優先し、プラグイン wet は遅れてもよい。
+    /// </summary>
+    private void ScheduleEditorEnterBackgroundWork(DocumentSession? activeWhenLeft)
+    {
+        var ticket = ++_editorEnterBackgroundTicket;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            _ = RunEditorEnterBackgroundWorkAsync(ticket, activeWhenLeft);
+        });
+    }
+
+    private async Task RunEditorEnterBackgroundWorkAsync(int ticket, DocumentSession? activeWhenLeft)
+    {
+        if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
         {
             return;
         }
 
-        UpgradeLibraryPeaksForEditor();
-        // タイル構築やウィンドウ寸法の復元よりピーク完了が先だと、空の Primary へ描いて終わることがある。
-        // アクティブを載せ直してから、レイアウト確定後にもう一度描く。
-        RebindActiveWaveformAfterLibraryLeave();
-        ForEachWaveform(view => view.Refresh());
-        Overview.Refresh();
-        ScheduleEditorWaveformPaint();
+        // 再生開始のキー入力を先に捌く。
+        await Dispatcher.Yield(DispatcherPriority.Input);
+        if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+        {
+            return;
+        }
+
+        await UpgradeKeptLibrarySessionsForEditorAsync(activeWhenLeft).ConfigureAwait(true);
+        if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+        {
+            return;
+        }
+
+        await SyncVstInsertEngineAsync(openEditorSlot: null, preferPlayback: true);
     }
 
     /// <summary>
@@ -3062,10 +3128,21 @@ public partial class MainWindow
 
     private void RefreshTransportCommandsEnabled()
     {
+        var doc = _document;
+        var editor = !IsLibraryMaximized;
+        var allowsRegions = editor && doc is { AllowsRegionsAndLoops: true };
         Transport.SetCommandsEnabled(
-            _document is not null,
-            allowEdit: !IsLibraryMaximized,
-            hasMarkers: TransportHasMarkers());
+            doc is not null,
+            allowEdit: editor,
+            new TransportBar.CommandAvailability(
+                HasMarkers: TransportHasMarkers(),
+                HasRegions: allowsRegions && doc is { Regions.Count: > 0 },
+                HasSelectedRegions: allowsRegions && Waveform.HasSelectedRegions,
+                HasSampleLoop: allowsRegions && doc is { SampleLoop.IsEmpty: false },
+                HasSelection: doc is not null && !doc.Selection.IsEmpty,
+                AllowsRegionsAndLoops: allowsRegions,
+                CanBounce: CanBounceSelectedVstInserts(),
+                CanMergeTabs: CanMergeSelectedTabs()));
         // 押せるボタンが無いグループを畳んだあと、ツールバー領域自体の表示も合わせる。
         ApplyTransportToolbarVisibility();
     }
@@ -3476,8 +3553,12 @@ public partial class MainWindow
         RefreshTileChrome();
     }
 
-    private void SyncPlaylistSelectionLoudness() =>
+    private void SyncPlaylistSelectionLoudness()
+    {
         SyncSelectionLoudness(measureMissing: true);
+        // ミックスダウン等の選択条件が変わるのでツールバー／メニュー有効状態を合わせる。
+        RefreshTransportCommandsEnabled();
+    }
 
     private void OnLibraryPlaylistSelectionChanged()
     {
@@ -7129,7 +7210,10 @@ public partial class MainWindow
 
         // 一度出した波形列があればメモリへ戻し、追加直後の再デコードを避ける。
         _ = LibraryPlaylistWaveform.HasEntry(file, LibraryPlaylistWaveform.BarCount);
-        return new DocumentSession(document);
+        var session = new DocumentSession(document);
+        // エディタへ戻したとき同じスロット＋プラグインが有効になるよう、開いた時点で載せる。
+        ApplyDefaultVstInserts(session);
+        return session;
     }
 
     private void ReleaseHeldLibraryJacket()

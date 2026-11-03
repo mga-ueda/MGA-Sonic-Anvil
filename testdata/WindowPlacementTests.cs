@@ -144,6 +144,59 @@ public sealed class WindowPlacementTests
     }
 
     [Fact]
+    public void ResolveFloatingPlacement_CentersOnOwnerThenClamps()
+    {
+        var work = new Rect(0, 0, 1000, 800);
+        var owner = new Rect(100, 50, 400, 300);
+        var placed = WindowPlacement.ResolveFloatingPlacement(
+            width: 200,
+            height: 100,
+            ownerBounds: owner,
+            rememberedTopLeft: null,
+            workArea: work);
+        Assert.Equal(200, placed.X, 3); // 100 + (400-200)/2
+        Assert.Equal(150, placed.Y, 3); // 50 + (300-100)/2
+        Assert.Equal(200, placed.Width, 3);
+        Assert.Equal(100, placed.Height, 3);
+
+        var overflow = WindowPlacement.ResolveFloatingPlacement(
+            width: 300,
+            height: 200,
+            ownerBounds: new Rect(850, 700, 100, 80),
+            rememberedTopLeft: null,
+            workArea: work);
+        Assert.Equal(700, overflow.X, 3);
+        Assert.Equal(600, overflow.Y, 3);
+        Assert.Equal(300, overflow.Width, 3);
+        Assert.Equal(200, overflow.Height, 3);
+    }
+
+    [Fact]
+    public void ResolveFloatingPlacement_RestoresRememberedThenClamps()
+    {
+        var work = new Rect(0, 0, 1000, 800);
+        var restored = WindowPlacement.ResolveFloatingPlacement(
+            width: 240,
+            height: 180,
+            ownerBounds: new Rect(0, 0, 500, 400),
+            rememberedTopLeft: new Point(40, 60),
+            workArea: work);
+        Assert.Equal(40, restored.X, 3);
+        Assert.Equal(60, restored.Y, 3);
+
+        var clipped = WindowPlacement.ResolveFloatingPlacement(
+            width: 240,
+            height: 180,
+            ownerBounds: null,
+            rememberedTopLeft: new Point(900, 700),
+            workArea: work);
+        Assert.Equal(760, clipped.X, 3);
+        Assert.Equal(620, clipped.Y, 3);
+        Assert.Equal(240, clipped.Width, 3);
+        Assert.Equal(180, clipped.Height, 3);
+    }
+
+    [Fact]
     public void ClampRectToWorkArea_KeepsWindowOnSecondaryMonitor()
     {
         // 右セカンダリ（プライマリは 0..1920）。当該モニタ基準なら飛ばない。
