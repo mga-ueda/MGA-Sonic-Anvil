@@ -134,6 +134,7 @@ internal enum WaveMenuCommand
     CopyFilePath,
     DuplicateFile,
     MergeTabs,
+    Bounce,
     DeleteFile,
     CloseTab,
     CloseOthers,
@@ -241,6 +242,8 @@ internal sealed class WaveformContextMenuModel
     public bool CanCloseTabsToRight { get; init; }
     public bool CanCloseTabsToLeft { get; init; }
     public bool CanMergeTabs { get; init; }
+
+    public bool CanBounce { get; init; }
 
     /// <summary>タブが選択されているか。編集・書き出し・履歴ペーストが「選択ファイル／選択タブ」対象へ切り替わる。</summary>
     public bool HasSelectedTabs { get; init; }
@@ -802,7 +805,7 @@ internal static class WaveformContextMenuBuilder
             UiStrings.WaveMenuDeleteAllMarkers,
             WaveMenuCommand.DeleteAllMarkers,
             enabled: (m.CanEdit || m.LibraryMaximized)
-                && (m.HasMarkers || m.HasSelectedTabs || m.LibraryMaximized)),
+                && (m.HasMarkers || m.SelectedTabsHaveMarkers)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             UiStrings.WaveMenuSetRegion,
@@ -822,7 +825,7 @@ internal static class WaveformContextMenuBuilder
             UiStrings.WaveMenuDeleteAllRegions,
             WaveMenuCommand.DeleteAllRegions,
             enabled: (m.CanEdit && m.HasRegions && m.AllowsRegionsAndLoops)
-                || ((m.CanEdit || m.LibraryMaximized) && (m.SelectedTabsHaveRegions || m.LibraryMaximized))),
+                || ((m.CanEdit || m.LibraryMaximized) && m.SelectedTabsHaveRegions)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             UiStrings.WaveMenuSetLoop,
@@ -833,7 +836,7 @@ internal static class WaveformContextMenuBuilder
             UiStrings.WaveMenuClearLoopItem,
             WaveMenuCommand.ClearLoopItem,
             enabled: (m.CanEdit && m.HasSampleLoop)
-                || ((m.CanEdit || m.LibraryMaximized) && (m.SelectedTabsHaveSampleLoop || m.LibraryMaximized))),
+                || ((m.CanEdit || m.LibraryMaximized) && m.SelectedTabsHaveSampleLoop)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> PlaybackItems(WaveformContextMenuModel m) =>
@@ -1045,7 +1048,7 @@ internal static class WaveformContextMenuBuilder
 
     /// <summary>
     /// タブ管理。閉じる系／全選択／再開／タイルはタブ右クリックと同じ文言・アクセスキー。
-    /// 加えて次／前のタブとファイルの時間。リネーム・複製・削除は FileItems、バウンスと書き出しは ExportItems。
+    /// 加えて次／前のタブとファイルの時間。リネーム・複製・削除は FileItems、バウンス／書き出しは ExportItems。
     /// </summary>
     private static IReadOnlyList<WaveMenuEntry> TabItems(WaveformContextMenuModel m) =>
     [
@@ -1097,7 +1100,8 @@ internal static class WaveformContextMenuBuilder
             WaveMenuCommand.ExportMp3,
             "Ctrl+Shift+M",
             m.HasDocument && !m.IsBusy && !m.IsRecording && (!m.LibraryMaximized || m.CanExportMp3)),
-        Cmd(UiStrings.WaveMenuMergeTabs, WaveMenuCommand.MergeTabs, "Ctrl+Shift+B", m.CanMergeTabs),
+        Cmd(UiStrings.WaveMenuMergeTabs, WaveMenuCommand.MergeTabs, "Ctrl+Shift+X", m.CanMergeTabs),
+        Cmd(UiStrings.WaveMenuBounce, WaveMenuCommand.Bounce, "Ctrl+Shift+B", m.CanBounce),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuExportByMarkersSelected : UiStrings.WaveMenuExportByMarkers,
@@ -1253,10 +1257,21 @@ internal static class WaveformContextMenuBuilder
             }
             else if (item.Command is { } command)
             {
+                // ツールバーと同じ TransportIcon（カタログ）をメニューにも載せる。
+                if (TransportToolbarCatalog.TryGetByMenuCommand(command, out var catalog))
+                {
+                    menuItem.Icon = new TransportIconGlyph
+                    {
+                        Icon = catalog.Icon,
+                        Width = 18,
+                        Height = 18,
+                    };
+                }
+
                 menuItem.Click += (_, _) => onCommand(command);
             }
 
-                        items.Add(menuItem);
+            items.Add(menuItem);
         }
     }
 }

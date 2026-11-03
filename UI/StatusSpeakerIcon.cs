@@ -37,7 +37,7 @@ internal sealed class StatusSpeakerIcon : FrameworkElement
 
         TransportIconDrawing.Draw(
             dc,
-            TransportIcon.Volume,
+            TransportIcon.StudioSpeaker,
             bounds,
             Theme.Get("PrimaryForeBrush"),
             isPlaying: false,

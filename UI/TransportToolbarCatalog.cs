@@ -112,6 +112,8 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.TimeStretch, () => UiStrings.LabelToolbarTimeStretch, () => UiStrings.TooltipTimeStretch),
         new(TransportCommand.Reverse, TransportIcon.Reverse,
             WaveMenuCommand.Reverse, () => UiStrings.LabelToolbarReverse, () => UiStrings.TooltipReverse),
+        new(TransportCommand.Bounce, TransportIcon.Bounce,
+            WaveMenuCommand.Bounce, () => UiStrings.LabelToolbarBounce, () => UiStrings.TooltipBounce),
 
         new(TransportCommand.NewDocument, TransportIcon.NewDocument,
             WaveMenuCommand.NewDocument, () => UiStrings.LabelToolbarNew, () => UiStrings.TooltipNew),
@@ -363,9 +365,26 @@ internal static class TransportToolbarCatalog
         return false;
     }
 
+    /// <summary>メニューコマンドに対応するツールバー項目（アイコン共有用）。</summary>
+    public static bool TryGetByMenuCommand(WaveMenuCommand command, out Item item)
+    {
+        foreach (var entry in All)
+        {
+            if (entry.MenuCommand == command)
+            {
+                item = entry;
+                return true;
+            }
+        }
+
+        item = default;
+        return false;
+    }
+
     public static bool TryGetItem(string? name, out Item item)
     {
-        if (!string.IsNullOrWhiteSpace(name) && ItemsByName.TryGetValue(name.Trim(), out item))
+        if (!string.IsNullOrWhiteSpace(name)
+            && ItemsByName.TryGetValue(MapLegacyCommandName(name.Trim()), out item))
         {
             return true;
         }
@@ -444,7 +463,9 @@ internal static class TransportToolbarCatalog
     }
 
     /// <summary>
-    /// 設定から実際の並びを解決。Layout が空なら既定＋ Hidden で移行。
+    /// 設定から実際の並びを解決。既定は全コマンド表示。
+    /// Layout が空なら Hidden だけ除外。Layout があるときも、Layout に無い新規コマンドは
+    /// Hidden に明示されていなければ足す（カタログ追加分が隠れないようにする）。
     /// 表示コマンドは常にカタログ順＋カテゴリ境界へ組み直す。
     /// </summary>
     public static string[] ResolveLayout(AppSettings settings) =>
@@ -452,25 +473,35 @@ internal static class TransportToolbarCatalog
 
     public static string[] ResolveLayout(IEnumerable<string>? layout, IEnumerable<string>? hidden)
     {
+        var hiddenSet = new HashSet<string>(
+            NormalizeHidden(hidden),
+            StringComparer.OrdinalIgnoreCase);
         var stored = layout?.ToArray() ?? [];
-        string[] baseLayout;
+        var shown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Layout にあるものは表示（同名が Hidden でも Layout を正とする）。
         if (stored.Length > 0)
         {
-            baseLayout = NormalizeLayout(stored);
-        }
-        else
-        {
-            var defaults = CreateDefaultLayout();
-            var hiddenSet = new HashSet<string>(
-                NormalizeHidden(hidden),
-                StringComparer.OrdinalIgnoreCase);
-            baseLayout = hiddenSet.Count == 0
-                ? defaults
-                : NormalizeLayout(
-                    defaults.Where(entry => IsSeparator(entry) || !hiddenSet.Contains(entry)));
+            foreach (var entry in NormalizeLayout(stored))
+            {
+                if (!IsSeparator(entry))
+                {
+                    shown.Add(entry);
+                }
+            }
         }
 
-        return BuildAutoLayout(baseLayout);
+        // Hidden に無いカタログ項目は表示が既定（Layout 未記載の新規コマンドも出す）。
+        foreach (var command in AllCommands)
+        {
+            var name = command.ToString();
+            if (!hiddenSet.Contains(name))
+            {
+                shown.Add(name);
+            }
+        }
+
+        return BuildAutoLayout(shown);
     }
 
     /// <summary>Layout を正本にし Hidden を同期した組を返す（並びはおまかせ配置へ正規化）。</summary>
@@ -497,7 +528,7 @@ internal static class TransportToolbarCatalog
                 continue;
             }
 
-            var trimmed = raw.Trim();
+            var trimmed = MapLegacyCommandName(raw.Trim());
             if (IsSeparator(trimmed))
             {
                 var token = IsGroupSeparator(trimmed) ? SeparatorToken : SectionSeparatorToken;
@@ -558,16 +589,8 @@ internal static class TransportToolbarCatalog
             .ToArray();
     }
 
-    public static bool IsCommandVisible(AppSettings settings, TransportCommand command)
-    {
-        var layout = settings.TransportToolbarLayout;
-        if (layout is { Length: > 0 })
-        {
-            return IsCommandInLayout(layout, command);
-        }
-
-        return IsCommandVisible(settings.HiddenTransportToolbarCommands, command);
-    }
+    public static bool IsCommandVisible(AppSettings settings, TransportCommand command) =>
+        IsCommandInLayout(ResolveLayout(settings), command);
 
     public static bool IsCommandVisible(IEnumerable<string>? hidden, TransportCommand command)
     {
@@ -626,7 +649,7 @@ internal static class TransportToolbarCatalog
                 continue;
             }
 
-            var trimmed = entry.Trim();
+            var trimmed = MapLegacyCommandName(entry.Trim());
             if (!known.Contains(trimmed) || !seen.Add(trimmed))
             {
                 continue;
@@ -640,4 +663,10 @@ internal static class TransportToolbarCatalog
 
         return [.. result];
     }
+
+    /// <summary>旧 Bounce Single／All を現行の Bounce へ寄せる。</summary>
+    private static string MapLegacyCommandName(string name) =>
+        name is "BounceSingle" or "BounceAll"
+            ? nameof(TransportCommand.Bounce)
+            : name;
 }

@@ -27,6 +27,8 @@ internal enum TransportIcon
     Normalize,
     NormalizePerRegion,
     Volume,
+    /// <summary>ステータスの出力スピーカー（大型キャビネット）。</summary>
+    StudioSpeaker,
     Pitch,
     TimeStretch,
     Reverse,
@@ -85,6 +87,7 @@ internal enum TransportIcon
     MinimalChrome,
     CopyFileName,
     MergeTabs,
+    Bounce,
     ExportByChannels,
     DeleteAllMarkers,
     DeleteRegions,
@@ -176,6 +179,7 @@ internal enum TransportCommand
     SeekViewRight,
     CopyFileName,
     MergeTabs,
+    Bounce,
     ExportByChannels,
     DeleteAllMarkers,
     DeleteRegions,
@@ -183,6 +187,79 @@ internal enum TransportCommand
     PreviousTrack,
     NextTrack,
     CopyAllTabTimes,
+}
+
+/// <summary>メニュー／リスト用のトランスポートアイコン。ツールバーと同じ <see cref="TransportIconDrawing"/> を描く。</summary>
+internal sealed class TransportIconGlyph : FrameworkElement
+{
+    public static readonly DependencyProperty IconProperty = DependencyProperty.Register(
+        nameof(Icon),
+        typeof(TransportIcon),
+        typeof(TransportIconGlyph),
+        new FrameworkPropertyMetadata(TransportIcon.PlayPause, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty IsPlayingProperty = DependencyProperty.Register(
+        nameof(IsPlaying),
+        typeof(bool),
+        typeof(TransportIconGlyph),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty IsLatchedProperty = DependencyProperty.Register(
+        nameof(IsLatched),
+        typeof(bool),
+        typeof(TransportIconGlyph),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty ForeOverrideProperty = DependencyProperty.Register(
+        nameof(ForeOverride),
+        typeof(Color?),
+        typeof(TransportIconGlyph),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public TransportIcon Icon
+    {
+        get => (TransportIcon)GetValue(IconProperty);
+        set => SetValue(IconProperty, value);
+    }
+
+    public bool IsPlaying
+    {
+        get => (bool)GetValue(IsPlayingProperty);
+        set => SetValue(IsPlayingProperty, value);
+    }
+
+    public bool IsLatched
+    {
+        get => (bool)GetValue(IsLatchedProperty);
+        set => SetValue(IsLatchedProperty, value);
+    }
+
+    /// <summary>Keep Target の鍵など、既定前景以外の色。</summary>
+    public Color? ForeOverride
+    {
+        get => (Color?)GetValue(ForeOverrideProperty);
+        set => SetValue(ForeOverrideProperty, value);
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        var bounds = new Rect(RenderSize);
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        var fore = ForeOverride ?? Theme.Get("PrimaryForeBrush");
+        TransportIconDrawing.Draw(
+            dc,
+            Icon,
+            bounds,
+            fore,
+            IsPlaying,
+            UiThemeService.Current,
+            accent: true,
+            latched: IsLatched);
+    }
 }
 
 internal sealed class TransportIconButton : Button
@@ -607,6 +684,9 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(cx + 5, cy - 4), new Point(cx + 8, cy));
                 dc.DrawLine(pen, new Point(cx + 8, cy), new Point(cx + 5, cy + 4));
                 break;
+            case TransportIcon.StudioSpeaker:
+                DrawStudioSpeaker(dc, pen, cx, cy);
+                break;
             case TransportIcon.Pitch:
                 dc.DrawEllipse(null, pen, new Point(cx - 3.5, cy + 6), 3.2, 2.2);
                 dc.DrawLine(pen, new Point(cx - 0.3, cy + 6), new Point(cx - 0.3, cy - 8));
@@ -722,12 +802,22 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(cx + 2, cy + 6), new Point(cx + 9, cy + 6));
                 break;
             case TransportIcon.MergeTabs:
-                // 2 ファイル → 1 ファイルへまとめる（バウンス）。
+                // 2 ファイル → 1 ファイルへまとめる（ミックスダウン）。
                 dc.DrawRectangle(null, pen, new Rect(cx - 10, cy - 9, 6, 6));
                 dc.DrawRectangle(null, pen, new Rect(cx - 10, cy + 3, 6, 6));
                 dc.DrawLine(pen, new Point(cx - 3, cy - 6), new Point(cx + 1, cy));
                 dc.DrawLine(pen, new Point(cx - 3, cy + 6), new Point(cx + 1, cy));
                 dc.DrawRectangle(null, pen, new Rect(cx + 3, cy - 6, 7, 12));
+                break;
+            case TransportIcon.Bounce:
+                // 選択ファイルを波形へ焼き込む（並んだタブ＋下矢印）。
+                dc.DrawRectangle(null, pen, new Rect(cx - 10, cy - 9, 7, 8));
+                dc.DrawRectangle(null, pen, new Rect(cx - 3.5, cy - 9, 7, 8));
+                dc.DrawRectangle(null, pen, new Rect(cx + 3, cy - 9, 7, 8));
+                dc.DrawLine(pen, new Point(cx, cy + 1), new Point(cx, cy + 8));
+                dc.DrawLine(pen, new Point(cx, cy + 8), new Point(cx - 3.5, cy + 4.5));
+                dc.DrawLine(pen, new Point(cx, cy + 8), new Point(cx + 3.5, cy + 4.5));
+                dc.DrawLine(pen, new Point(cx - 8, cy + 9), new Point(cx + 8, cy + 9));
                 break;
             case TransportIcon.ExportByChannels:
                 dc.DrawLine(pen, new Point(cx - 8, cy - 6), new Point(cx - 3, cy - 9));
@@ -1355,6 +1445,19 @@ internal static class TransportIconDrawing
     private static Point GearPolar(double cx, double cy, double radius, double angle) =>
         new(cx + Math.Cos(angle) * radius, cy + Math.Sin(angle) * radius);
 
+    /// <summary>大型スピーカー（キャビネット＋ウーファー／ツイーター）。</summary>
+    private static void DrawStudioSpeaker(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        var body = new Rect(cx - 7.5, cy - 11, 15, 22);
+        dc.DrawRoundedRectangle(null, pen, body, 1.5, 1.5);
+        // 上：ツイーター
+        dc.DrawEllipse(null, pen, new Point(cx, cy - 5.5), 3.2, 3.2);
+        dc.DrawEllipse(null, pen, new Point(cx, cy - 5.5), 1.1, 1.1);
+        // 下：ウーファー
+        dc.DrawEllipse(null, pen, new Point(cx, cy + 5), 5.2, 5.2);
+        dc.DrawEllipse(null, pen, new Point(cx, cy + 5), 2.2, 2.2);
+    }
+
     private static void DrawPadlock(DrawingContext dc, Pen pen, Brush brush, bool open, double cx, double cy)
     {
         var body = new RectangleGeometry(new Rect(10, 16, 14, 11));
@@ -1384,10 +1487,11 @@ internal static class TransportIconDrawing
         {
             if (open)
             {
+                // 右足をボディから大きく離す（メニュー約 17px でも閉錠と判別できるように）。
                 ctx.BeginFigure(new Point(12.5, 16), false, false);
-                ctx.LineTo(new Point(12.5, 11.5), true, false);
-                ctx.ArcTo(new Point(22, 11.5), new Size(4.75, 4.75), 0, false, SweepDirection.Clockwise, true, false);
-                ctx.LineTo(new Point(22, 13.5), true, false);
+                ctx.LineTo(new Point(12.5, 10), true, false);
+                ctx.ArcTo(new Point(24, 9.5), new Size(5.75, 5.75), 0, false, SweepDirection.Clockwise, true, false);
+                ctx.LineTo(new Point(25.5, 13), true, false);
             }
             else
             {

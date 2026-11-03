@@ -161,12 +161,14 @@ public sealed class TransportToolbarSettingsTests
     [Fact]
     public void ResolveLayout_AlwaysRebuildsToCatalogOrder()
     {
-        var resolved = TransportToolbarCatalog.ResolveLayout(
-            [
-                nameof(TransportCommand.Open),
-                nameof(TransportCommand.TogglePlayback),
-            ],
-            hidden: null);
+        var layout = new[]
+        {
+            nameof(TransportCommand.Open),
+            nameof(TransportCommand.TogglePlayback),
+        };
+        // Hidden を Layout と同期した状態（カスタマイズ保存後と同じ）。
+        var hidden = TransportToolbarCatalog.HiddenFromLayout(layout);
+        var resolved = TransportToolbarCatalog.ResolveLayout(layout, hidden);
         Assert.Equal(
             [
                 nameof(TransportCommand.TogglePlayback),
@@ -174,6 +176,48 @@ public sealed class TransportToolbarSettingsTests
                 nameof(TransportCommand.Open),
             ],
             resolved);
+    }
+
+    [Fact]
+    public void ResolveLayout_ShowsNewCatalogCommandsByDefault()
+    {
+        // 古い Layout／Hidden に無い新規コマンドは、表示が既定なので足す。
+        var legacyShown = TransportToolbarCatalog.AllCommands
+            .Where(command => command is not TransportCommand.Bounce)
+            .Select(command => command.ToString());
+        var legacyLayout = TransportToolbarCatalog.BuildAutoLayout(legacyShown);
+        // 追加前に同期された Hidden には Bounce がまだ無い（現行 HiddenFromLayout だと入ってしまう）。
+        var legacyHidden = TransportToolbarCatalog.HiddenFromLayout(legacyLayout)
+            .Where(name => name is not nameof(TransportCommand.Bounce))
+            .ToArray();
+        Assert.DoesNotContain(nameof(TransportCommand.Bounce), legacyHidden);
+
+        var resolved = TransportToolbarCatalog.ResolveLayout(legacyLayout, legacyHidden);
+        Assert.Contains(nameof(TransportCommand.Bounce), resolved);
+    }
+
+    [Fact]
+    public void ResolveLayout_KeepsExplicitlyHiddenCommandsHidden()
+    {
+        var layout = TransportToolbarCatalog.CreateDefaultLayout()
+            .Where(entry => entry is not nameof(TransportCommand.Bounce))
+            .ToArray();
+        var hidden = TransportToolbarCatalog.HiddenFromLayout(layout);
+        Assert.Contains(nameof(TransportCommand.Bounce), hidden);
+
+        var resolved = TransportToolbarCatalog.ResolveLayout(layout, hidden);
+        Assert.DoesNotContain(nameof(TransportCommand.Bounce), resolved);
+    }
+
+    [Fact]
+    public void NormalizeLayout_MapsLegacyBounceNamesToBounce()
+    {
+        var normalized = TransportToolbarCatalog.NormalizeLayout(
+            ["BounceSingle", "Open", "BounceAll"]);
+        Assert.Contains(nameof(TransportCommand.Bounce), normalized);
+        Assert.DoesNotContain("BounceSingle", normalized);
+        Assert.DoesNotContain("BounceAll", normalized);
+        Assert.Equal(1, normalized.Count(entry => entry == nameof(TransportCommand.Bounce)));
     }
 
     [Fact]
@@ -362,6 +406,8 @@ public sealed class TransportToolbarSettingsTests
                 Assert.Contains(sentinel, host.Children.Cast<object>());
 
                 settings.TransportToolbarLayout = [nameof(TransportCommand.Cut)];
+                settings.HiddenTransportToolbarCommands =
+                    TransportToolbarCatalog.HiddenFromLayout(settings.TransportToolbarLayout);
                 bar.ApplyLayoutFromSettings(settings);
                 Assert.DoesNotContain(sentinel, host.Children.Cast<object>());
                 Assert.Single(host.Children);
@@ -400,15 +446,17 @@ public sealed class TransportToolbarSettingsTests
                 });
 
                 var bar = new TransportBar();
+                string[] layout =
+                [
+                    nameof(TransportCommand.Cut),
+                    nameof(TransportCommand.Copy),
+                    TransportToolbarCatalog.SeparatorToken,
+                    nameof(TransportCommand.Open),
+                ];
                 bar.ApplyLayoutFromSettings(new AppSettings
                 {
-                    TransportToolbarLayout =
-                    [
-                        nameof(TransportCommand.Cut),
-                        nameof(TransportCommand.Copy),
-                        TransportToolbarCatalog.SeparatorToken,
-                        nameof(TransportCommand.Open),
-                    ],
+                    TransportToolbarLayout = layout,
+                    HiddenTransportToolbarCommands = TransportToolbarCatalog.HiddenFromLayout(layout),
                 });
                 Assert.Equal(2, bar.ItemsHost.Children.Count);
 
@@ -467,16 +515,89 @@ public sealed class TransportToolbarSettingsTests
                     ],
                 });
 
-                bar.SetCommandsEnabled(enabled: true, allowEdit: true, hasMarkers: false);
+                bar.SetCommandsEnabled(
+                    enabled: true,
+                    allowEdit: true,
+                    new TransportBar.CommandAvailability(HasMarkers: false));
                 Assert.True(bar.ButtonFor(TransportCommand.TogglePlayback)!.IsEnabled);
                 Assert.False(bar.ButtonFor(TransportCommand.PreviousMarker)!.IsEnabled);
                 Assert.False(bar.ButtonFor(TransportCommand.NextMarker)!.IsEnabled);
                 Assert.False(bar.ButtonFor(TransportCommand.DeleteMarkers)!.IsEnabled);
 
-                bar.SetCommandsEnabled(enabled: true, allowEdit: true, hasMarkers: true);
+                bar.SetCommandsEnabled(
+                    enabled: true,
+                    allowEdit: true,
+                    new TransportBar.CommandAvailability(HasMarkers: true));
                 Assert.True(bar.ButtonFor(TransportCommand.PreviousMarker)!.IsEnabled);
                 Assert.True(bar.ButtonFor(TransportCommand.NextMarker)!.IsEnabled);
                 Assert.True(bar.ButtonFor(TransportCommand.DeleteMarkers)!.IsEnabled);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+
+            throw new Exception(error.ToString());
+        }
+    }
+
+    [Fact]
+    public void SetCommandsEnabled_DisablesBounceAndMergeWhenUnavailable()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (System.Windows.Application.Current is null)
+                {
+                    _ = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+                }
+
+                var assembly = Uri.EscapeDataString(typeof(TransportBar).Assembly.GetName().Name!);
+                System.Windows.Application.Current!.Resources.MergedDictionaries.Add(new System.Windows.ResourceDictionary
+                {
+                    Source = new Uri($"pack://application:,,,/{assembly};component/Themes/UiColors.xaml", UriKind.Absolute),
+                });
+
+                var bar = new TransportBar();
+                bar.ApplyLayoutFromSettings(new AppSettings
+                {
+                    TransportToolbarLayout =
+                    [
+                        nameof(TransportCommand.TogglePlayback),
+                        nameof(TransportCommand.Bounce),
+                        nameof(TransportCommand.MergeTabs),
+                    ],
+                });
+
+                bar.SetCommandsEnabled(
+                    enabled: true,
+                    allowEdit: true,
+                    new TransportBar.CommandAvailability(CanBounce: false, CanMergeTabs: false));
+                Assert.True(bar.ButtonFor(TransportCommand.TogglePlayback)!.IsEnabled);
+                Assert.False(bar.ButtonFor(TransportCommand.Bounce)!.IsEnabled);
+                Assert.False(bar.ButtonFor(TransportCommand.MergeTabs)!.IsEnabled);
+
+                bar.SetCommandsEnabled(
+                    enabled: true,
+                    allowEdit: false,
+                    new TransportBar.CommandAvailability(CanBounce: false, CanMergeTabs: true));
+                Assert.False(bar.ButtonFor(TransportCommand.Bounce)!.IsEnabled);
+                Assert.True(bar.ButtonFor(TransportCommand.MergeTabs)!.IsEnabled);
+
+                bar.SetCommandsEnabled(
+                    enabled: true,
+                    allowEdit: true,
+                    new TransportBar.CommandAvailability(CanBounce: true, CanMergeTabs: true));
+                Assert.True(bar.ButtonFor(TransportCommand.Bounce)!.IsEnabled);
+                Assert.True(bar.ButtonFor(TransportCommand.MergeTabs)!.IsEnabled);
             }
             catch (Exception ex)
             {
@@ -539,11 +660,18 @@ public sealed class TransportToolbarSettingsTests
     [Fact]
     public void ResolveLayout_IgnoresStoredOrderAndKeepsShownCommands()
     {
-        // 保存並び・セパレータは捨て、Layout に載っているコマンドだけをカタログ順へ組み直す。
-        // Layout があるとき Hidden は使わない（表示セットの正本は Layout）。
-        var resolved = TransportToolbarCatalog.ResolveLayout(
-            ["Save", TransportToolbarCatalog.SeparatorToken, "Open", nameof(TransportCommand.TogglePlayback)],
-            hidden: ["Open"]);
+        // 保存並び・セパレータは捨て、表示セットをカタログ順へ組み直す。
+        // Layout にあるコマンドは Hidden より優先。それ以外は Hidden に無いものだけ足す。
+        var layout = new[]
+        {
+            "Save",
+            TransportToolbarCatalog.SeparatorToken,
+            "Open",
+            nameof(TransportCommand.TogglePlayback),
+        };
+        var hidden = TransportToolbarCatalog.HiddenFromLayout(layout);
+        hidden = [.. hidden, "Open"]; // Layout にある Open は Hidden でも残る
+        var resolved = TransportToolbarCatalog.ResolveLayout(layout, hidden);
         Assert.Equal(
             [
                 nameof(TransportCommand.TogglePlayback),

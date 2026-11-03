@@ -1293,11 +1293,7 @@
                         </Popup>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="Icon" Value="{x:Null}">
-                            <Setter TargetName="IconPresenter" Property="Visibility" Value="Collapsed"/>
-                            <Setter TargetName="IconPresenter" Property="Width" Value="0"/>
-                            <Setter TargetName="IconPresenter" Property="Margin" Value="0"/>
-                        </Trigger>
+                        <!-- アイコン無しでも列幅は残し、項目の文字位置を揃える。 -->
                         <Trigger Property="InputGestureText" Value="{x:Null}">
                             <Setter TargetName="Gesture" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="Gesture" Property="Margin" Value="0"/>
@@ -1323,10 +1319,16 @@
                             <Setter TargetName="PART_Popup" Property="HorizontalOffset" Value="0"/>
                             <Setter TargetName="PART_Popup" Property="VerticalOffset" Value="0"/>
                             <Setter TargetName="Arrow" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="IconPresenter" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="IconPresenter" Property="Width" Value="0"/>
+                            <Setter TargetName="IconPresenter" Property="Margin" Value="0"/>
                         </Trigger>
                         <Trigger Property="Role" Value="TopLevelItem">
                             <Setter Property="Padding" Value="10,2"/>
                             <Setter Property="MinHeight" Value="0"/>
+                            <Setter TargetName="IconPresenter" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="IconPresenter" Property="Width" Value="0"/>
+                            <Setter TargetName="IconPresenter" Property="Margin" Value="0"/>
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>

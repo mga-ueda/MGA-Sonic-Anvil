@@ -283,6 +283,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveAs));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SaveMp3));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ExportWave));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.MergeTabs));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.Bounce));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleMinimalChrome));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.MaximizeWaveform));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SeekViewLeft));
@@ -303,6 +305,9 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.TimeZoomIn));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.NewDocument));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleWaapi));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.AddMarker));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.DeleteMarkers));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.DeleteAllMarkers));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SelectToStart));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CloseTab));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.LoopPlay));
@@ -397,14 +402,14 @@ public sealed class LibraryPlayerModeTests
             MenuGestures.Volume,
             LibraryPlayerMode.MenuGesture(playerMode: false, WaveMenuCommand.Volume, MenuGestures.Volume));
         Assert.Equal(
-            "Ctrl+Shift+B",
-            LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.MergeTabs, "Ctrl+Shift+B"));
+            "Ctrl+Shift+X",
+            LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.MergeTabs, "Ctrl+Shift+X"));
         Assert.Equal(
             "Ctrl+Shift+M",
             LibraryPlayerMode.MenuGesture(playerMode: true, WaveMenuCommand.ExportMp3, "Ctrl+Shift+M"));
         Assert.False(LibraryPlayerMode.IsDestructiveEditShortcut(
-            Key.B, ModifierKeys.Control | ModifierKeys.Shift));
-        Assert.True(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.Control | ModifierKeys.Shift));
+            Key.X, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.X, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.LeftShift, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.F4, ModifierKeys.Alt));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Space, ModifierKeys.Alt));
@@ -548,7 +553,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.S, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.None));
-        Assert.True(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.B, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.X, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.W, ModifierKeys.Control | ModifierKeys.Shift));

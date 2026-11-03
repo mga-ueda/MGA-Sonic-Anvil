@@ -169,6 +169,13 @@ internal static class LibraryPlayerMode
             or TransportCommand.ToggleAnalyzerMaximize
             or TransportCommand.SaveMp3
             or TransportCommand.ExportWave
+            // ミックスダウン／バウンスは CommandAvailability で条件判定（未達ならグレー）。
+            or TransportCommand.MergeTabs
+            or TransportCommand.Bounce
+            // 捨てマーカー（右クリックメニューと同じくプレイヤーでも可）。
+            or TransportCommand.AddMarker
+            or TransportCommand.DeleteMarkers
+            or TransportCommand.DeleteAllMarkers
             => false,
         _ => true,
     };
@@ -289,8 +296,8 @@ internal static class LibraryPlayerMode
             (Key.Y, ModifierKeys.Control) => true,
             (Key.T, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.M, ModifierKeys.Control | ModifierKeys.Shift) => true,
-            // バウンス（選択ファイルを重ねて合成）。
-            (Key.B, ModifierKeys.Control | ModifierKeys.Shift) => true,
+            // ミックスダウン（選択ファイルを重ねて合成）。
+            (Key.X, ModifierKeys.Control | ModifierKeys.Shift) => true,
             // 音量／ラウドネス揃え（素の V は不可。Ctrl+Shift+V のみ）。
             (Key.V, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Tab, ModifierKeys.Control) => true,
@@ -302,7 +309,7 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// プレイヤーでキーから起こすとまずい破壊編集ショートカット。
     /// 右クリックメニューからは <see cref="BlocksWaveMenu"/> 経由で実行する。
-    /// <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>（バウンス）と
+    /// <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>（ミックスダウン）と
     /// <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>（音量）は除外。
     /// </summary>
     public static bool IsDestructiveEditShortcut(Key key, ModifierKeys modifiers) =>
@@ -318,7 +325,7 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// プレイヤー右クリックでショートカット表記を出さない破壊編集コマンド。
     /// キー制限は <see cref="IsDestructiveEditShortcut"/> のまま。
-    /// バウンス（<see cref="WaveMenuCommand.MergeTabs"/>）と音量（<see cref="WaveMenuCommand.Volume"/>）は表記を残す。
+    /// ミックスダウン（<see cref="WaveMenuCommand.MergeTabs"/>）と音量（<see cref="WaveMenuCommand.Volume"/>）は表記を残す。
     /// </summary>
     public static bool HidesDestructiveMenuGesture(WaveMenuCommand command) => command switch
     {

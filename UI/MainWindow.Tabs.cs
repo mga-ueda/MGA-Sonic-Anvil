@@ -234,6 +234,8 @@ public partial class MainWindow
         }
 
         var index = Math.Clamp(closed.Index, 0, _sessions.Count);
+        // 閉じるときに ForgetVstInserts で空になっているので、永続インサートを載せ直す。
+        ApplyDefaultVstInserts(session);
         _sessions.Insert(index, session);
         ActivateSession(session);
         // ファイルが 1 つに減ってタイルが解除されていても、複数に戻ったら
@@ -302,6 +304,7 @@ public partial class MainWindow
         RebuildTabBar();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
+        RefreshTransportCommandsEnabled();
     }
 
     /// <summary>タブまたはタイルの帯。Ctrl で個別、Shift で範囲、通常クリックで前面。</summary>
@@ -342,6 +345,7 @@ public partial class MainWindow
         RebuildTabBar();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
+        RefreshTransportCommandsEnabled();
     }
 
     /// <summary>Shift+クリック。起点（前回操作したタブ、無ければアクティブ）から範囲選択。</summary>
@@ -370,6 +374,7 @@ public partial class MainWindow
         RebuildTabBar();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
+        RefreshTransportCommandsEnabled();
     }
 
     /// <summary>Esc から呼ぶ。解除したら true。</summary>
@@ -384,6 +389,7 @@ public partial class MainWindow
         RebuildTabBar();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
+        RefreshTransportCommandsEnabled();
         return true;
     }
 
@@ -748,8 +754,8 @@ public partial class MainWindow
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.TabMenuMergeSelected,
                 MergeSelectedTabs,
-                "Ctrl+Shift+B",
-                canMutate));
+                "Ctrl+Shift+X",
+                enabled: CanMergeSelectedTabs()));
         }
 
         menu.Items.Add(FileNameColorMarkerMenu.Create(

@@ -162,8 +162,28 @@ internal partial class TransportBar : UserControl
         }
     }
 
-    public void SetCommandsEnabled(bool enabled, bool allowEdit = true, bool hasMarkers = true)
+    /// <summary>ドキュメント有無以外の、いま実行できるか（リージョン無しで削除など）。</summary>
+    public readonly record struct CommandAvailability(
+        bool HasMarkers = true,
+        bool HasRegions = true,
+        bool HasSelectedRegions = true,
+        bool HasSampleLoop = true,
+        bool HasSelection = true,
+        bool AllowsRegionsAndLoops = true,
+        bool CanBounce = true,
+        bool CanMergeTabs = true);
+
+    public void SetCommandsEnabled(
+        bool enabled,
+        bool allowEdit = true,
+        CommandAvailability availability = default)
     {
+        // default は全 false。未指定時は従来どおりマーカー以外は通す。
+        if (availability.Equals(default(CommandAvailability)))
+        {
+            availability = new CommandAvailability();
+        }
+
         foreach (var (command, button) in _buttons)
         {
             if (command is TransportCommand.Open
@@ -185,21 +205,29 @@ internal partial class TransportBar : UserControl
                 continue;
             }
 
-            if (command is TransportCommand.PreviousMarker
-                or TransportCommand.NextMarker
-                or TransportCommand.DeleteMarkers
-                or TransportCommand.DeleteAllMarkers)
-            {
-                button.IsEnabled = enabled && hasMarkers;
-                continue;
-            }
-
-            button.IsEnabled = enabled;
+            button.IsEnabled = enabled && IsCommandAvailable(command, availability);
         }
 
         RefreshGroupVisibility();
         Visibility = HasVisibleCommands ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    private static bool IsCommandAvailable(TransportCommand command, CommandAvailability a) =>
+        command switch
+        {
+            TransportCommand.PreviousMarker
+                or TransportCommand.NextMarker
+                or TransportCommand.DeleteMarkers
+                or TransportCommand.DeleteAllMarkers => a.HasMarkers,
+            TransportCommand.DeleteRegions => a.HasSelectedRegions && a.AllowsRegionsAndLoops,
+            TransportCommand.DeleteAllRegions => a.HasRegions && a.AllowsRegionsAndLoops,
+            TransportCommand.SetRegion
+                or TransportCommand.SetLoop => a.HasSelection && a.AllowsRegionsAndLoops,
+            TransportCommand.ClearLoop => a.HasSampleLoop && a.AllowsRegionsAndLoops,
+            TransportCommand.Bounce => a.CanBounce,
+            TransportCommand.MergeTabs => a.CanMergeTabs,
+            _ => true,
+        };
 
     /// <summary>設定の並びに従い、グループ単位のベール付きでツールバーを組み直す。</summary>
     public void ApplyLayoutFromSettings(AppSettings settings)
@@ -354,17 +382,17 @@ internal partial class TransportBar : UserControl
         var veil = new Border
         {
             Child = content,
-            CornerRadius = new CornerRadius(DesignMetrics.From96(10)),
+            CornerRadius = DesignMetrics.ControlCorner,
             Padding = new Thickness(
                 DesignMetrics.From96(4),
-                DesignMetrics.From96(3),
+                DesignMetrics.From96(2),
                 DesignMetrics.From96(4),
-                DesignMetrics.From96(3)),
+                DesignMetrics.From96(2)),
             Margin = new Thickness(
                 0,
                 0,
                 DesignMetrics.TransportGroupGap,
-                DesignMetrics.From96(2)),
+                DesignMetrics.From96(1)),
             VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true,
         };
@@ -378,7 +406,7 @@ internal partial class TransportBar : UserControl
         var line = new Border
         {
             Width = DesignMetrics.From96(1),
-            Height = DesignMetrics.From96(18),
+            Height = DesignMetrics.From96(16),
             Margin = new Thickness(
                 DesignMetrics.From96(2),
                 0,
