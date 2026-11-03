@@ -353,8 +353,8 @@ internal static class DesignMetrics
     /// <summary>ラウドネス左の VST インサートラック幅（Include Tail ＋スロット 4+4 列）。</summary>
     public static double VstInsertRackWidth => VstInsertTailColumnWidth + (VstInsertSlotColumnWidth * 2);
 
-    /// <summary>インサート左の Include Tail チェック列。</summary>
-    public static double VstInsertTailColumnWidth => From96(56);
+    /// <summary>インサート左の Include Tail チェック列（□＋ラベル横並び）。</summary>
+    public static double VstInsertTailColumnWidth => From96(96);
 
     /// <summary>スロット 1 列の幅（左右に 4 段ずつ）。</summary>
     public static double VstInsertSlotColumnWidth => From96(150);

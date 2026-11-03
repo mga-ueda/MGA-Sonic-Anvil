@@ -18,7 +18,6 @@ internal sealed class VstInsertRackView : Grid
 {
     private readonly RoundedButton[] _slots = new RoundedButton[VstInsertChain.MaxSlots];
     private readonly CheckBox _includeTailBox;
-    private readonly TextBlock _includeTailLabel;
     private DocumentSession? _session;
     private Action? _onChanged;
     private Action<int>? _openEditor;
@@ -103,42 +102,25 @@ internal sealed class VstInsertRackView : Grid
             RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         }
 
+        // 他チェック（プレイリスト／WAAPI バー）と同じ DarkCheckBoxStyle・字号・前景。
         _includeTailBox = new CheckBox
         {
+            Content = UiStrings.LabelVstBounceIncludeTail,
             IsChecked = AppStorage.Settings.ResolveVstBounceIncludeTail(),
             Focusable = false,
+            FontSize = 11,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = UiStrings.TooltipVstBounceIncludeTail,
         };
         _includeTailBox.SetResourceReference(StyleProperty, "DarkCheckBoxStyle");
+        _includeTailBox.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
         _includeTailBox.Checked += (_, _) => PersistIncludeTail(true);
         _includeTailBox.Unchecked += (_, _) => PersistIncludeTail(false);
-
-        _includeTailLabel = new TextBlock
-        {
-            Text = UiStrings.LabelVstBounceIncludeTail,
-            FontSize = 9,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            TextAlignment = TextAlignment.Center,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 2, 0, 0),
-            IsHitTestVisible = false,
-        };
-
-        var includeTailHost = new StackPanel
-        {
-            Orientation = Orientation.Vertical,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = UiStrings.TooltipVstBounceIncludeTail,
-        };
-        includeTailHost.Children.Add(_includeTailBox);
-        includeTailHost.Children.Add(_includeTailLabel);
-        SetColumn(includeTailHost, 0);
-        SetRow(includeTailHost, 0);
-        SetRowSpan(includeTailHost, slotRows);
-        Children.Add(includeTailHost);
+        SetColumn(_includeTailBox, 0);
+        SetRow(_includeTailBox, 0);
+        SetRowSpan(_includeTailBox, slotRows);
+        Children.Add(_includeTailBox);
 
         var slotMargin = DesignMetrics.VstInsertSlotMargin;
         for (var i = 0; i < VstInsertChain.MaxSlots; i++)
@@ -383,9 +365,9 @@ internal sealed class VstInsertRackView : Grid
     public void ApplyTheme()
     {
         SyncIncludeTailFromSettings();
+        _includeTailBox.Content = UiStrings.LabelVstBounceIncludeTail;
         _includeTailBox.ToolTip = UiStrings.TooltipVstBounceIncludeTail;
-        _includeTailLabel.Text = UiStrings.LabelVstBounceIncludeTail;
-        _includeTailLabel.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("MutedForeBrush"));
+        _includeTailBox.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
         Refresh();
     }
 
