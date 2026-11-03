@@ -11,11 +11,8 @@ internal sealed partial class PlaybackSampleProvider
     public int Read(float[] buffer, int offset, int count)
     {
         int written;
-        var pushedSource = false;
         lock (_gate)
         {
-            _sourceMeterThisRead = 0;
-            _sourceMeterScratchFrames = 0;
             written = ReadCore(buffer, offset, count);
             ApplyFlushFade(buffer, offset, written);
             if (_flushFadeTotal > 0)
@@ -35,24 +32,14 @@ internal sealed partial class PlaybackSampleProvider
         {
             ApplyPlaybackPitch(buffer, offset, written);
             ApplyBpmMonitorNoLock(buffer, offset, written);
-            pushedSource = _sourceMeterThisRead > 0;
         }
 
-        // メーターへの書き込みは _gate の外で行う。UI スレッドは毎描画フレームで
-        // CursorFrame（_gate）を読むため、コールバック内の長い保持はスクロールの
-        // ジッターになる。スクラッチはこのオーディオスレッドしか触らない。
-        if (pushedSource)
-        {
-            FlushSourceMeterScratch();
-        }
-
+        // メーターは聴こえる出力と同じ（VST／ピッチ／BPM 後）。書き込みは _gate の外。
+        // UI は毎描画で CursorFrame（_gate）を読むため、長い保持はスクロールのジッターになる。
         if (written > 0)
         {
+            PushMeterFromOutput(buffer, offset, written);
             PushOutputLoudness(buffer, offset, written);
-            if (!pushedSource)
-            {
-                PushMeterFromOutput(buffer, offset, written);
-            }
         }
 
         return written;
@@ -2057,7 +2044,7 @@ internal sealed partial class PlaybackSampleProvider
         _fadeMixScratch = new float[channels];
     }
 
-    /// <summary>1 フレーム分のソース信号をメーターへ流し、ルーティングして出力へ書く。</summary>
+    /// <summary>1 フレーム分をルーティングして出力へ書く。メーターは Read 末尾の処理後バッファから取る。</summary>
     private void EmitFrame(
         float[] buffer,
         int offset,
@@ -2070,7 +2057,6 @@ internal sealed partial class PlaybackSampleProvider
     {
         gain *= _shuttleOutputGain;
         source = ApplySolo(source);
-        PushSourceFrame(source, gain);
         var playGain = _monitorDim ? gain * _monitorDimLinear : gain;
         if (_directRoute)
         {
@@ -2419,60 +2405,10 @@ internal sealed partial class PlaybackSampleProvider
         return framesWanted * outCh;
     }
 
-    private void PushSourceFrame(ReadOnlySpan<float> frame, float gain)
-    {
-        var n = Math.Min(Math.Max(1, frame.Length), ChannelLayout.MaxChannels);
-        if (_sourceMeterScratchFrames == 0)
-        {
-            _sourceMeterScratchChannels = n;
-        }
-
-        var channels = _sourceMeterScratchChannels;
-        var dest = _sourceMeterScratchFrames * channels;
-        var need = dest + channels;
-        if (_sourceMeterScratch.Length < need)
-        {
-            Array.Resize(ref _sourceMeterScratch, Math.Max(need, _sourceMeterScratch.Length * 2 + 64));
-        }
-
-        var copy = Math.Min(n, channels);
-        for (var ch = 0; ch < copy; ch++)
-        {
-            _sourceMeterScratch[dest + ch] = frame[ch] * gain;
-        }
-
-        for (var ch = copy; ch < channels; ch++)
-        {
-            _sourceMeterScratch[dest + ch] = 0;
-        }
-
-        _sourceMeterScratchFrames++;
-        _sourceMeterThisRead++;
-    }
-
-    private void FlushSourceMeterScratch()
-    {
-        if (_sourceMeterScratchFrames <= 0)
-        {
-            return;
-        }
-
-        var n = Math.Max(1, _sourceMeterScratchChannels);
-        lock (_monitorGate)
-        {
-            for (var i = 0; i < _sourceMeterScratchFrames; i++)
-            {
-                WriteSourceMeterNoLock(_sourceMeterScratch.AsSpan(i * n, n));
-            }
-        }
-
-        _sourceMeterScratchFrames = 0;
-    }
-
     private void WriteSourceMeterNoLock(ReadOnlySpan<float> frame)
     {
         var n = Math.Min(Math.Max(1, frame.Length), ChannelLayout.MaxChannels);
-        _meterSourceChannels = Math.Max(_meterSourceChannels, n);
+        _meterSourceChannels = n;
         var dest = _meterWrite * ChannelLayout.MaxChannels;
         for (var ch = 0; ch < n; ch++)
         {
@@ -2501,19 +2437,41 @@ internal sealed partial class PlaybackSampleProvider
         AdvanceMeterWriteNoLock();
     }
 
+    /// <summary>
+    /// 処理後の interleaved 出力をメーターへ。ダイレクトルートはポートから論理 ch へ戻す。
+    /// </summary>
     private void PushMeterFromOutput(float[] source, int offset, int count)
     {
         var channels = Math.Max(1, _outputChannels);
         var frames = count / channels;
-        Span<float> frame = stackalloc float[2];
+        var direct = _directRoute;
+        var routeMap = _routeMap;
         lock (_monitorGate)
         {
+            if (direct && routeMap.Length > 0)
+            {
+                var logical = Math.Min(routeMap.Length, ChannelLayout.MaxChannels);
+                Span<float> frame = stackalloc float[ChannelLayout.MaxChannels];
+                var dest = frame[..logical];
+                for (var i = 0; i < frames; i++)
+                {
+                    ChannelRouter.Gather(
+                        source.AsSpan(offset + i * channels, channels),
+                        dest,
+                        routeMap);
+                    WriteSourceMeterNoLock(dest);
+                }
+
+                return;
+            }
+
+            Span<float> stereo = stackalloc float[2];
             for (var i = 0; i < frames; i++)
             {
                 var src = offset + i * channels;
-                frame[0] = source[src];
-                frame[1] = channels > 1 ? source[src + 1] : frame[0];
-                WriteSourceMeterNoLock(channels > 1 ? frame : frame[..1]);
+                stereo[0] = source[src];
+                stereo[1] = channels > 1 ? source[src + 1] : stereo[0];
+                WriteSourceMeterNoLock(channels > 1 ? stereo : stereo[..1]);
             }
         }
     }
