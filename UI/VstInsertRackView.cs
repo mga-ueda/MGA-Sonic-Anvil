@@ -390,7 +390,7 @@ internal sealed class VstInsertRackView : Grid
     }
 
     /// <summary>
-    /// ショートカット用。空きならインサートメニュー、使用中ならエディタを開く（Ctrl+クリックのバイパスはしない）。
+    /// ショートカット用。空きならインサートメニュー、使用中ならエディタを開く（バイパスはしない）。
     /// </summary>
     public bool ActivateSlot(int index)
     {
@@ -409,6 +409,29 @@ internal sealed class VstInsertRackView : Grid
             _openEditor?.Invoke(index);
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// ショートカット用。バイパス中なら解除する。解除した場合 true。
+    /// </summary>
+    public bool ClearBypassIfSet(int index)
+    {
+        if (_session is null || (uint)index >= VstInsertChain.MaxSlots)
+        {
+            return false;
+        }
+
+        var slot = _session.VstInserts.Slots[index];
+        if (slot.IsEmpty || !slot.Bypassed)
+        {
+            return false;
+        }
+
+        slot.Bypassed = false;
+        SyncPersistedBypass(index, false);
+        Refresh();
+        _onChanged?.Invoke();
         return true;
     }
 

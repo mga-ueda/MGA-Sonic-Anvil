@@ -1455,7 +1455,7 @@ public partial class MainWindow
             return true;
         }
 
-        // エディタ: Alt+Shift+I＝Include Tail。Ctrl+Shift+1–8＝VST インサート（空き＝選択／使用中＝GUI）。
+        // エディタ: Alt+Shift+I＝Include Tail。Ctrl+Shift+1–8＝VST インサート（空き＝選択／バイパス解除／GUI 開閉）。
         if (!IsLibraryMaximized && TryHandleVstBounceIncludeTailShortcut(key, modifiers))
         {
             return true;
@@ -1492,7 +1492,7 @@ public partial class MainWindow
         return true;
     }
 
-    /// <summary>Ctrl+Shift+上段 1–8。空き＝挿入、使用中＝GUI 開閉トグル。</summary>
+    /// <summary>Ctrl+Shift+上段 1–8。空き＝挿入、バイパス中＝解除、それ以外＝GUI 開閉。</summary>
     private bool TryHandleVstInsertSlotShortcut(Key key, ModifierKeys modifiers)
     {
         if (!IsVstInsertUiEnabled()
