@@ -687,11 +687,6 @@ internal static class WaveformContextMenuBuilder
             enabled: m.CanCopySelectionTimes),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
-            m.HasSelectedTabs ? UiStrings.WaveMenuDetectSilenceSelected : UiStrings.WaveMenuDetectSilence,
-            WaveMenuCommand.DetectSilence,
-            "Ctrl+D",
-            m.CanEdit || m.LibraryMaximized),
-        Cmd(
             UiStrings.WaveMenuHistory,
             WaveMenuCommand.History,
             "U",
@@ -725,6 +720,11 @@ internal static class WaveformContextMenuBuilder
                 : (m.HasSelectedTabs ? UiStrings.WaveMenuVolumeSelected : UiStrings.WaveMenuVolume),
             WaveMenuCommand.Volume,
             MenuGestures.Volume,
+            m.CanEdit || m.LibraryMaximized),
+        Cmd(
+            m.HasSelectedTabs ? UiStrings.WaveMenuDetectSilenceSelected : UiStrings.WaveMenuDetectSilence,
+            WaveMenuCommand.DetectSilence,
+            "Ctrl+D",
             m.CanEdit || m.LibraryMaximized),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuNormalizeSelected : UiStrings.WaveMenuNormalize,

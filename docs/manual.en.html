@@ -708,7 +708,7 @@
           <li>When the level falls, silence is written immediately and stops at the silence insert duration on skip (default 500 ms; unused on playback). It is not dumped when sound returns.</li>
           <li>Starting a recording always asks whether to turn Silent Skip on. The checkbox starts from the status-bar switch. OK updates the status bar, Cancel leaves it. The prompt shows the current threshold and silence insert duration (changeable in Settings).</li>
           <li>The region checkbox is enabled only when Silent Skip is on. Checking that adds a region to each recorded stretch separated by a pad. Silence does not get a region. Brief dips in the waveform are not split. A continued take gets regions for the new audio only. Off by default. Remembered. Adding regions is chosen when you start recording.</li>
-          <li>The threshold and silence insert duration are on the Editing tab in Settings (threshold default −60 dB). Not shared with Silence &amp; Hit Detection (waveform right-click → Edit → Silence &amp; Hit Detection / <kbd>Ctrl</kbd>+<kbd>D</kbd>), including its cut fades.</li>
+          <li>The threshold and silence insert duration are on the Editing tab in Settings (threshold default −60 dB). Not shared with Silence &amp; Hit Detection (waveform right-click → Audio → Silence &amp; Hit Detection / <kbd>Ctrl</kbd>+<kbd>D</kbd>), including its cut fades.</li>
         </ul>
       </article>
 
@@ -942,7 +942,7 @@
       <h2 id="silence-hit">6. Silence &amp; Hit Detection</h2>
       <p>Find silence gaps or hit points automatically, then delete silence, add regions / markers, or mark hit points.</p>
       <p>This is not Silent Skip (skip silent stretches during playback). Silent Skip is under <a href="#layout-silent">Layout → Silent Skip</a>.</p>
-      <p>Open with Waveform right-click → Edit → Silence &amp; Hit Detection (<kbd>Ctrl</kbd>+<kbd>D</kbd>). The dialog uses a frosted-glass window.</p>
+      <p>Open with Waveform right-click → Audio → Silence &amp; Hit Detection (<kbd>Ctrl</kbd>+<kbd>D</kbd>). The dialog uses a frosted-glass window.</p>
       <ul>
         <li>Uses the selection, or the whole file if nothing is selected.</li>
         <li>Closing the dialog remembers the settings for next time.</li>
@@ -1328,7 +1328,7 @@
           <tr><td>Right-click → Audio → Normalize Waveform per Region</td><td>Fit each region's peak to −0.1 dB; short fades from Settings (default 20 ms) at the edges</td></tr>
           <tr><td><kbd>Delete</kbd></td><td><strong>Editor</strong>: ripple-delete the waveform selection (selected markers / regions go with it). <strong>Player</strong>: does not ripple-delete audio; with list focus, removes selected rows from the list only (files are never deleted; <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close; disabled while front chrome is hidden)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>Delete</kbd></td><td>Silence the selection. The dialog chooses the default edge fade (on by default; Enter applies, Esc cancels. Length and markers stay. Also on right-click → Edit. Does nothing in the player)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> / right-click → Edit → Silence &amp; Hit Detection</td><td>Delete silence / add regions / add markers / hit points (selection, or the whole file). Dialog for thresholds, gate timing, and cut fades; hit mode also has rise ratio 5–100% (default 20%). Settings are remembered. Independent of Silent Skip and the click-prevention fade. Default threshold −5 dB. With several tabs selected, confirmation only</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> / right-click → Audio → Silence &amp; Hit Detection</td><td>Delete silence / add regions / add markers / hit points (selection, or the whole file). Dialog for thresholds, gate timing, and cut fades; hit mode also has rise ratio 5–100% (default 20%). Settings are remembered. Independent of Silent Skip and the click-prevention fade. Default threshold −5 dB. With several tabs selected, confirmation only</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Ins</kbd> / right-click → Edit → Insert Silence</td><td>Insert the given seconds at the playhead (right-click uses the click; ↑↓ / wheel: 0.1 s, Shift 1 s, Ctrl 10 s, Ctrl+Shift 60 s; Enter inserts; 0.001–600 s). Default fade on both sides is on and uses the Settings click-prevention fade. Other selected tabs use each playhead</td></tr>
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (in the player, destructive edits are available from the playlist; destructive edit keys stay off; bounce <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs (a dim overlay and progress when it takes time)</td></tr>
@@ -1394,7 +1394,7 @@
           <tr><td>Drag a flag / loop bar</td><td>Move (the guide snaps to markers / loop edges)</td></tr>
           <tr><td>Double-click a comment / region name</td><td>Edit (<code>-A</code> lime / <code>-L</code> blue / <code>-E</code> red)</td></tr>
           <tr><td>Right-click a flag / loop bar</td><td>Delete</td></tr>
-          <tr><td>Right-click (waveform) → Edit → Silence &amp; Hit Detection</td><td>Same as <kbd>Ctrl</kbd>+<kbd>D</kbd> (delete silence / regions / markers / hit points; rise ratio in hit mode; independent of Silent Skip)</td></tr>
+          <tr><td>Right-click (waveform) → Audio → Silence &amp; Hit Detection</td><td>Same as <kbd>Ctrl</kbd>+<kbd>D</kbd> (delete silence / regions / markers / hit points; rise ratio in hit mode; independent of Silent Skip)</td></tr>
           <tr><td>Right-click (waveform) → Edit → Insert Silence</td><td>Same as <kbd>Ctrl</kbd>+<kbd>Ins</kbd> (key uses the playhead; right-click uses the click; ↑↓ / wheel for seconds; Enter inserts)</td></tr>
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (pointer position on the waveform, or the playhead; in the player, destructive edits are available from the playlist; destructive edit keys stay off; bounce <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click a tab / tile strip</td><td>Toggle that tab in the selection</td></tr>

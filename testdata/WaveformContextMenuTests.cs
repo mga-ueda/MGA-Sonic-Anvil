@@ -336,6 +336,8 @@ public sealed class WaveformContextMenuTests
             Assert.All(root, command => Assert.Null(command));
             Assert.Contains(WaveMenuCommand.CopySelectionTime, CommandsIn(tree, UiStrings.WaveMenuCatEdit));
             Assert.Contains(WaveMenuCommand.CopySelectionTimePath, CommandsIn(tree, UiStrings.WaveMenuCatEdit));
+            Assert.DoesNotContain(WaveMenuCommand.DetectSilence, CommandsIn(tree, UiStrings.WaveMenuCatEdit));
+            Assert.Contains(WaveMenuCommand.DetectSilence, CommandsIn(tree, UiStrings.WaveMenuCatAudio));
             Assert.DoesNotContain(WaveMenuCommand.DeleteAllMarkers, root);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
             Assert.Contains(WaveMenuCommand.DeleteAllRegions, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
