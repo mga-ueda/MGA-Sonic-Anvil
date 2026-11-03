@@ -407,6 +407,35 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         }
     }
 
+    public void ResetProcessing()
+    {
+        lock (_gate)
+        {
+            if (_disposed || _faulted || !_active || _processor == IntPtr.Zero)
+            {
+                return;
+            }
+
+            try
+            {
+                unsafe
+                {
+                    var vt = *(IntPtr**)_processor;
+                    var setProcessing = Marshal.GetDelegateForFunctionPointer<SetProcessingFn>(vt[8]);
+                    // setProcessing(0/1) で多くのプラグインがディレイ線を捨てる。
+                    setProcessing(_processor, 0);
+                    setProcessing(_processor, 1);
+                }
+
+                _projectTimeSamples = 0;
+                _continuousTimeSamples = 0;
+            }
+            catch
+            {
+            }
+        }
+    }
+
     public void ResetEditor()
     {
         lock (_gate)

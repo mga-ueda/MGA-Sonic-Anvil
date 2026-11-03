@@ -24,6 +24,12 @@ internal interface IVstSlotProcessor : IDisposable
     bool Process(float[] buffer, int offset, int sampleCount, int channels);
 
     /// <summary>
+    /// オフライン処理直前用。ディレイ／リバーブ等の内部バッファを捨てる。
+    /// ライブ再生の温存経路では呼ばない。
+    /// </summary>
+    void ResetProcessing();
+
+    /// <summary>
     /// プラグイン GUI（IPlugView）を用意する。UI スレッドから呼ぶ。
     /// 失敗・非対応は null。
     /// </summary>

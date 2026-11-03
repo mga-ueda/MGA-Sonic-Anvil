@@ -317,6 +317,34 @@ public sealed class VstInsertEngineTests
     }
 
     [Fact]
+    public void UnloadBypassedLiveSlots_DetachesBypassedKeepsActive()
+    {
+        var factory = new CountingFactory();
+        using var engine = new VstInsertEngine(factory);
+        var owner = new object();
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\A.vst3";
+        chain.Slots[1].PluginPath = @"C:\B.vst3";
+        engine.Apply(owner, chain, playerBypass: false);
+        Assert.NotNull(engine.TryGetLive(0));
+        Assert.NotNull(engine.TryGetLive(1));
+
+        chain.Slots[0].Bypassed = true;
+        engine.Apply(owner, chain, playerBypass: false);
+        Assert.True(engine.IsSlotBypassed(0));
+        Assert.NotNull(engine.TryGetLive(0));
+
+        engine.UnloadBypassedLiveSlots();
+        Assert.Null(engine.TryGetLive(0));
+        Assert.NotNull(engine.TryGetLive(1));
+        Assert.True(engine.IsSlotBypassed(0));
+
+        engine.EnsureSlotLoaded(0);
+        Assert.NotNull(engine.TryGetLive(0));
+        Assert.Equal(3, factory.CreateCount);
+    }
+
+    [Fact]
     public void Apply_DifferentStructure_ReloadsSlot()
     {
         var factory = new CountingFactory();
@@ -550,11 +578,34 @@ public sealed class VstInsertEngineTests
         await engine.ProcessOfflineAsync(buffer, channels: 1);
         Assert.Equal(new float[] { 1f, 0.5f, 0.2f, 0.4f }, buffer);
         Assert.True(factory.Last.ProcessCount >= 1);
+        Assert.True(factory.Last.ResetProcessingCount >= 1);
 
         // exclusive 解除後は通常 Process も動く
         var live = new float[] { 0.5f };
         engine.Process(live, 0, live.Length, 1);
         Assert.Equal(new float[] { 1f }, live);
+    }
+
+    [Fact]
+    public async Task ProcessOffline_ClearsResidueBeforeSecondPass()
+    {
+        // ライブ温存で同一プロセッサを直列バウンスしても、2 本目先頭へ wet が混ざらない。
+        var factory = new CountingFactory { LeaveBleed = true };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Reverb.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var first = new float[] { 1f, 0f, 0f, 0f };
+        engine.Process(first, 0, first.Length, 1);
+        Assert.True(factory.Last.Bleed > 0f);
+        Assert.Equal(0, factory.Last.ResetProcessingCount);
+
+        var second = new float[] { 0f, 0f, 0f, 0f };
+        await engine.ProcessOfflineAsync(second, channels: 1);
+        Assert.True(factory.Last.ResetProcessingCount >= 1);
+        Assert.Equal(0f, second[0]);
+        Assert.Equal(0f, factory.Last.Bleed);
     }
 
     [Fact]
@@ -790,6 +841,10 @@ public sealed class VstInsertEngineTests
 
         public bool Process(float[] buffer, int offset, int sampleCount, int channels) => true;
 
+        public void ResetProcessing()
+        {
+        }
+
         public Vst3EditorSession? TryOpenEditor() => null;
 
         public void ResetEditor()
@@ -804,6 +859,8 @@ public sealed class VstInsertEngineTests
         public int CreateCount { get; private set; }
 
         public float Gain { get; set; } = 1f;
+
+        public bool LeaveBleed { get; set; }
 
         public int ProcessDelayMs { get; set; }
 
@@ -820,7 +877,7 @@ public sealed class VstInsertEngineTests
             var classId = string.IsNullOrWhiteSpace(slot.ClassId)
                 ? ResolveClassIdWhenMissing
                 : slot.ClassId;
-            Last = new MockProcessor(slot.PluginPath!, classId, Gain, ProcessDelayMs, DisposeDelayMs);
+            Last = new MockProcessor(slot.PluginPath!, classId, Gain, ProcessDelayMs, DisposeDelayMs, LeaveBleed);
             if (slot.StateBlob is not null)
             {
                 Last.ApplyState(slot.StateBlob);
@@ -835,8 +892,15 @@ public sealed class VstInsertEngineTests
         private readonly float _gain;
         private readonly int _delayMs;
         private readonly int _disposeDelayMs;
+        private readonly bool _leaveBleed;
 
-        public MockProcessor(string path, string? classId, float gain, int delayMs, int disposeDelayMs = 0)
+        public MockProcessor(
+            string path,
+            string? classId,
+            float gain,
+            int delayMs,
+            int disposeDelayMs = 0,
+            bool leaveBleed = false)
         {
             PluginPath = path;
             ClassId = classId;
@@ -844,6 +908,7 @@ public sealed class VstInsertEngineTests
             _gain = gain;
             _delayMs = delayMs;
             _disposeDelayMs = disposeDelayMs;
+            _leaveBleed = leaveBleed;
         }
 
         public string PluginPath { get; }
@@ -857,6 +922,10 @@ public sealed class VstInsertEngineTests
         public byte[]? LastState { get; private set; }
 
         public int ProcessCount { get; private set; }
+
+        public int ResetProcessingCount { get; private set; }
+
+        public float Bleed { get; private set; }
 
         public void Reconfigure(double sampleRate, int maxBlockSize, int channels)
         {
@@ -874,12 +943,39 @@ public sealed class VstInsertEngineTests
             }
 
             ProcessCount++;
+            var hadEnergy = false;
+            for (var i = 0; i < sampleCount; i++)
+            {
+                if (Math.Abs(buffer[offset + i]) > 1e-8f)
+                {
+                    hadEnergy = true;
+                    break;
+                }
+            }
+
+            if (sampleCount > 0 && Bleed != 0f)
+            {
+                buffer[offset] += Bleed;
+            }
+
             for (var i = 0; i < sampleCount; i++)
             {
                 buffer[offset + i] *= _gain;
             }
 
+            if (_leaveBleed)
+            {
+                // 無音フラッシュでは再武装せず、入力にエネルギーがあるときだけ残す。
+                Bleed = hadEnergy ? 1f : 0f;
+            }
+
             return true;
+        }
+
+        public void ResetProcessing()
+        {
+            ResetProcessingCount++;
+            Bleed = 0f;
         }
 
         public Vst3EditorSession? TryOpenEditor() => null;
