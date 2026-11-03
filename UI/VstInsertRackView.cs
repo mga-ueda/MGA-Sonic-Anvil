@@ -114,7 +114,7 @@ internal sealed class VstInsertRackView : Grid
             ToolTip = UiStrings.TooltipVstBounceIncludeTail,
         };
         _includeTailBox.SetResourceReference(StyleProperty, "DarkCheckBoxStyle");
-        _includeTailBox.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        _includeTailBox.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
         _includeTailBox.Checked += (_, _) => PersistIncludeTail(true);
         _includeTailBox.Unchecked += (_, _) => PersistIncludeTail(false);
         SetColumn(_includeTailBox, 0);
@@ -262,9 +262,7 @@ internal sealed class VstInsertRackView : Grid
         }
         else
         {
-            ActionButtonLooks.ApplyAccent(button);
-            button.BorderSize = 1;
-            button.InvalidateVisual();
+            ActionButtonLooks.ApplyVstInsertFilled(button);
         }
     }
 
@@ -367,7 +365,7 @@ internal sealed class VstInsertRackView : Grid
         SyncIncludeTailFromSettings();
         _includeTailBox.Content = UiStrings.LabelVstBounceIncludeTail;
         _includeTailBox.ToolTip = UiStrings.TooltipVstBounceIncludeTail;
-        _includeTailBox.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        _includeTailBox.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
         Refresh();
     }
 
@@ -515,15 +513,15 @@ internal sealed class VstInsertRackView : Grid
         var persisted = SlotIsPersisted(from);
         label.Text = name;
         label.Foreground = WpfControlHelpers.FrozenBrush(Theme.Get(
-            persisted ? "VstInsertSlotPersistForeBrush" : "ExportButtonForeBrush"));
+            persisted ? "VstInsertSlotPersistForeBrush" : "VstInsertSlotFilledForeBrush"));
         // RoundedButton の OnRender と同じく中央寄せ（左寄せだと持ち上げ時だけズレて見える）。
         label.HorizontalAlignment = HorizontalAlignment.Stretch;
         label.TextAlignment = TextAlignment.Center;
         label.FontWeight = FontWeights.Bold;
         _dragGhost.Background = WpfControlHelpers.FrozenBrush(Theme.Get(
-            persisted ? "VstInsertSlotPersistFillBrush" : "ExportButtonFillBrush"));
+            persisted ? "VstInsertSlotPersistFillBrush" : "VstInsertSlotFilledFillBrush"));
         _dragGhost.BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get(
-            persisted ? "VstInsertSlotPersistBackBrush" : "ExportButtonBackBrush"));
+            persisted ? "VstInsertSlotPersistBackBrush" : "VstInsertSlotFilledBackBrush"));
         _dragGhost.BorderThickness = new Thickness(1);
         _dragGhost.CornerRadius = new CornerRadius(DesignMetrics.ControlCornerRadius);
         // 元スロットと同じ大きさのカードを持ち上げる。

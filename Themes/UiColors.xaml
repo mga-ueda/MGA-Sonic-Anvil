@@ -139,7 +139,7 @@
     <SolidColorBrush x:Key="HistoryStripCurrentForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="HistoryStripPastForeBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="HistoryStripFutureForeBrush" Color="#FF484848" />
-    <!-- VST インサート。空き＝グレー、永続化＝オレンジ、通常使用中／Bounce＝Export。ドロップ時のみ専用色。 -->
+    <!-- VST インサート。空き＝グレー、通常使用中＝青（Export と同色）、永続化＝オレンジ。ドロップ時のみ専用色。 -->
     <SolidColorBrush x:Key="VstInsertSlotDropBackBrush" Color="#994A9EFF" />
     <SolidColorBrush x:Key="VstInsertSlotEmptyFillBrush" Color="#002A2A2E" />
     <SolidColorBrush x:Key="VstInsertSlotEmptyFocusFillBrush" Color="#FF3A3A40" />
@@ -148,6 +148,13 @@
     <SolidColorBrush x:Key="VstInsertSlotEmptyHoverBackBrush" Color="#FF8A8A92" />
     <SolidColorBrush x:Key="VstInsertSlotEmptyPressedBackBrush" Color="#FF585860" />
     <SolidColorBrush x:Key="VstInsertSlotEmptyForeBrush" Color="#80B0B0B0" />
+    <SolidColorBrush x:Key="VstInsertSlotFilledFillBrush" Color="#FF0F1B2D" />
+    <SolidColorBrush x:Key="VstInsertSlotFilledFocusFillBrush" Color="#FF1A3F77" />
+    <SolidColorBrush x:Key="VstInsertSlotFilledHoverFillBrush" Color="#FF122843" />
+    <SolidColorBrush x:Key="VstInsertSlotFilledBackBrush" Color="#FF1E6ED2" />
+    <SolidColorBrush x:Key="VstInsertSlotFilledHoverBackBrush" Color="#FF2D82E6" />
+    <SolidColorBrush x:Key="VstInsertSlotFilledPressedBackBrush" Color="#FF145AB4" />
+    <SolidColorBrush x:Key="VstInsertSlotFilledForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="VstInsertSlotPersistFillBrush" Color="#FF2D1A0C" />
     <SolidColorBrush x:Key="VstInsertSlotPersistFocusFillBrush" Color="#FF4A2A10" />
     <SolidColorBrush x:Key="VstInsertSlotPersistHoverFillBrush" Color="#FF3A2210" />

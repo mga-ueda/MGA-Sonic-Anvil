@@ -430,6 +430,18 @@ internal static class ActionButtonLooks
             Theme.Get("VstInsertSlotEmptyForeBrush"),
             borderSize: 1);
 
+    public static void ApplyVstInsertFilled(RoundedButton button) =>
+        Apply(
+            button,
+            Theme.Get("VstInsertSlotFilledFillBrush"),
+            Theme.Get("VstInsertSlotFilledFocusFillBrush"),
+            Theme.Get("VstInsertSlotFilledHoverFillBrush"),
+            Theme.Get("VstInsertSlotFilledBackBrush"),
+            Theme.Get("VstInsertSlotFilledHoverBackBrush"),
+            Theme.Get("VstInsertSlotFilledPressedBackBrush"),
+            Theme.Get("VstInsertSlotFilledForeBrush"),
+            borderSize: 1);
+
     public static void ApplyVstInsertPersist(RoundedButton button) =>
         Apply(
             button,
