@@ -143,7 +143,7 @@ internal static class DesignMetrics
     /// <summary>ウィンドウ枠（リサイズ辺）。</summary>
     public static double WindowFramePad => From96(24);
 
-    public static double TransportButtonSide => Dip(40);
+    public static double TransportButtonSide => From96(24);
 
     public static double TransportWaapiButtonWidth => From96(56);
 
