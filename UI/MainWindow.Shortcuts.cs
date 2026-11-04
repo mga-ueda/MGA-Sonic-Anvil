@@ -1480,7 +1480,7 @@ public partial class MainWindow
             return true;
         }
 
-        // エディタ: 上段 無修飾＝割合、Shift＝マーカー番号、Ctrl＝リージョン番号。
+        // エディタ: 上段 無修飾＝割合、Ctrl＝マーカー番号、Shift＝リージョン番号。
         // テンキーは再生操作（Alt＋テンキーは割合、Ctrl＋テンキーはマーカー番号）。
         if (!IsLibraryMaximized && TryHandleEditorDigitJump(key, modifiers))
         {

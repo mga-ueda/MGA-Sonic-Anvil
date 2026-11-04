@@ -33,9 +33,6 @@ public partial class MainWindow
         _ = SyncVstInsertEngineAsync(openEditorSlot: null, preferPlayback: false);
     }
 
-    private Task SyncVstInsertEngineAsync() =>
-        SyncVstInsertEngineAsync(openEditorSlot: null, preferPlayback: false);
-
     private Task SyncVstInsertEngineAsync(int? openEditorSlot) =>
         SyncVstInsertEngineAsync(openEditorSlot, preferPlayback: false);
 
@@ -312,7 +309,7 @@ public partial class MainWindow
             var live = _player.VstInserts.TryGetLive(i);
             if (want.IsEmpty || live is null)
             {
-                DetachAndCloseVstEditor(i);
+                OrphanVstEditorForReplace(i);
                 continue;
             }
 
@@ -320,7 +317,7 @@ public partial class MainWindow
                 && string.Equals(live.ClassId ?? string.Empty, want.ClassId ?? string.Empty, StringComparison.Ordinal);
             if (!same)
             {
-                DetachAndCloseVstEditor(i);
+                OrphanVstEditorForReplace(i);
             }
         }
     }
@@ -334,7 +331,7 @@ public partial class MainWindow
         {
             if (chain is null || chain.Slots[i].IsEmpty)
             {
-                DetachAndCloseVstEditor(i);
+                OrphanVstEditorForReplace(i);
             }
         }
     }
@@ -427,7 +424,7 @@ public partial class MainWindow
             }
         }
 
-        DetachAndCloseVstEditor(index);
+        OrphanVstEditorForReplace(index);
         SyncVstInsertEngine();
         VstInsertRack.Refresh();
     }
@@ -941,7 +938,7 @@ public partial class MainWindow
 
         if (_vstEditors.TryGetValue(slotIndex, out var existing) && existing.IsVisible)
         {
-            DetachAndCloseVstEditor(slotIndex);
+            OrphanVstEditorForReplace(slotIndex);
             return true;
         }
 
@@ -967,7 +964,7 @@ public partial class MainWindow
                 return;
             }
 
-            DetachAndCloseVstEditor(slotIndex);
+            OrphanVstEditorForReplace(slotIndex);
         }
 
         var live = _player.VstInserts.TryGetLive(slotIndex);
@@ -1075,6 +1072,7 @@ public partial class MainWindow
 
     /// <summary>
     /// ExclusiveLoad 後の差し替え用。removed/DestroyWindow は呼ばず Hide のみ。
+    /// Soft Limit 等は DetachPluginNow（removed/DestroyWindow）で固まることがあるので常に Orphan。
     /// </summary>
     private void OrphanVstEditorForReplace(int slotIndex)
     {
@@ -1119,18 +1117,13 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>
-    /// Soft Limit 等は DetachPluginNow（removed/DestroyWindow）で固まることがあるので常に Orphan。
-    /// </summary>
-    private void DetachAndCloseVstEditor(int slotIndex) => OrphanVstEditorForReplace(slotIndex);
-
     private void CloseAllVstEditors(bool resumeAudioOnClose = true)
     {
         foreach (var key in _vstEditors.Keys.ToArray())
         {
             if (!resumeAudioOnClose)
             {
-                DetachAndCloseVstEditor(key);
+                OrphanVstEditorForReplace(key);
             }
             else
             {
@@ -1178,7 +1171,7 @@ public partial class MainWindow
     {
         if (!resumeAudioOnClose)
         {
-            DetachAndCloseVstEditor(slotIndex);
+            OrphanVstEditorForReplace(slotIndex);
             return;
         }
 

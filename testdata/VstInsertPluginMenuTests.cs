@@ -206,11 +206,11 @@ public sealed class VstInsertPluginMenuTests
     {
         var plugin = new VstPickerEntry("EQ Soft", @"C:\a.vst3", "FabFilter", "Fx|EQ", null);
         Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "Fab", VstInsertPickerGroupMode.Category));
+            plugin, LibrarySearchQuery.Parse("Fab"), VstInsertPickerGroupMode.Category));
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "EQ", VstInsertPickerGroupMode.Category));
+            plugin, LibrarySearchQuery.Parse("EQ"), VstInsertPickerGroupMode.Category));
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "Soft", VstInsertPickerGroupMode.Category));
+            plugin, LibrarySearchQuery.Parse("Soft"), VstInsertPickerGroupMode.Category));
     }
 
     [Fact]
@@ -218,11 +218,11 @@ public sealed class VstInsertPluginMenuTests
     {
         var plugin = new VstPickerEntry("Pro-Q", @"C:\a.vst3", "FabFilter", "Fx|EQ", null);
         Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "EQ", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("EQ"), VstInsertPickerGroupMode.Vendor));
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "Fab", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("Fab"), VstInsertPickerGroupMode.Vendor));
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "Pro", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("Pro"), VstInsertPickerGroupMode.Vendor));
     }
 
     [Fact]
@@ -230,15 +230,15 @@ public sealed class VstInsertPluginMenuTests
     {
         var plugin = new VstPickerEntry("Pro-Q 3", @"C:\a.vst3", "FabFilter", "Fx|EQ", null);
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "fab pro", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("fab pro"), VstInsertPickerGroupMode.Vendor));
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "waves|pro", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("waves|pro"), VstInsertPickerGroupMode.Vendor));
         Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "waves soft", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("waves soft"), VstInsertPickerGroupMode.Vendor));
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "eq soft|pro", VstInsertPickerGroupMode.Category));
+            plugin, LibrarySearchQuery.Parse("eq soft|pro"), VstInsertPickerGroupMode.Category));
         Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "fab eq", VstInsertPickerGroupMode.Category));
+            plugin, LibrarySearchQuery.Parse("fab eq"), VstInsertPickerGroupMode.Category));
     }
 
     [Fact]
@@ -246,13 +246,13 @@ public sealed class VstInsertPluginMenuTests
     {
         var plugin = new VstPickerEntry("Pro-Q 3", @"C:\a.vst3", "FabFilter", "Fx|EQ", null);
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "\"pro-q 3\"", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("\"pro-q 3\""), VstInsertPickerGroupMode.Vendor));
         Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "\"pro q\"", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("\"pro q\""), VstInsertPickerGroupMode.Vendor));
         Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "Pro*", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("Pro*"), VstInsertPickerGroupMode.Vendor));
         Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
-            plugin, "*.wav", VstInsertPickerGroupMode.Vendor));
+            plugin, LibrarySearchQuery.Parse("*.wav"), VstInsertPickerGroupMode.Vendor));
     }
 
     [Fact]

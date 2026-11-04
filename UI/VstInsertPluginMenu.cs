@@ -106,12 +106,6 @@ internal static class VstInsertPluginMenu
     /// </summary>
     public static bool MatchesPickerFilter(
         VstPickerEntry plugin,
-        string filter,
-        VstInsertPickerGroupMode mode) =>
-        MatchesPickerFilter(plugin, LibrarySearchQuery.Parse(filter), mode);
-
-    public static bool MatchesPickerFilter(
-        VstPickerEntry plugin,
         IReadOnlyList<string[]> groups,
         VstInsertPickerGroupMode mode)
     {
