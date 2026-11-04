@@ -247,7 +247,7 @@ internal static partial class UiStrings
         "Could not load the plug-in.");
     public static string ErrorVstInsertAltiverbNeedsExeLaunch => Get(
         "Altiverb など一部のプラグインは、Cursor / Visual Studio のデバッガ付きプロセスでは読み込めません（iLok）。\n起動構成「MGA Sonic Anvil (デバッガなし)」で F5 すると、デバッガ無しの exe が起動します。",
-        "Some plug-ins (e.g. Altiverb / iLok) cannot load in a Cursor/Visual Studio debugged process.\nUse launch config “MGA Sonic Anvil (no debugger)” — F5 starts the exe without a debugger.");
+        "Some plug-ins (e.g. Altiverb / iLok) cannot load in a Cursor/Visual Studio debugged process.\nUse launch config “MGA Sonic Anvil (デバッガなし)” — F5 starts the exe without a debugger.");
     public static string ErrorVstInsertEditorFailed => Get(
         "プラグインの UI を開けませんでした。音声処理は使える場合があります。",
         "Could not open the plug-in UI. Audio processing may still work.");
