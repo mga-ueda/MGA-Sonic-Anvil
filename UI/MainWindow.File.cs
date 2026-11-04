@@ -2191,6 +2191,7 @@ public partial class MainWindow
             settings.ResolvedLibraryPlaylistWaveformSizeMp3(),
             settings.GaplessPlayback,
             settings.ShowMainMenuBar,
+            settings.ResolvedMainMenuBarAlign(),
             settings.ShowTransportToolbar,
             settings.HiddenTransportToolbarCommands,
             settings.TransportToolbarLayout,
@@ -2274,6 +2275,7 @@ public partial class MainWindow
         settings.GaplessPlayback = dialog.SelectedGaplessPlayback;
         Mp3Gapless.Enabled = settings.GaplessPlayback;
         settings.ShowMainMenuBar = dialog.SelectedShowMainMenuBar;
+        settings.ApplyMainMenuBarAlign(dialog.SelectedMainMenuBarAlign);
         settings.ShowTransportToolbar = dialog.SelectedShowTransportToolbar;
         var toolbarLayout = TransportToolbarCatalog.ApplyLayout(dialog.SelectedTransportToolbarLayout);
         settings.TransportToolbarLayout = toolbarLayout.Layout;

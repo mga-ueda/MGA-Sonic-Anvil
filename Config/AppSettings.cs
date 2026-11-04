@@ -119,8 +119,21 @@ internal sealed class AppSettings
     /// <summary>ウィンドウ上部のメニューバーを出す。既定オン。波形右クリックと同じ内容。</summary>
     public bool ShowMainMenuBar { get; set; } = true;
 
+    /// <summary>
+    /// メニューバー項目列の横位置。Left / Center。既定は左（従来どおり）。
+    /// </summary>
+    public string MainMenuBarAlign { get; set; } = nameof(LayoutMainMenuBarAlign.Left);
+
     /// <summary>メニュー直下のトランスポートツールバー領域を出す。既定オン。</summary>
     public bool ShowTransportToolbar { get; set; } = true;
+
+    public LayoutMainMenuBarAlign ResolvedMainMenuBarAlign() =>
+        string.Equals(MainMenuBarAlign?.Trim(), "Center", StringComparison.OrdinalIgnoreCase)
+            ? LayoutMainMenuBarAlign.Center
+            : LayoutMainMenuBarAlign.Left;
+
+    public void ApplyMainMenuBarAlign(LayoutMainMenuBarAlign align) =>
+        MainMenuBarAlign = align == LayoutMainMenuBarAlign.Center ? "Center" : "Left";
 
     /// <summary>
     /// ツールバーで隠すコマンド名（<c>TransportCommand</c> の名前）。空は全表示。

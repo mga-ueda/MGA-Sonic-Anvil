@@ -279,11 +279,25 @@
                         Style="{StaticResource SettingsColumnScrollViewerStyle}">
             <!-- プリセット1行（波形〜既定に戻す）が SettingsPanelWidth より広いので MaxWidth は付けない。 -->
             <StackPanel HorizontalAlignment="Left">
-              <CheckBox x:Name="ShowMainMenuBarBox"
-                        Style="{StaticResource DarkCheckBoxStyle}"
-                        Content="{x:Static domain:UiStrings.LabelShowMainMenuBar}"
-                        HorizontalAlignment="Left"
-                        Margin="0,0,0,8" />
+              <StackPanel Orientation="Horizontal"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,8">
+                <CheckBox x:Name="ShowMainMenuBarBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelShowMainMenuBar}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,12,0" />
+                <TextBlock Text="{x:Static domain:UiStrings.LabelMainMenuBarAlign}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <ComboBox x:Name="MainMenuBarAlignCombo"
+                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                          Padding="6,1"
+                          FontSize="11.333"
+                          VerticalContentAlignment="Center"
+                          VerticalAlignment="Center"
+                          MinWidth="72" />
+              </StackPanel>
               <CheckBox x:Name="ShowTransportToolbarBox"
                         Style="{StaticResource DarkCheckBoxStyle}"
                         Content="{x:Static domain:UiStrings.LabelShowTransportToolbar}"

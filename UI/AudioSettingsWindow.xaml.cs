@@ -98,6 +98,9 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedShowMainMenuBar { get; private set; } = true;
 
+    public LayoutMainMenuBarAlign SelectedMainMenuBarAlign { get; private set; } =
+        LayoutMainMenuBarAlign.Left;
+
     public bool SelectedShowTransportToolbar { get; private set; } = true;
 
     public string[] SelectedHiddenTransportToolbarCommands { get; private set; } = [];
@@ -183,6 +186,7 @@ internal partial class AudioSettingsWindow : Window
     private readonly bool _enableBackgroundAnimationOpenedAt;
     private readonly int _backgroundAnimationSpeedOpenedAt;
     private readonly bool _showMainMenuBarOpenedAt;
+    private readonly LayoutMainMenuBarAlign _mainMenuBarAlignOpenedAt;
     private readonly DispatcherTimer _backgroundAnimationSpeedPreviewTimer = new()
     {
         Interval = TimeSpan.FromMilliseconds(150),
@@ -232,6 +236,7 @@ internal partial class AudioSettingsWindow : Window
         LibraryPlaylistWaveformSize libraryPlaylistWaveformSizeMp3 = LibraryPlaylistWaveformSize.L,
         bool gaplessPlayback = true,
         bool showMainMenuBar = true,
+        LayoutMainMenuBarAlign mainMenuBarAlign = LayoutMainMenuBarAlign.Left,
         bool showTransportToolbar = true,
         IEnumerable<string>? hiddenTransportToolbarCommands = null,
         IEnumerable<string>? transportToolbarLayout = null,
@@ -299,6 +304,8 @@ internal partial class AudioSettingsWindow : Window
         SelectedGaplessPlayback = gaplessPlayback;
         SelectedShowMainMenuBar = showMainMenuBar;
         _showMainMenuBarOpenedAt = SelectedShowMainMenuBar;
+        SelectedMainMenuBarAlign = mainMenuBarAlign;
+        _mainMenuBarAlignOpenedAt = SelectedMainMenuBarAlign;
         SelectedShowTransportToolbar = showTransportToolbar;
         _showTransportToolbarOpenedAt = SelectedShowTransportToolbar;
         // ディスク上の生値（空 Layout＝既定）。Cancel でここへ戻す。
@@ -629,6 +636,7 @@ internal partial class AudioSettingsWindow : Window
         ShowMainMenuBarBox.IsChecked = SelectedShowMainMenuBar;
         ShowMainMenuBarBox.Checked += (_, _) => PreviewShowMainMenuBar(true);
         ShowMainMenuBarBox.Unchecked += (_, _) => PreviewShowMainMenuBar(false);
+        FillMainMenuBarAlignCombo();
         ShowTransportToolbarBox.IsChecked = SelectedShowTransportToolbar;
         ShowTransportToolbarBox.Checked += (_, _) => PreviewShowTransportToolbar(true);
         ShowTransportToolbarBox.Unchecked += (_, _) => PreviewShowTransportToolbar(false);
@@ -1681,6 +1689,9 @@ internal partial class AudioSettingsWindow : Window
         SelectedGaplessPlayback = GaplessPlaybackBox.IsChecked != false;
         SelectedEnableBackgroundAnimation = EnableBackgroundAnimationBox.IsChecked != false;
         SelectedShowMainMenuBar = ShowMainMenuBarBox.IsChecked != false;
+        SelectedMainMenuBarAlign = MainMenuBarAlignCombo.SelectedItem is NamedMainMenuBarAlignItem align
+            ? align.Align
+            : LayoutMainMenuBarAlign.Left;
         SelectedShowTransportToolbar = ShowTransportToolbarBox.IsChecked != false;
         ApplyLayoutSelection(SelectedTransportToolbarLayout);
         ReadLayoutPresets();
@@ -2559,15 +2570,55 @@ internal partial class AudioSettingsWindow : Window
         }
     }
 
+    private void FillMainMenuBarAlignCombo()
+    {
+        MainMenuBarAlignCombo.Items.Clear();
+        MainMenuBarAlignCombo.Items.Add(
+            new NamedMainMenuBarAlignItem(
+                LayoutMainMenuBarAlign.Left,
+                UiStrings.LabelLayoutToolbarAlignLeft));
+        MainMenuBarAlignCombo.Items.Add(
+            new NamedMainMenuBarAlignItem(
+                LayoutMainMenuBarAlign.Center,
+                UiStrings.LabelLayoutToolbarAlignCenter));
+        MainMenuBarAlignCombo.SelectedIndex =
+            SelectedMainMenuBarAlign == LayoutMainMenuBarAlign.Center ? 1 : 0;
+        ComboBoxFit.Apply(MainMenuBarAlignCombo);
+        MainMenuBarAlignCombo.SelectionChanged += (_, _) => PreviewMainMenuBarAlign();
+        MainMenuBarAlignCombo.DropDownClosed += (_, _) => PreviewMainMenuBarAlign();
+    }
+
+    private void PreviewMainMenuBarAlign()
+    {
+        var align = MainMenuBarAlignCombo.SelectedItem is NamedMainMenuBarAlignItem item
+            ? item.Align
+            : LayoutMainMenuBarAlign.Left;
+        SelectedMainMenuBarAlign = align;
+        if (AppStorage.Settings.ResolvedMainMenuBarAlign() == align)
+        {
+            return;
+        }
+
+        AppStorage.Settings.ApplyMainMenuBarAlign(align);
+        if (Owner is MainWindow window)
+        {
+            window.ApplyMainMenuBarAlign();
+        }
+    }
+
     private void RevertShowMainMenuBarPreview()
     {
-        if (AppStorage.Settings.ShowMainMenuBar == _showMainMenuBarOpenedAt)
+        var showChanged = AppStorage.Settings.ShowMainMenuBar != _showMainMenuBarOpenedAt;
+        var alignChanged = AppStorage.Settings.ResolvedMainMenuBarAlign() != _mainMenuBarAlignOpenedAt;
+        if (!showChanged && !alignChanged)
         {
             return;
         }
 
         AppStorage.Settings.ShowMainMenuBar = _showMainMenuBarOpenedAt;
         SelectedShowMainMenuBar = _showMainMenuBarOpenedAt;
+        AppStorage.Settings.ApplyMainMenuBarAlign(_mainMenuBarAlignOpenedAt);
+        SelectedMainMenuBarAlign = _mainMenuBarAlignOpenedAt;
         if (Owner is MainWindow window)
         {
             window.EnsureMainMenuBar();
@@ -2903,8 +2954,12 @@ internal partial class AudioSettingsWindow : Window
             + ComboBoxFit.MeasureText(this, UiStrings.LabelTransportToolbarDock, 11.333)
             + 8 + 140
             + 8 + 60;
+        var mainMenuBarRow = MeasureCheckBoxContentWidth(ShowMainMenuBarBox)
+            + 12
+            + ComboBoxFit.MeasureText(this, UiStrings.LabelMainMenuBarAlign, 11.333)
+            + 8 + 72;
         return Max(
-            MeasureCheckBoxContentWidth(ShowMainMenuBarBox),
+            mainMenuBarRow,
             MeasureCheckBoxContentWidth(ShowTransportToolbarBox),
             ComboBoxFit.MeasureText(this, UiStrings.ButtonTransportToolbarCustomize, 11.333) + 36,
             fullscreenRow,
@@ -3470,6 +3525,11 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private sealed record ParallelismItem(int Value, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record NamedMainMenuBarAlignItem(LayoutMainMenuBarAlign Align, string Label)
     {
         public override string ToString() => Label;
     }

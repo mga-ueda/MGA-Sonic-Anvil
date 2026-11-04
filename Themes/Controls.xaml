@@ -1160,7 +1160,8 @@
         </Setter>
     </Style>
 
-    <!-- ウィンドウ上部メニューバー。項目は DarkMenuItemStyle（TopLevelHeader で下開き）。 -->
+    <!-- ウィンドウ上部メニューバー。項目は DarkMenuItemStyle（TopLevelHeader で下開き）。
+         ItemsPanel の HorizontalAlignment で左／中央を切り替える（既定左）。 -->
     <Style x:Key="DarkMenuStyle" TargetType="Menu">
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <Setter Property="Background" Value="{DynamicResource MainMenuBarBackBrush}" />
@@ -1169,6 +1170,13 @@
         <Setter Property="Padding" Value="4,0" />
         <Setter Property="Height" Value="{x:Static ui:DesignMetrics.MainMenuBarHeight}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Menu">

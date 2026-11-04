@@ -38,6 +38,13 @@ internal enum LayoutTransportToolbarAlign
     Center,
 }
 
+/// <summary>ウィンドウ上部メニューバーの項目列の横位置。</summary>
+internal enum LayoutMainMenuBarAlign
+{
+    Left,
+    Center,
+}
+
 /// <summary>F9–F12 各スロットの表示内容。ワークスペース項目は持たない。</summary>
 internal sealed class WindowLayoutPreset
 {

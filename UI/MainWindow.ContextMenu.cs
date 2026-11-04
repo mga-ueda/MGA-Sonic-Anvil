@@ -64,6 +64,69 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// メニューバー項目列の左／中央寄せ。設定の MainMenuBarAlign を反映する。
+    /// </summary>
+    internal void ApplyMainMenuBarAlign()
+    {
+        var align = AppStorage.Settings.ResolvedMainMenuBarAlign();
+        var horizontal = align == LayoutMainMenuBarAlign.Left
+            ? HorizontalAlignment.Left
+            : HorizontalAlignment.Center;
+
+        if (TrySetMainMenuItemsPanelAlign(horizontal))
+        {
+            return;
+        }
+
+        var factory = new FrameworkElementFactory(typeof(StackPanel));
+        factory.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, horizontal);
+        MainMenuBar.ItemsPanel = new ItemsPanelTemplate(factory);
+    }
+
+    private bool TrySetMainMenuItemsPanelAlign(HorizontalAlignment horizontal)
+    {
+        if (FindMainMenuItemsPanel() is not { } panel)
+        {
+            return false;
+        }
+
+        panel.HorizontalAlignment = horizontal;
+        return true;
+    }
+
+    private Panel? FindMainMenuItemsPanel()
+    {
+        if (!MainMenuBar.IsLoaded)
+        {
+            return null;
+        }
+
+        return FindVisualChild<Panel>(MainMenuBar);
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent)
+        where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            if (FindVisualChild<T>(child) is { } nested)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// ツールバーの表示。設定オフ／アイコン全非表示／動画ミニは畳む。
     /// 本再生クローム隠れは Opacity 側（PlaylistVideoChromeTargets）。
     /// </summary>
@@ -209,6 +272,7 @@ public partial class MainWindow
         }
 
         MainMenuBar.Visibility = Visibility.Visible;
+        ApplyMainMenuBarAlign();
         RebuildMainMenuBar();
         if (!_playlistVideoChromeVisible)
         {
