@@ -148,15 +148,12 @@ public partial class MainWindow
             }
             catch
             {
-                if (!VstAppReplaceSmokeActive)
-                {
-                    OwnerCenteredMessageBox.Show(
-                        this,
-                        UiStrings.ErrorVstInsertEditorFailed,
-                        UiStrings.AppName,
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                }
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorVstInsertEditorFailed,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
         }
     }
@@ -192,16 +189,12 @@ public partial class MainWindow
             // 試行せず即拒否。F5 は「デバッガなし」構成で exe 手渡し起動すること。
             if (Vst3DebuggerLoadGuard.ShouldRefuseUnderDebugger(entry.Path))
             {
-                if (!VstAppReplaceSmokeActive)
-                {
-                    OwnerCenteredMessageBox.Show(
-                        this,
-                        UiStrings.ErrorVstInsertAltiverbNeedsExeLaunch,
-                        UiStrings.AppName,
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                }
-
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorVstInsertAltiverbNeedsExeLaunch,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
@@ -286,15 +279,12 @@ public partial class MainWindow
             }
             else if (!IsLibraryMaximized)
             {
-                if (!VstAppReplaceSmokeActive)
-                {
-                    OwnerCenteredMessageBox.Show(
-                        this,
-                        UiStrings.ErrorVstInsertLoadFailed,
-                        UiStrings.AppName,
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                }
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorVstInsertLoadFailed,
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
         }
         finally

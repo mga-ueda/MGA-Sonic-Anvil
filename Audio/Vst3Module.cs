@@ -38,7 +38,6 @@ internal sealed class Vst3Module : IDisposable
 
     public static Vst3Module? TryAcquire(string pluginPath)
     {
-        LastAcquireFailure = null;
         var acquired = TryAcquireResolved(pluginPath);
         if (acquired is not null)
         {
@@ -49,14 +48,7 @@ internal sealed class Vst3Module : IDisposable
         if (TryMapX86CommonFilesToProgramFiles(pluginPath, out var alt64)
             && !string.Equals(alt64, pluginPath, StringComparison.OrdinalIgnoreCase))
         {
-            var previous = LastAcquireFailure;
-            acquired = TryAcquireResolved(alt64);
-            if (acquired is not null)
-            {
-                return acquired;
-            }
-
-            LastAcquireFailure = previous ?? LastAcquireFailure;
+            return TryAcquireResolved(alt64);
         }
 
         return null;
@@ -66,7 +58,6 @@ internal sealed class Vst3Module : IDisposable
     {
         if (!Vst3FactoryProbe.TryResolveBinary(pluginPath, out var binary))
         {
-            LastAcquireFailure = "resolve-binary";
             return null;
         }
 
@@ -81,21 +72,18 @@ internal sealed class Vst3Module : IDisposable
         // セッション復元経由でも Altiverb をデバッガ下で読むと InitDll から戻らない
         if (Vst3DebuggerLoadGuard.ShouldRefuseUnderDebugger(key))
         {
-            LastAcquireFailure = "refused-under-debugger";
             return null;
         }
 
         var module = Vst3HostNative.LoadLibraryEx(key, IntPtr.Zero, Vst3HostNative.LoadWithAlteredSearchPath);
         if (module == IntPtr.Zero)
         {
-            LastAcquireFailure = "module-load";
             return null;
         }
 
         var factory = InitAndGetFactory(module);
         if (factory == IntPtr.Zero)
         {
-            LastAcquireFailure = "module-factory";
             return null;
         }
 
@@ -129,9 +117,6 @@ internal sealed class Vst3Module : IDisposable
             pluginPath.AsSpan(idx + marker.Length));
         return File.Exists(mapped) || Directory.Exists(mapped);
     }
-
-    /// <summary>直近の TryAcquire 失敗理由（診断用）。</summary>
-    public static string? LastAcquireFailure { get; private set; }
 
     /// <summary>InitDll → GetPluginFactory。失敗時は Zero（モジュールは解放済み）。</summary>
     private static IntPtr InitAndGetFactory(IntPtr module)

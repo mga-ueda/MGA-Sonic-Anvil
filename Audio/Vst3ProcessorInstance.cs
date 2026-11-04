@@ -111,29 +111,20 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         }
     }
 
-    /// <summary>直近の TryCreate 失敗理由（診断用）。成功時は null。</summary>
-    internal static string? LastCreateFailure { get; private set; }
-
-    /// <summary>直近の TryOpenEditor 失敗理由（診断用）。成功時は null。</summary>
-    internal static string? LastEditorFailure { get; private set; }
-
     public static Vst3ProcessorInstance? TryCreate(
         VstInsertSlot slot,
         double sampleRate,
         int maxBlockSize,
         int channels)
     {
-        LastCreateFailure = null;
         if (slot.IsEmpty || string.IsNullOrWhiteSpace(slot.PluginPath))
         {
-            LastCreateFailure = "empty-slot";
             return null;
         }
 
         var module = Vst3Module.TryAcquire(slot.PluginPath);
         if (module is null)
         {
-            LastCreateFailure = "module-acquire:" + (Vst3Module.LastAcquireFailure ?? "?");
             return null;
         }
 
@@ -144,7 +135,6 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         {
             if (!module.TryResolveClassId(slot.ClassId, slot.DisplayName, out var cid, out var info))
             {
-                LastCreateFailure = "resolve-class";
                 return null;
             }
 
@@ -158,7 +148,6 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
             if (component == IntPtr.Zero)
             {
-                LastCreateFailure = "create-instance";
                 return null;
             }
 
@@ -180,11 +169,10 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
             var initResult = InitializeComponentResult(component, host.ComPtr);
             if (initResult != Vst3HostNative.KResultOk)
             {
-                LastCreateFailure = "initialize:" + initResult.ToString("X8");
                 return null;
             }
 
-            var procQi = Vst3HostNative.QueryInterface(
+            _ = Vst3HostNative.QueryInterface(
                 component,
                 Vst3HostNative.IAudioProcessorIid,
                 out processor);
@@ -196,7 +184,6 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
             if (processor == IntPtr.Zero)
             {
-                LastCreateFailure = "qi-iaudioprocessor:" + procQi.ToString("X8");
                 return null;
             }
 
@@ -235,16 +222,14 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
             if (instance.Faulted)
             {
-                LastCreateFailure = "setup-or-activate";
                 instance.Dispose();
                 return null;
             }
 
             return instance;
         }
-        catch (Exception ex)
+        catch
         {
-            LastCreateFailure = "exception:" + ex.GetType().Name + ":" + ex.Message;
             return null;
         }
         finally
@@ -447,12 +432,10 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
     public Vst3EditorSession? TryOpenEditor()
     {
-        LastEditorFailure = null;
         lock (_gate)
         {
             if (_disposed || _faulted || _component == IntPtr.Zero)
             {
-                LastEditorFailure = "disposed-or-faulted";
                 return null;
             }
 
@@ -471,7 +454,6 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
             {
                 if (!EnsureControllerNoLock())
                 {
-                    LastEditorFailure = "ensure-controller";
                     return null;
                 }
 
@@ -479,9 +461,8 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
                 SyncControllerStateNoLock();
                 _editorOpening = true;
             }
-            catch (Exception ex)
+            catch
             {
-                LastEditorFailure = "exception:" + ex.GetType().Name + ":" + ex.Message;
                 return null;
             }
         }
@@ -494,7 +475,6 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
             view = CreateEditorViewNoLock();
             if (view == IntPtr.Zero)
             {
-                LastEditorFailure = "create-view";
                 return null;
             }
 
@@ -502,9 +482,8 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
             frame = new Vst3PlugFrame();
             SetFrame(view, frame.ComPtr);
         }
-        catch (Exception ex)
+        catch
         {
-            LastEditorFailure = "exception:" + ex.GetType().Name + ":" + ex.Message;
             ReleaseViewQuiet(view);
             view = IntPtr.Zero;
             frame?.Dispose();
@@ -522,7 +501,6 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         {
             if (_disposed || _faulted || _plugView != IntPtr.Zero)
             {
-                LastEditorFailure = _disposed || _faulted ? "disposed-or-faulted" : "already-open";
                 ReleaseViewQuiet(view);
                 frame?.Dispose();
                 return null;
