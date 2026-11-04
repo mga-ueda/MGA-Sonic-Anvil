@@ -2581,12 +2581,28 @@ internal partial class AudioSettingsWindow : Window
             new NamedMainMenuBarAlignItem(
                 LayoutMainMenuBarAlign.Center,
                 UiStrings.LabelLayoutToolbarAlignCenter));
-        MainMenuBarAlignCombo.SelectedIndex =
-            SelectedMainMenuBarAlign == LayoutMainMenuBarAlign.Center ? 1 : 0;
+        MainMenuBarAlignCombo.Items.Add(
+            new NamedMainMenuBarAlignItem(
+                LayoutMainMenuBarAlign.Right,
+                UiStrings.LabelLayoutToolbarAlignRight));
+        MainMenuBarAlignCombo.SelectedIndex = SelectedMainMenuBarAlign switch
+        {
+            LayoutMainMenuBarAlign.Center => 1,
+            LayoutMainMenuBarAlign.Right => 2,
+            _ => 0,
+        };
         ComboBoxFit.Apply(MainMenuBarAlignCombo);
         MainMenuBarAlignCombo.SelectionChanged += (_, _) => PreviewMainMenuBarAlign();
         MainMenuBarAlignCombo.DropDownClosed += (_, _) => PreviewMainMenuBarAlign();
     }
+
+    private static int ToolbarAlignIndex(LayoutTransportToolbarAlign align) =>
+        align switch
+        {
+            LayoutTransportToolbarAlign.Left => 0,
+            LayoutTransportToolbarAlign.Right => 2,
+            _ => 1,
+        };
 
     private void PreviewMainMenuBarAlign()
     {
@@ -3663,8 +3679,12 @@ internal partial class AudioSettingsWindow : Window
                 new NamedTransportToolbarAlignItem(
                     LayoutTransportToolbarAlign.Center,
                     UiStrings.LabelLayoutToolbarAlignCenter));
-            transportToolbarAlign.SelectedIndex =
-                preset.ResolvedTransportToolbarAlign() == LayoutTransportToolbarAlign.Left ? 0 : 1;
+            transportToolbarAlign.Items.Add(
+                new NamedTransportToolbarAlignItem(
+                    LayoutTransportToolbarAlign.Right,
+                    UiStrings.LabelLayoutToolbarAlignRight));
+            transportToolbarAlign.SelectedIndex = ToolbarAlignIndex(
+                preset.ResolvedTransportToolbarAlign());
             ComboBoxFit.Apply(transportToolbarAlign);
 
             var editor = new LayoutPresetEditor(
@@ -3856,8 +3876,8 @@ internal partial class AudioSettingsWindow : Window
                     preset.ResolvedAnalyzerDock() == LayoutAnalyzerDock.Top ? 1 : 0;
                 _transportToolbarDock.SelectedIndex =
                     preset.ResolvedTransportToolbarDock() == LayoutTransportToolbarDock.Bottom ? 1 : 0;
-                _transportToolbarAlign.SelectedIndex =
-                    preset.ResolvedTransportToolbarAlign() == LayoutTransportToolbarAlign.Left ? 0 : 1;
+                _transportToolbarAlign.SelectedIndex = ToolbarAlignIndex(
+                    preset.ResolvedTransportToolbarAlign());
                 _levelMeter.IsChecked = preset.ShowLevelMeter;
                 _statusBar.IsChecked = preset.ResolvedShowStatusBar(Slot);
                 SyncDependent();

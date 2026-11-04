@@ -64,14 +64,16 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// メニューバー項目列の左／中央寄せ。設定の MainMenuBarAlign を反映する。
+    /// メニューバー項目列の左／中央／右寄せ。設定の MainMenuBarAlign を反映する。
     /// </summary>
     internal void ApplyMainMenuBarAlign()
     {
-        var align = AppStorage.Settings.ResolvedMainMenuBarAlign();
-        var horizontal = align == LayoutMainMenuBarAlign.Left
-            ? HorizontalAlignment.Left
-            : HorizontalAlignment.Center;
+        var horizontal = AppStorage.Settings.ResolvedMainMenuBarAlign() switch
+        {
+            LayoutMainMenuBarAlign.Center => HorizontalAlignment.Center,
+            LayoutMainMenuBarAlign.Right => HorizontalAlignment.Right,
+            _ => HorizontalAlignment.Left,
+        };
 
         if (TrySetMainMenuItemsPanelAlign(horizontal))
         {

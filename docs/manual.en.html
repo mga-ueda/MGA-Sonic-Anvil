@@ -231,14 +231,14 @@
         </ul>
         <h4>Layout</h4>
         <ul>
-          <li><strong>Show menu bar</strong> — on by default. Top-of-window menu (same tree as the waveform right-click, without Here; playhead-based). Off hides it. Applies as soon as you change it; Cancel restores it. Always hidden during F9 minimal chrome, regardless of this setting. With the bar visible, <kbd>Alt</kbd>+letter opens a top-level menu (app toggles use <kbd>Alt</kbd>+<kbd>Shift</kbd>+letter; see <a href="#shortcuts-accesskeys">Shortcuts</a>). The neighboring <strong>Align</strong> control (left / center) sets how the menu items are grouped (default left). Changes apply immediately; Cancel restores them.</li>
+          <li><strong>Show menu bar</strong> — on by default. Top-of-window menu (same tree as the waveform right-click, without Here; playhead-based). Off hides it. Applies as soon as you change it; Cancel restores it. Always hidden during F9 minimal chrome, regardless of this setting. With the bar visible, <kbd>Alt</kbd>+letter opens a top-level menu (app toggles use <kbd>Alt</kbd>+<kbd>Shift</kbd>+letter; see <a href="#shortcuts-accesskeys">Shortcuts</a>). The neighboring <strong>Align</strong> control (left / center / right) sets how the menu items are grouped (default left). Changes apply immediately; Cancel restores them.</li>
           <li><strong>Show toolbar</strong> — on by default. Off hides the toolbar. Applies as soon as you change it; Cancel restores it.</li>
           <li><strong>Customize toolbar…</strong> — choose which buttons appear (unavailable while the toolbar is off). <span class="ui">Add</span> from the left list, <span class="ui">Remove</span> from the right (double-click works too). Order and separators are automatic (see <a href="#layout-transport">Toolbar</a>). Selecting an item shows its description below. <span class="ui">Reset to default</span> brings back every button. Changes show on the toolbar right away; Cancel restores it.</li>
           <li>
             <p><strong>F9–F12 presets</strong> — per-mode chrome, used when you enter a mode via Startup mode or the <kbd>F9</kbd>–<kbd>F12</kbd> keys.</p>
             <ul>
-              <li>Each mode remembers: fullscreen (Off / On / Toggle) and Toggle’s first state, waveform (player only; always on in the editor), analyzers (top / bottom), toolbar (top / bottom, left / center), level meter, and status bar.</li>
-              <li>Toolbar “top” is under the menu bar; “bottom” is above the status bar. “Left / center” aligns the buttons. Every mode defaults to top, center.</li>
+              <li>Each mode remembers: fullscreen (Off / On / Toggle) and Toggle’s first state, waveform (player only; always on in the editor), analyzers (top / bottom), toolbar (top / bottom, left / center / right), level meter, and status bar.</li>
+              <li>Toolbar “top” is under the menu bar; “bottom” is above the status bar. “Left / center / right” aligns the buttons. Every mode defaults to top, center.</li>
               <li>The library column is not editable here (on only in F10).</li>
               <li>Defaults at a glance: F9 = waveform only, fullscreen Off / F10 = full player chrome, fullscreen Off / F11 = analyzers off, fullscreen Toggle (starts on) / F12 = analyzers on, fullscreen Toggle (starts off).</li>
               <li><span class="ui">Reset to defaults</span> restores that mode only.</li>
@@ -695,7 +695,7 @@
         <ul>
           <li><strong>Order</strong> — buttons are grouped by menu category, with the playback group first and the rest in menu order. Each group sits on a rounded backdrop; thin lines inside a group mark the menu’s separators and submenu breaks. The bar wraps when the window is narrow.</li>
           <li><strong>Buttons shown</strong> — all of them by default. Remove some in Settings → Layout → <span class="ui">Customize toolbar…</span>. The order cannot be changed.</li>
-          <li><strong>Position</strong> — top (under the menu bar) / bottom (above the status bar) and left / center, chosen per F9–F12 mode (Settings → Layout presets; default top, center).</li>
+          <li><strong>Position</strong> — top (under the menu bar) / bottom (above the status bar) and left / center / right, chosen per F9–F12 mode (Settings → Layout presets; default top, center).</li>
           <li><strong>Unavailable buttons</strong> — buttons that cannot be used right now are dimmed (for example editor-only commands in the player). Previous / next marker and marker delete are dimmed when there are no markers. A group with no usable button is hidden entirely.</li>
           <li><strong>When it is hidden</strong> — when turned off in Settings, in the <kbd>F8</kbd> video mini, and during real video playback (it hides with the front chrome).</li>
           <li>The company logo and license are not shown on the toolbar. Other → Version opens a frosted-glass about dialog with the app icon, name, version, and rights links. GitHub opens the repository, MIT License this app’s full text, and LAME / FFmpeg / EffeTune / WinBlur each open their project site (browser). The Wwise® / Audiokinetic® trademark line is included. Other → License shows the bundled <code>THIRD_PARTY_NOTICES.md</code> (same trademarks, EffeTune / WinBlur, and more) in a frosted-glass dialog. See <a href="#trademarks">Trademarks and license</a>.</li>

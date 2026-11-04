@@ -35,9 +35,14 @@ public sealed class ShowMainMenuBarSettingsTests
         Assert.Equal("Center", centered.MainMenuBarAlign);
         Assert.Equal(LayoutMainMenuBarAlign.Center, centered.ResolvedMainMenuBarAlign());
 
-        var json = JsonSerializer.Serialize(centered, AppSettingsJsonContext.Default.AppSettings);
+        var right = new AppSettings();
+        right.ApplyMainMenuBarAlign(LayoutMainMenuBarAlign.Right);
+        Assert.Equal("Right", right.MainMenuBarAlign);
+        Assert.Equal(LayoutMainMenuBarAlign.Right, right.ResolvedMainMenuBarAlign());
+
+        var json = JsonSerializer.Serialize(right, AppSettingsJsonContext.Default.AppSettings);
         var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
-        Assert.Equal(LayoutMainMenuBarAlign.Center, back!.ResolvedMainMenuBarAlign());
+        Assert.Equal(LayoutMainMenuBarAlign.Right, back!.ResolvedMainMenuBarAlign());
 
         // 旧設定で欠落・空文字なら左。
         var missing = JsonSerializer.Deserialize(
