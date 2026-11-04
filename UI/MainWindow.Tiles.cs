@@ -992,12 +992,15 @@ public partial class MainWindow
 
             FileNameColorMarkerVisual.Apply(pane.Marker, pane.Session.DisplayName, pane.Session.Document.SourcePath);
             FitTileTitleWidth(pane.Header, pane.Title, pane.Marker);
+            // タブと同じく、ハイライト色は色設定（DocumentTabSelected*）。
             pane.Title.Foreground = (Brush)FindResource(
-                dirty ? "DirtyAccentBrush" : highlighted ? "PrimaryForeBrush" : "MutedForeBrush");
-            var path = pane.Session.Document.SourcePath ?? UiStrings.UntitledDocument;
-                        ApplyWaveformTileBackground(pane.Host);
+                highlighted
+                    ? "DocumentTabSelectedForeBrush"
+                    : dirty ? "DirtyAccentBrush" : "MutedForeBrush");
+            ApplyWaveformTileBackground(pane.Host);
             pane.Header.Background = highlighted
-                ? (Brush)FindResource("WaveformTileActiveHeaderBrush")
+                ? (Brush)FindResource(
+                    dirty ? "DocumentTabSelectedDirtyBackBrush" : "DocumentTabSelectedBackBrush")
                 : Brushes.Transparent;
             // アクティブ以外はシアンのシークバーを出さない。
             pane.View.ShowPlayhead = ReferenceEquals(pane.Session, _activeSession);

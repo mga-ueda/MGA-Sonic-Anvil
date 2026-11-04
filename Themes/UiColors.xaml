@@ -34,7 +34,10 @@
     <SolidColorBrush x:Key="WaveFillOverlayBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="WaveZeroLineBrush" Color="#5ACCCCCC" />
     <SolidColorBrush x:Key="TimelineWellBackBrush" Color="#FF17171A" />
-    <SolidColorBrush x:Key="WaveformTileActiveHeaderBrush" Color="#FF4A7A98" />
+    <!-- タブ／タイル帯の選択・アクティブ。背景は半透明。 -->
+    <SolidColorBrush x:Key="DocumentTabSelectedBackBrush" Color="#30FFFFFF" />
+    <SolidColorBrush x:Key="DocumentTabSelectedDirtyBackBrush" Color="#40FF002B" />
+    <SolidColorBrush x:Key="DocumentTabSelectedForeBrush" Color="#FFFFFFFF" />
     <!-- タイル間の敷居。約 2% 白で、隣との境がやっと分かる程度。 -->
     <SolidColorBrush x:Key="WaveformTileDividerBrush" Color="#06FFFFFF" />
     <SolidColorBrush x:Key="TileSearchVeilBrush" Color="#8C000000" />
