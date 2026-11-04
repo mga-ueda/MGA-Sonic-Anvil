@@ -579,11 +579,6 @@ internal sealed class AppSettings
     public string VstInsertPickerGroupBy { get; set; } = "vendor";
 
     /// <summary>
-    /// 旧「Tab／Tabs」スコープ設定。右クリックのインサート選択に置き換えたため未使用。読み書きのみ互換で残す。
-    /// </summary>
-    public string VstInsertScope { get; set; } = "tab";
-
-    /// <summary>
     /// 永続化した「スロット番号＋プラグイン＋パラメータ」（最大 8。空要素は未設定）。
     /// タブを閉じても、別波形を新規オープンしたとき同じスロットに同じプラグイン／パラメータが有効になる。
     /// </summary>

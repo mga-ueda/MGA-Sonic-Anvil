@@ -1699,8 +1699,8 @@ internal static partial class UiStrings
     public static string EditHistoryOrigin => Get("初期状態", "Original");
     public static string OverlayClose => Get("Close", "Close");
     public static string EditHistoryHint => Get(
-        "↑↓ 移動　Enter／X／外側クリック 確定　Esc キャンセル\nCtrl+クリック／Shift+↑↓ 選択　Ctrl+C コピー　Ctrl+V 別ファイルへ適用",
-        "↑↓ move   Enter / X / click outside apply   Esc cancel\nCtrl+click / Shift+↑↓ select   Ctrl+C copy   Ctrl+V apply to file");
+        "↑↓ 移動　Enter／X／外側クリック 確定　Esc キャンセル\nCtrl+クリック／Shift+↑↓ 選択　Ctrl+C コピー　Ctrl+V 別ファイルへ適用\n右下ドラッグでサイズ変更（次回も記憶）",
+        "↑↓ move   Enter / X / click outside apply   Esc cancel\nCtrl+click / Shift+↑↓ select   Ctrl+C copy   Ctrl+V apply to file\nDrag bottom-right to resize (remembered)");
 
     public static string EditHistoryNotCopyable => Get(
         "この操作は別ファイルへ適用できません",
