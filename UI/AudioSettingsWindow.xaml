@@ -298,19 +298,34 @@
                           VerticalAlignment="Center"
                           MinWidth="72" />
               </StackPanel>
-              <CheckBox x:Name="ShowTransportToolbarBox"
-                        Style="{StaticResource DarkCheckBoxStyle}"
-                        Content="{x:Static domain:UiStrings.LabelShowTransportToolbar}"
-                        HorizontalAlignment="Left"
-                        Margin="0,0,0,8" />
-              <ui:RoundedButton x:Name="TransportToolbarCustomizeButton"
-                                Content="{x:Static domain:UiStrings.ButtonTransportToolbarCustomize}"
-                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                MinWidth="160"
-                                Padding="12,0"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,16"
-                                Click="TransportToolbarCustomizeButton_Click" />
+              <StackPanel Orientation="Horizontal"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,16">
+                <CheckBox x:Name="ShowTransportToolbarBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelShowTransportToolbar}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,12,0" />
+                <TextBlock x:Name="TransportToolbarIconScaleLabel"
+                           Text="{x:Static domain:UiStrings.LabelTransportToolbarIconScale}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <ComboBox x:Name="TransportToolbarIconScaleCombo"
+                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                          Padding="6,1"
+                          FontSize="11.333"
+                          VerticalContentAlignment="Center"
+                          VerticalAlignment="Center"
+                          MinWidth="72"
+                          Margin="0,0,12,0" />
+                <ui:RoundedButton x:Name="TransportToolbarCustomizeButton"
+                                  Content="{x:Static domain:UiStrings.ButtonTransportToolbarCustomize}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="160"
+                                  Padding="12,0"
+                                  VerticalAlignment="Center"
+                                  Click="TransportToolbarCustomizeButton_Click" />
+              </StackPanel>
               <StackPanel x:Name="LayoutPresetsHost" />
             </StackPanel>
           </ScrollViewer>

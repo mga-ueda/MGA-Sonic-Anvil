@@ -408,21 +408,18 @@ internal static class MenuAccessKeys
 /// <summary>波形右クリック。カテゴリはサブメニュー、各項目にアクセスキー。</summary>
 internal static class WaveformContextMenuBuilder
 {
-    /// <param name="includeHere">
-    /// クリック位置依存の「この位置」。波形右クリックのみ true。
-    /// メニューバーとプレイリスト行右クリックは位置が無い／メニューバー例外のため false。
-    /// </param>
-    public static IReadOnlyList<WaveMenuEntry> Build(WaveformContextMenuModel m, bool includeHere = true)
+    /// <summary>
+    /// 波形右クリック・上部メニューバー・プレイリスト右クリックで同じ木を返す。
+    /// 「この位置」はクリック／再生ヘッドの Hit に応じる（無いときはカテゴリ自体を出さない）。
+    /// </summary>
+    public static IReadOnlyList<WaveMenuEntry> Build(WaveformContextMenuModel m)
     {
         var items = new List<WaveMenuEntry>();
-        if (includeHere)
+        var here = HereItems(m);
+        if (here.Count > 0)
         {
-            var here = HereItems(m);
-            if (here.Count > 0)
-            {
-                // クリック位置依存のため先頭。定位置カテゴリは下の順。
-                items.Add(Sub(UiStrings.WaveMenuCatHere, here));
-            }
+            // 位置依存のため先頭。定位置カテゴリは下の順。
+            items.Add(Sub(UiStrings.WaveMenuCatHere, here));
         }
 
         items.Add(Sub(UiStrings.WaveMenuCatFile, FileItems(m)));
@@ -1258,11 +1255,11 @@ internal static class WaveformContextMenuBuilder
             else if (item.Command is { } command)
             {
                 // ツールバーと同じ TransportIcon（カタログ）をメニューにも載せる。
-                if (TransportToolbarCatalog.TryGetByMenuCommand(command, out var catalog))
+                if (TryMenuIcon(command, out var icon))
                 {
                     menuItem.Icon = new TransportIconGlyph
                     {
-                        Icon = catalog.Icon,
+                        Icon = icon,
                         Width = 18,
                         Height = 18,
                     };
@@ -1273,5 +1270,26 @@ internal static class WaveformContextMenuBuilder
 
             items.Add(menuItem);
         }
+    }
+
+    /// <summary>
+    /// ツールバーカタログのアイコン。ClearLoop はトグル統合後もメニューに残るので専用絵柄を返す。
+    /// </summary>
+    private static bool TryMenuIcon(WaveMenuCommand command, out TransportIcon icon)
+    {
+        if (TransportToolbarCatalog.TryGetByMenuCommand(command, out var catalog))
+        {
+            icon = catalog.Icon;
+            return true;
+        }
+
+        if (command is WaveMenuCommand.ClearLoop or WaveMenuCommand.ClearLoopItem)
+        {
+            icon = TransportIcon.ClearLoop;
+            return true;
+        }
+
+        icon = default;
+        return false;
     }
 }

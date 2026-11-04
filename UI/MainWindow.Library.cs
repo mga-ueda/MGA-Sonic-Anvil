@@ -3155,6 +3155,7 @@ public partial class MainWindow
         var doc = _document;
         var editor = !IsLibraryMaximized;
         var allowsRegions = editor && doc is { AllowsRegionsAndLoops: true };
+        var hasSampleLoop = allowsRegions && doc is { SampleLoop.IsEmpty: false };
         Transport.SetCommandsEnabled(
             doc is not null,
             allowEdit: editor,
@@ -3162,13 +3163,17 @@ public partial class MainWindow
                 HasMarkers: TransportHasMarkers(),
                 HasRegions: allowsRegions && doc is { Regions.Count: > 0 },
                 HasSelectedRegions: allowsRegions && Waveform.HasSelectedRegions,
-                HasSampleLoop: allowsRegions && doc is { SampleLoop.IsEmpty: false },
+                HasSampleLoop: hasSampleLoop,
                 HasSelection: doc is not null && !doc.Selection.IsEmpty,
                 AllowsRegionsAndLoops: allowsRegions,
                 CanBounce: CanBounceSelectedVstInserts(),
                 CanMergeTabs: CanMergeSelectedTabs()));
+        Transport.SetSampleLoopPresent(hasSampleLoop);
         // 押せるボタンが無いグループを畳んだあと、ツールバー領域自体の表示も合わせる。
         ApplyTransportToolbarVisibility();
+        // ツールバーと同じタイミングで、タイムライン等のルート有効状態も直す。
+        // ファイルを開いただけでは ApplyWaveformMaximizeChrome が走らず、灰色のまま残ることがある。
+        RebuildMainMenuBar();
     }
 
     /// <summary>シーク先と同じソース（プレイヤーは捨てマーカー、編集はドキュメント）。</summary>

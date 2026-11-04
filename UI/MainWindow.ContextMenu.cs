@@ -332,7 +332,7 @@ public partial class MainWindow
         }
 
         var hit = CaptureMenuBarHit();
-        var entries = WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit), includeHere: false);
+        var entries = WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit));
         if (TryRefreshMainMenuRootsInPlace(entries))
         {
             return;
@@ -668,7 +668,7 @@ public partial class MainWindow
     {
         var hit = CaptureMenuBarHit();
         _waveMenuHit = hit;
-        var entries = WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit), includeHere: false);
+        var entries = WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(hit));
         var header = top.Header as string ?? string.Empty;
         foreach (var entry in entries.OfType<WaveMenuItemEntry>())
         {
@@ -939,7 +939,7 @@ public partial class MainWindow
 
     /// <summary>メニューバーはクリック位置が無いので再生ヘッド基準（キーボード右クリックと同趣旨）。</summary>
     private WaveformContextHit CaptureMenuBarHit() =>
-        new() { Frame = Waveform.PlayheadFrame };
+        Waveform.CaptureContextHitAtPlayhead();
 
     private void OpenWaveformContextMenu(WaveformContextHit hit)
     {

@@ -1055,6 +1055,7 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal(
             [
                 UiStrings.LibraryMenuColor,
+                UiStrings.WaveMenuCatHere,
                 UiStrings.WaveMenuCatFile,
                 UiStrings.WaveMenuCatEdit,
                 UiStrings.WaveMenuCatFormat,
@@ -1069,11 +1070,11 @@ public sealed class LibraryBrowserSelectionTests
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
             Assert.Equal(UiStrings.WaveMenuCatPlayback, UiStrings.LibraryMenuCatPitch);
-            var listEdit = view.OpenContextMenuItems[2];
-            var listFormat = view.OpenContextMenuItems[3];
-            var listExport = view.OpenContextMenuItems[4];
-            var listPlayback = view.OpenContextMenuItems[8];
-            var listOther = view.OpenContextMenuItems[11];
+            var listEdit = view.OpenContextMenuItems[3];
+            var listFormat = view.OpenContextMenuItems[4];
+            var listExport = view.OpenContextMenuItems[5];
+            var listPlayback = view.OpenContextMenuItems[9];
+            var listOther = view.OpenContextMenuItems[12];
             var listPlaylist = listPlayback.Items.OfType<MenuItem>()
                 .First(item => (string)item.Header == UiStrings.WaveMenuCatPlaylist);
             Assert.Equal(MenuGestures.PreviousTrack, ((MenuItem)listPlaylist.Items[0]).InputGestureText);
@@ -1103,8 +1104,8 @@ public sealed class LibraryBrowserSelectionTests
             Assert.IsType<Separator>(listOther.Items[3]);
             Assert.Equal(UiStrings.WaveMenuSettings, (string)((MenuItem)listOther.Items[4]).Header);
             // Wwise はプレイヤーでは実行不可でもカテゴリ自体は残してグレーアウト。
-            Assert.False(view.OpenContextMenuItems[10].IsEnabled);
-            Assert.Equal(UiStrings.WaveMenuCatWwise, (string)view.OpenContextMenuItems[10].Header);
+            Assert.False(view.OpenContextMenuItems[11].IsEnabled);
+            Assert.Equal(UiStrings.WaveMenuCatWwise, (string)view.OpenContextMenuItems[11].Header);
             WaveMenuCommand? waveCommand = null;
             view.PlaylistWaveMenuRequested += (_, command) => waveCommand = command;
             var sampleRateItem = (MenuItem)listFormat.Items[0];

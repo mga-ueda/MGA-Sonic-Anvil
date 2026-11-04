@@ -103,6 +103,9 @@ internal partial class AudioSettingsWindow : Window
 
     public bool SelectedShowTransportToolbar { get; private set; } = true;
 
+    public int SelectedTransportToolbarIconScalePercent { get; private set; } =
+        TransportToolbarIconScale.DefaultPercent;
+
     public string[] SelectedHiddenTransportToolbarCommands { get; private set; } = [];
 
     public string[] SelectedTransportToolbarLayout { get; private set; } = [];
@@ -193,6 +196,7 @@ internal partial class AudioSettingsWindow : Window
     };
     private bool _updatingBackgroundAnimationSpeed;
     private readonly bool _showTransportToolbarOpenedAt;
+    private readonly int _transportToolbarIconScaleOpenedAt;
     private readonly string[] _hiddenTransportToolbarCommandsOpenedAt;
     private readonly string[] _transportToolbarLayoutOpenedAt;
     private bool _transportToolbarPreviewReady;
@@ -238,6 +242,7 @@ internal partial class AudioSettingsWindow : Window
         bool showMainMenuBar = true,
         LayoutMainMenuBarAlign mainMenuBarAlign = LayoutMainMenuBarAlign.Left,
         bool showTransportToolbar = true,
+        int transportToolbarIconScalePercent = TransportToolbarIconScale.DefaultPercent,
         IEnumerable<string>? hiddenTransportToolbarCommands = null,
         IEnumerable<string>? transportToolbarLayout = null,
         bool libraryShowPlaylistPdf = true,
@@ -308,6 +313,9 @@ internal partial class AudioSettingsWindow : Window
         _mainMenuBarAlignOpenedAt = SelectedMainMenuBarAlign;
         SelectedShowTransportToolbar = showTransportToolbar;
         _showTransportToolbarOpenedAt = SelectedShowTransportToolbar;
+        SelectedTransportToolbarIconScalePercent =
+            TransportToolbarIconScale.ClampPercent(transportToolbarIconScalePercent);
+        _transportToolbarIconScaleOpenedAt = SelectedTransportToolbarIconScalePercent;
         // ディスク上の生値（空 Layout＝既定）。Cancel でここへ戻す。
         _transportToolbarLayoutOpenedAt = transportToolbarLayout?.ToArray() ?? [];
         _hiddenTransportToolbarCommandsOpenedAt =
@@ -640,6 +648,8 @@ internal partial class AudioSettingsWindow : Window
         ShowTransportToolbarBox.IsChecked = SelectedShowTransportToolbar;
         ShowTransportToolbarBox.Checked += (_, _) => PreviewShowTransportToolbar(true);
         ShowTransportToolbarBox.Unchecked += (_, _) => PreviewShowTransportToolbar(false);
+        FillTransportToolbarIconScale(SelectedTransportToolbarIconScalePercent);
+        TransportToolbarIconScaleCombo.SelectionChanged += TransportToolbarIconScaleCombo_SelectionChanged;
         SyncTransportToolbarCustomizeEnabled();
         _transportToolbarPreviewReady = true;
         FillLayoutPresets();
@@ -682,7 +692,10 @@ internal partial class AudioSettingsWindow : Window
 
     private void SyncTransportToolbarCustomizeEnabled()
     {
-        TransportToolbarCustomizeButton.IsEnabled = ShowTransportToolbarBox.IsChecked != false;
+        var on = ShowTransportToolbarBox.IsChecked != false;
+        TransportToolbarCustomizeButton.IsEnabled = on;
+        TransportToolbarIconScaleLabel.IsEnabled = on;
+        TransportToolbarIconScaleCombo.IsEnabled = on;
     }
 
     private void PreviewShowTransportToolbar(bool show)
@@ -695,6 +708,8 @@ internal partial class AudioSettingsWindow : Window
     private void ApplyTransportToolbarPreview()
     {
         AppStorage.Settings.ShowTransportToolbar = SelectedShowTransportToolbar;
+        AppStorage.Settings.TransportToolbarIconScalePercent =
+            SelectedTransportToolbarIconScalePercent;
         AppStorage.Settings.TransportToolbarLayout = SelectedTransportToolbarLayout;
         AppStorage.Settings.HiddenTransportToolbarCommands = SelectedHiddenTransportToolbarCommands;
         if (Owner is MainWindow window)
@@ -706,6 +721,8 @@ internal partial class AudioSettingsWindow : Window
     private void RevertTransportToolbarPreview()
     {
         var sameShow = AppStorage.Settings.ShowTransportToolbar == _showTransportToolbarOpenedAt;
+        var sameIconScale =
+            AppStorage.Settings.TransportToolbarIconScalePercent == _transportToolbarIconScaleOpenedAt;
         var currentLayout = AppStorage.Settings.TransportToolbarLayout ?? [];
         var sameLayout = currentLayout.SequenceEqual(
             _transportToolbarLayoutOpenedAt,
@@ -714,15 +731,17 @@ internal partial class AudioSettingsWindow : Window
         var sameHidden = currentHidden.SequenceEqual(
             _hiddenTransportToolbarCommandsOpenedAt,
             StringComparer.OrdinalIgnoreCase);
-        if (sameShow && sameLayout && sameHidden)
+        if (sameShow && sameIconScale && sameLayout && sameHidden)
         {
             return;
         }
 
         AppStorage.Settings.ShowTransportToolbar = _showTransportToolbarOpenedAt;
+        AppStorage.Settings.TransportToolbarIconScalePercent = _transportToolbarIconScaleOpenedAt;
         AppStorage.Settings.TransportToolbarLayout = _transportToolbarLayoutOpenedAt.ToArray();
         AppStorage.Settings.HiddenTransportToolbarCommands = _hiddenTransportToolbarCommandsOpenedAt.ToArray();
         SelectedShowTransportToolbar = _showTransportToolbarOpenedAt;
+        SelectedTransportToolbarIconScalePercent = _transportToolbarIconScaleOpenedAt;
         SelectedTransportToolbarLayout = TransportToolbarCatalog.ResolveLayout(
             _transportToolbarLayoutOpenedAt,
             _hiddenTransportToolbarCommandsOpenedAt);
@@ -732,6 +751,46 @@ internal partial class AudioSettingsWindow : Window
         {
             window.ApplyTransportToolbarVisibility();
         }
+    }
+
+    private void FillTransportToolbarIconScale(int percent)
+    {
+        var current = TransportToolbarIconScale.ClampPercent(percent);
+        TransportToolbarIconScaleCombo.Items.Clear();
+        ScaleItem? selected = null;
+        foreach (var preset in TransportToolbarIconScale.Percents)
+        {
+            var item = new ScaleItem(preset, TransportToolbarIconScale.FormatPercent(preset));
+            TransportToolbarIconScaleCombo.Items.Add(item);
+            if (preset == current)
+            {
+                selected = item;
+            }
+        }
+
+        if (selected is null)
+        {
+            selected = new ScaleItem(current, TransportToolbarIconScale.FormatPercent(current));
+            TransportToolbarIconScaleCombo.Items.Add(selected);
+        }
+
+        TransportToolbarIconScaleCombo.SelectedItem = selected;
+    }
+
+    private void TransportToolbarIconScaleCombo_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded || !_transportToolbarPreviewReady
+            || TransportToolbarIconScaleCombo.SelectedItem is not ScaleItem item)
+        {
+            return;
+        }
+
+        SelectedTransportToolbarIconScalePercent =
+            TransportToolbarIconScale.ClampPercent(item.Percent);
+        ApplyTransportToolbarPreview();
+        ComboBoxFit.Apply(TransportToolbarIconScaleCombo);
     }
 
     private void FillLayoutPresets()
@@ -1693,6 +1752,10 @@ internal partial class AudioSettingsWindow : Window
             ? align.Align
             : LayoutMainMenuBarAlign.Left;
         SelectedShowTransportToolbar = ShowTransportToolbarBox.IsChecked != false;
+        SelectedTransportToolbarIconScalePercent =
+            TransportToolbarIconScaleCombo.SelectedItem is ScaleItem iconScaleItem
+                ? TransportToolbarIconScale.ClampPercent(iconScaleItem.Percent)
+                : TransportToolbarIconScale.DefaultPercent;
         ApplyLayoutSelection(SelectedTransportToolbarLayout);
         ReadLayoutPresets();
         SelectedLibraryShowPlaylistPdf = LibraryShowPlaylistPdfBox.IsChecked != false;
@@ -2784,6 +2847,7 @@ internal partial class AudioSettingsWindow : Window
         var deviceMax = Math.Max(80, ResolveSettingsWorkArea().Width - 200);
         ComboBoxFit.Apply(LanguageCombo);
         ComboBoxFit.Apply(UiScaleCombo);
+        ComboBoxFit.Apply(TransportToolbarIconScaleCombo);
         ComboBoxFit.Apply(MultiFileArrangeCombo);
         ComboBoxFit.Apply(LaunchModeCombo);
         ComboBoxFit.Apply(LibraryPlaylistWaveformSizeWaveCombo);
@@ -2974,10 +3038,15 @@ internal partial class AudioSettingsWindow : Window
             + 12
             + ComboBoxFit.MeasureText(this, UiStrings.LabelMainMenuBarAlign, 11.333)
             + 8 + 72;
+        var toolbarRow = MeasureCheckBoxContentWidth(ShowTransportToolbarBox)
+            + 12
+            + ComboBoxFit.MeasureText(this, UiStrings.LabelTransportToolbarIconScale, 11.333)
+            + 8 + 72
+            + 12
+            + ComboBoxFit.MeasureText(this, UiStrings.ButtonTransportToolbarCustomize, 11.333) + 36;
         return Max(
             mainMenuBarRow,
-            MeasureCheckBoxContentWidth(ShowTransportToolbarBox),
-            ComboBoxFit.MeasureText(this, UiStrings.ButtonTransportToolbarCustomize, 11.333) + 36,
+            toolbarRow,
             fullscreenRow,
             checksWithToolbar) + gutter;
     }

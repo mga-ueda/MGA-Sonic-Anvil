@@ -127,6 +127,10 @@ internal sealed class AppSettings
     /// <summary>メニュー直下のトランスポートツールバー領域を出す。既定オン。</summary>
     public bool ShowTransportToolbar { get; set; } = true;
 
+    /// <summary>ツールバーアイコンの拡大（％）。100 未満は 100。上限 200（2 倍）。既定はいまのサイズ。</summary>
+    public int TransportToolbarIconScalePercent { get; set; } =
+        TransportToolbarIconScale.DefaultPercent;
+
     public LayoutMainMenuBarAlign ResolvedMainMenuBarAlign() =>
         MainMenuBarAlign?.Trim().ToLowerInvariant() switch
         {
@@ -984,6 +988,12 @@ internal sealed class AppSettings
     public int ResolvedUiScalePercent() => UiScale.ClampPercent(UiScalePercent);
 
     public double ResolvedUiScale() => UiScale.FactorFrom(UiScalePercent);
+
+    public int ResolvedTransportToolbarIconScalePercent() =>
+        TransportToolbarIconScale.ClampPercent(TransportToolbarIconScalePercent);
+
+    public double ResolvedTransportToolbarIconScale() =>
+        TransportToolbarIconScale.FactorFrom(TransportToolbarIconScalePercent);
 
     public FadeShape ResolvedFadeInCurve() => FadeCurves.ParseStored(DefaultFadeInCurve);
 
