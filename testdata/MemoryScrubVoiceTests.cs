@@ -189,6 +189,29 @@ public sealed class MemoryScrubVoiceTests
         Assert.False(AudioPlayer.ShouldIgnorePlaybackStopped(suppress: false, playing: true, scrubbing: false));
     }
 
+    [Fact]
+    public void PlayedWaveOutput_IsRecreatedBeforeNextTrack()
+    {
+        // 初期化直後で未再生のデバイスはそのまま使う（作り直さない）。
+        Assert.False(AudioPlayer.ShouldRecreateOutputBeforePlay(
+            isAsio: false, discardQueued: false, stopped: true, outputStarted: false));
+
+        // 一度でも鳴らしたデバイスは、曲末で自己停止していても作り直して
+        // 前の曲の先読み（曲頭へのバッファ漏れ）を捨てる。本バグの核心。
+        Assert.True(AudioPlayer.ShouldRecreateOutputBeforePlay(
+            isAsio: false, discardQueued: false, stopped: true, outputStarted: true));
+
+        // Stop／Pause／Seek 済み（破棄要求）や、まだ再生中のデバイスも作り直す。
+        Assert.True(AudioPlayer.ShouldRecreateOutputBeforePlay(
+            isAsio: false, discardQueued: true, stopped: true, outputStarted: false));
+        Assert.True(AudioPlayer.ShouldRecreateOutputBeforePlay(
+            isAsio: false, discardQueued: false, stopped: false, outputStarted: false));
+
+        // ASIO はデバイスを止めず無音ゲートで洗い流すので、決して作り直さない。
+        Assert.False(AudioPlayer.ShouldRecreateOutputBeforePlay(
+            isAsio: true, discardQueued: true, stopped: false, outputStarted: true));
+    }
+
     private static AudioDocument MakeSine(int frames, int rate)
     {
         var samples = new float[frames * 2];

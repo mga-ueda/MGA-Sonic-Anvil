@@ -24,6 +24,7 @@ internal sealed class AudioPlayer : IDisposable
     private bool _scrubbing;
     private bool _suppressPlaybackEnded;
     private bool _discardQueuedOutput;
+    private bool _outputStarted;
     private bool _asioEndArmed;
     private bool _playExitLayer;
     private bool _shutdownFlushStarted;
@@ -56,6 +57,21 @@ internal sealed class AudioPlayer : IDisposable
     /// </summary>
     internal static bool ShouldIgnorePlaybackStopped(bool suppress, bool playing, bool scrubbing) =>
         suppress || !playing || scrubbing;
+
+    /// <summary>
+    /// WaveOut / WASAPI は一度でも再生したデバイスを、次の再生前に作り直して捨てる。
+    /// Pause / Stop ではデバイスを止めず無音ゲートで流し続けている（ASIO と同じ方式）ため、
+    /// 作り直し時に破棄するのは「無音を流し終えたデバイス」になり、ドライバ／ミキサの
+    /// 先読みも無音化済み。これで次の曲の頭に前の曲の尾が混じらない（ジャジャーン対策）。
+    /// 初期化直後で未再生のデバイスはそのまま使う。
+    /// ASIO は止めずにプロバイダの無音ゲートで洗い流すので作り直さない。
+    /// </summary>
+    internal static bool ShouldRecreateOutputBeforePlay(
+        bool isAsio,
+        bool discardQueued,
+        bool stopped,
+        bool outputStarted) =>
+        !isAsio && (discardQueued || !stopped || outputStarted);
 
     public bool HasOutputDevice => _output is not null;
 
@@ -700,13 +716,17 @@ internal sealed class AudioPlayer : IDisposable
     /// ASIO はデバイスを止めず、プロバイダの無音ゲートで先読みを洗い流して
     /// あるので、ゲートを開けるだけ（Stop すると HasReachedEnd が残り
     /// シークバーが即終了扱いになる）。
-    /// WaveOut / WASAPI は Stop 後に先読みが残ることがあるので作り直す
-    /// （IM Importer と同じ）。
+    /// WaveOut / WASAPI も Pause / Stop ではデバイスを止めず無音を流し続けるので、
+    /// 作り直し時に捨てるのは無音化済みのデバイス。曲末の自己停止後や
+    /// discardQueued 時だけ作り直して、確実に清潔なデバイスから鳴らす。
     /// </summary>
     private void StartOutput()
     {
-        if (_output is not AsioOut
-            && (_discardQueuedOutput || _output!.PlaybackState != PlaybackState.Stopped))
+        if (ShouldRecreateOutputBeforePlay(
+                _output is AsioOut,
+                _discardQueuedOutput,
+                _output is null || _output.PlaybackState == PlaybackState.Stopped,
+                _outputStarted))
         {
             RecreateOutputKeepingCursor();
         }
@@ -716,10 +736,20 @@ internal sealed class AudioPlayer : IDisposable
         _asioEndArmed = false;
         ResetSmoothCursor();
         _provider.SetPaused(false);
+        // 終了洗い流し（BeginSilenceFlush）後に同じプロバイダで再生を始めても、
+        // Read が無音を返し続けないよう、再生のたびに無音ゲートを必ず解除する。
+        _provider.CancelSilenceFlush();
         if (_output is null)
         {
             InitOutputDevice();
         }
+
+        // WaveOut.Volume は Vista+ で自プロセスの Windows セッション音量（永続）に
+        // 等価。旧版の洗い流しや外部が 0 のまま残していると、作り直した新しい
+        // WaveOut もそれを継承して完全無音になるため、再生直前に必ず 1 へ戻す。
+        // WASAPI はストリーム音量（AudioStreamVolume＝ミキサ UI とは別系統）が旧版の
+        // 洗い流しで 0 のまま残ると、ミキサは 100% でも完全無音になる。再生直前に 1 へ戻す。
+        EnsureOutputFullVolume();
 
         if (_output!.PlaybackState != PlaybackState.Playing)
         {
@@ -727,14 +757,89 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _playing = true;
+        // 一度でも鳴らした WaveOut / WASAPI は、次の再生で作り直して先読みを捨てる。
+        if (_output is not AsioOut)
+        {
+            _outputStarted = true;
+        }
+
+        // 非 ASIO はセッションが生きているこのタイミングで、毎回、旧版や外部が
+        // 残したミュート・音量 0（Volume≈0 の壊れた状態）だけを戻す。健全な音量や
+        // ユーザーが意図的に下げた音量は ShouldRestore 判定で触らない。
+        if (_output is not AsioOut)
+        {
+            TryRestoreProcessSessions();
+        }
+    }
+
+    /// <summary>
+    /// 再生直前に出力の内部音量を戻す。
+    /// WaveOut はインスタンス音量（＝Vista+ では Windows セッション音量）が実質 0 の
+    /// ときだけ 1 へ戻す（ユーザーがミキサで意図的に下げた音量は触らない）。
+    /// WASAPI はストリーム音量（AudioStreamVolume）を必ず 1 へ戻す。これはミキサ UI
+    /// （ISimpleAudioVolume）とは別系統の内部ゲインで、旧版の洗い流しが全チャンネルを
+    /// 0 のまま残すと、ミキサが 100% でも完全無音になる（本バグ）。既定が 1 の内部値
+    /// なので毎回 1 に揃えてもユーザー設定は壊さない。ASIO は対象外。
+    /// </summary>
+    private void EnsureOutputFullVolume()
+    {
+        switch (_output)
+        {
+            case WaveOutEvent wave:
+                EnsureWaveOutFullVolume(wave);
+                break;
+            case WasapiOut wasapi:
+                EnsureWasapiStreamFullVolume(wasapi);
+                break;
+        }
+    }
+
+    private static void EnsureWaveOutFullVolume(WaveOutEvent wave)
+    {
+        try
+        {
+            if (!AudioSessionRestore.ShouldRestore(muted: false, volume: wave.Volume))
+            {
+                return;
+            }
+
+            wave.Volume = 1f;
+        }
+        catch
+        {
+            // 音量設定に失敗しても再生は続ける。
+        }
+    }
+
+    private static void EnsureWasapiStreamFullVolume(WasapiOut wasapi)
+    {
+        try
+        {
+            var stream = wasapi.AudioStreamVolume;
+            var channels = stream.ChannelCount;
+            if (channels < 1)
+            {
+                return;
+            }
+
+            var volumes = new float[channels];
+            Array.Fill(volumes, 1f);
+            stream.SetAllVolumes(volumes);
+        }
+        catch
+        {
+            // ストリーム音量にアクセスできなくても再生は続ける。
+        }
     }
 
     private void RecreateOutputKeepingCursor()
     {
         var frame = _provider.CursorFrame;
         RecreateOutput();
-        InitOutputDevice();
+        // Init の前にプロバイダをシークしておく。InitOutputDevice → Init や
+        // 直後の初回 Play が旧位置のフレームを拾わないようにする。
         _provider.SeekFrame(frame);
+        InitOutputDevice();
     }
 
     private void ResetSmoothCursor()
@@ -754,32 +859,14 @@ internal sealed class AudioPlayer : IDisposable
 
         if (_playing)
         {
-            if (_output is AsioOut)
-            {
-                // デバイスは動かしたまま無音を流し、ドライバ／仮想ミキサの
-                // 先読みを無音で置き換える（停止時に洗い流す）。
-                _provider.SetPaused(true);
-            }
-            else
-            {
-                // WaveOut / WASAPI は即止める。残った先読みは次の Play で
-                // デバイスごと作り直して捨てる。
-                _suppressPlaybackEnded = true;
-                try
-                {
-                    _output?.Stop();
-                }
-                catch
-                {
-                    // 次の Play で作り直す。
-                }
-                finally
-                {
-                    _suppressPlaybackEnded = false;
-                }
-
-                _discardQueuedOutput = true;
-            }
+            // ASIO / WaveOut / WASAPI 共通: デバイスは止めず、無音ゲートを開くだけ。
+            // 動かしたまま無音を流すと、ドライバ／OS ミキサ／仮想ミキサ（VoiceMeeter 等）
+            // の先読みが無音で上書きされ続け、次の再生（またはデバイス作り直し）で前の曲の
+            // 尾が頭に混じらない（ジャジャーン対策）。以前は WaveOut / WASAPI をここで
+            // Stop していたため、ドライバ／ミキサに実音の尾が残ったまま次の再生の頭と
+            // 重なっていた。WaveOut.Volume / セッション音量には一切触らない（Vista+ で
+            // 永続化され、0 のまま残すと次回起動から無音になる＝別バグ）。
+            _provider.SetPaused(true);
         }
 
         _provider.SetPlaybackSpeed(1);
@@ -792,29 +879,14 @@ internal sealed class AudioPlayer : IDisposable
         _playing = false;
         _provider.SetPlaybackSpeed(1);
 
-        // ASIO はデバイスを止めず無音ゲートで洗い流す（Pause と同じ）。
-        // driver.Stop → Start は旧バッファの再生や HasReachedEnd の残留を招く。
-        if (_output is AsioOut)
-        {
-            _provider.SetPaused(true);
-            return;
-        }
-
-        _suppressPlaybackEnded = true;
-        try
-        {
-            _output?.Stop();
-        }
-        catch
-        {
-            // 次の Play でデバイスを作り直す。
-        }
-        finally
-        {
-            _suppressPlaybackEnded = false;
-        }
-
-        _discardQueuedOutput = true;
+        // ASIO / WaveOut / WASAPI 共通: デバイスは止めず無音ゲートで洗い流す（Pause と同じ）。
+        // 動かしたまま無音を流し続けることで、ドライバ／OS ミキサ／仮想ミキサ（VoiceMeeter 等）
+        // の先読みが無音で置き換わり、次の再生の頭に前の曲の尾が混じらない（ジャジャーン対策）。
+        // driver.Stop → Start は旧バッファの再生や HasReachedEnd の残留を招くため呼ばない。
+        // 実停止後は次の Play でデバイスを作り直すが、このとき破棄するのは「無音を流し終えた
+        // デバイス」なので、後段ミキサの尾も無音化済みで頭に混ざらない。
+        // WaveOut.Volume / セッション音量には一切触らない。
+        _provider.SetPaused(true);
     }
 
     public void EnsureOutputDevice()
@@ -857,8 +929,13 @@ internal sealed class AudioPlayer : IDisposable
         _suppressPlaybackEnded = true;
         try
         {
-            TryMuteOutput(_output);
-            _provider.BeginSilenceFlush();
+            // WaveOut / WASAPI は即座に止めて破棄する。デバイスを直後に捨てるので、
+            // ここで _provider.BeginSilenceFlush() を呼んでも無音は 1 バッファも流れず
+            // 意味がない（旧実装のなごり＝冗長）。むしろ _silenceOnly=true を残す副作用が
+            // あったため外した。WaveOut.Volume / AudioStreamVolume による終了ミュートも
+            // 使わない（Vista+ で永続化され、0 のまま残すと次回起動から無音になる本バグ）。
+            // ASIO の VoiceMeeter 尾洗い流し（上の BeginSilenceFlushWait 経由で
+            // デバイスを動かしたまま待つ）はここには来ないので影響しない。
             FlushStopOutput();
         }
         finally
@@ -978,7 +1055,9 @@ internal sealed class AudioPlayer : IDisposable
         try
         {
             _scrubbing = false;
-            var muted = TryMuteOutput(_output);
+            // インスタンス音量でのミュートは使わない（WaveOut.Volume は Vista+ で
+            // 永続化される Windows セッション音量に等価で、0 のまま残すと次回起動から
+            // 無音になる＝本バグ）。プロバイダの無音ゲートだけで先読みを置き換える。
             _provider.BeginSilenceFlush();
 
             var playing = false;
@@ -997,11 +1076,8 @@ internal sealed class AudioPlayer : IDisposable
             }
 
             _playing = true;
-            // ミュートできた WaveOut / WASAPI は適用待ちだけ。
-            // ASIO とミュート失敗時は、後段 hop が無音に置き換わるまで待つ。
-            return !muted || _output is AsioOut
-                ? EstimateFlushMilliseconds(_output)
-                : AudioOutputFlush.MutedSettleMilliseconds;
+            // 後段 hop（ドライバ／ミキサ）が無音ゲートの無音に置き換わるまで待つ。
+            return EstimateFlushMilliseconds(_output);
         }
         catch
         {
@@ -1033,43 +1109,14 @@ internal sealed class AudioPlayer : IDisposable
     }
 
     /// <summary>
-    /// 既にキューへ乗った音を直ちに消す。WasapiOut.Volume は端末マスターなので使わない。
-    /// ASIO はセッション音量が効かないので false。
+    /// 旧版の終了洗い流しが自プロセスの Windows セッションを Mute=true / Volume=0 の
+    /// まま残すと、次回起動でミキサがミュート・音量 0 のまま音が出なくなる。
+    /// 出力デバイスを作って再生し始めるたびに、壊れた状態のときだけ戻す。
+    /// ユーザーが意図的に下げた音量は <see cref="AudioSessionRestore.ShouldRestore"/>
+    /// で判定して触らない。
     /// </summary>
-    private static bool TryMuteOutput(IWavePlayer output)
+    private static void TryRestoreProcessSessions()
     {
-        if (output is AsioOut)
-        {
-            TryMuteProcessSessions();
-            return false;
-        }
-
-        var muted = false;
-        try
-        {
-            if (output is WaveOutEvent wave)
-            {
-                wave.Volume = 0;
-                muted = true;
-            }
-            else if (output is WasapiOut wasapi)
-            {
-                var stream = wasapi.AudioStreamVolume;
-                stream.SetAllVolumes(new float[stream.ChannelCount]);
-                muted = true;
-            }
-        }
-        catch
-        {
-            // セッション側のミュートに任せる。
-        }
-
-        return TryMuteProcessSessions() || muted;
-    }
-
-    private static bool TryMuteProcessSessions()
-    {
-        var muted = false;
         try
         {
             using var enumerator = new MMDeviceEnumerator();
@@ -1077,21 +1124,18 @@ internal sealed class AudioPlayer : IDisposable
             {
                 using (device)
                 {
-                    muted |= TryMuteDeviceSessions(device);
+                    TryRestoreDeviceSessions(device);
                 }
             }
         }
         catch
         {
-            // 終了時のミュート失敗は洗い流し待ちで回収する。
+            // デバイス列挙に失敗しても再生自体は続ける。
         }
-
-        return muted;
     }
 
-    private static bool TryMuteDeviceSessions(MMDevice device)
+    private static void TryRestoreDeviceSessions(MMDevice device)
     {
-        var muted = false;
         try
         {
             var sessions = device.AudioSessionManager.Sessions;
@@ -1106,9 +1150,15 @@ internal sealed class AudioPlayer : IDisposable
                         continue;
                     }
 
-                    session.SimpleAudioVolume.Mute = true;
-                    session.SimpleAudioVolume.Volume = 0f;
-                    muted = true;
+                    var volume = session.SimpleAudioVolume;
+                    // 旧洗い流しは Mute=true かつ Volume=0。Volume≈0 のときだけ戻す。
+                    if (!AudioSessionRestore.ShouldRestore(volume.Mute, volume.Volume))
+                    {
+                        continue;
+                    }
+
+                    volume.Mute = false;
+                    volume.Volume = 1f;
                 }
                 catch
                 {
@@ -1120,8 +1170,6 @@ internal sealed class AudioPlayer : IDisposable
         {
             // デバイスによってはセッション列挙が失敗する。
         }
-
-        return muted;
     }
 
     private int EstimateFlushMilliseconds(IWavePlayer output)
@@ -1388,6 +1436,10 @@ internal sealed class AudioPlayer : IDisposable
         try
         {
             _output.PlaybackStopped -= OnPlaybackStopped;
+            // 止めて破棄するだけ。残った先読みは次の Play でデバイスを作り直して捨てる。
+            // インスタンス音量（WaveOut.Volume）は Vista+ で永続化される Windows
+            // セッション音量に等価なので、破棄前に 0 へ落とすと次回以降も無音のまま
+            // 残る（本バグ）。絶対に触らない。
             _output.Stop();
             _output.Dispose();
         }
@@ -1400,6 +1452,7 @@ internal sealed class AudioPlayer : IDisposable
             _output = null;
             _deviceRate = 0;
             _deviceChannels = 0;
+            _outputStarted = false;
             _suppressPlaybackEnded = false;
         }
     }

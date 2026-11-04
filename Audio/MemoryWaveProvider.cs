@@ -953,6 +953,21 @@ internal sealed partial class PlaybackSampleProvider : ISampleProvider
     }
 
 
+    /// <summary>
+    /// 無音ゲート（BeginSilenceFlush / フェード完了）を解除して可聴に戻す。
+    /// 終了洗い流し後に同じプロバイダで再生を始めても、Read が無音を返し続けない
+    /// ようにする。再生・出力開始・バインド時に必ず呼ぶ。
+    /// </summary>
+    public void CancelSilenceFlush()
+    {
+        lock (_gate)
+        {
+            _silenceOnly = false;
+            _flushFadeTotal = 0;
+            _flushFadeRemaining = 0;
+        }
+    }
+
     public void SeekFrame(long frame)
     {
         lock (_gate)
