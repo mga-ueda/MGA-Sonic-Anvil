@@ -287,7 +287,6 @@ public partial class MainWindow : Window
         Mp3Gapless.Enabled = AppStorage.Settings.GaplessPlayback;
         ApplyMonitorMixFromSettings();
         ApplySilentSkipFromSettings();
-        MaybeStartVstAppReplaceSmoke();
 
         Transport.CommandInvoked += (_, command) => ExecuteTransport(command);
         StatusTimes.CurrentCommitted += (_, frame) =>
