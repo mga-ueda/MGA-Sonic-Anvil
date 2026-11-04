@@ -2097,6 +2097,12 @@ public partial class MainWindow
             return false;
         }
 
+        // 既に再生中なら遅延 EOF（旧デバイスの PlaybackStopped）由来。重ねて起動しない。
+        if (_player.IsPlaying)
+        {
+            return false;
+        }
+
         // A-B は再生窓ループ。選択は一通停止なのでここでは再開しない。
         if (Waveform.TryGetPlayerAbLoop(out _) || !_document.Selection.IsEmpty)
         {
