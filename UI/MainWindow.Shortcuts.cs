@@ -5,6 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
+using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
