@@ -34,7 +34,7 @@ internal partial class AudioSettingsWindow
     // const を直接 if に置くと Debug/Release の片方で CS0162 になるため、プロパティ越しに読む。
     private static bool VstTabEnabled => VstFeature.IsEnabled;
 
-    /// <summary>コンストラクタから。Release ではタブごと外す。</summary>
+    /// <summary>コンストラクタから。機能オフ時はタブごと外す。</summary>
     private void InitializeVstTab(
         IEnumerable<string>? vst3SearchPaths,
         bool useSteinbergHostCache)
