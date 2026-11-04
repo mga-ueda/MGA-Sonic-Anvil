@@ -2907,6 +2907,10 @@ public partial class MainWindow
         {
             Topmost = want;
         }
+
+        // フルスクリーン／常に最前面でホストが Topmost 帯に入ったあと、
+        // Owner 無しの VST エディタが同じ帯の背後へ回らないよう押し上げる。
+        RaiseOpenVstEditorsAboveShell();
     }
 
     private bool TryGetSavedFullscreenBounds(out Rect saved)
