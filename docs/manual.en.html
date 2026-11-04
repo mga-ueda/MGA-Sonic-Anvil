@@ -110,6 +110,7 @@
           <ol>
             <li><a href="#auto-speaker">Auto speaker selection</a></li>
             <li><a href="#mp3-downmix">MP3 downmix</a></li>
+            <li><a href="#settings-vst">VST</a></li>
           </ol>
         </li>
         <li><a href="#spectrogram">Spectrogram / loudness</a></li>
@@ -121,6 +122,7 @@
             <li><a href="#shortcuts-view">View / zoom</a></li>
             <li><a href="#shortcuts-seek">Seek / selection</a></li>
             <li><a href="#shortcuts-edit">Edit</a></li>
+            <li><a href="#shortcuts-vst">VST inserts</a></li>
             <li><a href="#shortcuts-mark">Markers / regions / loops</a></li>
             <li><a href="#shortcuts-format">Format</a></li>
             <li><a href="#shortcuts-waapi">WAAPI</a></li>
@@ -142,7 +144,7 @@
       <h2 id="about">1. What this app does</h2>
       <div class="hero">
         <p><strong>Edit waveforms and send them to Wwise in one window.</strong></p>
-        <p>Fade, match loudness, delete unused parts, copy / paste, markers, regions, loops, and a spectrogram. Listen, decide, and apply.</p>
+        <p>Fade, match loudness, delete unused parts, copy / paste, markers, regions, loops, a spectrogram, and VST3 inserts. Listen, decide, and apply.</p>
         <p><strong>Wwise gets a single Wave file.</strong> The original wave is written to Originals and imported as Interactive Music. Markers ending in <code>-A</code> / <code>-L</code> / <code>-E</code> and the sample loop are used (not Custom Cues). See <a href="#export">WAAPI EXPORT</a>.</p>
         <p>You can save an open file as Wave or MP3. Right-click a tab to write the current edits to another file.</p>
         <p>New file: <kbd>Ctrl</kbd>+<kbd>N</kbd>. After opening, record with <kbd>Ctrl</kbd>+<kbd>R</kbd>. Before recording, you are always asked whether to use Silent Skip (skip silence). Recording uses the current file format and overwrites from the playhead (Undo restores it). It does not start if no file is open.</p>
@@ -179,6 +181,7 @@
         <a href="#layout-single-loop">Single Loop</a>
         <a href="#layout-top">On top</a>
         <a href="#layout-meters">Meters</a>
+        <a href="#layout-vst">VST inserts</a>
         <a href="#layout-waapi">WAAPI</a>
         <a href="#layout-status">Status bar</a>
       </nav>
@@ -204,7 +207,7 @@
         <ul>
           <li>In Settings, New, and save-confirm dialogs, <kbd>Tab</kbd> also moves to the buttons.</li>
           <li><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd> goes to the next tab, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd> to the previous (wraps from the end to the start; key-repeat pauses at the ends). <kbd>Esc</kbd> closes it.</li>
-          <li>Width follows the Audio tab. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / Wwise.</li>
+          <li>Width follows the Audio tab. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / Wwise / VST.</li>
         </ul>
         <h4>General</h4>
         <ul>
@@ -563,7 +566,7 @@
         <h4>Destructive playlist edits</h4>
         <p>The player is built for listening first. Still, from the playlist right-click you can run destructive edits and exports on one or many selected files — normalize, fade, pitch, time stretch, reverse, sample rate / bit depth / channel convert, insert silence, silence &amp; hit detection, match loudness, and related export commands (whole file; applied edits are saved to disk and cannot be undone).</p>
         <div class="note">
-          <p>Because an accidental destructive edit cannot be undone, <strong>keyboard shortcuts do not run normalize / fade / pitch / time stretch / reverse / format convert / insert silence / silence detection and similar commands in the player</strong> (those menu items also hide their gesture text). Use the playlist right-click (or the menu key / <kbd>Shift</kbd>+<kbd>F10</kbd>). Plain <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> stay previous / next / restart track. Exceptions: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> (bounce selected files) and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> (volume / Match Loudness) work from the keyboard and keep their menu gestures (plain <kbd>V</kbd> stays off in the player).</p>
+          <p>Because an accidental destructive edit cannot be undone, <strong>keyboard shortcuts do not run normalize / fade / pitch / time stretch / reverse / format convert / insert silence / silence detection and similar commands in the player</strong> (those menu items also hide their gesture text). Use the playlist right-click (or the menu key / <kbd>Shift</kbd>+<kbd>F10</kbd>). Plain <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> stay previous / next / restart track. Exceptions: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> (Mixdown) and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> (volume / Match Loudness) work from the keyboard and keep their menu gestures (plain <kbd>V</kbd> stays off in the player).</p>
         </div>
         <h4>Jacket and background</h4>
         <ul>
@@ -616,18 +619,18 @@
           <li>“Find Tabs (F)” (<kbd>Ctrl</kbd>+<kbd>F</kbd>; while tiled), “Clear Tab Search (Z)” (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>; while filtered)</li>
           <li>“Export Wave (W)”, “Export MP3 (M)”, “Export Wave Separated by Markers (H)”, “Export Wave Separated by Regions (G)”, “Export by Channel (C)”</li>
         </ul>
-        <p>Waveform right-click has a “Tabs” category. Close this / others / right / left / all, select all, reopen, file times, and tiling use the same wording and access keys as the tab menu (acting on the active tab). It also has “Next Tab (N)”, “Previous Tab (V)”, “Find Tabs (F)”, and “Clear Tab Search (Z)”. Bounce, Wave / MP3 export, and separate live under waveform → Export; rename / duplicate / delete live under waveform → File.</p>
-        <h4>Bounce</h4>
-        <p>With two or more tabs selected (playlist rows in the player), “Bounce Selected Files (J)” mixes their waveforms together into a new Wave and opens it in the tab to the right of the selection. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> does the same (also in the player, with the gesture shown on the right-click menu).</p>
+        <p>Waveform right-click has a “Tabs” category. Close this / others / right / left / all, select all, reopen, file times, and tiling use the same wording and access keys as the tab menu (acting on the active tab). It also has “Next Tab (N)”, “Previous Tab (V)”, “Find Tabs (F)”, and “Clear Tab Search (Z)”. Mixdown, Wave / MP3 export, and separate live under waveform → Export; rename / duplicate / delete live under waveform → File.</p>
+        <h4>Mixdown</h4>
+        <p>With two or more tabs selected (playlist rows in the player), “Mixdown (X)” mixes their waveforms together into a new Wave and opens it in the tab to the right of the selection. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> does the same (also in the player, with the gesture shown on the right-click menu).</p>
         <ul>
-          <li>The length is the longest tab. Bounce runs only when every file matches the leftmost selected tab’s sample rate, channel count, and bit depth. A different file cancels the bounce with no conversion, and the dialog names the files that do not match.</li>
+          <li>The length is the longest tab. Mixdown runs only when every file matches the leftmost selected tab’s sample rate, channel count, and bit depth. A different file cancels the mixdown with no conversion, and the dialog names the files that do not match.</li>
           <li>Markers and regions are carried over in place. A marker at the same position with the same comment is kept only once.</li>
-          <li>It asks where to save first. Default name <code>Bounce.wav</code>. The dialog starts in the last bounce folder. If there is none yet, it uses the folder of the first selected tab that has a file, else the last export folder. The chosen location is kept for the next bounce.</li>
+          <li>It asks where to save first. Default name <code>Bounce.wav</code>. The dialog starts in the last mixdown folder. If there is none yet, it uses the folder of the first selected tab that has a file, else the last export folder. The chosen location is kept for the next mixdown.</li>
         </ul>
         <div class="note">
-          <p>16-bit bounce is not recommended. Use 24-bit or higher. 16-bit bounce is still allowed.</p>
-          <p>The bounce path does not dither. At 16-bit, fades and reverb tails are plain rounding.</p>
-          <p>Before the bounce is written, the summed float32 samples are scanned for values beyond ±1. If any exceed full scale, a warning states how far over they are (for example, 1 dB over). There are two choices: cancel the bounce, or lower the entire mix by the detected overage and then bounce.</p>
+          <p>16-bit mixdown is not recommended. Use 24-bit or higher. 16-bit mixdown is still allowed.</p>
+          <p>The mixdown path does not dither. At 16-bit, fades and reverb tails are plain rounding.</p>
+          <p>Before the mixdown is written, the summed float32 samples are scanned for values beyond ±1. If any exceed full scale, a warning states how far over they are (for example, 1 dB over). There are two choices: cancel the mixdown, or lower the entire mix by the detected overage and then mix down.</p>
         </div>
         <h4>Export</h4>
         <ul>
@@ -643,7 +646,7 @@
         <ul>
           <li><kbd>Ctrl</kbd>+click toggles, <kbd>Shift</kbd>+click selects a range, and <kbd>Ctrl</kbd>+<kbd>A</kbd> while the pointer is over the tab bar or a tile file-name strip selects all. Selected tabs and tile strips are highlighted. <kbd>Esc</kbd> deselects.</li>
           <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> selects every tab regardless of the pointer position or tiling. While the tile search filter is active, only the tabs the search matched. Tile strips use the same multi-select.</li>
-          <li>With a selection, the right-click menu keeps Close Other / Right / Left, and becomes “Close Selected/All Tabs” / “Bounce Selected Files” / “Duplicate Selected Files” / “Delete Selected Files” / “Paste Copied Edits to Selected/All Tabs” / “Export Selected Tabs as Wave / MP3” / “Export Selected Tabs Separated by Markers / Regions” / “Export Selected Tabs by Channel”. When every tab is selected, those labels switch to “Export Selected Files …”.</li>
+          <li>With a selection, the right-click menu keeps Close Other / Right / Left, and becomes “Close Selected/All Tabs” / “Mixdown” / “Duplicate Selected Files” / “Delete Selected Files” / “Paste Copied Edits to Selected/All Tabs” / “Export Selected Tabs as Wave / MP3” / “Export Selected Tabs Separated by Markers / Regions” / “Export Selected Tabs by Channel”. When every tab is selected, those labels switch to “Export Selected Files …”.</li>
           <li><kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. A dim overlay blocks the UI and shows an overall bar plus a bar per tab.</li>
         </ul>
         <h4>When the bar is full</h4>
@@ -680,7 +683,7 @@
           <li>Covered tiles cannot be used. Clicking does not activate them, and <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd> / <kbd>PageDown</kbd> skip them.</li>
           <li>Changing the text to narrow the filter makes the first matching waveform active (tab order, from the top-left tile). If that file is already active, it stays. If nothing matches, the active file is left unchanged. Clearing the text to remove the filter also leaves the active file.</li>
           <li>Confirming the search never selects tabs by itself. Changing or confirming the search text also clears any leftover tab multi-selection. Select explicitly with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, which selects only the tabs the search matched while the filter is active.</li>
-          <li>If a new tab added while the filter is active (a bounce or duplicate) has a name that does not match, it is neither brought to the front nor selected — it just stays dimmed. Leaving tile view also resets the search.</li>
+          <li>If a new tab added while the filter is active (a mixdown or duplicate) has a name that does not match, it is neither brought to the front nor selected — it just stays dimmed. Leaving tile view also resets the search.</li>
         </ul>
       </article>
 
@@ -745,7 +748,7 @@
 
       <article class="part" id="layout-meters">
         <h3>Spectrum / loudness / meters / vector scope</h3>
-        <p>A view of the playback output.</p>
+        <p>A view of the playback output. With VST inserts loaded, meters take the post-plugin signal so they match what you hear.</p>
         <h4>Monitor column (BPM / MONO / DIM / LC)</h4>
         <p class="where">Between loudness and the spectrum. Same in the editor and the player.</p>
         <ul>
@@ -785,6 +788,20 @@
         </ul>
       </article>
 
+      <article class="part" id="layout-vst">
+        <h3>VST inserts</h3>
+        <p class="where">Left of loudness in the editor. Up to 8 slots (4+4). Hard-bypassed in the player.</p>
+        <ul>
+          <li>Pick from the Recognized list built on the Settings <a href="#settings-vst">VST</a> tab (click an empty slot, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd>). Candidates that do not fit the file’s channel count are hidden.</li>
+          <li>Click a filled slot for the GUI; the same shortcut closes it when open. <kbd>Ctrl</kbd>+click toggles bypass. Right-click for Insert / Insert to All Tabs / Bypass / Persist / Remove, and so on.</li>
+          <li>Drag to an empty slot to move, or swap two occupied slots. Persisted slots stay on the same index across every open tab.</li>
+          <li><strong>Persist</strong> — remembers the plug-in, parameters, and bypass for every open tab and the next launch. Clear it from the right-click menu.</li>
+          <li><strong>Include Tail</strong> (left of the rack, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) — when bouncing, extend the waveform until effect tails die out; off keeps the original length.</li>
+          <li><strong>Bounce Selected</strong> (toolbar / Export menu / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) — bakes inserts into the waveform on the selected tabs (or the active tab) and bypasses those slots. Editor only. Undoable. Separate from <a href="#layout-tabs">Mixdown</a> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), which stacks tabs.</li>
+          <li>Some plug-ins (for example Altiverb) will not load under a debugger. Launch the exe without a debugger from Visual Studio / Cursor.</li>
+        </ul>
+      </article>
+
       <article class="part" id="layout-waapi">
         <h3>WAAPI bar</h3>
         <p>Connection, destination, <span class="ui">Play -E</span>, <span class="ui">Auto Active</span>, <span class="ui">EXPORT</span>.</p>
@@ -804,7 +821,7 @@
 
       </div>
       <div class="note">
-        <p>The selected tabs are stacked into a new Wave. Plugins and effects are not applied. If the sum exceeds ±1, a warning appears before writing and you can cancel or lower the whole mix first (<a href="#layout-tabs">Tabs → Bounce</a>). Files of different length are lined up before stacking.</p>
+        <p>The selected tabs are stacked into a new Wave. Per-tab VST inserts are not applied (to bake inserts into the waveform, see <a href="#layout-vst">VST inserts → Bounce</a>). If the sum exceeds ±1, a warning appears before writing and you can cancel or lower the whole mix first (<a href="#layout-tabs">Tabs → Mixdown</a>). Files of different length are lined up before stacking.</p>
       </div>
 
       <h2 id="playback">4. Playback</h2>
@@ -1097,7 +1114,7 @@
       </div>
 
       <h2 id="settings">10. Settings and language</h2>
-      <p>Settings are the gear on the toolbar, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
+      <p>Settings are the gear on the toolbar, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / Wwise / VST. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
       <ul>
         <li>Language is on General. The default is <span class="ui">Auto</span> (Japanese if the PC is Japanese, otherwise English). The Japanese UI may still show some English labels.</li>
         <li>Wallpaper is also on General. None by default. It covers the window over the animated background while keeping its aspect ratio. Details are under <a href="#layout-settings">Layout → Settings</a>.</li>
@@ -1130,6 +1147,15 @@
         </tbody>
       </table>
       <p>This matches 5.1 (L / R / C / LFE / Ls / Rs). Atmos height speakers or unusual layouts can come out unbalanced.</p>
+
+      <h3 id="settings-vst">10-3. VST</h3>
+      <p>VST3 search folders and the list of plug-ins available for inserts. How the rack works is under <a href="#layout-vst">Layout → VST inserts</a>.</p>
+      <ul>
+        <li><strong>Use Cubase / Nuendo plug-in cache</strong> — when on, candidates come from Steinberg’s host cache so you can skip adding search folders.</li>
+        <li><strong>VST3 search folders</strong> — empty means the default folders. Add / remove / reorder with the buttons.</li>
+        <li><strong>Scan</strong> — rebuilds the list only when you press it (opening Settings does not scan). Instruments and OnlyARA go to Not recognized automatically. Failed or instrument entries can still be forced with Add &gt;&gt; (re-checked on the next scan).</li>
+        <li><strong>Recognized / Not recognized</strong> — controls what appears in the insert picker. Clear list empties it until you scan again.</li>
+      </ul>
 
       <h2 id="spectrogram">11. Spectrogram / loudness analysis</h2>
       <h3>Switching</h3>
@@ -1191,6 +1217,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Show / hide the WAAPI bar (<strong>editor only</strong>; off in the player)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E (only while the WAAPI bar is visible; <strong>editor only</strong>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active (only while the WAAPI bar is visible; no underline on the label; <strong>editor only</strong>)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (VST insert rack; extend / cut tails on bounce; <strong>editor only</strong>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start (while tile search has focus, closes non-matching tiles instead)</td></tr>
         </tbody>
       </table>
@@ -1208,7 +1235,8 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save as (with several tabs selected, pick a folder, write each as Wave, and point the tabs at those files)</td></tr>
           <tr><td><kbd>F2</kbd></td><td>Rename the file (double-clicking the file name on a tab / tile strip, tab right-click → Rename File (N), or waveform right-click → File → Rename File (F) does the same)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate the file (opens in the next tab)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; only when formats match; if the sum exceeds ±1, cancel or lower the mix before writing; same key and menu gesture in the player)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>Mixdown two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; only when formats match; if the sum exceeds ±1, cancel or lower the mix before writing; same key and menu gesture in the player; per-tab VST inserts are not applied)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; <strong>editor only</strong>; selected tabs, or the active tab; see <a href="#layout-vst">VST inserts</a>)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Export MP3 (selected tabs, or the current tab; selected playlist rows in the player; does not save; waveform right-click → Export)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Quit (tabs left open and unsaved working copies come back on the next launch)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if unsaved; several unsaved tabs can be finished together)</td></tr>
@@ -1312,7 +1340,7 @@
 
       <h3 id="shortcuts-edit">Edit</h3>
       <p>With multiple tabs selected, fade / normalize (incl. per region) / volume / pitch / time stretch / reverse / insert silence / Silence &amp; Hit Detection / sample-rate, bit-depth and channel conversion apply to every selected file. Save (<kbd>Ctrl</kbd>+<kbd>S</kbd>) and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) do the same (menu names change to “… Selected Files”; Silence &amp; Hit Detection only confirms then applies the current settings; insert silence uses the click on the active file, or the playhead for <kbd>Ctrl</kbd>+<kbd>Ins</kbd>, and each other file’s playhead; files the edit cannot apply to are skipped; a dim overlay shows progress and blocks input while running).</p>
-      <p>In the player (<kbd>F10</kbd>), the same family of destructive edits can run on multiple files from the playlist right-click, but listening comes first — an accidental destructive edit cannot be undone, so <strong>the destructive keys in the table below (I / O / X / N / R / P / T / S / B / C / Delete / Shift+Delete / Ctrl+D / Ctrl+Ins, and similar) do not run in the player</strong> (gesture text is hidden on the menu too; exceptions: bounce <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> work from the key and keep their menu gestures; plain <kbd>V</kbd> stays off in the player — see <a href="#layout-player">Player mode → Destructive playlist edits</a>).</p>
+      <p>In the player (<kbd>F10</kbd>), the same family of destructive edits can run on multiple files from the playlist right-click, but listening comes first — an accidental destructive edit cannot be undone, so <strong>the destructive keys in the table below (I / O / X / N / R / P / T / S / B / C / Delete / Shift+Delete / Ctrl+D / Ctrl+Ins, and similar) do not run in the player</strong> (gesture text is hidden on the menu too; exceptions: Mixdown <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> work from the key and keep their menu gestures; plain <kbd>V</kbd> stays off in the player — see <a href="#layout-player">Player mode → Destructive playlist edits</a>).</p>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
@@ -1330,11 +1358,23 @@
           <tr><td><kbd>Shift</kbd>+<kbd>Delete</kbd></td><td>Silence the selection. The dialog chooses the default edge fade (on by default; Enter applies, Esc cancels. Length and markers stay. Also on right-click → Edit. Does nothing in the player)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> / right-click → Audio → Silence &amp; Hit Detection</td><td>Delete silence / add regions / add markers / hit points (selection, or the whole file). Dialog for thresholds, gate timing, and cut fades; hit mode also has rise ratio 5–100% (default 20%). Settings are remembered. Independent of Silent Skip and the click-prevention fade. Default threshold −5 dB. With several tabs selected, confirmation only</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Ins</kbd> / right-click → Edit → Insert Silence</td><td>Insert the given seconds at the playhead (right-click uses the click; ↑↓ / wheel: 0.1 s, Shift 1 s, Ctrl 10 s, Ctrl+Shift 60 s; Enter inserts; 0.001–600 s). Default fade on both sides is on and uses the Settings click-prevention fade. Other selected tabs use each playhead</td></tr>
-          <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (in the player, destructive edits are available from the playlist; destructive edit keys stay off; bounce <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
+          <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (in the player, destructive edits are available from the playlist; destructive edit keys stay off; Mixdown <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd></td><td>Cut / copy / paste (markers in range included; a matching region is included too). With tabs selected, <kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to those tabs (a dim overlay and progress when it takes time)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo an edit (in the player, disposable A-B and temporary markers only; <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo an edit (in the player, disposable A-B and temporary markers only)</td></tr>
           <tr><td><kbd>U</kbd></td><td>Edit history</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="shortcuts-vst">VST inserts</h3>
+      <p><strong>Editor only</strong> (the player hard-bypasses the rack and ignores these keys). See <a href="#layout-vst">Layout → VST inserts</a>.</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd></td><td>Slot action: empty = pick a plug-in; bypassed = clear bypass; filled = open / close the GUI</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (extend / cut tails when bouncing)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+click (slot)</td><td>Toggle bypass</td></tr>
         </tbody>
       </table>
 
@@ -1396,7 +1436,7 @@
           <tr><td>Right-click a flag / loop bar</td><td>Delete</td></tr>
           <tr><td>Right-click (waveform) → Audio → Silence &amp; Hit Detection</td><td>Same as <kbd>Ctrl</kbd>+<kbd>D</kbd> (delete silence / regions / markers / hit points; rise ratio in hit mode; independent of Silent Skip)</td></tr>
           <tr><td>Right-click (waveform) → Edit → Insert Silence</td><td>Same as <kbd>Ctrl</kbd>+<kbd>Ins</kbd> (key uses the playhead; right-click uses the click; ↑↓ / wheel for seconds; Enter inserts)</td></tr>
-          <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (pointer position on the waveform, or the playhead; in the player, destructive edits are available from the playlist; destructive edit keys stay off; bounce <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
+          <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (pointer position on the waveform, or the playhead; in the player, destructive edits are available from the playlist; destructive edit keys stay off; Mixdown <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click a tab / tile strip</td><td>Toggle that tab in the selection</td></tr>
           <tr><td><kbd>Shift</kbd>+click a tab / tile strip</td><td>Range-select tabs</td></tr>
           <tr><td>Right-click a tab</td><td>
@@ -1404,9 +1444,9 @@
               <li>Close this / others / right / left / all. Rename, copy file name / full path, duplicate, delete the file. Select all. Reopen. <span class="ui">Color</span> (a manual filename color; see <a href="#layout-filename-color">Filename colors</a>).</li>
               <li>Show all file times (table: copy / range copy / CSV / PDF; with multiple tabs selected, only the selected files). Copy selection time (also with full path).</li>
               <li>Tiling (keep tabs, side by side, stacked, grid). Find Tabs / Clear Tab Search. Export Wave or MP3. Separate by markers or regions. Export by channel.</li>
-              <li>With a selection, others / right / left stay, and the menu offers close, bounce (choose where to save, then the mixed Wave opens to the right), duplicate or delete, paste history, file times, and export for those tabs. When every tab is selected, export labels read “Export Selected Files …”.</li>
-              <li>Waveform right-click → Tabs mirrors close / select all / reopen / file times / tiling with the same letters, and adds next / previous tab, Find Tabs, and Clear Tab Search. Bounce and export are under waveform → Export; rename / duplicate / delete under waveform → File.</li>
-              <li>Tab-menu letters: <kbd>S</kbd> / <kbd>O</kbd> / <kbd>R</kbd> / <kbd>L</kbd> / <kbd>X</kbd> / <kbd>F</kbd> / <kbd>E</kbd> / <kbd>P</kbd> / <kbd>U</kbd> / <kbd>D</kbd> / <kbd>A</kbd> / <kbd>T</kbd> / <kbd>I</kbd> / <kbd>K</kbd> / <kbd>Q</kbd> / <kbd>V</kbd> (paste history while selected) / <kbd>B</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> / <kbd>F</kbd> (Find Tabs) / <kbd>Z</kbd> / <kbd>W</kbd> / <kbd>M</kbd> / <kbd>H</kbd> / <kbd>G</kbd> / <kbd>C</kbd> / <kbd>J</kbd>.</li>
+              <li>With a selection, others / right / left stay, and the menu offers close, Mixdown (choose where to save, then the mixed Wave opens to the right), duplicate or delete, paste history, file times, and export for those tabs. When every tab is selected, export labels read “Export Selected Files …”.</li>
+              <li>Waveform right-click → Tabs mirrors close / select all / reopen / file times / tiling with the same letters, and adds next / previous tab, Find Tabs, and Clear Tab Search. Mixdown and export are under waveform → Export; rename / duplicate / delete under waveform → File.</li>
+              <li>Tab-menu letters: <kbd>S</kbd> / <kbd>O</kbd> / <kbd>R</kbd> / <kbd>L</kbd> / <kbd>X</kbd> / <kbd>F</kbd> / <kbd>E</kbd> / <kbd>P</kbd> / <kbd>U</kbd> / <kbd>D</kbd> / <kbd>A</kbd> / <kbd>T</kbd> / <kbd>I</kbd> / <kbd>K</kbd> / <kbd>Q</kbd> / <kbd>V</kbd> (paste history while selected) / <kbd>B</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> / <kbd>F</kbd> (Find Tabs) / <kbd>Z</kbd> / <kbd>W</kbd> / <kbd>M</kbd> / <kbd>H</kbd> / <kbd>G</kbd> / <kbd>C</kbd>.</li>
             </ul>
           </td></tr>
         </tbody>
@@ -1591,7 +1631,7 @@
           <tr><td><kbd>Ctrl</kbd>+top-row / <kbd>Ctrl</kbd>+numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to a marker number when temporary markers exist (audio waveform / real video playback / F8 / frame pause; two digits OK; the dim preview does not jump)</td></tr>
           <tr><td><kbd>Shift</kbd>+top-row <kbd>0</kbd>–<kbd>9</kbd></td><td>Does nothing (the player does not jump to the file's regions; region-number jumps are editor-only). Tree <kbd>Shift</kbd>+<kbd>8</kbd> still expands the subtree</td></tr>
           <tr><td><kbd>Alt</kbd>+numpad <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump by view percent (same as unmodified top-row digits; 0 = start, 9 = 90%; unmodified numpad stays transport)</td></tr>
-          <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same as right-click on the tree, Favorites, and playlist. Destructive edits are available from the playlist (destructive edit keys stay off; bounce <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
+          <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same as right-click on the tree, Favorites, and playlist. Destructive edits are available from the playlist (destructive edit keys stay off; Mixdown <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>Remove selected rows from the list (files are never deleted; when the list has keyboard focus. <kbd>Ctrl</kbd>+<kbd>W</kbd> does not close. Disabled during real video playback / bright PDF view and other chrome-hidden states). When Favorites has focus, removes the registration only</td></tr>
           <tr><td>Tree <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate a non-root folder into the same parent (roots cannot be duplicated; <kbd>Ctrl</kbd>+<kbd>D</kbd> is not used). The name is the original name, a space, and a number (for example, Name 2)</td></tr>
           <tr><td>Playlist <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate every selected file (one or many; <kbd>Ctrl</kbd>+<kbd>D</kbd> is not used). The suffix matches folder duplicate</td></tr>
@@ -1634,6 +1674,7 @@
         <li>In-app preview is a guide. Always check the result in Wwise after EXPORT.</li>
         <li>You cannot write AIFF. Choose Wave or MP3. Wave writes 8 / 16 / 24-bit, and keeps 32-bit when the file already is (4-bit is for listening and is saved as 16-bit).</li>
         <li>Multichannel MP3 is the stereo mix you hear now.</li>
+        <li>VST3 support targets effect plug-ins. Instruments and OnlyARA stay out of Recognized by default. Not every plug-in is guaranteed to work; some will not load under a debugger.</li>
         <li>EXPORT changes the Wwise project. Back up first.</li>
       </ul>
 
