@@ -12,7 +12,7 @@ Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, a
 
 **Several files can be tiled for comparison, not just tabbed.** Shift+T cycles side by side → stacked → grid → off (skips layouts that will not fit; Ctrl+T is Trim). The right-click menu picks one directly. A setting chooses the default arrangement applied after opening multiple files. While tiled, Ctrl+F searches tab names (space = AND, `|` = OR) and dims non-matching tiles under frosted glass. Alt+Enter closes tiles that did not match (keeps unsaved; no prompt; clears the filter).
 
-**The editor hosts VST3 inserts** (Ctrl+Shift+1–8, Bounce = Ctrl+Shift+B; asks whether to keep tails). Mixdown is Ctrl+Shift+X (warns when inserts are active). See the manual for details.
+**The editor hosts VST3 inserts** (Ctrl+Shift+1–8, Bounce = Ctrl+Shift+B; asks whether to keep tails; Cancel aborts). Mixdown is Ctrl+Shift+X (warns when inserts are active). See the manual for details.
 
 **EXPORT talks to Wwise in Wave-only mode.** Turn on WAAPI above the level meter, pick a destination, and EXPORT writes the source wave into Originals and imports it as a Music Playlist Container (-A / -L / -E and the sample loop; markers are not Custom Cues). Play -E previews the loop wrap and writes Play post-exit on EXPORT.
 

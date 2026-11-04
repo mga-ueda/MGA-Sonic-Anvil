@@ -946,14 +946,6 @@ internal sealed class VstInsertEngine : IDisposable
         }
     }
 
-    public bool IsSlotBypassed(int index)
-    {
-        lock (_gate)
-        {
-            return (uint)index < (uint)_bypass.Length && _bypass[index];
-        }
-    }
-
     public IVstSlotProcessor? TryGetLive(int index)
     {
         lock (_gate)
