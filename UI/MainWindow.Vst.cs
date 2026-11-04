@@ -981,6 +981,7 @@ public partial class MainWindow
             if (existing.IsVisible && titleMatches)
             {
                 existing.Activate();
+                ForegroundActivation.RaiseInTopmostBand(existing);
                 return;
             }
 
@@ -1033,6 +1034,7 @@ public partial class MainWindow
         }
 
         // Owner 無し（所有関係は子ダイアログとデッドロックしやすい）。前面には Topmost で出す。
+        // ホストのフルスクリーン Topmost と帯が競合するので、Show 後と ApplyWindowTopmost 後に RaiseInTopmostBand する。
         // 初回はアプリ中央、再オープンはセッション内の前回位置。見切れは PlaceFloating 側で押す。
         var hasRemembered = _vstEditorPositions.TryGetValue(slotIndex, out var remembered);
         var window = new VstPluginEditorWindow(null, session)
@@ -1070,6 +1072,7 @@ public partial class MainWindow
             window.Show();
             window.ApplyPlacement();
             window.Activate();
+            ForegroundActivation.RaiseInTopmostBand(window);
         }
         catch
         {
@@ -1087,6 +1090,33 @@ public partial class MainWindow
                 UiStrings.AppName,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>
+    /// 開いている VST エディタをホストより手前の Topmost 帯へ押し上げる（フォーカスは奪わない）。
+    /// </summary>
+    private void RaiseOpenVstEditorsAboveShell()
+    {
+        if (_vstEditors.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var window in _vstEditors.Values)
+        {
+            try
+            {
+                if (!window.IsVisible)
+                {
+                    continue;
+                }
+
+                ForegroundActivation.RaiseInTopmostBand(window);
+            }
+            catch
+            {
+            }
         }
     }
 

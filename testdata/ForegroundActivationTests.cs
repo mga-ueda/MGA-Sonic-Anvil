@@ -36,6 +36,33 @@ public sealed class ForegroundActivationTests
         });
     }
 
+    [Fact]
+    public void RaiseInTopmostBand_ForcesTopmostWithoutHiding()
+    {
+        RunSta(() =>
+        {
+            var window = new Window
+            {
+                Width = 120,
+                Height = 80,
+                WindowStyle = WindowStyle.ToolWindow,
+                ShowInTaskbar = false,
+                Topmost = false,
+            };
+            try
+            {
+                window.Show();
+                ForegroundActivation.RaiseInTopmostBand(window);
+                Assert.True(window.Topmost);
+                Assert.True(window.IsVisible);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
     private static void RunSta(Action action)
     {
         Exception? error = null;

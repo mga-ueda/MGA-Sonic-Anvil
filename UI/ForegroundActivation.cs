@@ -82,6 +82,39 @@ internal static class ForegroundActivation
         window.Topmost = keepTop;
     }
 
+    /// <summary>
+    /// 既に Topmost の窓を、同じ最前面帯の先頭へ上げる（アクティブは奪わない）。
+    /// ホストがフルスクリーンで Topmost になったあとに、プラグイン GUI が背後へ回るのを防ぐ。
+    /// </summary>
+    internal static void RaiseInTopmostBand(Window window)
+    {
+        if (!window.IsVisible)
+        {
+            return;
+        }
+
+        if (!window.Topmost)
+        {
+            window.Topmost = true;
+        }
+
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        // Topmost=true 済みだと依存プロパティの再代入は no-op なので、Win32 で帯内 Z 順だけ上げる。
+        SetWindowPos(
+            hwnd,
+            HwndTopmost,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoActivate);
+    }
+
     private static void TryAttachAndForeground(IntPtr hwnd)
     {
         var foreground = GetForegroundWindow();
@@ -138,6 +171,21 @@ internal static class ForegroundActivation
         public uint Count;
         public uint Timeout;
     }
+
+    private static readonly IntPtr HwndTopmost = new(-1);
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoActivate = 0x0010;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        IntPtr hwnd,
+        IntPtr hwndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        uint flags);
 
     [DllImport("user32.dll")]
     private static extern bool AllowSetForegroundWindow(int processId);
