@@ -350,6 +350,21 @@ internal static class DesignMetrics
     /// <summary>履歴プレビュー1行。</summary>
     public static double HistoryStripRowHeight => From96(14);
 
+    /// <summary>編集履歴オーバーレイの既定幅。</summary>
+    public static double EditHistoryOverlayDefaultWidth => From96(420);
+
+    /// <summary>編集履歴オーバーレイの既定高さ。</summary>
+    public static double EditHistoryOverlayDefaultHeight => From96(480);
+
+    /// <summary>編集履歴オーバーレイの最小幅。</summary>
+    public static double EditHistoryOverlayMinWidth => From96(280);
+
+    /// <summary>編集履歴オーバーレイの最小高さ。</summary>
+    public static double EditHistoryOverlayMinHeight => From96(200);
+
+    /// <summary>編集履歴オーバーレイ右下のリサイズつまみ。</summary>
+    public static double EditHistoryOverlayResizeGrip => From96(14);
+
     /// <summary>ラウドネスの Consolas 12 で約1文字。左右余白に使う。</summary>
     public static double LoudnessMeterCharWidth => From96(7);
 
