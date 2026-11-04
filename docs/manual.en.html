@@ -793,6 +793,7 @@
         <p class="where">Left of loudness in the editor. Up to 8 slots (4+4). Hard-bypassed in the player.</p>
         <ul>
           <li>Pick from the Recognized list built on the Settings <a href="#settings-vst">VST</a> tab (click an empty slot, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd>). Candidates that do not fit the file’s channel count are hidden.</li>
+          <li>The picker is a vendor / category tree. Focus starts in the search box (same syntax as the library: space = AND, <code>|</code> = OR, quotes, <code>*</code> / <code>?</code>). Matching text is highlighted in yellow. Vendor view also matches vendor names; category view also matches category nodes (not the other way around). <kbd>↓</kbd> moves to the tree; <kbd>Ctrl</kbd>+<kbd>F</kbd> / <kbd>Alt</kbd>+<kbd>F</kbd> return to search. <kbd>↑</kbd> on the first tree row and <kbd>↓</kbd> on the last also return to search. Keys: <a href="#shortcuts-vst">Shortcuts → VST inserts</a>.</li>
           <li>Click a filled slot for the GUI; the same shortcut closes it when open. <kbd>Ctrl</kbd>+click toggles bypass. Right-click for Insert / Insert to All Tabs / Bypass / Persist / Remove, and so on.</li>
           <li>Drag to an empty slot to move, or swap two occupied slots. Persisted slots stay on the same index across every open tab.</li>
           <li><strong>Persist</strong> — remembers the plug-in, parameters, and bypass for every open tab and the next launch. Clear it from the right-click menu.</li>
@@ -1375,6 +1376,18 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (extend / cut tails when bouncing; on by default)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click (slot)</td><td>Toggle bypass</td></tr>
+        </tbody>
+      </table>
+      <p>While the plug-in picker dialog is open</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd> / <kbd>Alt</kbd>+<kbd>F</kbd></td><td>Focus the search box (select all). Search is focused when the dialog opens</td></tr>
+          <tr><td><kbd>↓</kbd> in search</td><td>Move to the tree (first matching plug-in while filtering)</td></tr>
+          <tr><td><kbd>↑</kbd> on the first tree row / <kbd>↓</kbd> on the last</td><td>Return to search</td></tr>
+          <tr><td>Typing in search</td><td>Same filter syntax as the library (space = AND, <code>|</code> = OR, quotes, <code>*</code> / <code>?</code>). Hits highlighted in yellow</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Clear typeahead if any → clear search text if any → otherwise close</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Accept the selected plug-in (or expand a group)</td></tr>
         </tbody>
       </table>
 

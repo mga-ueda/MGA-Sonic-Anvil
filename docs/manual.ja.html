@@ -847,6 +847,7 @@
         <p class="where">エディタのラウドネス左。最大 8 スロット（左右 4+4）。プレイヤーでは聴感用にバイパスします。</p>
         <ul>
           <li>設定の <a href="#settings-vst">VST</a> タブでスキャンした「認識する」一覧から、空スロットへ挿せます（クリック、または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+上段 <kbd>1</kbd>–<kbd>8</kbd>）。チャンネル数に合わない候補は選べません。</li>
+          <li>選択ダイアログはメーカー名／種別のツリーです。開くと検索欄にフォーカスします（ライブラリと同じ空白 AND、<code>|</code> OR、引用、<code>*</code>／<code>?</code>）。ヒット語は黄色く強調。メーカー表示ではメーカー名、種別表示では種別ノード名も対象（交差しない）。<kbd>↓</kbd> でツリーへ、<kbd>Ctrl</kbd>+<kbd>F</kbd>／<kbd>Alt</kbd>+<kbd>F</kbd> で検索欄へ戻ります。ツリー先頭の <kbd>↑</kbd>／末尾の <kbd>↓</kbd> も検索欄へ。くわしいキーは <a href="#shortcuts-vst">ショートカット → VST インサート</a>。</li>
           <li>使用中スロットはクリックで GUI。もう一度のショートカットで閉じます。<kbd>Ctrl</kbd>+クリックでバイパス。右クリックでインサート／全てのタブにインサート／バイパス／永続化／削除など。</li>
           <li>スロットを空きへドラッグで移動、使用中どうしは入れ替えます。永続化したスロットは全タブ共通で同じ番号へ追従します。</li>
           <li><strong>永続化</strong> …… プラグイン・パラメータ・バイパスを覚えて、開いている全タブと次回起動にも載せます。解除は右クリックから。</li>
@@ -1445,6 +1446,18 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail（バウンス時にテールで伸ばす／切る。既定オン）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>選択ファイルをバウンス（インサートを波形へ焼き込み、対象スロットをバイパス）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+クリック（スロット）</td><td>バイパスの切替</td></tr>
+        </tbody>
+      </table>
+      <p>プラグイン選択ダイアログが開いているとき</p>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd>／<kbd>Alt</kbd>+<kbd>F</kbd></td><td>検索欄をアクティブ（全選択）。開いた直後も検索欄</td></tr>
+          <tr><td>検索欄で <kbd>↓</kbd></td><td>ツリーへ（絞り込み中は先頭のヒットプラグイン）</td></tr>
+          <tr><td>ツリー先頭で <kbd>↑</kbd>／末尾で <kbd>↓</kbd></td><td>検索欄へ戻る</td></tr>
+          <tr><td>検索欄の文字</td><td>ライブラリと同じ絞り込み（空白 AND、<code>|</code> OR、引用、<code>*</code>／<code>?</code>）。ヒットは黄色強調</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>タイプアヘッドがあれば解除 → 検索文字があれば空に → どちらも無ければ閉じる</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>選択中のプラグインを決定（グループなら展開）</td></tr>
         </tbody>
       </table>
 
