@@ -452,6 +452,12 @@ internal sealed class AppSettings
     /// <summary>閉じたときの高さ。次回復元する。</summary>
     public int SettingsWindowHeight { get; set; }
 
+    /// <summary>編集履歴オーバーレイの幅。0 なら既定。</summary>
+    public int EditHistoryOverlayWidth { get; set; }
+
+    /// <summary>編集履歴オーバーレイの高さ。0 なら既定。</summary>
+    public int EditHistoryOverlayHeight { get; set; }
+
     /// <summary>色設定ウィンドウの位置。未保存なら false（初回はアプリ中央）。</summary>
     public bool ColorPanelHasPosition { get; set; }
 

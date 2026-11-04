@@ -3,7 +3,9 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Threading;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
 
@@ -30,8 +32,10 @@ internal sealed class EditHistoryOverlay : Border
 
     public EditHistoryOverlay()
     {
-        Width = 340;
-        MaxHeight = 360;
+        MinWidth = DesignMetrics.EditHistoryOverlayMinWidth;
+        MinHeight = DesignMetrics.EditHistoryOverlayMinHeight;
+        Width = DesignMetrics.EditHistoryOverlayDefaultWidth;
+        Height = DesignMetrics.EditHistoryOverlayDefaultHeight;
         Padding = new Thickness(0, 0, 0, 6);
         // 塗りは DWM Acrylic ティント。枠だけ描く。
         Background = Brushes.Transparent;
@@ -69,7 +73,6 @@ internal sealed class EditHistoryOverlay : Border
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            MaxHeight = 300,
             Content = _items,
         };
 
@@ -81,12 +84,16 @@ internal sealed class EditHistoryOverlay : Border
             _hint.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
         };
 
-        var root = new DockPanel();
+        var body = new DockPanel();
         DockPanel.SetDock(caption, Dock.Top);
         DockPanel.SetDock(_hint, Dock.Top);
-        root.Children.Add(caption);
-        root.Children.Add(_hint);
-        root.Children.Add(_scroll);
+        body.Children.Add(caption);
+        body.Children.Add(_hint);
+        body.Children.Add(_scroll);
+
+        var root = new Grid();
+        root.Children.Add(body);
+        root.Children.Add(CreateResizeGrip());
         Child = root;
     }
 
@@ -94,12 +101,19 @@ internal sealed class EditHistoryOverlay : Border
     {
         ArgumentNullException.ThrowIfNull(placementTarget);
         EnsureAcrylicHost(placementTarget);
+        ApplySavedSize();
         Visibility = Visibility.Visible;
-        _acrylicHost!.IsOpen = true;
+        // まず中央に出してから Absolute で左上を固定（リサイズが普通の窓と同じになる）。
+        _acrylicHost!.Placement = PlacementMode.Center;
+        _acrylicHost.HorizontalOffset = 0;
+        _acrylicHost.VerticalOffset = 0;
+        _acrylicHost.IsOpen = true;
+        Dispatcher.BeginInvoke(PinTopLeftAbsolute, DispatcherPriority.Loaded);
     }
 
     public void Close()
     {
+        PersistSize();
         if (_acrylicHost is not null)
         {
             _acrylicHost.IsOpen = false;
@@ -160,6 +174,7 @@ internal sealed class EditHistoryOverlay : Border
                 FontSize = 12,
                 FontFamily = new FontFamily("Consolas"),
                 TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = item.Title,
                 Foreground = copying && !selected
                     ? copyMark
                     : selected ? selectedFore : future ? futureFore : idleFore,
@@ -181,6 +196,148 @@ internal sealed class EditHistoryOverlay : Border
         }
 
         selectedRow?.BringIntoView();
+    }
+
+    private Thumb CreateResizeGrip()
+    {
+        var gripSize = DesignMetrics.EditHistoryOverlayResizeGrip;
+        var thumb = new Thumb
+        {
+            Width = gripSize,
+            Height = gripSize,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Cursor = Cursors.SizeNWSE,
+            Focusable = false,
+            Margin = new Thickness(0, 0, 2, 2),
+            Template = CreateGripTemplate(gripSize),
+        };
+        thumb.DragDelta += (_, e) => ResizeBy(e.HorizontalChange, e.VerticalChange);
+        thumb.DragCompleted += (_, _) => PersistSize();
+        return thumb;
+    }
+
+    private static ControlTemplate CreateGripTemplate(double size)
+    {
+        var template = new ControlTemplate(typeof(Thumb));
+        var root = new FrameworkElementFactory(typeof(Grid));
+        var hit = new FrameworkElementFactory(typeof(Border));
+        hit.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        root.AppendChild(hit);
+
+        var canvas = new FrameworkElementFactory(typeof(Canvas));
+        canvas.SetValue(WidthProperty, size);
+        canvas.SetValue(HeightProperty, size);
+        canvas.SetValue(IsHitTestVisibleProperty, false);
+        AppendGripLineFactory(canvas, size, inset: 4);
+        AppendGripLineFactory(canvas, size, inset: 8);
+        root.AppendChild(canvas);
+        template.VisualTree = root;
+        return template;
+    }
+
+    private static void AppendGripLineFactory(FrameworkElementFactory canvas, double size, double inset)
+    {
+        var line = new FrameworkElementFactory(typeof(Line));
+        line.SetValue(Line.X1Property, inset);
+        line.SetValue(Line.Y1Property, size - 2);
+        line.SetValue(Line.X2Property, size - 2);
+        line.SetValue(Line.Y2Property, inset);
+        line.SetValue(Shape.StrokeThicknessProperty, 1.0);
+        line.SetResourceReference(Shape.StrokeProperty, "MutedForeBrush");
+        line.SetValue(UIElement.OpacityProperty, 0.7);
+        canvas.AppendChild(line);
+    }
+
+    private void ResizeBy(double dx, double dy)
+    {
+        // Absolute 固定後に幅・高さだけ変える（左上は固定、右下へ伸びる）。
+        if (_acrylicHost is { Placement: not PlacementMode.Absolute })
+        {
+            PinTopLeftAbsolute();
+        }
+
+        var max = MaxPanelSize();
+        Width = Math.Clamp(Width + dx, MinWidth, max.Width);
+        Height = Math.Clamp(Height + dy, MinHeight, max.Height);
+    }
+
+    /// <summary>
+    /// 画面上の左上を Absolute に固定する。Center のままだとリサイズで全体が動く。
+    /// </summary>
+    private void PinTopLeftAbsolute()
+    {
+        if (_acrylicHost is null || !_acrylicHost.IsOpen)
+        {
+            return;
+        }
+
+        Point screen;
+        try
+        {
+            screen = PointToScreen(new Point(0, 0));
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+
+        var dip = ScreenPixelsToDip(screen);
+        _acrylicHost.Placement = PlacementMode.Absolute;
+        _acrylicHost.HorizontalOffset = dip.X;
+        _acrylicHost.VerticalOffset = dip.Y;
+    }
+
+    private Point ScreenPixelsToDip(Point screenPixels)
+    {
+        var source = PresentationSource.FromVisual(this)
+            ?? (_acrylicHost?.PlacementTarget is Visual target
+                ? PresentationSource.FromVisual(target)
+                : null);
+        if (source?.CompositionTarget is null)
+        {
+            return screenPixels;
+        }
+
+        return source.CompositionTarget.TransformFromDevice.Transform(screenPixels);
+    }
+
+    private void ApplySavedSize()
+    {
+        var settings = AppStorage.Settings;
+        var max = MaxPanelSize();
+        var width = settings.EditHistoryOverlayWidth > 0
+            ? settings.EditHistoryOverlayWidth
+            : DesignMetrics.EditHistoryOverlayDefaultWidth;
+        var height = settings.EditHistoryOverlayHeight > 0
+            ? settings.EditHistoryOverlayHeight
+            : DesignMetrics.EditHistoryOverlayDefaultHeight;
+        Width = Math.Clamp(width, MinWidth, max.Width);
+        Height = Math.Clamp(height, MinHeight, max.Height);
+    }
+
+    private void PersistSize()
+    {
+        var settings = AppStorage.Settings;
+        var width = (int)Math.Round(Width);
+        var height = (int)Math.Round(Height);
+        if (settings.EditHistoryOverlayWidth == width
+            && settings.EditHistoryOverlayHeight == height)
+        {
+            return;
+        }
+
+        settings.EditHistoryOverlayWidth = width;
+        settings.EditHistoryOverlayHeight = height;
+        AppStorage.Save();
+    }
+
+    private static Size MaxPanelSize()
+    {
+        var work = SystemParameters.WorkArea;
+        return new Size(
+            Math.Max(DesignMetrics.EditHistoryOverlayMinWidth, work.Width * 0.9),
+            Math.Max(DesignMetrics.EditHistoryOverlayMinHeight, work.Height * 0.9));
     }
 
     private void EnsureAcrylicHost(UIElement placementTarget)
