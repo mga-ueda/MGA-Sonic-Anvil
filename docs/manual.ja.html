@@ -854,8 +854,7 @@
           <li>使用中スロットはクリックで GUI。もう一度のショートカットで閉じます。<kbd>Ctrl</kbd>+クリックでバイパス。右クリックでインサート／全てのタブにインサート／バイパス／永続化／削除など。</li>
           <li>スロットを空きへドラッグで移動、使用中どうしは入れ替えます。永続化したスロットは全タブ共通で同じ番号へ追従します。</li>
           <li><strong>永続化</strong> …… プラグイン・パラメータ・バイパスを覚えて、開いている全タブと次回起動にも載せます。解除は右クリックから。</li>
-          <li><strong>Include Tail</strong>（ラック左、<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>）…… オンならバウンス時に残響が消えるまで波形を伸ばし、オフなら元の長さで切ります（既定オン）。</li>
-          <li><strong>選択ファイルをバウンス</strong>（ツールバー／書き出しメニュー／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>）…… 選択タブ（無ければアクティブ）のインサートを波形へ焼き込み、対象スロットをバイパスします。エディタのみ。アンドゥ可。タブを重ねる <a href="#layout-tabs">ミックスダウン</a>（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>）とは別です。</li>
+          <li><strong>選択ファイルをバウンス</strong>（ツールバー／書き出しメニュー／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>）…… 選択タブ（無ければアクティブ）のインサートを波形へ焼き込み、対象スロットをバイパスします。実行時にテイルを付加するか確認します（残す／切る。既定は残す）。エディタのみ。アンドゥ可。タブを重ねる <a href="#layout-tabs">ミックスダウン</a>（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>）とは別です。</li>
           <li>一部のプラグイン（例: Altiverb）はデバッガ付きプロセスでは読めません。Visual Studio／Cursor からデバッガ無しで exe を起動する構成を使ってください。</li>
         </ul>
       </article>
@@ -1292,7 +1291,6 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>WAAPI バーの表示切替（<strong>エディタのみ</strong>。プレイヤー中は無効）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E（WAAPI バー表示時のみ。<strong>エディタのみ</strong>）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active（WAAPI バー表示時のみ。ラベルに下線なし。<strong>エディタのみ</strong>）</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail（VST インサートラック。バウンス時のテール伸長。既定オン。<strong>エディタのみ</strong>）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>再生開始位置からやり直し（タイル検索フォーカス中はヒット以外を閉じる）</td></tr>
         </tbody>
       </table>
@@ -1448,8 +1446,7 @@
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+上段 <kbd>1</kbd>–<kbd>8</kbd></td><td>スロット操作。空き＝プラグイン選択、バイパス中＝解除、使用中＝GUI の開閉</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail（バウンス時にテールで伸ばす／切る。既定オン）</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>選択ファイルをバウンス（インサートを波形へ焼き込み、対象スロットをバイパス）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>選択ファイルをバウンス（インサートを波形へ焼き込み、対象スロットをバイパス。実行時にテイルを残すか確認。既定は残す）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+クリック（スロット）</td><td>バイパスの切替</td></tr>
         </tbody>
       </table>

@@ -800,8 +800,7 @@
           <li>Click a filled slot for the GUI; the same shortcut closes it when open. <kbd>Ctrl</kbd>+click toggles bypass. Right-click for Insert / Insert to All Tabs / Bypass / Persist / Remove, and so on.</li>
           <li>Drag to an empty slot to move, or swap two occupied slots. Persisted slots stay on the same index across every open tab.</li>
           <li><strong>Persist</strong> — remembers the plug-in, parameters, and bypass for every open tab and the next launch. Clear it from the right-click menu.</li>
-          <li><strong>Include Tail</strong> (left of the rack, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) — when bouncing, extend the waveform until effect tails die out; off keeps the original length (on by default).</li>
-          <li><strong>Bounce Selected</strong> (toolbar / Export menu / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) — bakes inserts into the waveform on the selected tabs (or the active tab) and bypasses those slots. Editor only. Undoable. Separate from <a href="#layout-tabs">Mixdown</a> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), which stacks tabs.</li>
+          <li><strong>Bounce Selected</strong> (toolbar / Export menu / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) — bakes inserts into the waveform on the selected tabs (or the active tab) and bypasses those slots. Asks whether to include tails (Keep / Cut; Keep by default). Editor only. Undoable. Separate from <a href="#layout-tabs">Mixdown</a> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), which stacks tabs.</li>
           <li>Some plug-ins (for example Altiverb) will not load under a debugger. Launch the exe without a debugger from Visual Studio / Cursor.</li>
         </ul>
       </article>
@@ -1222,7 +1221,6 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Show / hide the WAAPI bar (<strong>editor only</strong>; off in the player)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E (only while the WAAPI bar is visible; <strong>editor only</strong>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active (only while the WAAPI bar is visible; no underline on the label; <strong>editor only</strong>)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (VST insert rack; extend / cut tails on bounce; on by default; <strong>editor only</strong>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start (while tile search has focus, closes non-matching tiles instead)</td></tr>
         </tbody>
       </table>
@@ -1378,8 +1376,7 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd></td><td>Slot action: empty = pick a plug-in; bypassed = clear bypass; filled = open / close the GUI</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (extend / cut tails when bouncing; on by default)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; asks Keep / Cut tails; Keep by default)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click (slot)</td><td>Toggle bypass</td></tr>
         </tbody>
       </table>
