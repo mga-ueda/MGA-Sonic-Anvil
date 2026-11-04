@@ -1828,6 +1828,18 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void InteractivePlayCoalesce_CollapsesRapidTapsToLatest()
+    {
+        // 連打の合流待ちは一瞬だけ（感知できないが連打は畳める範囲）。
+        Assert.InRange(LibraryPlayerMode.InteractivePlayCoalesceMs, 1, 300);
+
+        // 後から来た予約（世代が進んだ）だけが鳴る。連打の古い予約は捨てられ、曲頭が重ならない。
+        Assert.True(LibraryPlayerMode.IsLatestInteractivePlay(scheduledGeneration: 5, currentGeneration: 5));
+        Assert.False(LibraryPlayerMode.IsLatestInteractivePlay(scheduledGeneration: 4, currentGeneration: 5));
+        Assert.False(LibraryPlayerMode.IsLatestInteractivePlay(scheduledGeneration: 3, currentGeneration: 6));
+    }
+
+    [Fact]
     public void RegionDigitJump_CtrlTopRow_TwoDigitsFromOne()
     {
         Assert.True(LibraryPlayerMode.TryResolveRegionDigitJump(0, 1, 12, out var p1, out var s1));

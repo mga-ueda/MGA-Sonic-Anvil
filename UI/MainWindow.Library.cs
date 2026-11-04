@@ -27,6 +27,19 @@ public partial class MainWindow
     /// <summary>本再生リクエストの世代。プロキシ待ち中に別再生へ差し替わったら古い方を捨てる。</summary>
     private int _libraryPlayTicket;
 
+    /// <summary>
+    /// 直近に受け付けた本再生リクエスト（同一セッション・同一パラメータ）。
+    /// ダブルクリックは「選択→SessionActivated」と「ダブルクリック→SessionPlayRequested」の
+    /// 2 連（まれに 3 連）で同じ曲へ PlayLibrarySessionAsync が走る。プレイヤーは次曲を先読み
+    /// 済みで EnsureLibrarySessionLoadedAsync が同期完了するため _libraryPlayTicket では潰せず、
+    /// 新しい曲の頭が 2〜3 回鳴る（「ジャジャジャーン」）。ダブルクリック間隔内の同一要求は畳む。
+    /// </summary>
+    private DocumentSession? _lastLibraryPlayRequestSession;
+    private bool _lastLibraryPlayRequestStopAfterTrack;
+    private bool _lastLibraryPlayRequestKeepAmbientGlow;
+    private bool _lastLibraryPlayRequestFromStart;
+    private long _lastLibraryPlayRequestTicks;
+
     /// <summary>再帰追加中に再生する最初の登録曲。グループ再配置で他曲へ飛ばないようにする。</summary>
     private DocumentSession? _libraryFolderPlaySession;
     /// <summary>プレイリスト置換中は空セッションで既定ウォッシュへ落とさない。</summary>
@@ -37,6 +50,17 @@ public partial class MainWindow
     private bool? _pendingLibraryWashHadArt;
     private bool _libraryPlayOnArrowRelease;
     private bool _libraryPlayOnTrackKeyRelease;
+    /// <summary>
+    /// テンキー 5／4／6 やカーソルの曲送りを合流待ち（<see cref="LibraryPlayerMode.InteractivePlayCoalesceMs"/>）
+    /// してから 1 回だけ本再生するためのタイマーと予約内容。連打で曲頭が重なるのを防ぐ。
+    /// </summary>
+    private DispatcherTimer? _interactivePlayTimer;
+    private DocumentSession? _interactivePlaySession;
+    private bool _interactivePlayStopAfterTrack;
+    private bool _interactivePlayKeepAmbientGlow;
+    private bool _interactivePlayFromStart;
+    private int _interactivePlayGeneration;
+    private int _interactivePlayScheduledGeneration;
     /// <summary>Shift+↑↓ 連打中はメーター平均を毎打で再計算せず、離したときにまとめる。</summary>
     private bool _playlistSelectionLoudnessDeferred;
     private int _playlistSelectionLoudnessDeferTicket;
@@ -3903,6 +3927,15 @@ public partial class MainWindow
             return;
         }
 
+        // テンキー 4/6 や ↑↓ は「押下で選択・離して再生」。ここで即 Play すると
+        // 離し側の再生と二重になり、曲頭がジャジャーンと重なる。選択中はアートワーク
+        // だけ更新し、本再生はキー離し（QueueInteractiveLibraryPlay）に任せる。
+        if (_libraryPlayOnTrackKeyRelease || _libraryPlayOnArrowRelease)
+        {
+            ShowLibraryArtwork(session);
+            return;
+        }
+
         _ = PlayLibrarySessionAsync(session);
     }
 
@@ -3910,6 +3943,9 @@ public partial class MainWindow
     {
         _ = PlayLibrarySessionAsync(session);
     }
+
+    private static string SessionName(DocumentSession? session) =>
+        session is null ? "(null)" : Path.GetFileName(session.Document.SourcePath) ?? session.DisplayName;
 
     private Task RegisterLibraryPathsAsync(IReadOnlyList<string> paths) =>
         RegisterLibraryPathsAsync(paths, play: true);
@@ -4585,7 +4621,7 @@ public partial class MainWindow
             return;
         }
 
-        _ = PlayLibrarySessionAsync(session);
+        QueueInteractiveLibraryPlay(session);
     }
 
     private void TryPlayLibraryAfterTrackKeyRelease()
@@ -4605,8 +4641,73 @@ public partial class MainWindow
         var session = LibraryBrowser.SelectedSession ?? _activeSession;
         if (session is not null)
         {
-            _ = PlayLibrarySessionAsync(session);
+            QueueInteractiveLibraryPlay(session);
         }
+    }
+
+    /// <summary>
+    /// キー操作による本再生を <see cref="LibraryPlayerMode.InteractivePlayCoalesceMs"/> だけ合流待ちしてから
+    /// 1 回だけ実行する。連打しても最後に落ち着いた曲だけが頭から鳴り、曲頭が 2〜3 回重なる
+    /// （「ジャジャジャーン」）のを防ぐ。先読みの自動送り（ギャップレス）はこの経路を通らない。
+    /// </summary>
+    private void QueueInteractiveLibraryPlay(
+        DocumentSession? session,
+        bool stopAfterTrack = false,
+        bool keepAmbientGlow = false,
+        bool fromStart = false)
+    {
+        _interactivePlaySession = session;
+        _interactivePlayStopAfterTrack = stopAfterTrack;
+        _interactivePlayKeepAmbientGlow = keepAmbientGlow;
+        _interactivePlayFromStart = fromStart;
+        _interactivePlayScheduledGeneration = ++_interactivePlayGeneration;
+
+        if (_interactivePlayTimer is null)
+        {
+            _interactivePlayTimer = new DispatcherTimer(DispatcherPriority.Input, Dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(LibraryPlayerMode.InteractivePlayCoalesceMs),
+            };
+            _interactivePlayTimer.Tick += OnInteractiveLibraryPlayTick;
+        }
+
+        // 連打は最後の 1 回に畳む（トレーリング）。押すたびに貼り直す。
+        _interactivePlayTimer.Stop();
+        _interactivePlayTimer.Start();
+    }
+
+    /// <summary>予約済みの対話本再生を取り消す（明示の停止・一時停止・別経路の再生が勝ったとき）。</summary>
+    private void CancelInteractiveLibraryPlay()
+    {
+        _interactivePlayTimer?.Stop();
+        _interactivePlaySession = null;
+        // 世代を進め、万一ディスパッチ済みの Tick が後から来ても最新ではないとして捨てる。
+        _interactivePlayGeneration++;
+    }
+
+    private void OnInteractiveLibraryPlayTick(object? sender, EventArgs e)
+    {
+        _interactivePlayTimer?.Stop();
+        if (!LibraryPlayerMode.IsLatestInteractivePlay(
+                _interactivePlayScheduledGeneration,
+                _interactivePlayGeneration))
+        {
+            return;
+        }
+
+        // 合流待ちのあいだにプレイヤーを抜けていたら鳴らさない。
+        if (!IsLibraryMaximized)
+        {
+            _interactivePlaySession = null;
+            return;
+        }
+
+        var session = _interactivePlaySession;
+        var stopAfterTrack = _interactivePlayStopAfterTrack;
+        var keepAmbientGlow = _interactivePlayKeepAmbientGlow;
+        var fromStart = _interactivePlayFromStart;
+        _interactivePlaySession = null;
+        _ = PlayLibrarySessionAsync(session, stopAfterTrack, keepAmbientGlow, fromStart);
     }
 
     private void StepLibraryTrackSelection(int direction, bool wrap)
@@ -4617,6 +4718,38 @@ public partial class MainWindow
             : (LibraryBrowser.SelectedSession ?? _activeSession);
         LibraryBrowser.SelectPlaylistStep(cursor, direction, wrap);
         _libraryPlayOnTrackKeyRelease = true;
+    }
+
+    /// <summary>
+    /// 直前と同一の本再生要求（同じセッション・同じパラメータ）がダブルクリック間隔内に
+    /// 再度来たら true。ダブルクリックの 2 連・3 連 Play を 1 回へ畳む。
+    /// 別曲への切替・停止からの開始・意図的な再開（間隔を越える）は畳まない。
+    /// <paramref name="fromStart"/>（テンキー 5 頭出し）は毎回効かせるので畳まない。
+    /// </summary>
+    private bool IsDuplicateLibraryPlayRequest(
+        DocumentSession session,
+        bool stopAfterTrack,
+        bool keepAmbientGlow,
+        bool fromStart)
+    {
+        var now = Stopwatch.GetTimestamp();
+        var windowMs = Math.Max(200u, GetDoubleClickTime());
+        var elapsedMs = (now - _lastLibraryPlayRequestTicks) * 1000.0 / Stopwatch.Frequency;
+        // fromStart は明示頭出し。ダブルクリック抑制に巻き込むとテンキー 5 連打が効かなくなる。
+        var duplicate = !fromStart
+            && _lastLibraryPlayRequestSession is not null
+            && ReferenceEquals(session, _lastLibraryPlayRequestSession)
+            && stopAfterTrack == _lastLibraryPlayRequestStopAfterTrack
+            && keepAmbientGlow == _lastLibraryPlayRequestKeepAmbientGlow
+            && fromStart == _lastLibraryPlayRequestFromStart
+            && elapsedMs <= windowMs;
+
+        _lastLibraryPlayRequestSession = session;
+        _lastLibraryPlayRequestStopAfterTrack = stopAfterTrack;
+        _lastLibraryPlayRequestKeepAmbientGlow = keepAmbientGlow;
+        _lastLibraryPlayRequestFromStart = fromStart;
+        _lastLibraryPlayRequestTicks = now;
+        return duplicate;
     }
 
     private void CancelLibraryGapless()
@@ -4878,7 +5011,7 @@ public partial class MainWindow
             return false;
         }
 
-        _ = PlayLibrarySessionAsync(session);
+        QueueInteractiveLibraryPlay(session);
         return true;
     }
 
@@ -4960,7 +5093,9 @@ public partial class MainWindow
 
         if (session is not null)
         {
-            _ = PlayLibrarySessionAsync(session);
+            // fromStart: true で、直前の本再生（fromStart: false）と同一視して
+            // IsDuplicateLibraryPlayRequest に畳まれないようにする（テンキー 5 頭出し）。
+            QueueInteractiveLibraryPlay(session, fromStart: true);
             return;
         }
 
@@ -5230,6 +5365,17 @@ public partial class MainWindow
         bool keepAmbientGlow = false,
         bool fromStart = false)
     {
+        // ダブルクリックは選択（SessionActivated）とダブルクリック（SessionPlayRequested）で
+        // 同じ曲へ連続して入る。先読み済みで同期完了する経路では _libraryPlayTicket では
+        // 潰せず、新しい曲の頭が 2〜3 回鳴る。直前と同一の要求はダブルクリック間隔内で畳む。
+        if (session is not null && IsDuplicateLibraryPlayRequest(session, stopAfterTrack, keepAmbientGlow, fromStart))
+        {
+            return;
+        }
+
+        // ここまで来た本再生が勝ち。合流待ち中の対話予約があれば畳む（このまま鳴らす）。
+        CancelInteractiveLibraryPlay();
+
         StopVideoFrameStep();
         CancelLibraryGapless();
         _libraryPlayOnArrowRelease = false;
@@ -5307,16 +5453,12 @@ public partial class MainWindow
 
             if (IsPlaybackActive())
             {
-                // 次の本再生へつなぐときは暗いプレビューへ落とさない
-                //（プレイリストが一瞬見える／dim・格子が本再生に残る）。
-                if (bridgeChrome)
-                {
-                    PausePlaybackSoft(keepPlaylistVisual: true);
-                }
-                else
-                {
-                    StopPlayback();
-                }
+                // 次の本再生へつなぐときは Halt（先頭へ戻す停止）しない。
+                // 旧曲を lastStart へ Seek してから次曲頭を鳴らすと、残留と重なって
+                // ジャジャーン／切替直前の異音になる。
+                // 本再生は直後の StartPlayback(0)／映像開始が先頭を担当する。
+                // 動画クロムを跨ぐときだけプレイリスト映像を残して一時停止する。
+                PausePlaybackSoft(keepPlaylistVisual: bridgeChrome);
             }
 
             ApplyLoadedLibrarySession(session);
@@ -5485,9 +5627,12 @@ public partial class MainWindow
 
     private Task EnsureLibrarySessionLoadedAsync(DocumentSession session, bool bind = true)
     {
+        // 別セッションへ載せる前の停止は Pause のみ。HaltPlaybackToStart（先頭へ戻す）は
+        // 旧曲を seekedTo=0 にしてから次曲を鳴らすため、切替直前の異音の原因になる。
+        // 明示停止（Space など）の Halt 経路は触らない。
         if (bind && IsPlaybackActive() && !ReferenceEquals(session, _activeSession))
         {
-            StopPlayback();
+            PausePlaybackSoft();
         }
 
         if (LibraryPlaylistDocuments.IsVisual(session.Document))

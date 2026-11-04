@@ -43,6 +43,9 @@ public partial class MainWindow
     [DllImport("user32.dll")]
     private static extern bool IsWindowEnabled(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    private static extern uint GetDoubleClickTime();
+
     private static bool IsVkDown(int vKey) => (GetAsyncKeyState(vKey) & 0x8000) != 0;
 
     private MediaKeyHook? _mediaKeyHook;

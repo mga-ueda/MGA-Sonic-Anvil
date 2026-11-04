@@ -869,6 +869,8 @@ public partial class MainWindow
     /// <summary>その場で一時停止し、カーソルを現在フレームへ合わせる。</summary>
     private bool PausePlaybackHere(bool immersiveVideoHold = false)
     {
+        // 明示の一時停止は合流待ち中の曲送り／再生し直し予約より優先する。
+        CancelInteractiveLibraryPlay();
         if (_document is null || !IsPlaybackActive())
         {
             return false;
@@ -937,6 +939,8 @@ public partial class MainWindow
     /// <summary>停止して再生開始位置へ戻す。</summary>
     private void HaltPlaybackToStart(bool keepVideoChromeHidden = false)
     {
+        // 明示の停止は合流待ち中の曲送り／再生し直し予約より優先する。
+        CancelInteractiveLibraryPlay();
         _editorPlayAfterPcmTicket++;
         // 開始位置へ戻す停止。動画／PDF 本再生中にクロームを隠したままにするときは keepVideoChromeHidden。
         // 動画本再生の Space 一時停止は PausePlaybackHere 側。暗いプレビューへ落とすのは Escape。

@@ -2355,6 +2355,22 @@ internal static class LibraryPlayerMode
         command is LibraryNumpadCommand.PreviousTrack or LibraryNumpadCommand.NextTrack;
 
     /// <summary>
+    /// テンキー 5（再生し直し）／4・6（前後曲）／カーソルの曲送りなど、キー操作による本再生の合流待ち（ms）。
+    /// 連打は 1 回の down／up ごとに <c>PlayLibrarySessionAsync</c> が走り、押すたびに曲頭が本再生されて
+    /// 2〜3 回重なる（「ジャジャジャーン」）。最後の操作からこの時間だけ待ってから 1 回だけ本再生し、
+    /// 連打は最後に落ち着いた曲だけを頭から鳴らす。先読みの自動送り（ギャップレス）はこの経路を
+    /// 通らないので、意図した途切れない連続再生は保たれる。単発は離してから鳴る従来の体感のまま。
+    /// </summary>
+    public const int InteractivePlayCoalesceMs = 120;
+
+    /// <summary>
+    /// 予約済みの対話本再生が最新（予約時の世代＝現在の世代）なら鳴らしてよい。
+    /// 連打で後から来た予約が世代を進めると、古い予約は捨てられ曲頭が重ならない。
+    /// </summary>
+    public static bool IsLatestInteractivePlay(int scheduledGeneration, int currentGeneration) =>
+        scheduledGeneration == currentGeneration;
+
+    /// <summary>
     /// マーカー番号・Ctrl+←→ など捨てキュー操作を使うか。
     /// 音声波形／動画本再生／F8／イマーシブ一時停止（暗いプレビューは不可）。
     /// </summary>
