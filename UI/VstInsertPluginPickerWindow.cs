@@ -12,8 +12,8 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// VST インサート用プラグイン選択ウィンドウ。
-/// メーカー／種別のツリー手繰り、ライブラリと同じインクリメンタルサーチ、キーボード操作。
-/// モーダル表示のため本体ショートカットは反応しない。
+/// メーカー／種別のツリー手繰り、ライブラリと同じ検索構文の検索窓、
+/// インクリメンタルサーチ、キーボード操作。モーダル表示のため本体ショートカットは反応しない。
 /// </summary>
 internal sealed class VstInsertPluginPickerWindow : Window
 {
@@ -22,17 +22,22 @@ internal sealed class VstInsertPluginPickerWindow : Window
 
     private readonly IReadOnlyList<VstPickerEntry> _plugins;
     private readonly TreeView _tree = new();
+    private readonly TextBox _searchBox = new();
+    private readonly TextBlock _searchHint = new();
     private readonly RadioButton _vendorRadio;
     private readonly RadioButton _categoryRadio;
     private readonly AcrylicToastHost _typeaheadToast = new();
     private readonly HashSet<TreeViewItem> _typeaheadHighlighted = [];
     private readonly Dictionary<TreeViewItem, string> _headerNames = new();
 
+    private string _filter = "";
+    private List<string[]> _filterGroups = [];
     private string _typeahead = "";
     private string _typeaheadWalk = "";
     private string _typeaheadIgnoreText = "";
     private DispatcherTimer? _typeaheadToastIdleTimer;
     private VstInsertPickerGroupMode _groupMode;
+    private bool _suppressExpandScroll;
     private bool _accepted;
 
     public VstPickerEntry? Selected { get; private set; }
@@ -82,10 +87,12 @@ internal sealed class VstInsertPluginPickerWindow : Window
         var radioRow = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Margin = new Thickness(0, 0, 0, 10),
+            Margin = new Thickness(0, 0, 0, 8),
         };
         radioRow.Children.Add(_vendorRadio);
         radioRow.Children.Add(_categoryRadio);
+
+        var searchHost = CreateSearchEditor();
 
         ApplyTreeStyle();
         _tree.IsTextSearchEnabled = false;
@@ -112,8 +119,10 @@ internal sealed class VstInsertPluginPickerWindow : Window
 
         var root = new DockPanel();
         DockPanel.SetDock(radioRow, Dock.Top);
+        DockPanel.SetDock(searchHost, Dock.Top);
         DockPanel.SetDock(buttons, Dock.Bottom);
         root.Children.Add(radioRow);
+        root.Children.Add(searchHost);
         root.Children.Add(buttons);
         root.Children.Add(_tree);
 
@@ -129,9 +138,30 @@ internal sealed class VstInsertPluginPickerWindow : Window
         Closed += (_, _) => ClearTypeahead();
         PreviewKeyDown += Window_PreviewKeyDown;
         PreviewTextInput += Window_PreviewTextInput;
-        AppDialogKeys.Attach(this, Close, interceptEscape: () => ClearTypeahead());
-        // Attach の Loaded がボタンへフォーカスするため、その後でツリーへ寄せる。
-        Loaded += (_, _) => Dispatcher.BeginInvoke(FocusTreeInitial, DispatcherPriority.Input);
+        AppDialogKeys.Attach(this, Close, interceptEscape: TryInterceptEscape);
+        // Attach の Loaded がボタンへフォーカスするため、その後で検索窓へ寄せる。
+        Loaded += (_, _) => Dispatcher.BeginInvoke(FocusSearchInitial, DispatcherPriority.Input);
+    }
+
+    private bool TryInterceptEscape()
+    {
+        if (ClearTypeahead())
+        {
+            return true;
+        }
+
+        if (_searchBox.Text.Length == 0)
+        {
+            return false;
+        }
+
+        _searchBox.Text = "";
+        if (!_searchBox.IsKeyboardFocusWithin)
+        {
+            FocusSearchInitial();
+        }
+
+        return true;
     }
 
     private void OnGroupModeChanged(VstInsertPickerGroupMode mode)
@@ -146,7 +176,10 @@ internal sealed class VstInsertPluginPickerWindow : Window
         AppStorage.Save();
         ClearTypeahead();
         RebuildTree();
-        FocusTreeInitial();
+        if (!_searchBox.IsKeyboardFocusWithin)
+        {
+            FocusTreeInitial();
+        }
     }
 
     private void RebuildTree()
@@ -155,6 +188,7 @@ internal sealed class VstInsertPluginPickerWindow : Window
         _headerNames.Clear();
         _typeaheadHighlighted.Clear();
 
+        var plugins = FilteredPlugins();
         if (_plugins.Count == 0)
         {
             var empty = new TreeViewItem
@@ -167,9 +201,14 @@ internal sealed class VstInsertPluginPickerWindow : Window
             return;
         }
 
+        if (plugins.Count == 0)
+        {
+            return;
+        }
+
         if (_groupMode == VstInsertPickerGroupMode.Vendor)
         {
-            foreach (var group in VstInsertPluginMenu.GroupPickerByVendor(_plugins))
+            foreach (var group in VstInsertPluginMenu.GroupPickerByVendor(plugins))
             {
                 var vendor = CreateGroupItem(group.Key);
                 foreach (var plugin in group.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
@@ -185,12 +224,66 @@ internal sealed class VstInsertPluginPickerWindow : Window
         }
         else
         {
-            foreach (var plugin in _plugins.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+            foreach (var plugin in plugins.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
             {
                 AddPluginUnderCategory(plugin);
             }
 
             SortItemCollection(_tree.Items);
+        }
+
+        if (_filterGroups.Count > 0)
+        {
+            _suppressExpandScroll = true;
+            try
+            {
+                ExpandAllGroups(_tree.Items);
+            }
+            finally
+            {
+                _suppressExpandScroll = false;
+            }
+        }
+
+        SyncFilterHighlights();
+    }
+
+    private IReadOnlyList<VstPickerEntry> FilteredPlugins()
+    {
+        if (_filterGroups.Count == 0)
+        {
+            return _plugins;
+        }
+
+        var matched = new List<VstPickerEntry>();
+        foreach (var plugin in _plugins)
+        {
+            if (MatchesFilter(plugin))
+            {
+                matched.Add(plugin);
+            }
+        }
+
+        return matched;
+    }
+
+    private bool MatchesFilter(VstPickerEntry plugin) =>
+        VstInsertPluginMenu.MatchesPickerFilter(plugin, _filterGroups, _groupMode);
+
+    private static void ExpandAllGroups(ItemCollection items)
+    {
+        foreach (var raw in items)
+        {
+            if (raw is not TreeViewItem item || item.Tag is not null)
+            {
+                continue;
+            }
+
+            item.IsExpanded = true;
+            if (item.Items.Count > 0)
+            {
+                ExpandAllGroups(item.Items);
+            }
         }
     }
 
@@ -323,7 +416,9 @@ internal sealed class VstInsertPluginPickerWindow : Window
 
     private void TreeItem_Expanded(object sender, RoutedEventArgs e)
     {
-        if (!ReferenceEquals(sender, e.OriginalSource) || sender is not TreeViewItem item)
+        if (_suppressExpandScroll
+            || !ReferenceEquals(sender, e.OriginalSource)
+            || sender is not TreeViewItem item)
         {
             return;
         }
@@ -396,6 +491,120 @@ internal sealed class VstInsertPluginPickerWindow : Window
         return block;
     }
 
+    private Grid CreateSearchEditor()
+    {
+        _searchBox.FontSize = DesignMetrics.From96(13);
+        _searchBox.Height = DesignMetrics.AudioInputHeight;
+        _searchBox.AcceptsReturn = false;
+        _searchBox.AcceptsTab = false;
+        _searchBox.VerticalContentAlignment = VerticalAlignment.Center;
+        _searchBox.SetResourceReference(StyleProperty, "LibrarySearchBoxStyle");
+        _searchBox.TextChanged += SearchBox_TextChanged;
+        _searchBox.GotKeyboardFocus += (_, _) => SyncSearchHint();
+        _searchBox.LostKeyboardFocus += (_, _) => SyncSearchHint();
+        _searchBox.PreviewKeyDown += SearchBox_PreviewKeyDown;
+        KeyboardNavigation.SetIsTabStop(_searchBox, false);
+
+        _searchHint.Text = UiStrings.LabelVstInsertPickerSearchHint;
+        _searchHint.FontSize = DesignMetrics.From96(13);
+        _searchHint.Margin = new Thickness(8, 0, 0, 0);
+        _searchHint.VerticalAlignment = VerticalAlignment.Center;
+        _searchHint.IsHitTestVisible = false;
+        _searchHint.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
+
+        var host = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        host.Children.Add(_searchBox);
+        host.Children.Add(_searchHint);
+        SyncSearchHint();
+        return host;
+    }
+
+    private void SyncSearchHint() =>
+        _searchHint.Visibility = string.IsNullOrEmpty(_searchBox.Text) && !_searchBox.IsKeyboardFocused
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        SyncSearchHint();
+        var next = _searchBox.Text.Trim();
+        if (string.Equals(_filter, next, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _filter = next;
+        _filterGroups = LibrarySearchQuery.Parse(next);
+        ClearTypeahead();
+        RebuildTree();
+    }
+
+    private void SearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key != Key.Down || Keyboard.Modifiers != ModifierKeys.None || ImeComposition.IsComposing)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        FocusTreeFromSearch();
+    }
+
+    private void FocusSearchInitial()
+    {
+        Keyboard.Focus(_searchBox);
+        if (_searchBox.IsKeyboardFocusWithin)
+        {
+            _searchBox.SelectAll();
+        }
+    }
+
+    private void FocusTreeFromSearch()
+    {
+        if (_tree.Items.Count == 0)
+        {
+            return;
+        }
+
+        _tree.UpdateLayout();
+        if (_filterGroups.Count > 0 && TryFocusFirstPlugin())
+        {
+            return;
+        }
+
+        FocusTreeInitial();
+    }
+
+    private bool TryFocusFirstPlugin()
+    {
+        if (!TryCollectTypeahead(out var items, out _, out _))
+        {
+            return false;
+        }
+
+        foreach (var item in items)
+        {
+            if (item.Tag is not VstPickerEntry)
+            {
+                continue;
+            }
+
+            EnsureAncestorsExpanded(item);
+            item.IsSelected = true;
+            item.BringIntoView();
+            Keyboard.Focus(item);
+            if (!item.IsKeyboardFocusWithin)
+            {
+                _tree.Focus();
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     private void FocusTreeInitial()
     {
         if (_tree.Items.Count == 0)
@@ -463,6 +672,21 @@ internal sealed class VstInsertPluginPickerWindow : Window
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
 
+        if (key == Key.F
+            && modifiers is ModifierKeys.Control or ModifierKeys.Alt
+            && !ImeComposition.IsComposing)
+        {
+            e.Handled = true;
+            FocusSearchInitial();
+            return;
+        }
+
+        // 検索窓への入力はタイプアヘッドへ回さない。
+        if (_searchBox.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
         // ラジオにフォーカスがあっても、ライブラリと同じく本体ショートカットへ漏らさない。
         if (TryHandleTypeaheadKey(key, modifiers))
         {
@@ -481,7 +705,8 @@ internal sealed class VstInsertPluginPickerWindow : Window
 
     private void Window_PreviewTextInput(object sender, TextCompositionEventArgs e)
     {
-        if (!LibraryExplorerTypeahead.IsTypeaheadText(e.Text))
+        if (_searchBox.IsKeyboardFocusWithin
+            || !LibraryExplorerTypeahead.IsTypeaheadText(e.Text))
         {
             return;
         }
@@ -540,7 +765,12 @@ internal sealed class VstInsertPluginPickerWindow : Window
                 ClearTypeahead();
             }
 
-            MoveSelection(direction);
+            // 先頭で上／末尾で下は検索窓へ戻る。
+            if (!TryMoveSelection(direction, leaveAtBoundary: true))
+            {
+                FocusSearchInitial();
+            }
+
             e.Handled = true;
             return;
         }
@@ -598,6 +828,8 @@ internal sealed class VstInsertPluginPickerWindow : Window
         _typeahead = "";
         _typeaheadWalk = "";
         HideTypeaheadToast();
+        // タイプアヘッドを閉じたら、検索窓のヒット強調を戻す。
+        SyncFilterHighlights();
         return had;
     }
 
@@ -780,6 +1012,126 @@ internal sealed class VstInsertPluginPickerWindow : Window
         }
     }
 
+    private void SyncFilterHighlights()
+    {
+        if (IsTypeaheadActive || _filterGroups.Count == 0)
+        {
+            return;
+        }
+
+        ClearTypeaheadHighlights();
+        ApplyFilterHighlights(_tree.Items);
+    }
+
+    private void ApplyFilterHighlights(ItemCollection items)
+    {
+        foreach (var raw in items)
+        {
+            if (raw is not TreeViewItem item || !item.IsEnabled)
+            {
+                continue;
+            }
+
+            var name = HeaderName(item);
+            if (ApplyLibraryFilterHighlight(item, name, _filterGroups))
+            {
+                _typeaheadHighlighted.Add(item);
+            }
+
+            if (item.Items.Count > 0)
+            {
+                ApplyFilterHighlights(item.Items);
+            }
+        }
+    }
+
+    /// <summary>
+    /// ライブラリ検索の各語（ワイルドカード以外）が名前に含まれる範囲を黄色くする。
+    /// </summary>
+    private bool ApplyLibraryFilterHighlight(
+        TreeViewItem item,
+        string name,
+        IReadOnlyList<string[]> groups)
+    {
+        if (name.Length == 0 || groups.Count == 0)
+        {
+            return false;
+        }
+
+        var marks = new bool[name.Length];
+        var any = false;
+        foreach (var terms in groups)
+        {
+            foreach (var term in terms)
+            {
+                if (string.IsNullOrEmpty(term) || term.Contains('*') || term.Contains('?'))
+                {
+                    continue;
+                }
+
+                var start = 0;
+                while (start < name.Length)
+                {
+                    var index = name.IndexOf(term, start, StringComparison.OrdinalIgnoreCase);
+                    if (index < 0)
+                    {
+                        break;
+                    }
+
+                    any = true;
+                    for (var i = 0; i < term.Length; i++)
+                    {
+                        marks[index + i] = true;
+                    }
+
+                    start = index + Math.Max(1, term.Length);
+                }
+            }
+        }
+
+        if (!any)
+        {
+            return false;
+        }
+
+        if (item.Header is not TextBlock block)
+        {
+            block = new TextBlock();
+            item.Header = block;
+        }
+
+        block.Inlines.Clear();
+        block.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+        var runStart = 0;
+        while (runStart < name.Length)
+        {
+            var highlighted = marks[runStart];
+            var runEnd = runStart + 1;
+            while (runEnd < name.Length && marks[runEnd] == highlighted)
+            {
+                runEnd++;
+            }
+
+            var text = name[runStart..runEnd];
+            if (highlighted)
+            {
+                block.Inlines.Add(new Run(text)
+                {
+                    Background = TypeaheadHitBack,
+                    Foreground = TypeaheadHitFore,
+                });
+            }
+            else
+            {
+                block.Inlines.Add(new Run(text));
+            }
+
+            runStart = runEnd;
+        }
+
+        return true;
+    }
+
     private void ClearTypeaheadHighlights()
     {
         if (_typeaheadHighlighted.Count == 0)
@@ -871,25 +1223,52 @@ internal sealed class VstInsertPluginPickerWindow : Window
         MoveSelection(-1);
     }
 
-    private void MoveSelection(int delta)
+    private void MoveSelection(int delta) =>
+        TryMoveSelection(delta, leaveAtBoundary: false);
+
+    /// <summary>
+    /// 選択を1行動かす。leaveAtBoundary なら端で false（呼び出し側が検索窓へ）。
+    /// </summary>
+    private bool TryMoveSelection(int delta, bool leaveAtBoundary)
     {
         if (delta == 0 || !TryCollectTypeahead(out var items, out _, out var current))
         {
-            return;
+            return false;
         }
 
         if (items.Count == 0)
         {
-            return;
+            return false;
         }
 
-        var index = current < 0
-            ? (delta > 0 ? 0 : items.Count - 1)
-            : Math.Clamp(current + delta, 0, items.Count - 1);
+        int index;
+        if (current < 0)
+        {
+            index = delta > 0 ? 0 : items.Count - 1;
+        }
+        else
+        {
+            var next = current + delta;
+            if (next < 0 || next >= items.Count)
+            {
+                if (leaveAtBoundary)
+                {
+                    return false;
+                }
+
+                index = Math.Clamp(next, 0, items.Count - 1);
+            }
+            else
+            {
+                index = next;
+            }
+        }
+
         var item = items[index];
         item.IsSelected = true;
         item.BringIntoView();
         item.Focus();
+        return true;
     }
 
     private void ClearTypeaheadIfSelectionMovedByMouse()

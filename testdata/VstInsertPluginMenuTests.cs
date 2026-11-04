@@ -201,6 +201,75 @@ public sealed class VstInsertPluginMenuTests
         Assert.Equal(["Reverb"], paths[0]);
     }
 
+    [Fact]
+    public void MatchesPickerFilter_CategoryModeIgnoresVendor()
+    {
+        var plugin = new VstPickerEntry("EQ Soft", @"C:\a.vst3", "FabFilter", "Fx|EQ", null);
+        Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "Fab", VstInsertPickerGroupMode.Category));
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "EQ", VstInsertPickerGroupMode.Category));
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "Soft", VstInsertPickerGroupMode.Category));
+    }
+
+    [Fact]
+    public void MatchesPickerFilter_VendorModeIgnoresCategory()
+    {
+        var plugin = new VstPickerEntry("Pro-Q", @"C:\a.vst3", "FabFilter", "Fx|EQ", null);
+        Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "EQ", VstInsertPickerGroupMode.Vendor));
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "Fab", VstInsertPickerGroupMode.Vendor));
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "Pro", VstInsertPickerGroupMode.Vendor));
+    }
+
+    [Fact]
+    public void MatchesPickerFilter_UsesLibraryAndOrAcrossFields()
+    {
+        var plugin = new VstPickerEntry("Pro-Q 3", @"C:\a.vst3", "FabFilter", "Fx|EQ", null);
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "fab pro", VstInsertPickerGroupMode.Vendor));
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "waves|pro", VstInsertPickerGroupMode.Vendor));
+        Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "waves soft", VstInsertPickerGroupMode.Vendor));
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "eq soft|pro", VstInsertPickerGroupMode.Category));
+        Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "fab eq", VstInsertPickerGroupMode.Category));
+    }
+
+    [Fact]
+    public void MatchesPickerFilter_SupportsLibraryQuotesAndWildcards()
+    {
+        var plugin = new VstPickerEntry("Pro-Q 3", @"C:\a.vst3", "FabFilter", "Fx|EQ", null);
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "\"pro-q 3\"", VstInsertPickerGroupMode.Vendor));
+        Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "\"pro q\"", VstInsertPickerGroupMode.Vendor));
+        Assert.True(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "Pro*", VstInsertPickerGroupMode.Vendor));
+        Assert.False(VstInsertPluginMenu.MatchesPickerFilter(
+            plugin, "*.wav", VstInsertPickerGroupMode.Vendor));
+    }
+
+    [Fact]
+    public void CategoryFilterLabels_UsesVisibleSegmentsNotRawFx()
+    {
+        Assert.Equal(["Reverb"], VstInsertPluginMenu.CategoryFilterLabels("Fx|Reverb").ToArray());
+        Assert.Equal(
+            [UiStrings.LabelVstInsertCategoryUnknown],
+            VstInsertPluginMenu.CategoryFilterLabels(null).ToArray());
+        Assert.True(TileSearchQuery.MatchesAny(
+            VstInsertPluginMenu.CategoryFilterLabels("Fx|Reverb"),
+            LibrarySearchQuery.Parse("rev*")));
+        Assert.False(TileSearchQuery.MatchesAny(
+            VstInsertPluginMenu.CategoryFilterLabels("Fx|Reverb"),
+            LibrarySearchQuery.Parse("Fx")));
+    }
+
     [Theory]
     [InlineData("L316 Mono", "L316", (int)VstChannelHint.Mono)]
     [InlineData("CLA-2A Stereo", "CLA-2A", (int)VstChannelHint.Stereo)]
