@@ -91,6 +91,8 @@ internal static class ColorDevCatalog
             ("MouseGuideBrush", ColorDevGroup.Guides),
             ("MouseGuideOnSelectionBrush", ColorDevGroup.Guides),
 
+            ("WaveSelectionBackBrush", ColorDevGroup.Selection),
+            ("WaveSelectionWaveFillBrush", ColorDevGroup.Selection),
             ("WaveSelectionFillBrush", ColorDevGroup.Selection),
             ("LoopRangeFillBrush", ColorDevGroup.Selection),
 
@@ -236,6 +238,10 @@ internal static class ColorDevCatalog
             ("AcrylicDialogTintBrush", ColorDevGroup.Dialog),
             ("AcrylicToastTintBrush", ColorDevGroup.Dialog),
             ("DialogInputBackBrush", ColorDevGroup.Dialog),
+            ("SilenceDetectWaveformBackBrush", ColorDevGroup.Dialog),
+            ("SilenceDetectWaveFillBrush", ColorDevGroup.Dialog),
+            ("SilenceDetectSelectionBackBrush", ColorDevGroup.Dialog),
+            ("SilenceDetectSelectionWaveFillBrush", ColorDevGroup.Dialog),
             ("ExportButtonFillBrush", ColorDevGroup.Dialog),
             ("ExportButtonFocusFillBrush", ColorDevGroup.Dialog),
             ("ExportButtonHoverFillBrush", ColorDevGroup.Dialog),

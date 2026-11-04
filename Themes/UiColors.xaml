@@ -26,6 +26,11 @@
     <SolidColorBrush x:Key="WaveformBackBrush" Color="#FF262626" />
     <SolidColorBrush x:Key="WaveformRecordBackBrush" Color="#FF3A1C1C" />
     <SolidColorBrush x:Key="WaveFillBrush" Color="#FFC6D9FF" />
+    <!-- 無音・ヒット検出プレビュー専用。 -->
+    <SolidColorBrush x:Key="SilenceDetectWaveformBackBrush" Color="#FF262626" />
+    <SolidColorBrush x:Key="SilenceDetectWaveFillBrush" Color="#FF919FBB" />
+    <SolidColorBrush x:Key="SilenceDetectSelectionBackBrush" Color="#FF919FBB" />
+    <SolidColorBrush x:Key="SilenceDetectSelectionWaveFillBrush" Color="#FF262626" />
     <SolidColorBrush x:Key="WaveFillOverlayBrush" Color="#FF3AB8E8" />
     <SolidColorBrush x:Key="WaveZeroLineBrush" Color="#5ACCCCCC" />
     <SolidColorBrush x:Key="TimelineWellBackBrush" Color="#FF17171A" />
@@ -38,6 +43,9 @@
     <SolidColorBrush x:Key="SeekExitBrush" Color="#FFDC2D2D" />
     <SolidColorBrush x:Key="MouseGuideBrush" Color="#DCFFFFFF" />
     <SolidColorBrush x:Key="MouseGuideOnSelectionBrush" Color="#DC000000" />
+    <!-- 選択の本描画は Back / WaveFill。Fill はプレイヤー・解析待ちの簡易ベール。 -->
+    <SolidColorBrush x:Key="WaveSelectionBackBrush" Color="#FFC6D9FF" />
+    <SolidColorBrush x:Key="WaveSelectionWaveFillBrush" Color="#FF262626" />
     <SolidColorBrush x:Key="WaveSelectionFillBrush" Color="#38FFFFFF" />
     <SolidColorBrush x:Key="LoopRangeFillBrush" Color="#1A1A3E5E" />
     <SolidColorBrush x:Key="SampleLoopTimelineBrush" Color="#FF4A7FA0" />

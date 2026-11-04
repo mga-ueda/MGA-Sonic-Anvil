@@ -18,6 +18,8 @@ public sealed class ColorDevCatalogTests
     [InlineData("OverviewOutsideFillBrush", "Overview")]
     [InlineData("WaveFillBrush", "Waveform")]
     [InlineData("PlayheadBrush", "Guides")]
+    [InlineData("WaveSelectionBackBrush", "Selection")]
+    [InlineData("WaveSelectionWaveFillBrush", "Selection")]
     [InlineData("WaveSelectionFillBrush", "Selection")]
     [InlineData("LoopRangeFillBrush", "Selection")]
     [InlineData("SampleLoopTimelineBrush", "SampleLoop")]
@@ -45,6 +47,10 @@ public sealed class ColorDevCatalogTests
     [InlineData("WindowBackBrush", "Dialog")]
     [InlineData("ColorPanelBackBrush", "Dialog")]
     [InlineData("DialogInputBackBrush", "Dialog")]
+    [InlineData("SilenceDetectWaveformBackBrush", "Dialog")]
+    [InlineData("SilenceDetectWaveFillBrush", "Dialog")]
+    [InlineData("SilenceDetectSelectionBackBrush", "Dialog")]
+    [InlineData("SilenceDetectSelectionWaveFillBrush", "Dialog")]
     [InlineData("UnknownBrush", "Other")]
     public void GroupOf_UsesKeyNotLabelPrefix(string key, string group)
     {
@@ -59,7 +65,9 @@ public sealed class ColorDevCatalogTests
         Assert.True(ColorDevCatalog.Rank("PlayerGlowVeilBrush") < ColorDevCatalog.Rank("WaveFillBrush"));
         Assert.True(ColorDevCatalog.Rank("WaveFillBrush") < ColorDevCatalog.Rank("OverviewOutsideFillBrush"));
         Assert.True(ColorDevCatalog.Rank("OverviewOutsideFillBrush") < ColorDevCatalog.Rank("PlayheadBrush"));
-        Assert.True(ColorDevCatalog.Rank("PlayheadBrush") < ColorDevCatalog.Rank("WaveSelectionFillBrush"));
+        Assert.True(ColorDevCatalog.Rank("PlayheadBrush") < ColorDevCatalog.Rank("WaveSelectionBackBrush"));
+        Assert.True(ColorDevCatalog.Rank("WaveSelectionBackBrush") < ColorDevCatalog.Rank("WaveSelectionWaveFillBrush"));
+        Assert.True(ColorDevCatalog.Rank("WaveSelectionWaveFillBrush") < ColorDevCatalog.Rank("WaveSelectionFillBrush"));
         Assert.True(ColorDevCatalog.Rank("WaveSelectionFillBrush") < ColorDevCatalog.Rank("LoopRangeFillBrush"));
         Assert.True(ColorDevCatalog.Rank("LoopRangeFillBrush") < ColorDevCatalog.Rank("SampleLoopTimelineBrush"));
         Assert.True(ColorDevCatalog.Rank("SampleLoopTimelineBrush") < ColorDevCatalog.Rank("CrossfadePreBrush"));
@@ -128,6 +136,12 @@ public sealed class ColorDevCatalogTests
     {
         var xaml = File.ReadAllText(FindUiColorsXaml());
         Assert.Contains("x:Key=\"WaveFillBrush\" Color=\"#FFC6D9FF\"", xaml);
+        Assert.Contains("x:Key=\"SilenceDetectWaveformBackBrush\" Color=\"#FF262626\"", xaml);
+        Assert.Contains("x:Key=\"SilenceDetectWaveFillBrush\" Color=\"#FF919FBB\"", xaml);
+        Assert.Contains("x:Key=\"SilenceDetectSelectionBackBrush\" Color=\"#FF919FBB\"", xaml);
+        Assert.Contains("x:Key=\"SilenceDetectSelectionWaveFillBrush\" Color=\"#FF262626\"", xaml);
+        Assert.Contains("x:Key=\"WaveSelectionBackBrush\" Color=\"#FFC6D9FF\"", xaml);
+        Assert.Contains("x:Key=\"WaveSelectionWaveFillBrush\" Color=\"#FF262626\"", xaml);
         Assert.Contains("x:Key=\"PlayerWaveFillBrush\" Color=\"#94C6D9FF\"", xaml);
         Assert.Contains("x:Key=\"PlayerFormatMismatchForeBrush\" Color=\"#FFFF8A1A\"", xaml);
         Assert.Contains("x:Key=\"PlayerFallbackWashNavyBrush\" Color=\"#FF0B1B49\"", xaml);

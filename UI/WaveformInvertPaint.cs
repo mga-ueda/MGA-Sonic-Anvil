@@ -4,7 +4,10 @@ using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>選択範囲で波形色と背景（リージョン下塗り含む）を入れ替える。</summary>
+/// <summary>
+/// 選択範囲を専用色で描く。波形画素→WaveSelectionWaveFill、背景画素→WaveSelectionBack
+/// （リージョン下塗りは選択波形側へ重ねる。旧・単純反転の見た目を既定色で再現）。
+/// </summary>
 internal static class WaveformInvertPaint
 {
     /// <summary>反転ビットマップを不透明で重ねると下地が消えるので、透かして重ねる。</summary>
@@ -29,7 +32,7 @@ internal static class WaveformInvertPaint
             return;
         }
 
-        // 選択列だけ反転すれば拡縮中も本物の見た目を保てるので、範囲を絞れるようにする。
+        // 選択列だけ塗り替えれば拡縮中も本物の見た目を保てるので、範囲を絞れるようにする。
         var xStart = Math.Clamp(colStart, 0, width);
         var xEnd = colEnd < 0 ? width : Math.Clamp(colEnd, xStart, width);
         if (xEnd <= xStart)
@@ -37,24 +40,24 @@ internal static class WaveformInvertPaint
             return;
         }
 
-        var waveformBack = ToBgra(Theme.Get("WaveformBackBrush"));
-        var sourceWave = ToBgra(Theme.Get("WaveFillBrush"));
-        // 画素ごとのレーン判定は width×height 回で高くつくため、行の色を先に引く。
-        var waveColorByY = BuildWaveColorRows(height, laneWaveColors, laneGapPx, sourceWave);
+        var selectionWave = ToBgra(Theme.Get("WaveSelectionWaveFillBrush"));
+        var selectionBack = ToBgra(Theme.Get("WaveSelectionBackBrush"));
+        // 多ch は選択背景もレーンごとに薄く色付け（本体波形と同じスウォッチ）。
+        var selectionBackByY = BuildSelectionBackRows(height, laneWaveColors, laneGapPx, selectionBack);
         var shadeTheme = UiThemeService.Painted;
         var shadeChannels = laneWaveColors is { Count: > 0 } ? laneWaveColors.Count : 1;
         if (document is null || document.FrameCount <= 0 || viewSpan <= 0)
         {
             for (var y = 0; y < height; y++)
             {
-                var waveFill = waveColorByY[y];
+                var back = selectionBackByY[y];
                 var row = y * width;
                 for (var x = xStart; x < xEnd; x++)
                 {
                     pixels[row + x] = InvertShaded(
                         pixels[row + x],
-                        waveformBack,
-                        waveFill,
+                        selectionWave,
+                        back,
                         y,
                         height,
                         shadeLanes,
@@ -85,25 +88,26 @@ internal static class WaveformInvertPaint
         for (var x = xStart; x < xEnd; x++)
         {
             var frame = FrameAtColumn(x, width, viewStart, viewSpan, frameCount);
-            var columnBack = waveformBack;
+            // 選択中の波形色を土台に、リージョン／ループ下塗りを重ねる。
+            var columnWave = selectionWave;
             foreach (var region in regions)
             {
                 if (region.ContainsFrame(frame))
                 {
-                    columnBack = BlendOver(columnBack, regionFill);
+                    columnWave = BlendOver(columnWave, regionFill);
                     break;
                 }
             }
 
             if (hasSampleLoop && frame >= sample.StartFrame && frame < sample.EndFrame)
             {
-                columnBack = BlendOver(columnBack, sampleLoop);
+                columnWave = BlendOver(columnWave, sampleLoop);
             }
 
             var underRole = SpanBgraAt(underSpans, frame);
             if (underRole != 0)
             {
-                columnBack = BlendOver(columnBack, underRole);
+                columnWave = BlendOver(columnWave, underRole);
             }
 
             for (var y = 0; y < height; y++)
@@ -111,8 +115,8 @@ internal static class WaveformInvertPaint
                 var index = y * width + x;
                 pixels[index] = InvertShaded(
                     pixels[index],
-                    columnBack,
-                    waveColorByY[y],
+                    columnWave,
+                    selectionBackByY[y],
                     y,
                     height,
                     shadeLanes,
@@ -121,6 +125,27 @@ internal static class WaveformInvertPaint
                     laneGapPx);
             }
         }
+    }
+
+    /// <summary>選択背景。多ch なら各レーンを ChannelSwatch で薄く色付け。</summary>
+    private static int[] BuildSelectionBackRows(
+        int height,
+        IReadOnlyList<int>? laneWaveColors,
+        double laneGapPx,
+        int selectionBack)
+    {
+        if (laneWaveColors is not { Count: > 1 } || !ChannelColors.UsesLaneTint(laneWaveColors.Count))
+        {
+            return BuildWaveColorRows(height, null, laneGapPx, selectionBack);
+        }
+
+        var tinted = new int[laneWaveColors.Count];
+        for (var i = 0; i < tinted.Length; i++)
+        {
+            tinted[i] = ChannelWavePaint.Tint(selectionBack, ToBgra(ChannelSwatch.Of(i)));
+        }
+
+        return BuildWaveColorRows(height, tinted, laneGapPx, selectionBack);
     }
 
     private static int[] BuildWaveColorRows(
@@ -187,17 +212,19 @@ internal static class WaveformInvertPaint
         return 0;
     }
 
-    /// <summary>波形ピクセルは背景色へ、背景ピクセルは波形色へ。白黒反転ではない。</summary>
-    internal static int InvertPixel(int pixel, int back, int waveFill)
+    /// <summary>
+    /// 波形画素→選択波形色、背景画素→選択背景色。白黒反転ではない。
+    /// </summary>
+    internal static int InvertPixel(int pixel, int selectedWave, int selectedBack)
     {
         var hasWave = ((pixel >> 24) & 0xFF) > 0;
-        return hasWave ? back : waveFill;
+        return hasWave ? selectedWave : selectedBack;
     }
 
     internal static int InvertShaded(
         int pixel,
-        int back,
-        int waveFill,
+        int selectedWave,
+        int selectedBack,
         int y,
         int height,
         bool shadeLanes,
@@ -205,7 +232,7 @@ internal static class WaveformInvertPaint
         int channels = 1,
         double laneGapPx = 0)
     {
-        var inverted = InvertPixel(pixel, back, waveFill);
+        var inverted = InvertPixel(pixel, selectedWave, selectedBack);
         return shadeLanes
             ? ApplyLaneShade(inverted, y, height, theme, channels, laneGapPx)
             : inverted;
