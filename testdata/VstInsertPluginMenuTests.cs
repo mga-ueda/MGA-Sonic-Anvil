@@ -282,6 +282,37 @@ public sealed class VstInsertPluginMenuTests
         Assert.Equal((VstChannelHint)hint, VstPluginChannelFit.GuessFromName(name));
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void ShouldClearSlotAcrossTabs_PersistedActsLikeAllTabs(
+        bool allTabsRequested,
+        bool persisted,
+        bool expected)
+    {
+        // 永続化は「全てのタブにインサート」扱い。単タブ削除でも全タブから外す。
+        Assert.Equal(
+            expected,
+            VstInsertRackView.ShouldClearSlotAcrossTabs(allTabsRequested, persisted));
+    }
+
+    [Fact]
+    public void SlotMatchesPluginForClear_PrefersDisplayName()
+    {
+        var slot = new VstInsertSlot
+        {
+            DisplayName = "Amp Room",
+            PluginPath = @"C:\VST3\Amp.vst3",
+            ClassId = "cls-a",
+        };
+        Assert.True(VstInsertRackView.SlotMatchesPluginForClear(slot, "Amp Room", null, null));
+        Assert.False(VstInsertRackView.SlotMatchesPluginForClear(slot, "Other", null, null));
+        Assert.True(VstInsertRackView.SlotMatchesPluginForClear(
+            slot, null, @"C:\VST3\Amp.vst3", "cls-a"));
+    }
+
     private static Vst3PluginEntry Entry(
         string name,
         string vendor,
