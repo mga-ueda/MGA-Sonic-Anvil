@@ -171,6 +171,32 @@ public sealed class TabMergeTests
     }
 
     [Fact]
+    public void WarnMergeActiveVstInserts_ListsTargetsAndUsesOkCancelWords()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            var japanese = UiStrings.WarnMergeActiveVstInserts("a.wav\nb.wav");
+            Assert.Contains("インサートは通りません", japanese);
+            Assert.Contains("対象:\na.wav\nb.wav", japanese);
+            Assert.Contains("\n\nOK:", japanese);
+            Assert.Contains("\nCancel:", japanese);
+
+            UiStrings.SetLanguage(UiLanguage.English);
+            var english = UiStrings.WarnMergeActiveVstInserts("a.wav\nb.wav");
+            Assert.Contains("does not apply per-tab inserts", english);
+            Assert.Contains("Affected:\na.wav\nb.wav", english);
+            Assert.Contains("\n\nOK:", english);
+            Assert.Contains("\nCancel:", english);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void FormatOverDb_RoundsOneDecibelToOne()
     {
         var peak = Math.Pow(10d, 1d / 20d);

@@ -1595,6 +1595,22 @@ public partial class MainWindow
             return;
         }
 
+        var activeInsertNames = CollectMergeActiveInsertNames(sources);
+        if (activeInsertNames.Length > 0)
+        {
+            var answer = OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.WarnMergeActiveVstInserts(string.Join("\n", activeInsertNames)),
+                UiStrings.TitleMergeTabs,
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning,
+                MessageBoxResult.Cancel);
+            if (answer != MessageBoxResult.OK)
+            {
+                return;
+            }
+        }
+
         var dialog = new SaveFileDialog
         {
             Filter = UiStrings.FilterSaveWave,
@@ -1685,6 +1701,22 @@ public partial class MainWindow
             RefreshExportEnabled();
             RefreshTransportCommandsEnabled();
         }
+    }
+
+    /// <summary>ミックスダウン対象のうち、バイパスされていない有効インサートを持つ表示名。</summary>
+    private static string[] CollectMergeActiveInsertNames(IReadOnlyList<DocumentSession> sources)
+    {
+        var names = new List<string>(sources.Count);
+        for (var i = 0; i < sources.Count; i++)
+        {
+            var session = sources[i];
+            if (session.VstInserts.HasProcessableSlot)
+            {
+                names.Add(session.DisplayName);
+            }
+        }
+
+        return names.ToArray();
     }
 
     /// <summary>前回バウンスしたフォルダ。無ければファイルを持つ最初の選択タブ、それも無ければ前回の書き出し先。</summary>

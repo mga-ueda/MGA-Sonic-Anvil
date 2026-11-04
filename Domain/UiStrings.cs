@@ -1074,6 +1074,13 @@ internal static partial class UiStrings
         "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nOK: ミックス全体を {0} dB 下げてミックスダウンする\nCancel: ミックスダウンを中止する",
         "The summed mix is {0} dB over 0 dBFS. Writing 16-bit or 24-bit would truncate the excess.\n\nOK: lower the entire mix by {0} dB and mix down\nCancel: cancel the mixdown",
         overDb);
+
+    /// <summary>ミックスダウン時、選択に有効な VST インサートがある注意（OK＝続行／Cancel＝中止）。</summary>
+    public static string WarnMergeActiveVstInserts(string list) => Format(
+        "選択中に有効な VST インサートがあります。ミックスダウンでは各タブのインサートは通りません。波形へ焼くには先にバウンスしてください。\n\n対象:\n{0}\n\nOK: このままミックスダウンする\nCancel: ミックスダウンを中止する",
+        "Some selected tabs have active VST inserts. Mixdown does not apply per-tab inserts. Bounce first to bake them into the waveform.\n\nAffected:\n{0}\n\nOK: continue the mixdown\nCancel: cancel the mixdown",
+        list);
+
     /// <summary>ミックスダウンの保存ダイアログのタイトル。</summary>
     public static string TitleMergeTabs => Get("ミックスダウン", "Mixdown");
     public static string ErrorFileNameEmpty => Get("ファイル名を入力してください。", "Enter a file name.");
