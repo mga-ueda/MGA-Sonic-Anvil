@@ -325,7 +325,7 @@ internal sealed partial class LibraryBrowserView
         };
         ArmMenuItemClick(clear, () => ClearPlaylistRequested?.Invoke(this, EventArgs.Empty));
 
-        var entries = WaveformContextMenuBuilder.Build(ResolveListWaveMenuModel(), includeHere: false);
+        var entries = WaveformContextMenuBuilder.Build(ResolveListWaveMenuModel());
         menu.Items.Clear();
         menu.Items.Add(color);
         WaveformContextMenuBuilder.Append(

@@ -185,6 +185,8 @@ public sealed class AppSettingsFileTests
             Assert.Equal(500, settings.ResolvedWwiseLookAheadTimeMs());
             Assert.Equal(100, settings.ResolvedUiScalePercent());
             Assert.Equal(1, settings.ResolvedUiScale());
+            Assert.Equal(100, settings.ResolvedTransportToolbarIconScalePercent());
+            Assert.Equal(1, settings.ResolvedTransportToolbarIconScale());
             Assert.False(File.Exists(path));
         }
         finally

@@ -2225,6 +2225,7 @@ public partial class MainWindow
             settings.ShowMainMenuBar,
             settings.ResolvedMainMenuBarAlign(),
             settings.ShowTransportToolbar,
+            settings.ResolvedTransportToolbarIconScalePercent(),
             settings.HiddenTransportToolbarCommands,
             settings.TransportToolbarLayout,
             settings.LibraryShowPlaylistPdf,
@@ -2309,6 +2310,8 @@ public partial class MainWindow
         settings.ShowMainMenuBar = dialog.SelectedShowMainMenuBar;
         settings.ApplyMainMenuBarAlign(dialog.SelectedMainMenuBarAlign);
         settings.ShowTransportToolbar = dialog.SelectedShowTransportToolbar;
+        settings.TransportToolbarIconScalePercent =
+            dialog.SelectedTransportToolbarIconScalePercent;
         var toolbarLayout = TransportToolbarCatalog.ApplyLayout(dialog.SelectedTransportToolbarLayout);
         settings.TransportToolbarLayout = toolbarLayout.Layout;
         settings.HiddenTransportToolbarCommands = toolbarLayout.Hidden;

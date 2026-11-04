@@ -12,6 +12,8 @@ internal partial class TransportBar : UserControl
     private readonly Dictionary<TransportCommand, TransportIconButton> _buttons = new();
     private readonly List<Border> _groupVeils = [];
     private string[]? _appliedLayout;
+    private double _appliedIconScale = 1;
+    private bool _sampleLoopPresent;
 
     public event EventHandler<TransportCommand>? CommandInvoked;
 
@@ -29,6 +31,8 @@ internal partial class TransportBar : UserControl
         {
             SetTooltip(item.Command, TransportToolbarCatalog.Describe(item));
         }
+
+        ApplySampleLoopButton();
     }
 
     private void SetTooltip(TransportCommand command, string tooltip)
@@ -52,6 +56,28 @@ internal partial class TransportBar : UserControl
             button.IsLatched = recording;
             button.InvalidateVisual();
         }
+    }
+
+    /// <summary>サンプルループの有無で SetLoop ボタンの絵柄・ツールチップを切り替える。</summary>
+    public void SetSampleLoopPresent(bool present)
+    {
+        _sampleLoopPresent = present;
+        ApplySampleLoopButton();
+    }
+
+    private void ApplySampleLoopButton()
+    {
+        if (!_buttons.TryGetValue(TransportCommand.SetLoop, out var button))
+        {
+            return;
+        }
+
+        button.Icon = _sampleLoopPresent ? TransportIcon.ClearLoop : TransportIcon.SetLoop;
+        button.IsLatched = _sampleLoopPresent;
+        TransportToolTip.Attach(
+            button,
+            _sampleLoopPresent ? UiStrings.TooltipClearLoop : UiStrings.TooltipSetLoop);
+        button.InvalidateVisual();
     }
 
     public void SetAnalysisView(WaveformAnalysisView view)
@@ -224,9 +250,10 @@ internal partial class TransportBar : UserControl
                 or TransportCommand.DeleteAllMarkers => a.HasMarkers,
             TransportCommand.DeleteRegions => a.HasSelectedRegions && a.AllowsRegionsAndLoops,
             TransportCommand.DeleteAllRegions => a.HasRegions && a.AllowsRegionsAndLoops,
-            TransportCommand.SetRegion
-                or TransportCommand.SetLoop => a.HasSelection && a.AllowsRegionsAndLoops,
-            TransportCommand.ClearLoop => a.HasSampleLoop && a.AllowsRegionsAndLoops,
+            TransportCommand.SetRegion => a.HasSelection && a.AllowsRegionsAndLoops,
+            // ループ無し＝選択から設定、ループ有り＝解除。どちらかできれば押せる。
+            TransportCommand.SetLoop =>
+                a.AllowsRegionsAndLoops && (a.HasSelection || a.HasSampleLoop),
             TransportCommand.Bounce => a.CanBounce,
             TransportCommand.MergeTabs => a.CanMergeTabs,
             _ => true,
@@ -236,13 +263,18 @@ internal partial class TransportBar : UserControl
     public void ApplyLayoutFromSettings(AppSettings settings)
     {
         var layout = TransportToolbarCatalog.ResolveLayout(settings);
-        // 再生／停止のクローム同期からも呼ばれる。並びが同じなら組み直さない（全ボタンが一瞬消えて点滅する）。
-        if (_appliedLayout is { } applied && applied.SequenceEqual(layout, StringComparer.Ordinal))
+        var iconScale = settings.ResolvedTransportToolbarIconScale();
+        // 再生／停止のクローム同期からも呼ばれる。並びと倍率が同じなら組み直さない（全ボタンが一瞬消えて点滅する）。
+        if (_appliedLayout is { } applied
+            && applied.SequenceEqual(layout, StringComparer.Ordinal)
+            && _appliedIconScale == iconScale)
         {
             return;
         }
 
         _appliedLayout = layout;
+        _appliedIconScale = iconScale;
+        ApplyIconScale(iconScale);
         ItemsHost.Children.Clear();
         _groupVeils.Clear();
         // 旧グループの StackPanel に残ったボタンを外してから付け直す。
@@ -259,7 +291,7 @@ internal partial class TransportBar : UserControl
         {
             if (TransportToolbarCatalog.IsSectionSeparator(entry))
             {
-                groupButtons?.Children.Add(CreateSectionSeparator());
+                groupButtons?.Children.Add(CreateSectionSeparator(iconScale));
                 continue;
             }
 
@@ -380,6 +412,17 @@ internal partial class TransportBar : UserControl
         return play!;
     }
 
+    private void ApplyIconScale(double iconScale)
+    {
+        var side = DesignMetrics.TransportButtonSideAt(iconScale);
+        MinHeight = DesignMetrics.TransportRowHeightAt(iconScale);
+        foreach (var button in _buttons.Values)
+        {
+            button.Width = side;
+            button.Height = side;
+        }
+    }
+
     private static Border CreateGroupVeil(UIElement content)
     {
         var veil = new Border
@@ -404,12 +447,12 @@ internal partial class TransportBar : UserControl
     }
 
     /// <summary>グループ内の区切り線（メニューのセパレータ／サブメニュー境界）。</summary>
-    private static Border CreateSectionSeparator()
+    private static Border CreateSectionSeparator(double iconScale)
     {
         var line = new Border
         {
             Width = DesignMetrics.From96(1),
-            Height = DesignMetrics.From96(16),
+            Height = DesignMetrics.From96(16) * Math.Max(1e-6, iconScale),
             Margin = new Thickness(
                 DesignMetrics.From96(2),
                 0,

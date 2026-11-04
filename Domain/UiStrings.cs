@@ -282,6 +282,10 @@ internal static partial class UiStrings
     public static string LabelShowTransportToolbar => Get(
         "ツールバーを表示(_T)",
         "Show _toolbar");
+    /// <summary>設定・レイアウト。ツールバーアイコンの拡大（最大 2 倍）。</summary>
+    public static string LabelTransportToolbarIconScale => Get(
+        "アイコンサイズ",
+        "Icon size");
     /// <summary>設定・レイアウトプリセット。ツールバー位置コンボの見出し。</summary>
     public static string LabelTransportToolbarDock => Get("ツールバー", "Toolbar");
     public static string ButtonTransportToolbarCustomize => Get(
@@ -321,6 +325,8 @@ internal static partial class UiStrings
     public static string IconStatePlaying => Get("再生中", "Playing");
     public static string IconStateRecordIdle => Get("待機中", "Idle");
     public static string IconStateRecording => Get("録音中", "Recording");
+    public static string IconStateNoLoop => Get("ループなし", "No loop");
+    public static string IconStateHasLoop => Get("ループあり", "Loop set");
     // ツールバー表示名はメニュー文言を正本にし、アクセスキーだけ除く（表記揺れ防止）。
     public static string LabelToolbarPlay => WithoutAccessKey(WaveMenuPlay);
     public static string LabelToolbarRecord => WithoutAccessKey(WaveMenuRecord);
@@ -384,7 +390,6 @@ internal static partial class UiStrings
     public static string LabelToolbarSampleRate => WithoutAccessKey(WaveMenuSampleRate);
     public static string LabelToolbarBitDepth => WithoutAccessKey(WaveMenuBitDepth);
     public static string LabelToolbarChannels => WithoutAccessKey(WaveMenuChannels);
-    public static string LabelToolbarClearLoop => WithoutAccessKey(WaveMenuClearLoop);
     public static string LabelToolbarDeleteMarkers => WithoutAccessKey(WaveMenuDeleteMarkers);
     public static string LabelToolbarJumpToTime => WithoutAccessKey(WaveMenuFocusTime);
     public static string LabelToolbarSpectrogram => WithoutAccessKey(WaveMenuViewSpectrogram);
@@ -1254,7 +1259,7 @@ internal static partial class UiStrings
     public static string TooltipSampleRate => Get("サンプルレート (S)", "Sample rate (S)");
     public static string TooltipBitDepth => Get("ビット深度 (B)", "Bit depth (B)");
     public static string TooltipChannels => Get("チャンネル (C)", "Channels (C)");
-    public static string TooltipClearLoop => Get("ループを削除", "Clear loop");
+    public static string TooltipClearLoop => Get("ループを解除", "Clear loop");
     public static string TooltipDeleteMarkers => Get("マーカーを削除 (Ctrl+Delete)", "Delete markers (Ctrl+Delete)");
     public static string TooltipTimeZoomIn => Get("時間拡大 (↑)", "Zoom in time (↑)");
     public static string TooltipTimeZoomOut => Get("時間縮小 (↓)", "Zoom out time (↓)");

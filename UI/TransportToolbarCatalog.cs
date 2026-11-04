@@ -148,8 +148,6 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.AddMarker, () => UiStrings.LabelToolbarAddMarker, () => UiStrings.TooltipAddMarker),
         new(TransportCommand.SetLoop, TransportIcon.SetLoop,
             WaveMenuCommand.SetLoop, () => UiStrings.LabelToolbarSetLoop, () => UiStrings.TooltipSetLoop),
-        new(TransportCommand.ClearLoop, TransportIcon.ClearLoop,
-            WaveMenuCommand.ClearLoopItem, () => UiStrings.LabelToolbarClearLoop, () => UiStrings.TooltipClearLoop),
         new(TransportCommand.SetRegion, TransportIcon.SetRegion,
             WaveMenuCommand.SetRegion, () => UiStrings.LabelToolbarSetRegion, () => UiStrings.TooltipSetRegion),
         new(TransportCommand.DeleteMarkers, TransportIcon.DeleteMarkers,
@@ -229,7 +227,7 @@ internal static class TransportToolbarCatalog
     }
 
     private static IReadOnlyList<WaveMenuEntry> MenuTree() =>
-        WaveformContextMenuBuilder.Build(new WaveformContextMenuModel(), includeHere: false);
+        WaveformContextMenuBuilder.Build(new WaveformContextMenuModel());
 
     private static MenuLayout BuildMenuLayout()
     {
@@ -330,6 +328,11 @@ internal static class TransportToolbarCatalog
             [
                 new(TransportIcon.Record, () => UiStrings.IconStateRecordIdle),
                 new(TransportIcon.Record, () => UiStrings.IconStateRecording, Latched: true),
+            ],
+            TransportCommand.SetLoop =>
+            [
+                new(TransportIcon.SetLoop, () => UiStrings.IconStateNoLoop),
+                new(TransportIcon.ClearLoop, () => UiStrings.IconStateHasLoop, Latched: true),
             ],
             _ => [],
         };
@@ -664,9 +667,12 @@ internal static class TransportToolbarCatalog
         return [.. result];
     }
 
-    /// <summary>旧 Bounce Single／All を現行の Bounce へ寄せる。</summary>
+    /// <summary>旧 Bounce Single／All、および分離していた ClearLoop を現行名へ寄せる。</summary>
     private static string MapLegacyCommandName(string name) =>
-        name is "BounceSingle" or "BounceAll"
-            ? nameof(TransportCommand.Bounce)
-            : name;
+        name switch
+        {
+            "BounceSingle" or "BounceAll" => nameof(TransportCommand.Bounce),
+            "ClearLoop" => nameof(TransportCommand.SetLoop),
+            _ => name,
+        };
 }

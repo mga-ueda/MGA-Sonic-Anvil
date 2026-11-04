@@ -198,10 +198,15 @@ public partial class MainWindow
                 TryAddMarkerAtPlayhead();
                 break;
             case TransportCommand.SetLoop:
-                SetSampleLoopFromSelection();
-                break;
-            case TransportCommand.ClearLoop:
-                ClearSampleLoop();
+                if (_document is { SampleLoop.IsEmpty: false })
+                {
+                    ClearSampleLoop();
+                }
+                else
+                {
+                    SetSampleLoopFromSelection();
+                }
+
                 break;
             case TransportCommand.SetRegion:
                 TrySetRegionFromSelection();

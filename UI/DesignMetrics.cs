@@ -123,7 +123,10 @@ internal static class DesignMetrics
 
     /// <summary>ツールバー1行分（上下余白 1+1 + ボタン）。折り返しで行が増える。</summary>
     public static double TransportRowHeight =>
-        From96(2) + TransportButtonSide;
+        TransportRowHeightAt(1);
+
+    public static double TransportRowHeightAt(double iconScale) =>
+        From96(2) + TransportButtonSideAt(iconScale);
 
     /// <summary>バージョン情報ダイアログなどの権利表記フォント。</summary>
     public static double BrandLicenseFontSize => From96(8);
@@ -144,6 +147,9 @@ internal static class DesignMetrics
     public static double WindowFramePad => From96(24);
 
     public static double TransportButtonSide => From96(24);
+
+    public static double TransportButtonSideAt(double iconScale) =>
+        TransportButtonSide * Math.Max(1e-6, iconScale);
 
     public static double TransportWaapiButtonWidth => From96(56);
 

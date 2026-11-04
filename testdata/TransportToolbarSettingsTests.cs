@@ -13,6 +13,8 @@ public sealed class TransportToolbarSettingsTests
     {
         var settings = new AppSettings();
         Assert.True(settings.ShowTransportToolbar);
+        Assert.Equal(100, settings.ResolvedTransportToolbarIconScalePercent());
+        Assert.Equal(1, settings.ResolvedTransportToolbarIconScale());
         Assert.Empty(settings.HiddenTransportToolbarCommands);
         Assert.Empty(settings.TransportToolbarLayout);
         Assert.True(AppSettings.CreateDefault().ShowTransportToolbar);
@@ -69,7 +71,7 @@ public sealed class TransportToolbarSettingsTests
         try
         {
             UiStrings.SetLanguage(UiLanguage.Japanese);
-            var menu = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel(), includeHere: false)
+            var menu = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel())
                 .OfType<WaveMenuItemEntry>()
                 .ToArray();
             string CategoryOf(WaveMenuCommand command) => UiStrings.WithoutAccessKey(
@@ -221,17 +223,30 @@ public sealed class TransportToolbarSettingsTests
     }
 
     [Fact]
+    public void NormalizeLayout_MapsLegacyClearLoopToSetLoop()
+    {
+        var normalized = TransportToolbarCatalog.NormalizeLayout(
+            ["ClearLoop", "Open", "SetLoop"]);
+        Assert.Contains(nameof(TransportCommand.SetLoop), normalized);
+        Assert.DoesNotContain("ClearLoop", normalized);
+        Assert.Equal(1, normalized.Count(entry => entry == nameof(TransportCommand.SetLoop)));
+    }
+
+    [Fact]
     public void Settings_HiddenCommandsRoundTrip()
     {
         var json = JsonSerializer.Serialize(
             new AppSettings
             {
                 ShowTransportToolbar = false,
+                TransportToolbarIconScalePercent = 200,
                 HiddenTransportToolbarCommands = ["TogglePlayback", "Record"],
             },
             AppSettingsJsonContext.Default.AppSettings);
         var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
         Assert.False(back!.ShowTransportToolbar);
+        Assert.Equal(200, back.TransportToolbarIconScalePercent);
+        Assert.Equal(2, back.ResolvedTransportToolbarIconScale());
         Assert.Equal(["TogglePlayback", "Record"], back.HiddenTransportToolbarCommands);
         Assert.False(TransportToolbarCatalog.IsCommandVisible(back, TransportCommand.TogglePlayback));
         Assert.True(TransportToolbarCatalog.IsCommandVisible(back, TransportCommand.Open));
@@ -361,6 +376,7 @@ public sealed class TransportToolbarSettingsTests
     [Theory]
     [InlineData(nameof(TransportCommand.TogglePlayback))]
     [InlineData(nameof(TransportCommand.Record))]
+    [InlineData(nameof(TransportCommand.SetLoop))]
     public void IconVariants_ListEveryStateStartingWithCatalogIcon(string commandName)
     {
         Assert.True(TransportToolbarCatalog.TryGetItem(commandName, out var item));
@@ -411,6 +427,52 @@ public sealed class TransportToolbarSettingsTests
                 bar.ApplyLayoutFromSettings(settings);
                 Assert.DoesNotContain(sentinel, host.Children.Cast<object>());
                 Assert.Single(host.Children);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+            throw new Exception(error.ToString());
+        }
+    }
+
+    [Fact]
+    public void ApplyLayoutFromSettings_ScalesIconButtonsUpToTwoTimes()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (System.Windows.Application.Current is null)
+                {
+                    _ = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+                }
+
+                var assembly = Uri.EscapeDataString(typeof(TransportBar).Assembly.GetName().Name!);
+                System.Windows.Application.Current!.Resources.MergedDictionaries.Add(new System.Windows.ResourceDictionary
+                {
+                    Source = new Uri($"pack://application:,,,/{assembly};component/Themes/UiColors.xaml", UriKind.Absolute),
+                });
+
+                var bar = new TransportBar();
+                var settings = new AppSettings();
+                bar.ApplyLayoutFromSettings(settings);
+                var play = Assert.IsType<TransportIconButton>(bar.ButtonFor(TransportCommand.TogglePlayback));
+                Assert.Equal(DesignMetrics.TransportButtonSide, play.Width);
+                Assert.Equal(DesignMetrics.TransportRowHeight, bar.MinHeight);
+
+                settings.TransportToolbarIconScalePercent = 200;
+                bar.ApplyLayoutFromSettings(settings);
+                Assert.Equal(DesignMetrics.TransportButtonSide * 2, play.Width);
+                Assert.Equal(DesignMetrics.TransportButtonSide * 2, play.Height);
+                Assert.Equal(DesignMetrics.TransportRowHeightAt(2), bar.MinHeight);
             }
             catch (Exception ex)
             {

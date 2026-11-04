@@ -140,7 +140,6 @@ internal enum TransportCommand
     ClearSelection,
     AddMarker,
     SetLoop,
-    ClearLoop,
     SetRegion,
     DeleteMarkers,
     NewDocument,

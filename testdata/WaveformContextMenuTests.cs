@@ -147,15 +147,17 @@ public sealed class WaveformContextMenuTests
     }
 
     [Fact]
-    public void Build_MenuBarOmitsHereCategory()
+    public void Build_SameModelYieldsIdenticalCommandTree()
     {
-        var tree = WaveformContextMenuBuilder.Build(
-            WaveformContextMenuModel.AllEnabledForTests(),
-            includeHere: false);
-        Assert.DoesNotContain(
-            UiStrings.WaveMenuCatHere,
-            tree.OfType<WaveMenuItemEntry>().Select(item => item.Header));
-        Assert.DoesNotContain(WaveMenuCommand.PlayFromHere, WaveformContextMenuBuilder.Commands(tree));
+        // 右クリックも上部メニューも同じ Build。同一モデルならコマンド集合も一致する。
+        var model = WaveformContextMenuModel.AllEnabledForTests();
+        var a = WaveformContextMenuBuilder.Commands(WaveformContextMenuBuilder.Build(model)).ToArray();
+        var b = WaveformContextMenuBuilder.Commands(WaveformContextMenuBuilder.Build(model)).ToArray();
+        Assert.Equal(a, b);
+        Assert.Contains(WaveMenuCommand.PlayFromHere, a);
+        Assert.Contains(WaveMenuCommand.SetLoop, a);
+        Assert.Contains(WaveMenuCommand.ClearLoopItem, a);
+        Assert.Contains(WaveMenuCommand.ClearLoop, a);
     }
 
     [Fact]
@@ -341,11 +343,25 @@ public sealed class WaveformContextMenuTests
             Assert.DoesNotContain(WaveMenuCommand.DeleteAllMarkers, root);
             Assert.Contains(WaveMenuCommand.DeleteAllMarkers, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
             Assert.Contains(WaveMenuCommand.DeleteAllRegions, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
+            Assert.Contains(WaveMenuCommand.SetLoop, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
+            Assert.Contains(WaveMenuCommand.ClearLoopItem, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
         }
         finally
         {
             UiStrings.SetLanguage(previous);
         }
+    }
+
+    [Fact]
+    public void Build_HereAndTimelineBothExposeLoopCommands()
+    {
+        var tree = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests());
+        Assert.Contains(UiStrings.WaveMenuCatHere, tree.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+        Assert.Contains(WaveMenuCommand.ClearLoop, CommandsIn(tree, UiStrings.WaveMenuCatHere));
+        Assert.Contains(WaveMenuCommand.SetLoop, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
+        Assert.Contains(WaveMenuCommand.ClearLoopItem, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
+        Assert.True(Category(tree, UiStrings.WaveMenuCatTimeline).Enabled);
+        Assert.True(Category(tree, UiStrings.WaveMenuCatHere).Enabled);
     }
 
     [Fact]
@@ -721,15 +737,14 @@ public sealed class WaveformContextMenuTests
             foreach (var language in new[] { UiLanguage.Japanese, UiLanguage.English })
             {
                 UiStrings.SetLanguage(language);
-                var roots = WaveformContextMenuBuilder.Build(
-                        WaveformContextMenuModel.AllEnabledForTests(),
-                        includeHere: false)
+                var roots = WaveformContextMenuBuilder.Build(WaveformContextMenuModel.AllEnabledForTests())
                     .OfType<WaveMenuItemEntry>()
                     .Select(item => (item.Header, Key: MenuAccessKeys.Read(item.Header)))
                     .ToList();
                 Assert.All(roots, r => Assert.True(r.Key is not null, r.Header));
 
                 var byKey = roots.ToDictionary(r => r.Key!.Value, r => r.Header);
+                Assert.Equal(UiStrings.WaveMenuCatHere, byKey['H']);
                 Assert.Equal(UiStrings.WaveMenuCatFile, byKey['F']);
                 Assert.Equal(UiStrings.WaveMenuCatEdit, byKey['E']);
                 Assert.Equal(UiStrings.WaveMenuCatFormat, byKey['N']);

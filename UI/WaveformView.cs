@@ -3100,6 +3100,17 @@ internal sealed partial class WaveformView : Grid
             return false;
         }
 
+        Focus();
+        ContextMenuRequested?.Invoke(this, BuildContextHit(pos, frameOverride));
+        return true;
+    }
+
+    /// <summary>メニューバー／キーボード用。再生ヘッド位置を「この位置」の基準にする。</summary>
+    public WaveformContextHit CaptureContextHitAtPlayhead() =>
+        BuildContextHit(ContextPointAtPlayhead(), PlayheadFrame);
+
+    private WaveformContextHit BuildContextHit(Point pos, long? frameOverride = null)
+    {
         var hitMarker = TryHitMarkerFlag(pos, out var marker);
         var hitRegion = TryHitRegionFlag(pos, out var region);
         var hitLoop = TryHitSampleLoopBar(pos);
@@ -3111,15 +3122,13 @@ internal sealed partial class WaveformView : Grid
                 : [marker.Frame];
         }
 
-        Focus();
-        ContextMenuRequested?.Invoke(this, new WaveformContextHit
+        return new WaveformContextHit
         {
             Frame = frameOverride ?? PointerFrame(pos.X),
             MarkerFrames = frames,
             Region = hitRegion ? region : WaveSelection.Empty,
             HitLoop = hitLoop,
-        });
-        return true;
+        };
     }
 
     private bool ContainsLocalPoint(Point pos) =>
