@@ -207,7 +207,7 @@
         <ul>
           <li>In Settings, New, and save-confirm dialogs, <kbd>Tab</kbd> also moves to the buttons.</li>
           <li><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd> goes to the next tab, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd> to the previous (wraps from the end to the start; key-repeat pauses at the ends). <kbd>Esc</kbd> closes it.</li>
-          <li>Width follows the Audio tab. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / Wwise / VST.</li>
+          <li>Width follows the Audio tab. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / VST / Wwise.</li>
         </ul>
         <h4>General</h4>
         <ul>
@@ -796,7 +796,7 @@
           <li>Click a filled slot for the GUI; the same shortcut closes it when open. <kbd>Ctrl</kbd>+click toggles bypass. Right-click for Insert / Insert to All Tabs / Bypass / Persist / Remove, and so on.</li>
           <li>Drag to an empty slot to move, or swap two occupied slots. Persisted slots stay on the same index across every open tab.</li>
           <li><strong>Persist</strong> — remembers the plug-in, parameters, and bypass for every open tab and the next launch. Clear it from the right-click menu.</li>
-          <li><strong>Include Tail</strong> (left of the rack, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) — when bouncing, extend the waveform until effect tails die out; off keeps the original length.</li>
+          <li><strong>Include Tail</strong> (left of the rack, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>) — when bouncing, extend the waveform until effect tails die out; off keeps the original length (on by default).</li>
           <li><strong>Bounce Selected</strong> (toolbar / Export menu / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) — bakes inserts into the waveform on the selected tabs (or the active tab) and bypasses those slots. Editor only. Undoable. Separate from <a href="#layout-tabs">Mixdown</a> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), which stacks tabs.</li>
           <li>Some plug-ins (for example Altiverb) will not load under a debugger. Launch the exe without a debugger from Visual Studio / Cursor.</li>
         </ul>
@@ -1114,7 +1114,7 @@
       </div>
 
       <h2 id="settings">10. Settings and language</h2>
-      <p>Settings are the gear on the toolbar, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / Wwise / VST. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
+      <p>Settings are the gear on the toolbar, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>. Tabs are General / Layout / Shown / Color / Audio / Player / Editing / Export · Paths / VST / Wwise. Details for each item are under <a href="#layout-settings">Layout → Settings</a>. <kbd>Esc</kbd> closes the window.</p>
       <ul>
         <li>Language is on General. The default is <span class="ui">Auto</span> (Japanese if the PC is Japanese, otherwise English). The Japanese UI may still show some English labels.</li>
         <li>Wallpaper is also on General. None by default. It covers the window over the animated background while keeping its aspect ratio. Details are under <a href="#layout-settings">Layout → Settings</a>.</li>
@@ -1203,7 +1203,7 @@
         <li><kbd>F</kbd> File / <kbd>E</kbd> Edit / <kbd>N</kbd> Convert / <kbd>X</kbd> Export / <kbd>V</kbd> View / <kbd>T</kbd> Timeline</li>
         <li><kbd>B</kbd> Tabs / <kbd>P</kbd> Playback / <kbd>A</kbd> Audio / <kbd>W</kbd> Wwise / <kbd>O</kbd> Other</li>
       </ul>
-      <p>Status-bar, monitor-column, and playlist-toolbar toggles show no underline in their labels. Toggle them with the <kbd>Alt</kbd>+<kbd>Shift</kbd>+letter keys below (separate from menu access keys). Many still work while F8 / F9 hide the chrome.</p>
+      <p>Status-bar, monitor-column, playlist-toolbar, WAAPI-bar, and VST-insert-rack toggles show no underline in their labels. Toggle them with the <kbd>Alt</kbd>+<kbd>Shift</kbd>+letter keys below (separate from menu access keys). Many still work while F8 / F9 hide the chrome.</p>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
@@ -1217,7 +1217,7 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Show / hide the WAAPI bar (<strong>editor only</strong>; off in the player)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Play -E (only while the WAAPI bar is visible; <strong>editor only</strong>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Auto Active (only while the WAAPI bar is visible; no underline on the label; <strong>editor only</strong>)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (VST insert rack; extend / cut tails on bounce; <strong>editor only</strong>)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (VST insert rack; extend / cut tails on bounce; on by default; <strong>editor only</strong>)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from the playback start (while tile search has focus, closes non-matching tiles instead)</td></tr>
         </tbody>
       </table>
@@ -1372,7 +1372,7 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd></td><td>Slot action: empty = pick a plug-in; bypassed = clear bypass; filled = open / close the GUI</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (extend / cut tails when bouncing)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Include Tail (extend / cut tails when bouncing; on by default)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click (slot)</td><td>Toggle bypass</td></tr>
         </tbody>
