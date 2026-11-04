@@ -1001,6 +1001,8 @@ internal sealed class SilenceDetectDialog : Window
 
 /// <summary>
 /// 選択範囲の波形と ±しきい値線。残す区間とヒットは適用時と同じ検出。
+/// 波形は SilenceDetectWaveFillBrush、背景は SilenceDetectWaveformBackBrush。
+/// 残す区間は SilenceDetectSelectionBack / SelectionWaveFill。
 /// 波形はエディタ本体と同じ PeakPyramid／輪郭接続／LOD／折れ線切替。ホイールはカーソル位置を基準に時間方向へ拡縮する。
 /// </summary>
 internal sealed class SilenceDetectWavePreview : FrameworkElement
@@ -1034,7 +1036,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     private bool _seekNudgeRepeatStarted;
     private long _seekNudgeLastAt;
     private double _hoverX = double.NaN;
-    private static readonly Pen HoverBarPen = CreateHoverBarPen();
+    private Pen? _hoverBarPen;
+    private Color _hoverBarColor;
     private Pen? _seekGlowOuter;
     private Pen? _seekGlowInner;
     private Pen? _seekCore;
@@ -1064,6 +1067,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
             _hitPointMode = value;
             RefreshKeepsFromEnvelope();
+            MarkWaveDirty();
             InvalidateVisual();
         }
     }
@@ -1076,8 +1080,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             _document = value;
             ResetView();
             RefreshDisplayGain();
-            MarkWaveDirty();
             RefreshKeepsFromEnvelope();
+            MarkWaveDirty();
             InvalidateVisual();
         }
     }
@@ -1090,8 +1094,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             _range = value;
             ResetView();
             RefreshDisplayGain();
-            MarkWaveDirty();
             RefreshKeepsFromEnvelope();
+            MarkWaveDirty();
             InvalidateVisual();
         }
     }
@@ -1103,8 +1107,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         {
             _channelMask = value;
             RefreshDisplayGain();
-            MarkWaveDirty();
             RefreshKeepsFromEnvelope();
+            MarkWaveDirty();
             InvalidateVisual();
         }
     }
@@ -1122,6 +1126,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             }
 
             RefreshKeepsFromEnvelope();
+            MarkWaveDirty();
             InvalidateVisual();
         }
     }
@@ -1665,6 +1670,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         _dragging = false;
         RefreshKeepsFromEnvelope();
+        MarkWaveDirty();
         InvalidateVisual();
     }
 
@@ -1758,9 +1764,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             return;
         }
 
-        var back = WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush"));
+        var back = WpfControlHelpers.FrozenBrush(Theme.Get("SilenceDetectWaveformBackBrush"));
         var zero = WpfControlHelpers.FrozenBrush(Theme.Get("WaveZeroLineBrush"));
-        var silenceDim = WpfControlHelpers.FrozenBrush(Theme.Get("OverviewOutsideFillBrush"));
         var thresholdBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterClipOnBrush"));
         dc.DrawRectangle(back, null, new Rect(0, 0, width, height));
 
@@ -1773,12 +1778,6 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         {
             var viewStart = _viewStart;
             var viewSpan = Math.Max(1.0, _viewSpan);
-            if (!_hitPointMode)
-            {
-                // 残す区間は地色のまま。無音側だけ概要バーと同様に薄く暗くする。
-                DrawSilenceDim(dc, silenceDim, width, height, viewStart, viewSpan);
-            }
-
             if (_bitmap is not null)
             {
                 dc.DrawImage(_bitmap, new Rect(0, 0, width, height));
@@ -1813,67 +1812,6 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         DrawSeekBar(dc, width, height);
     }
 
-    /// <summary>
-    /// 表示範囲内の無音（keep の外側）を薄く暗くする。keep 区間は WaveformBack のまま残す。
-    /// </summary>
-    private void DrawSilenceDim(
-        DrawingContext dc,
-        Brush dim,
-        double width,
-        double height,
-        double viewStart,
-        double viewSpan)
-    {
-        var viewEnd = viewStart + viewSpan;
-        var cursor = viewStart;
-        foreach (var span in _keeps)
-        {
-            if (span.IsEmpty)
-            {
-                continue;
-            }
-
-            var keepStart = Math.Max(span.StartFrame, viewStart);
-            var keepEnd = Math.Min(span.EndFrame, viewEnd);
-            if (keepEnd <= cursor)
-            {
-                continue;
-            }
-
-            if (keepStart > cursor)
-            {
-                DrawDimBand(dc, dim, cursor, keepStart, viewStart, viewSpan, width, height);
-            }
-
-            cursor = Math.Max(cursor, keepEnd);
-        }
-
-        if (cursor < viewEnd)
-        {
-            DrawDimBand(dc, dim, cursor, viewEnd, viewStart, viewSpan, width, height);
-        }
-    }
-
-    private static void DrawDimBand(
-        DrawingContext dc,
-        Brush dim,
-        double frame0,
-        double frame1,
-        double viewStart,
-        double viewSpan,
-        double width,
-        double height)
-    {
-        var x0 = (frame0 - viewStart) / viewSpan * width;
-        var x1 = (frame1 - viewStart) / viewSpan * width;
-        if (x1 <= x0 + 0.5)
-        {
-            return;
-        }
-
-        dc.DrawRectangle(dim, null, new Rect(x0, 0, x1 - x0, height));
-    }
-
     private void UpdateHoverBar(double x)
     {
         if (!double.IsNaN(_hoverX) && Math.Abs(_hoverX - x) < 0.5)
@@ -1896,11 +1834,18 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         InvalidateVisual();
     }
 
-    private static Pen CreateHoverBarPen()
+    /// <summary>エディタのマウスガイドと同じ MouseGuideBrush。</summary>
+    private void EnsureHoverBarPen()
     {
-        var pen = new Pen(Brushes.White, 1);
-        pen.Freeze();
-        return pen;
+        var color = Theme.Get("MouseGuideBrush");
+        if (_hoverBarPen is not null && _hoverBarColor == color)
+        {
+            return;
+        }
+
+        _hoverBarColor = color;
+        _hoverBarPen = new Pen(WpfControlHelpers.FrozenBrush(color), 1);
+        _hoverBarPen.Freeze();
     }
 
     private void DrawHoverBar(DrawingContext dc, double width, double height)
@@ -1910,8 +1855,9 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             return;
         }
 
+        EnsureHoverBarPen();
         var x = Math.Clamp(_hoverX, 0, width);
-        dc.DrawLine(HoverBarPen, new Point(x, 0), new Point(x, height));
+        dc.DrawLine(_hoverBarPen!, new Point(x, 0), new Point(x, height));
     }
 
     private void PlaceSeek(double x)
@@ -2157,7 +2103,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         var traceSamples = WaveformView.IsPolylineZoom(sampleFrames, pxW);
         var count = traceSamples ? 0 : FillVisibleColumns(pxW, start, end);
         var bitmap = new WriteableBitmap(pxW, pxH, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32, null);
-        var wave = ToPbgra(Theme.Get("WaveFillBrush"));
+        var wave = ToPbgra(Theme.Get("SilenceDetectWaveFillBrush"));
         bitmap.Lock();
         unsafe
         {
@@ -2179,6 +2125,12 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             {
                 PaintEnvelopeColumns(buffer, stride, pxW, pxH, count, mid, amp, wave, sampleFrames);
             }
+
+            // 残す区間は背景↔波形の入れ替え（専用色同士）。
+            if (!_hitPointMode)
+            {
+                InvertKeepSpans(buffer, stride, pxW, pxH);
+            }
         }
 
         bitmap.AddDirtyRect(new Int32Rect(0, 0, pxW, pxH));
@@ -2191,6 +2143,43 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         _bitmapViewSpan = _viewSpan;
         _bitmapGain = DrawnGain;
         _waveDirty = false;
+    }
+
+    /// <summary>
+    /// 残す区間を選択専用色で塗る（波形→SelectionWaveFill、背景→SelectionBack）。
+    /// </summary>
+    private unsafe void InvertKeepSpans(uint* buffer, int stride, int pxW, int pxH)
+    {
+        if (_keeps.Count == 0 || _viewSpan <= 0 || pxW <= 0 || pxH <= 0)
+        {
+            return;
+        }
+
+        var selectedWave = unchecked((int)ToPbgra(Theme.Get("SilenceDetectSelectionWaveFillBrush")));
+        var selectedBack = unchecked((int)ToPbgra(Theme.Get("SilenceDetectSelectionBackBrush")));
+        foreach (var span in _keeps)
+        {
+            if (span.IsEmpty)
+            {
+                continue;
+            }
+
+            var x0 = (int)Math.Floor((span.StartFrame - _viewStart) / _viewSpan * pxW);
+            var x1 = (int)Math.Ceiling((span.EndFrame - _viewStart) / _viewSpan * pxW);
+            x0 = Math.Clamp(x0, 0, pxW);
+            x1 = Math.Clamp(x1, x0, pxW);
+            for (var x = x0; x < x1; x++)
+            {
+                for (var y = 0; y < pxH; y++)
+                {
+                    var index = y * stride + x;
+                    buffer[index] = unchecked((uint)WaveformInvertPaint.InvertPixel(
+                        unchecked((int)buffer[index]),
+                        selectedWave,
+                        selectedBack));
+                }
+            }
+        }
     }
 
     /// <summary>エディタの RasterPeakEnvelope と同じく、列 min/max を塗り、必要なら隣列と輪郭をつなぐ。</summary>

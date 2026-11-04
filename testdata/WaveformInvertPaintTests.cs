@@ -52,12 +52,44 @@ public sealed class WaveformInvertPaintTests
     }
 
     [Fact]
-    public void InvertPixel_SwapsWaveAndBackground()
+    public void InvertPixel_MapsToSelectionColors()
     {
+        var selectedWave = unchecked((int)0xFF1A1A1A);
+        var selectedBack = unchecked((int)0xFFC6D9FF);
         var wave = unchecked((int)0xFF626262);
-        var back = unchecked((int)0xFFFAFAFA);
-        Assert.Equal(back, WaveformInvertPaint.InvertPixel(wave, back, wave));
-        Assert.Equal(wave, WaveformInvertPaint.InvertPixel(0, back, wave));
+        Assert.Equal(selectedWave, WaveformInvertPaint.InvertPixel(wave, selectedWave, selectedBack));
+        Assert.Equal(selectedBack, WaveformInvertPaint.InvertPixel(0, selectedWave, selectedBack));
+    }
+
+    [Fact]
+    public void SelectionColors_DefaultToFormerInvertPair()
+    {
+        // エディタ選択: 旧・反転（WaveFill ↔ WaveformBack）と同じ既定。
+        var selectionBack = UiThemePalette.ColorFor(UiTheme.Dark, "WaveSelectionBackBrush");
+        var selectionWave = UiThemePalette.ColorFor(UiTheme.Dark, "WaveSelectionWaveFillBrush");
+        Assert.Equal(0xC6, selectionBack.R);
+        Assert.Equal(0xD9, selectionBack.G);
+        Assert.Equal(0xFF, selectionBack.B);
+        Assert.Equal(0x26, selectionWave.R);
+        Assert.Equal(0x26, selectionWave.G);
+        Assert.Equal(0x26, selectionWave.B);
+    }
+
+    [Fact]
+    public void SilenceDetectColors_MatchCurrentDefaults()
+    {
+        var wave = UiThemePalette.ColorFor(UiTheme.Dark, "SilenceDetectWaveFillBrush");
+        var back = UiThemePalette.ColorFor(UiTheme.Dark, "SilenceDetectWaveformBackBrush");
+        var selectionBack = UiThemePalette.ColorFor(UiTheme.Dark, "SilenceDetectSelectionBackBrush");
+        var selectionWave = UiThemePalette.ColorFor(UiTheme.Dark, "SilenceDetectSelectionWaveFillBrush");
+        Assert.Equal(0x91, wave.R);
+        Assert.Equal(0x9F, wave.G);
+        Assert.Equal(0xBB, wave.B);
+        Assert.Equal(wave, selectionBack);
+        Assert.Equal(0x26, back.R);
+        Assert.Equal(0x26, back.G);
+        Assert.Equal(0x26, back.B);
+        Assert.Equal(back, selectionWave);
     }
 
     [Fact]
@@ -70,8 +102,8 @@ public sealed class WaveformInvertPaintTests
         Assert.True(((edge >> 16) & 0xFF) < ((center >> 16) & 0xFF));
         var inverted = WaveformInvertPaint.InvertShaded(
             fill,
-            back: unchecked((int)0xFF1A1A1A),
-            waveFill: fill,
+            selectedWave: unchecked((int)0xFF1A1A1A),
+            selectedBack: fill,
             y: 0,
             height: 100,
             shadeLanes: true,
