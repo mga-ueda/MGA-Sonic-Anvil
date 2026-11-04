@@ -18,10 +18,11 @@ internal sealed class ConfirmChoiceWindow : Window
         MessageBoxResult defaultResult,
         string? yesText = null,
         string? noText = null,
-        string? cancelText = null)
+        string? cancelText = null,
+        bool orangeNo = false)
     {
         var dialog = new ConfirmChoiceWindow(
-            text, caption, buttons, defaultResult, yesText, noText, cancelText);
+            text, caption, buttons, defaultResult, yesText, noText, cancelText, orangeNo);
         if (owner is not null)
         {
             // 起動クローク中の本体を Owner にすると、ダイアログも見えず操作不能になる。
@@ -73,7 +74,8 @@ internal sealed class ConfirmChoiceWindow : Window
         MessageBoxResult defaultResult,
         string? yesText = null,
         string? noText = null,
-        string? cancelText = null)
+        string? cancelText = null,
+        bool orangeNo = false)
     {
         Result = DismissResult(buttons);
         Title = caption;
@@ -121,6 +123,7 @@ internal sealed class ConfirmChoiceWindow : Window
             row.Children.Add(CreateButton(
                 string.IsNullOrEmpty(noText) ? UiStrings.ButtonCancel : noText,
                 MessageBoxResult.No,
+                orange: orangeNo,
                 isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons),
                 isCancel: true));
         }
@@ -135,6 +138,7 @@ internal sealed class ConfirmChoiceWindow : Window
             row.Children.Add(CreateButton(
                 string.IsNullOrEmpty(noText) ? UiStrings.ButtonNo : noText,
                 MessageBoxResult.No,
+                orange: orangeNo,
                 isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons)));
             row.Children.Add(CreateButton(
                 string.IsNullOrEmpty(cancelText) ? UiStrings.ButtonYesNoCancel : cancelText,
@@ -158,6 +162,7 @@ internal sealed class ConfirmChoiceWindow : Window
         string label,
         MessageBoxResult choice,
         bool accent = false,
+        bool orange = false,
         bool isDefault = false,
         bool isCancel = false)
     {
@@ -172,6 +177,10 @@ internal sealed class ConfirmChoiceWindow : Window
         if (accent)
         {
             ActionButtonLooks.ApplyAccent(button);
+        }
+        else if (orange)
+        {
+            ActionButtonLooks.ApplyOrange(button);
         }
         else
         {

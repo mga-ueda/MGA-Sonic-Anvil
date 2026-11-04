@@ -583,15 +583,6 @@ internal sealed class AppSettings
     /// </summary>
     public VstInsertSlotSnapshot[] DefaultVstInserts { get; set; } = [];
 
-    /// <summary>
-    /// インサート・バウンスでエフェクトの残響（テール）を鳴らし切るまで波形を伸ばす。
-    /// null は未設定（既定オン）。旧 settings.json にキーが無いときもオン扱い。
-    /// </summary>
-    public bool? VstBounceIncludeTail { get; set; }
-
-    /// <summary>Include Tail。未設定はオン。</summary>
-    public bool ResolveVstBounceIncludeTail() => VstBounceIncludeTail != false;
-
     /// <summary>F10 左のフォルダツリー幅。0 以下は既定。</summary>
     public double LibraryExplorerWidth { get; set; }
 

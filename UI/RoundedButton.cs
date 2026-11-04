@@ -418,6 +418,18 @@ internal static class ActionButtonLooks
             Theme.Get("ExportButtonPressedBackBrush"),
             Theme.Get("ExportButtonForeBrush"));
 
+    /// <summary>警告寄り（永続スロットと同系のオレンジ）。ダイアログ枠は 2px。</summary>
+    public static void ApplyOrange(RoundedButton button) =>
+        Apply(
+            button,
+            Theme.Get("VstInsertSlotPersistFillBrush"),
+            Theme.Get("VstInsertSlotPersistFocusFillBrush"),
+            Theme.Get("VstInsertSlotPersistHoverFillBrush"),
+            Theme.Get("VstInsertSlotPersistBackBrush"),
+            Theme.Get("VstInsertSlotPersistHoverBackBrush"),
+            Theme.Get("VstInsertSlotPersistPressedBackBrush"),
+            Theme.Get("VstInsertSlotPersistForeBrush"));
+
     public static void ApplyVstInsertEmpty(RoundedButton button) =>
         Apply(
             button,

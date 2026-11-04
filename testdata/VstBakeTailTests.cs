@@ -1,5 +1,4 @@
 using MgaSonicAnvil.Audio;
-using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Editing;
 using Xunit;
 
@@ -49,13 +48,5 @@ public sealed class VstBakeTailTests
         command!.Apply(document);
         Assert.Equal(4, document.FrameCount);
         Assert.Equal(after, document.Interleaved);
-    }
-
-    [Fact]
-    public void AppSettings_VstBounceIncludeTail_DefaultsOn()
-    {
-        Assert.True(new AppSettings().ResolveVstBounceIncludeTail());
-        Assert.True(AppSettings.CreateDefault().ResolveVstBounceIncludeTail());
-        Assert.False(new AppSettings { VstBounceIncludeTail = false }.ResolveVstBounceIncludeTail());
     }
 }
