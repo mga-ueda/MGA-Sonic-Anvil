@@ -422,6 +422,7 @@ internal static partial class UiStrings
     public static string LabelLayoutAnalyzerDockTop => Get("上", "Top");
     public static string LabelLayoutToolbarAlignLeft => Get("左", "Left");
     public static string LabelLayoutToolbarAlignCenter => Get("中", "Center");
+    public static string LabelLayoutToolbarAlignRight => Get("右", "Right");
     public static string LabelLayoutLevelMeter => Get("レベルメーター", "Level meter");
     public static string LabelLayoutStatusBar => Get("ステータスバー", "Status bar");
     public static string LabelLayoutPresetReset => Get("既定に戻す", "Reset to defaults");

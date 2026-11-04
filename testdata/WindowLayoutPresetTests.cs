@@ -172,6 +172,13 @@ public sealed class WindowLayoutPresetTests
             LayoutTransportToolbarAlign.Center,
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F12).ResolvedTransportToolbarAlign());
 
+        var right = new WindowLayoutPreset { FullscreenMode = "Off" };
+        right.ApplyTransportToolbarAlign(LayoutTransportToolbarAlign.Right);
+        settings.ApplyLayoutPreset(WindowLayoutSlot.F12, right);
+        Assert.Equal(
+            LayoutTransportToolbarAlign.Right,
+            settings.ResolvedLayoutPreset(WindowLayoutSlot.F12).ResolvedTransportToolbarAlign());
+
         // 旧プリセットで欠落・空文字なら中央。
         var legacy = new WindowLayoutPreset { FullscreenMode = "Off", TransportToolbarAlign = "" };
         settings.ApplyLayoutPreset(WindowLayoutSlot.F9, legacy);

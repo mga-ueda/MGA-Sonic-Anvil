@@ -36,6 +36,7 @@ internal enum LayoutTransportToolbarAlign
 {
     Left,
     Center,
+    Right,
 }
 
 /// <summary>ウィンドウ上部メニューバーの項目列の横位置。</summary>
@@ -43,6 +44,7 @@ internal enum LayoutMainMenuBarAlign
 {
     Left,
     Center,
+    Right,
 }
 
 /// <summary>F9–F12 各スロットの表示内容。ワークスペース項目は持たない。</summary>
@@ -84,7 +86,7 @@ internal sealed class WindowLayoutPreset
     /// </summary>
     public string TransportToolbarDock { get; set; } = nameof(LayoutTransportToolbarDock.Top);
 
-    /// <summary>Left / Center。スロット（F9–F12）ごとに独立。</summary>
+    /// <summary>Left / Center / Right。スロット（F9–F12）ごとに独立。</summary>
     public string TransportToolbarAlign { get; set; } = nameof(LayoutTransportToolbarAlign.Center);
 
     /// <summary>右列ピークレベルメーター。ゴニオの表示は ShowAnalyzerArea。</summary>
@@ -128,12 +130,20 @@ internal sealed class WindowLayoutPreset
         TransportToolbarDock = dock == LayoutTransportToolbarDock.Bottom ? "Bottom" : "Top";
 
     public LayoutTransportToolbarAlign ResolvedTransportToolbarAlign() =>
-        string.Equals(TransportToolbarAlign?.Trim(), "Left", StringComparison.OrdinalIgnoreCase)
-            ? LayoutTransportToolbarAlign.Left
-            : LayoutTransportToolbarAlign.Center;
+        TransportToolbarAlign?.Trim().ToLowerInvariant() switch
+        {
+            "left" => LayoutTransportToolbarAlign.Left,
+            "right" => LayoutTransportToolbarAlign.Right,
+            _ => LayoutTransportToolbarAlign.Center,
+        };
 
     public void ApplyTransportToolbarAlign(LayoutTransportToolbarAlign align) =>
-        TransportToolbarAlign = align == LayoutTransportToolbarAlign.Left ? "Left" : "Center";
+        TransportToolbarAlign = align switch
+        {
+            LayoutTransportToolbarAlign.Left => "Left",
+            LayoutTransportToolbarAlign.Right => "Right",
+            _ => "Center",
+        };
 
     /// <summary>
     /// 別スロットへ切替えたときの全画面初期値。

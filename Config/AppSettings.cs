@@ -120,7 +120,7 @@ internal sealed class AppSettings
     public bool ShowMainMenuBar { get; set; } = true;
 
     /// <summary>
-    /// メニューバー項目列の横位置。Left / Center。既定は左（従来どおり）。
+    /// メニューバー項目列の横位置。Left / Center / Right。既定は左（従来どおり）。
     /// </summary>
     public string MainMenuBarAlign { get; set; } = nameof(LayoutMainMenuBarAlign.Left);
 
@@ -128,12 +128,20 @@ internal sealed class AppSettings
     public bool ShowTransportToolbar { get; set; } = true;
 
     public LayoutMainMenuBarAlign ResolvedMainMenuBarAlign() =>
-        string.Equals(MainMenuBarAlign?.Trim(), "Center", StringComparison.OrdinalIgnoreCase)
-            ? LayoutMainMenuBarAlign.Center
-            : LayoutMainMenuBarAlign.Left;
+        MainMenuBarAlign?.Trim().ToLowerInvariant() switch
+        {
+            "center" => LayoutMainMenuBarAlign.Center,
+            "right" => LayoutMainMenuBarAlign.Right,
+            _ => LayoutMainMenuBarAlign.Left,
+        };
 
     public void ApplyMainMenuBarAlign(LayoutMainMenuBarAlign align) =>
-        MainMenuBarAlign = align == LayoutMainMenuBarAlign.Center ? "Center" : "Left";
+        MainMenuBarAlign = align switch
+        {
+            LayoutMainMenuBarAlign.Center => "Center",
+            LayoutMainMenuBarAlign.Right => "Right",
+            _ => "Left",
+        };
 
     /// <summary>
     /// ツールバーで隠すコマンド名（<c>TransportCommand</c> の名前）。空は全表示。
