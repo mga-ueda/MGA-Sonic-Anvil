@@ -1251,7 +1251,7 @@ public partial class MainWindow
 
         if (key == Key.D && modifiers == ModifierKeys.Control)
         {
-            // Ctrl+T はタイル巡回済み。無音検出は Ctrl+D（プレイリスト複数選択も可）。
+            // Shift+T はタイル巡回済み。無音検出は Ctrl+D（プレイリスト複数選択も可）。
             if (!IsRecording && (_document is not null || HasBatchEditTargets))
             {
                 ApplyDetectSilence();
@@ -2605,7 +2605,8 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.T && modifiers == ModifierKeys.Control)
+        // Shift+T も大文字入力と同じ修飾。文字入力中は ShouldDeferShortcutToTextInput で既に返している。
+        if (LibraryPlayerMode.IsShiftLetterChord(key, modifiers) && key == Key.T)
         {
             if (!IsLibraryMaximized)
             {
