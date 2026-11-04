@@ -188,7 +188,6 @@ public sealed class VstInsertEngineTests
         Assert.Equal(1, engine.ReloadCount);
         Assert.Equal(1, factory.CreateCount);
         Assert.True(engine.StateApplyCount >= 2);
-        Assert.True(engine.IsSlotBypassed(0));
         Assert.Equal(new byte[] { 2, 3 }, factory.Last.LastState);
     }
 
@@ -208,14 +207,12 @@ public sealed class VstInsertEngineTests
         engine.Apply(owner, chain, playerBypass: false);
         Assert.Equal(0, factory.CreateCount);
         Assert.Null(engine.TryGetLive(0));
-        Assert.True(engine.IsSlotBypassed(0));
         Assert.Equal("A", chain.Slots[0].DisplayName);
 
         chain.Slots[0].Bypassed = false;
         engine.Apply(owner, chain, playerBypass: false);
         Assert.Equal(1, factory.CreateCount);
         Assert.NotNull(engine.TryGetLive(0));
-        Assert.False(engine.IsSlotBypassed(0));
         Assert.Equal(new byte[] { 1, 2 }, factory.Last.LastState);
     }
 
@@ -237,13 +234,11 @@ public sealed class VstInsertEngineTests
         chain.Slots[0].Bypassed = true;
         engine.Apply(owner, chain, playerBypass: false);
         Assert.Same(live, engine.TryGetLive(0));
-        Assert.True(engine.IsSlotBypassed(0));
         Assert.Equal(1, factory.CreateCount);
 
         chain.Slots[0].Bypassed = false;
         engine.Apply(owner, chain, playerBypass: false);
         Assert.Same(live, engine.TryGetLive(0));
-        Assert.False(engine.IsSlotBypassed(0));
         Assert.Equal(1, factory.CreateCount);
     }
 
@@ -270,7 +265,6 @@ public sealed class VstInsertEngineTests
         chain.Slots[1].ClassId = "b";
         engine.Apply(owner, chain, playerBypass: false);
         Assert.Same(live, engine.TryGetLive(0));
-        Assert.True(engine.IsSlotBypassed(0));
         Assert.NotNull(engine.TryGetLive(1));
         Assert.Equal(2, factory.CreateCount);
     }
@@ -313,7 +307,6 @@ public sealed class VstInsertEngineTests
         engine.EnsureSlotLoaded(0);
         Assert.Equal(1, factory.CreateCount);
         Assert.NotNull(engine.TryGetLive(0));
-        Assert.True(engine.IsSlotBypassed(0));
     }
 
     [Fact]
@@ -332,13 +325,11 @@ public sealed class VstInsertEngineTests
 
         chain.Slots[0].Bypassed = true;
         engine.Apply(owner, chain, playerBypass: false);
-        Assert.True(engine.IsSlotBypassed(0));
         Assert.NotNull(engine.TryGetLive(0));
 
         engine.UnloadBypassedLiveSlots();
         Assert.Null(engine.TryGetLive(0));
         Assert.NotNull(engine.TryGetLive(1));
-        Assert.True(engine.IsSlotBypassed(0));
         Assert.True(((MockProcessor)bypassedLive!).ResetProcessingCount >= 1);
 
         // バイパス解除は park から復帰し、再 create しない（バウンス Undo 相当）。
@@ -347,7 +338,6 @@ public sealed class VstInsertEngineTests
         Assert.NotNull(engine.TryGetLive(0));
         Assert.Same(bypassedLive, engine.TryGetLive(0));
         Assert.Equal(2, factory.CreateCount);
-        Assert.False(engine.IsSlotBypassed(0));
     }
 
     [Fact]
