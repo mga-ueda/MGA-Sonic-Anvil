@@ -276,6 +276,8 @@ internal static partial class UiStrings
     public static string LabelShowMainMenuBar => Get(
         "メニューバーを表示(_M)",
         "Show _menu bar");
+    /// <summary>設定・レイアウト。メニューバー項目列の横位置コンボの見出し。</summary>
+    public static string LabelMainMenuBarAlign => Get("配置", "Align");
     /// <summary>設定・レイアウト。メニュー直下ツールバー領域の表示。</summary>
     public static string LabelShowTransportToolbar => Get(
         "ツールバーを表示(_T)",
