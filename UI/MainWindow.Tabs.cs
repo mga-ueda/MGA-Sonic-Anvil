@@ -50,7 +50,8 @@ public partial class MainWindow
     private bool HasMultipleTabSelection => _selectedTabs.Count >= 2;
 
     /// <summary>
-    /// タブ／タイルの帯のハイライト。複数選択があるときは選択したものだけを光らせる
+    /// タブ／タイルの帯のハイライト（色設定 DocumentTabSelected*）。
+    /// 複数選択があるときは選択したものだけを光らせる
     /// （検索フィルター中の全選択などで、選択に入っていないアクティブタブが
     /// 選択済みに見えてしまわないように）。選択が無いときはアクティブを光らせる。
     /// </summary>
@@ -1314,8 +1315,9 @@ public partial class MainWindow
 
         var body = new DockPanel();
         body.Children.Add(grid);
-        ApplyTabChrome(session, body);
+        // Parent が付いてから Apply（背景は Border に書く）。
         border.Child = body;
+        ApplyTabChrome(session, body);
         border.MouseLeftButtonUp += (_, e) => HandleTabOrTileChromeClick(session, e);
         border.MouseDown += (_, e) =>
         {
@@ -1337,14 +1339,22 @@ public partial class MainWindow
     {
         var dirty = session.Document.IsDirty;
         var active = IsTabChromeHighlighted(session);
-        var accent = (Brush)FindResource(dirty ? "DirtyAccentBrush" : "AccentCyanBrush");
-        var titleBrush = dirty
-            ? accent
-            : (Brush)FindResource(active ? "PrimaryForeBrush" : "MutedForeBrush");
+        var dirtyAccent = dirty ? (Brush)FindResource("DirtyAccentBrush") : null;
+        // ハイライト色は色設定（DocumentTabSelected*）。背景は半透明既定。
+        var titleBrush = active
+            ? (Brush)FindResource("DocumentTabSelectedForeBrush")
+            : dirtyAccent ?? (Brush)FindResource("MutedForeBrush");
+        var closeBrush = active
+            ? (Brush)FindResource("DocumentTabSelectedForeBrush")
+            : (Brush)FindResource("MutedForeBrush");
+        var backBrush = active
+            ? (Brush)FindResource(
+                dirty ? "DocumentTabSelectedDirtyBackBrush" : "DocumentTabSelectedBackBrush")
+            : Brushes.Transparent;
 
         if (dock.Parent is Border host)
         {
-            host.Background = Brushes.Transparent;
+            host.Background = backBrush;
             host.BorderBrush = (Brush)FindResource("PlayerComboDropBorderBrush");
         }
 
@@ -1356,7 +1366,7 @@ public partial class MainWindow
                 {
                     if (block.Text == "×")
                     {
-                        block.Foreground = (Brush)FindResource("MutedForeBrush");
+                        block.Foreground = closeBrush;
                         continue;
                     }
 
