@@ -625,6 +625,7 @@
         <ul>
           <li>The length is the longest tab. Mixdown runs only when every file matches the leftmost selected tab’s sample rate, channel count, and bit depth. A different file cancels the mixdown with no conversion, and the dialog names the files that do not match.</li>
           <li>Markers and regions are carried over in place. A marker at the same position with the same comment is kept only once.</li>
+          <li>Per-tab VST inserts are not applied. If any selected tab has an active (non-bypassed) insert, a warning appears before the save dialog (continue or cancel; bounce first to bake inserts into the waveform).</li>
           <li>It asks where to save first. Default name <code>Bounce.wav</code>. The dialog starts in the last mixdown folder. If there is none yet, it uses the folder of the first selected tab that has a file, else the last export folder. The chosen location is kept for the next mixdown.</li>
         </ul>
         <div class="note">
@@ -822,7 +823,7 @@
 
       </div>
       <div class="note">
-        <p>The selected tabs are stacked into a new Wave. Per-tab VST inserts are not applied (to bake inserts into the waveform, see <a href="#layout-vst">VST inserts → Bounce</a>). If the sum exceeds ±1, a warning appears before writing and you can cancel or lower the whole mix first (<a href="#layout-tabs">Tabs → Mixdown</a>). Files of different length are lined up before stacking.</p>
+        <p>The selected tabs are stacked into a new Wave. Per-tab VST inserts are not applied (a warning appears before save if any insert is active; to bake inserts into the waveform, see <a href="#layout-vst">VST inserts → Bounce</a>). If the sum exceeds ±1, a warning appears before writing and you can cancel or lower the whole mix first (<a href="#layout-tabs">Tabs → Mixdown</a>). Files of different length are lined up before stacking.</p>
       </div>
 
       <h2 id="playback">4. Playback</h2>
@@ -1236,7 +1237,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save as (with several tabs selected, pick a folder, write each as Wave, and point the tabs at those files)</td></tr>
           <tr><td><kbd>F2</kbd></td><td>Rename the file (double-clicking the file name on a tab / tile strip, tab right-click → Rename File (N), or waveform right-click → File → Rename File (F) does the same)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate the file (opens in the next tab)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>Mixdown two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; only when formats match; if the sum exceeds ±1, cancel or lower the mix before writing; same key and menu gesture in the player; per-tab VST inserts are not applied)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>Mixdown two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; only when formats match; warns if any VST insert is active; if the sum exceeds ±1, cancel or lower the mix before writing; same key and menu gesture in the player; per-tab VST inserts are not applied)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; <strong>editor only</strong>; selected tabs, or the active tab; see <a href="#layout-vst">VST inserts</a>)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Export MP3 (selected tabs, or the current tab; selected playlist rows in the player; does not save; waveform right-click → Export)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Quit (tabs left open and unsaved working copies come back on the next launch)</td></tr>
