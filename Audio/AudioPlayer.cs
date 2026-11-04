@@ -59,10 +59,17 @@ internal sealed class AudioPlayer : IDisposable
         suppress || !playing || scrubbing;
 
     /// <summary>
+    /// Pause/Stop 後にデバイスを作り直した場合、旧デバイスから遅れて届く
+    /// PlaybackStopped は現行出力と一致しないので EOF にしない。
+    /// </summary>
+    internal static bool ShouldIgnoreStalePlaybackStopped(object? sender, object? currentOutput) =>
+        !ReferenceEquals(sender, currentOutput);
+
+    /// <summary>
     /// WaveOut / WASAPI は一度でも再生したデバイスを、次の再生前に作り直して捨てる。
-    /// Pause / Stop ではデバイスを止めず無音ゲートで流し続けている（ASIO と同じ方式）ため、
-    /// 作り直し時に破棄するのは「無音を流し終えたデバイス」になり、ドライバ／ミキサの
-    /// 先読みも無音化済み。これで次の曲の頭に前の曲の尾が混じらない（ジャジャーン対策）。
+    /// Pause / Stop / 曲末の自己停止でデバイスは実際に止まっており（<see cref="StopNonAsioOutput"/>）、
+    /// 停止後や discardQueued 時、一度でも鳴らした後（outputStarted）は確実に清潔な
+    /// デバイスを作り直してから鳴らす。これで前の曲の尾が次の曲の頭に混じらない。
     /// 初期化直後で未再生のデバイスはそのまま使う。
     /// ASIO は止めずにプロバイダの無音ゲートで洗い流すので作り直さない。
     /// </summary>
@@ -563,7 +570,8 @@ internal sealed class AudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _provider.SeekFrame(frame);
-        ResetSmoothPlayhead(_provider.PendingSeekFrame ?? _provider.CursorFrame);
+        var to = _provider.PendingSeekFrame ?? _provider.CursorFrame;
+        ResetSmoothPlayhead(to);
         if (!_playing)
         {
             _discardQueuedOutput = true;
@@ -716,17 +724,18 @@ internal sealed class AudioPlayer : IDisposable
     /// ASIO はデバイスを止めず、プロバイダの無音ゲートで先読みを洗い流して
     /// あるので、ゲートを開けるだけ（Stop すると HasReachedEnd が残り
     /// シークバーが即終了扱いになる）。
-    /// WaveOut / WASAPI も Pause / Stop ではデバイスを止めず無音を流し続けるので、
-    /// 作り直し時に捨てるのは無音化済みのデバイス。曲末の自己停止後や
-    /// discardQueued 時だけ作り直して、確実に清潔なデバイスから鳴らす。
+    /// WaveOut / WASAPI は Pause / Stop / 曲末で実際に止めているので、作り直し時に
+    /// 捨てるのは停止済みのデバイス。曲末の自己停止後や discardQueued 時、一度でも
+    /// 鳴らした後は作り直して、確実に清潔なデバイスから鳴らす。
     /// </summary>
     private void StartOutput()
     {
-        if (ShouldRecreateOutputBeforePlay(
-                _output is AsioOut,
-                _discardQueuedOutput,
-                _output is null || _output.PlaybackState == PlaybackState.Stopped,
-                _outputStarted))
+        var recreate = ShouldRecreateOutputBeforePlay(
+            _output is AsioOut,
+            _discardQueuedOutput,
+            _output is null || _output.PlaybackState == PlaybackState.Stopped,
+            _outputStarted);
+        if (recreate)
         {
             RecreateOutputKeepingCursor();
         }
@@ -757,6 +766,8 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _playing = true;
+        // 意図的 Stop の抑止をここで解除。真の EOF はこれ以降だけ受け取る。
+        _suppressPlaybackEnded = false;
         // 一度でも鳴らした WaveOut / WASAPI は、次の再生で作り直して先読みを捨てる。
         if (_output is not AsioOut)
         {
@@ -859,14 +870,20 @@ internal sealed class AudioPlayer : IDisposable
 
         if (_playing)
         {
-            // ASIO / WaveOut / WASAPI 共通: デバイスは止めず、無音ゲートを開くだけ。
-            // 動かしたまま無音を流すと、ドライバ／OS ミキサ／仮想ミキサ（VoiceMeeter 等）
-            // の先読みが無音で上書きされ続け、次の再生（またはデバイス作り直し）で前の曲の
-            // 尾が頭に混じらない（ジャジャーン対策）。以前は WaveOut / WASAPI をここで
-            // Stop していたため、ドライバ／ミキサに実音の尾が残ったまま次の再生の頭と
-            // 重なっていた。WaveOut.Volume / セッション音量には一切触らない（Vista+ で
-            // 永続化され、0 のまま残すと次回起動から無音になる＝別バグ）。
-            _provider.SetPaused(true);
+            if (_output is AsioOut)
+            {
+                // ASIO はデバイスを止めず、無音ゲートで先読みを洗い流す。
+                // Stop すると HasReachedEnd が残り、シークバーが即終了扱いになるため。
+                _provider.SetPaused(true);
+            }
+            else
+            {
+                // WaveOut / WASAPI は即 Stop。Playing のまま Dispose すると提出済みバッファが
+                // 止まらず「停止なのに後からもう一個」聞こえる。破棄は次の Play の recreate に任せる。
+                // Stop 後は無音ゲートを立て、Halt の Seek(0) で遅延 Read があっても頭を流さない。
+                StopNonAsioOutput();
+                _provider.BeginSilenceFlush();
+            }
         }
 
         _provider.SetPlaybackSpeed(1);
@@ -879,14 +896,48 @@ internal sealed class AudioPlayer : IDisposable
         _playing = false;
         _provider.SetPlaybackSpeed(1);
 
-        // ASIO / WaveOut / WASAPI 共通: デバイスは止めず無音ゲートで洗い流す（Pause と同じ）。
-        // 動かしたまま無音を流し続けることで、ドライバ／OS ミキサ／仮想ミキサ（VoiceMeeter 等）
-        // の先読みが無音で置き換わり、次の再生の頭に前の曲の尾が混じらない（ジャジャーン対策）。
-        // driver.Stop → Start は旧バッファの再生や HasReachedEnd の残留を招くため呼ばない。
-        // 実停止後は次の Play でデバイスを作り直すが、このとき破棄するのは「無音を流し終えた
-        // デバイス」なので、後段ミキサの尾も無音化済みで頭に混ざらない。
-        // WaveOut.Volume / セッション音量には一切触らない。
-        _provider.SetPaused(true);
+        if (_output is AsioOut)
+        {
+            // ASIO はデバイスを止めず無音ゲートで洗い流す（Pause と同じ）。
+            // driver.Stop → Start は旧バッファの再生や HasReachedEnd の残留を招く。
+            _provider.SetPaused(true);
+            return;
+        }
+
+        StopNonAsioOutput();
+        _provider.BeginSilenceFlush();
+    }
+
+    /// <summary>
+    /// WaveOut / WASAPI を止める。遅れて届く PlaybackStopped を EOF 扱いにしないよう
+    /// 抑止し、次の Play でデバイスを作り直すため <see cref="_discardQueuedOutput"/> を立てる。
+    /// 抑止は <see cref="StartOutput"/> まで維持する（Stop 直後に解除すると、遅延
+    /// PlaybackStopped が次の再生開始後に届いて AutoLoop 二重再生になる）。
+    /// WaveOut.Volume / AudioStreamVolume / セッション音量には一切触らない。
+    /// </summary>
+    private void StopNonAsioOutput()
+    {
+        _suppressPlaybackEnded = true;
+        try
+        {
+            if (_output is not null)
+            {
+                try
+                {
+                    _output.Stop();
+                }
+                catch
+                {
+                    // 次の Play でデバイスを作り直す。
+                }
+            }
+        }
+        catch
+        {
+            // 次の Play でデバイスを作り直す。
+        }
+
+        _discardQueuedOutput = true;
     }
 
     public void EnsureOutputDevice()
@@ -1462,7 +1513,10 @@ internal sealed class AudioPlayer : IDisposable
         // 一時停止の Stop（WaveOutEvent は Stop 後に非同期で届く）は
         // 終了イベントにしない。真の EOF は _playing 中にしか来ない。
         // 再生中スクラブの refill（Stop→Play）も同様。
-        if (ShouldIgnorePlaybackStopped(_suppressPlaybackEnded, _playing, _scrubbing))
+        // Pause/Stop → 作り直し後に旧デバイスから遅延した Stop も捨てる
+        // （捨てないと AutoLoop が二重再生＝頭のジャジャーンになる）。
+        if (ShouldIgnoreStalePlaybackStopped(sender, _output)
+            || ShouldIgnorePlaybackStopped(_suppressPlaybackEnded, _playing, _scrubbing))
         {
             return;
         }

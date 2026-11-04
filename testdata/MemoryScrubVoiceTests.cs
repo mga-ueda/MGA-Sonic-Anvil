@@ -190,6 +190,16 @@ public sealed class MemoryScrubVoiceTests
     }
 
     [Fact]
+    public void StalePlaybackStopped_FromOldOutput_IsIgnored()
+    {
+        var current = new object();
+        var stale = new object();
+        Assert.True(AudioPlayer.ShouldIgnoreStalePlaybackStopped(stale, current));
+        Assert.True(AudioPlayer.ShouldIgnoreStalePlaybackStopped(stale, null));
+        Assert.False(AudioPlayer.ShouldIgnoreStalePlaybackStopped(current, current));
+    }
+
+    [Fact]
     public void PlayedWaveOutput_IsRecreatedBeforeNextTrack()
     {
         // 初期化直後で未再生のデバイスはそのまま使う（作り直さない）。
