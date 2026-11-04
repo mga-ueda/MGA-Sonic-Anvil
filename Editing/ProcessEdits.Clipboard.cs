@@ -5,6 +5,70 @@ namespace MgaSonicAnvil.Editing;
 
 internal static partial class ProcessEdits
 {
+    /// <summary>選択範囲外を削除してファイルを短くする（チャンネルソロは見ない）。</summary>
+    public static IEditCommand? Trim(AudioDocument document, WaveSelection range)
+    {
+        range = range.Clamp(document.FrameCount);
+        if (range.IsEmpty)
+        {
+            return null;
+        }
+
+        if (range.StartFrame <= 0 && range.EndFrame >= document.FrameCount)
+        {
+            return null;
+        }
+
+        var silents = new List<WaveSelection>(2);
+        if (range.StartFrame > 0)
+        {
+            silents.Add(new WaveSelection(0, range.StartFrame));
+        }
+
+        if (range.EndFrame < document.FrameCount)
+        {
+            silents.Add(new WaveSelection(range.EndFrame, document.FrameCount));
+        }
+
+        var keeps = new List<WaveSelection>(1) { range };
+        var after = SilenceDetect.CopyKeepRanges(document.Interleaved, document.Channels, keeps);
+        var oldFrames = document.FrameCount;
+        var newFrames = after.Length / Math.Max(1, document.Channels);
+        if (newFrames <= 0 || newFrames >= oldFrames)
+        {
+            return null;
+        }
+
+        var before = document.CopyRange(0, oldFrames);
+        var markersAfter = MapMarkersThroughDeletes(document.SnapshotMarkers(), silents);
+        var regionsAfter = MapRegionsThroughDeletes(document.SnapshotRegions(), silents, newFrames);
+        var loopAfter = MapSelectionThroughDeletes(document.SampleLoop, silents, inclusiveEnd: true)
+            .Clamp(newFrames);
+        var command = new SpliceRangeCommand(
+            "Trim",
+            0,
+            before,
+            after,
+            document.Selection,
+            WaveSelection.Empty,
+            document.CursorFrame,
+            0,
+            document.SnapshotMarkers(),
+            markersAfter,
+            document.SampleLoop,
+            loopAfter,
+            document.SnapshotRegions(),
+            regionsAfter,
+            UiStrings.EditHistoryRange(
+                UiStrings.EditHistoryName("Trim"),
+                document.SampleRate,
+                range.StartFrame,
+                range.EndFrame));
+        AttachRangeReplay(command, document.SampleRate, range, Trim);
+        command.Persist = HistoryRecipes.Range(HistoryRecipes.Trim, document.SampleRate, range);
+        return command;
+    }
+
     public static IEditCommand Delete(
         AudioDocument document,
         WaveSelection range,

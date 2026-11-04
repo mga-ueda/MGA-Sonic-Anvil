@@ -93,6 +93,9 @@ public partial class MainWindow
             case WaveMenuCommand.Delete:
                 ApplyDelete();
                 break;
+            case WaveMenuCommand.Trim:
+                ApplyTrim();
+                break;
             case WaveMenuCommand.SilenceSelection:
                 PromptSilenceSelection();
                 break;

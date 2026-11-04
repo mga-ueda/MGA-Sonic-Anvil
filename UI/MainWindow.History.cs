@@ -602,7 +602,10 @@ public partial class MainWindow
                 UiStrings.AppName,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+            return;
         }
+
+        ShowEditAppliedToast("History Paste");
     }
 
     private void ReportHistoryPasteBusy(string[] names, double[] progress, long[] weights) =>

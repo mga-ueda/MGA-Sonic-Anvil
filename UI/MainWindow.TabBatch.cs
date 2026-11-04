@@ -68,8 +68,9 @@ public partial class MainWindow
     /// </summary>
     private bool TryRunEditOnSelectedTabs(
         string overlayMessage,
-        Func<DocumentSession, IProgress<double>?, IEditCommand?> build) =>
-        TryRunBatchEdit(overlayMessage, build, requireTabSelection: true);
+        Func<DocumentSession, IProgress<double>?, IEditCommand?> build,
+        string? appliedToast = null) =>
+        TryRunBatchEdit(overlayMessage, build, requireTabSelection: true, appliedToast: appliedToast);
 
     /// <summary>
     /// タブ選択またはプレイヤー選択へ一括編集。実行に入ったら true。
@@ -77,7 +78,8 @@ public partial class MainWindow
     private bool TryRunBatchEdit(
         string overlayMessage,
         Func<DocumentSession, IProgress<double>?, IEditCommand?> build,
-        bool requireTabSelection = false)
+        bool requireTabSelection = false,
+        string? appliedToast = null)
     {
         if (requireTabSelection)
         {
@@ -92,7 +94,8 @@ public partial class MainWindow
                 build,
                 saveAfter: false,
                 ensurePcm: false,
-                warnIfSkipped: true);
+                warnIfSkipped: true,
+                appliedToast: appliedToast);
             return true;
         }
 
@@ -113,7 +116,8 @@ public partial class MainWindow
             build,
             saveAfter: IsLibraryMaximized,
             ensurePcm: IsLibraryMaximized,
-            warnIfSkipped: true);
+            warnIfSkipped: true,
+            appliedToast: appliedToast);
         return true;
     }
 
@@ -123,8 +127,16 @@ public partial class MainWindow
     private Task RunSelectedTabsEditAsync(
         IReadOnlyList<DocumentSession> targets,
         string overlayMessage,
-        Func<DocumentSession, IProgress<double>?, IEditCommand?> build) =>
-        RunBatchEditAsync(targets, overlayMessage, build, saveAfter: false, ensurePcm: false, warnIfSkipped: true);
+        Func<DocumentSession, IProgress<double>?, IEditCommand?> build,
+        string? appliedToast = null) =>
+        RunBatchEditAsync(
+            targets,
+            overlayMessage,
+            build,
+            saveAfter: false,
+            ensurePcm: false,
+            warnIfSkipped: true,
+            appliedToast: appliedToast);
 
     /// <summary>
     /// 一括編集。PCM 確保（任意）→ コマンド生成を ExportParallelism で並列 → 履歴適用は UI 直列 → 任意で保存。
@@ -136,7 +148,8 @@ public partial class MainWindow
         Func<DocumentSession, IProgress<double>?, IEditCommand?> build,
         bool saveAfter,
         bool ensurePcm,
-        bool warnIfSkipped = true)
+        bool warnIfSkipped = true,
+        string? appliedToast = null)
     {
         if (targets.Count == 0 || IsUiBusy)
         {
@@ -364,6 +377,8 @@ public partial class MainWindow
 
             return;
         }
+
+        ShowEditAppliedToast(appliedToast);
 
         if (!willSave)
         {

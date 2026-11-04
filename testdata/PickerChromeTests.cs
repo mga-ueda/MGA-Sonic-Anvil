@@ -72,6 +72,29 @@ public sealed class PickerChromeTests
         });
     }
 
+    [Fact]
+    public void MeasureFormRow_IncludesIconGutterEvenWithoutIcon()
+    {
+        RunSta(() =>
+        {
+            var edge = PickerChrome.Option(UiStrings.LabelInsertSilenceEdgeFade);
+            var item = PickerChrome.FormHost(edge);
+            item.Padding = PickerChrome.FormItemPadding;
+            item.Icon = null;
+
+            var width = PickerChrome.MeasureFormRow(item);
+            // DarkMenuItemStyle は Icon 無しでも 22+8 の列を残す。以前はここを 0 として見切れていた。
+            const double iconGutter = 22 + 8;
+            Assert.True(width > item.Padding.Left + item.Padding.Right + iconGutter);
+            Assert.True(
+                width
+                    >= item.Padding.Left
+                        + item.Padding.Right
+                        + iconGutter
+                        + PickerChrome.MeasureUiText(UiStrings.LabelInsertSilenceEdgeFade));
+        });
+    }
+
     private static void RunSta(Action action)
     {
         Exception? error = null;

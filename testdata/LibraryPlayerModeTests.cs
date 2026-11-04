@@ -388,6 +388,7 @@ public sealed class LibraryPlayerModeTests
             Key.V, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.N, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.D, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.T, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.IsDestructiveEditShortcut(Key.N, LibraryPlayerMode.AltShift));
         Assert.True(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.Normalize));
         Assert.False(LibraryPlayerMode.HidesDestructiveMenuGesture(WaveMenuCommand.Volume));

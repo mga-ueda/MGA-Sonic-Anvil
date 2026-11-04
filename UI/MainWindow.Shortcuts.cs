@@ -1251,7 +1251,7 @@ public partial class MainWindow
 
         if (key == Key.D && modifiers == ModifierKeys.Control)
         {
-            // Shift+T はタイル巡回済み。無音検出は Ctrl+D（プレイリスト複数選択も可）。
+            // タイル巡回は Shift+T。無音検出は Ctrl+D（プレイリスト複数選択も可）。
             if (!IsRecording && (_document is not null || HasBatchEditTargets))
             {
                 ApplyDetectSilence();
@@ -1283,6 +1283,17 @@ public partial class MainWindow
         if (key == Key.Delete && modifiers == ModifierKeys.None)
         {
             ApplyDelete();
+            return true;
+        }
+
+        // Shift+T はタイル巡回。トリムは Ctrl+T。
+        if (key == Key.T && modifiers == ModifierKeys.Control)
+        {
+            if (!IsLibraryMaximized && !IsRecording && _document is not null)
+            {
+                ApplyTrim();
+            }
+
             return true;
         }
 
@@ -3490,6 +3501,19 @@ public partial class MainWindow
     }
 
     private void ShowCenterStatusToast(string text) => _centerStatusToast.Show(text);
+
+    /// <summary>
+    /// ワンショット破壊編集の適用完了トースト。ピッチ／ON・OFF と同様に英語ラベル。
+    /// </summary>
+    private void ShowEditAppliedToast(string? label)
+    {
+        if (!IsLoaded || string.IsNullOrWhiteSpace(label))
+        {
+            return;
+        }
+
+        ShowCenterStatusToast(label);
+    }
 
     private static string FormatPlaybackPitchToast(int semitones)
     {

@@ -306,6 +306,7 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains(TransportCommand.Undo, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.Cut, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.SilenceSelection, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.Trim, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.CrossfadeEdit, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.SampleRate, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.ExportWave, TransportToolbarCatalog.AllCommands);

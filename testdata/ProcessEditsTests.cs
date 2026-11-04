@@ -948,6 +948,37 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void Trim_KeepsSelectionAndRemovesOutside()
+    {
+        var document = MakeSine(frames: 50);
+        var original = (float[])document.Interleaved.Clone();
+        var history = new EditHistory();
+        document.Selection = new WaveSelection(10, 30);
+        document.ReplaceMarkers([new MarkerSnapshot(5, "out"), new MarkerSnapshot(20, "in")]);
+        var command = ProcessEdits.Trim(document, document.Selection);
+        Assert.NotNull(command);
+        history.Do(document, command);
+
+        Assert.Equal(20, document.FrameCount);
+        Assert.Single(document.Markers);
+        Assert.Equal(10, document.Markers[0].Frame);
+        Assert.Equal("in", document.Markers[0].Comment);
+        Assert.Equal(original.AsSpan(10 * document.Channels, 20 * document.Channels).ToArray(), document.Interleaved);
+        Assert.True(history.Undo(document));
+        Assert.Equal(50, document.FrameCount);
+        Assert.Equal(original, document.Interleaved);
+        Assert.Equal(2, document.Markers.Count);
+    }
+
+    [Fact]
+    public void Trim_ReturnsNullWhenSelectionIsWholeFile()
+    {
+        var document = MakeSine(frames: 50);
+        Assert.Null(ProcessEdits.Trim(document, new WaveSelection(0, 50)));
+        Assert.Null(ProcessEdits.Trim(document, WaveSelection.Empty));
+    }
+
+    [Fact]
     public void History_IsUnlimitedWithinMemory()
     {
         var document = MakeSine(frames: 32);

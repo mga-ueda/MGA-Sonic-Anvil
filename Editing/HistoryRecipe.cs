@@ -109,6 +109,7 @@ internal static class HistoryRecipes
     public const string Reverse = "Reverse";
     public const string NormalizePerRegion = "NormalizePerRegion";
     public const string Delete = "Delete";
+    public const string Trim = "Trim";
     public const string DeleteSilence = "DeleteSilence";
     public const string InsertSilence = "InsertSilence";
     public const string SilenceSelection = "SilenceSelection";
@@ -146,6 +147,7 @@ internal static class HistoryRecipes
         Reverse,
         NormalizePerRegion,
         Delete,
+        Trim,
         DeleteSilence,
         InsertSilence,
         SilenceSelection,
@@ -184,6 +186,7 @@ internal static class HistoryRecipes
         Reverse,
         NormalizePerRegion,
         Delete,
+        Trim,
         DeleteSilence,
         InsertSilence,
         SilenceSelection,
@@ -435,6 +438,7 @@ internal static class HistoryRecipes
                 channelMask: MaskOf(recipe),
                 fadeMs: FadeMsOf(recipe)),
             Delete => ProcessEdits.Delete(document, RangeOf(recipe), channelMask: MaskOf(recipe)),
+            Trim => ProcessEdits.Trim(document, RangeOf(recipe)),
             DeleteSilence => ProcessEdits.DeleteSilence(
                 document,
                 RangeOf(recipe),

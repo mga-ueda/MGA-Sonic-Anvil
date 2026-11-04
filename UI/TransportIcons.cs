@@ -33,6 +33,7 @@ internal enum TransportIcon
     TimeStretch,
     Reverse,
     Delete,
+    Trim,
     Undo,
     Redo,
     Cut,
@@ -128,6 +129,7 @@ internal enum TransportCommand
     TimeStretch,
     Reverse,
     Delete,
+    Trim,
     Undo,
     Redo,
     Cut,
@@ -576,6 +578,9 @@ internal static class TransportIconDrawing
                 break;
             case TransportIcon.Paste:
                 DrawPaste(dc, pen, cx, cy);
+                break;
+            case TransportIcon.Trim:
+                DrawTrim(dc, pen, selectionFill, cx, cy);
                 break;
             case TransportIcon.SilenceSelection:
                 DrawSilenceSelection(dc, pen, cx, cy);
@@ -1702,6 +1707,22 @@ internal static class TransportIconDrawing
         dc.DrawLine(pen, new Point(cx - 4, cy - 6), new Point(cx - 4, cy + 6));
         dc.DrawLine(pen, new Point(cx - 4, cy + 6), new Point(cx - 9, cy));
         dc.DrawLine(pen, new Point(cx - 1, cy), new Point(cx + 9, cy));
+    }
+
+    /// <summary>中央の選択を残すクロップ枠。左右は外側に開くブラケット（]█[）。</summary>
+    private static void DrawTrim(DrawingContext dc, Pen pen, Brush? selectionFill, double cx, double cy)
+    {
+        dc.DrawRectangle(selectionFill, pen, new Rect(cx - 3.5, cy - 6.5, 7, 13));
+
+        // 左 ] ：縦線 + 外側へ伸びる上下フック
+        dc.DrawLine(pen, new Point(cx - 4.5, cy - 8), new Point(cx - 4.5, cy + 8));
+        dc.DrawLine(pen, new Point(cx - 4.5, cy - 8), new Point(cx - 9.5, cy - 8));
+        dc.DrawLine(pen, new Point(cx - 4.5, cy + 8), new Point(cx - 9.5, cy + 8));
+
+        // 右 [ ：対称
+        dc.DrawLine(pen, new Point(cx + 4.5, cy - 8), new Point(cx + 4.5, cy + 8));
+        dc.DrawLine(pen, new Point(cx + 4.5, cy - 8), new Point(cx + 9.5, cy - 8));
+        dc.DrawLine(pen, new Point(cx + 4.5, cy + 8), new Point(cx + 9.5, cy + 8));
     }
 
     private static void DrawInsertSilence(DrawingContext dc, Pen pen, double cx, double cy)
