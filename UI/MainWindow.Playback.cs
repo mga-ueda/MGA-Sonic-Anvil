@@ -140,6 +140,9 @@ public partial class MainWindow
             case TransportCommand.Delete:
                 ApplyDelete();
                 break;
+            case TransportCommand.Trim:
+                ApplyTrim();
+                break;
             case TransportCommand.Undo:
                 UndoEdit();
                 break;

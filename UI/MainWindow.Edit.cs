@@ -1638,6 +1638,7 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Do(_document, command);
         AfterEdit();
+        ShowEditAppliedToast("Fade Around");
     }
 
     private void ApplyNormalize()
@@ -1655,7 +1656,8 @@ public partial class MainWindow
                     : ProcessEdits.Normalize(
                         session.Document,
                         TabBatchRange(session.Document),
-                        channelMask: TabBatchEditMask(session))))
+                        channelMask: TabBatchEditMask(session)),
+                appliedToast: "Normalize"))
         {
             return;
         }
@@ -1675,6 +1677,7 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Normalize(_document, range, channelMask: EditMask()));
         AfterTransform();
+        ShowEditAppliedToast("Normalize");
     }
 
     private void ApplyReverse()
@@ -1692,7 +1695,8 @@ public partial class MainWindow
                     : ProcessEdits.Reverse(
                         session.Document,
                         TabBatchRange(session.Document),
-                        channelMask: TabBatchEditMask(session))))
+                        channelMask: TabBatchEditMask(session)),
+                appliedToast: "Reverse"))
         {
             return;
         }
@@ -1718,6 +1722,7 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Do(_document, command);
         AfterTransform();
+        ShowEditAppliedToast("Reverse");
     }
 
     private void ApplyNormalizePerRegion()
@@ -1743,7 +1748,8 @@ public partial class MainWindow
                         document,
                         channelMask: TabBatchEditMask(session),
                         fadeMs: fadeMs);
-                }))
+                },
+                appliedToast: "Normalize per Region"))
         {
             return;
         }
@@ -1771,6 +1777,7 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Do(_document, command);
         AfterTransform();
+        ShowEditAppliedToast("Normalize per Region");
     }
 
     private void ApplyVolume(double gainDb)
@@ -1954,6 +1961,7 @@ public partial class MainWindow
 
         _clipboard = clip;
         _historyClipboardIsLatest = false;
+        ShowEditAppliedToast("Copy");
     }
 
     private static void RestoreKeyboardFocus(UIElement? focus)
@@ -2015,6 +2023,7 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Delete(_document, range, channelMask: EditMask()));
         AfterEdit();
+        ShowEditAppliedToast("Cut");
     }
 
     private void ApplyPaste()
@@ -2071,6 +2080,7 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Do(_document, command);
         AfterEdit();
+        ShowEditAppliedToast("Paste");
     }
 
     private void ApplyDelete()
@@ -2103,6 +2113,33 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Do(_document, ProcessEdits.Delete(_document, range, channelMask: EditMask()));
         AfterEdit();
+        ShowEditAppliedToast("Delete");
+    }
+
+    private void ApplyTrim()
+    {
+        if (RejectOutsideFadeToolAction() || _document is null)
+        {
+            return;
+        }
+
+        var range = _document.Selection;
+        if (range.IsEmpty)
+        {
+            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var command = ProcessEdits.Trim(_document, range);
+        if (command is null)
+        {
+            return;
+        }
+
+        StopPlaybackForEdit();
+        _history.Do(_document, command);
+        AfterEdit();
+        ShowEditAppliedToast("Trim");
     }
 
     private void PromptSilenceSelection()
@@ -3149,6 +3186,7 @@ public partial class MainWindow
         {
             SyncPlayWindowFromDocument();
             RefreshTransportCommandsEnabled();
+            ShowEditAppliedToast(redo ? "Redo" : "Undo");
         }
     }
 
@@ -3234,6 +3272,7 @@ public partial class MainWindow
         LoudnessMeter.RefreshOffline();
         RefreshStatus();
         RefreshHistoryStrip();
+        ShowEditAppliedToast("Pen");
     }
 
     private bool TryRenderPen(
@@ -3276,6 +3315,7 @@ public partial class MainWindow
 
         if (TryRevertOpenPenStroke())
         {
+            ShowEditAppliedToast("Undo");
             return;
         }
 
@@ -3311,6 +3351,7 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Undo(_document);
         AfterEdit();
+        ShowEditAppliedToast("Undo");
     }
 
     private void RedoEdit()
@@ -3352,6 +3393,7 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _history.Redo(_document);
         AfterEdit();
+        ShowEditAppliedToast("Redo");
     }
 
     private bool ResolveMenuCanUndo(bool canScratch)
@@ -3461,6 +3503,7 @@ public partial class MainWindow
         }
 
         RefreshViewsAfterHistoryPaste(sessions, applied);
+        ShowEditAppliedToast(redo ? "Redo" : "Undo");
     }
 
     /// <summary>編集コマンドの直前。再生ピッチはどの編集でも 0 に戻し、変わったときだけリセットのトーストを出す。</summary>

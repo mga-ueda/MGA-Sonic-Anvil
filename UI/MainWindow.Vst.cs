@@ -685,6 +685,12 @@ public partial class MainWindow
                 UiStrings.AppName,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
+            return;
+        }
+
+        if (IsLoaded)
+        {
+            ShowEditAppliedToast("Bounce");
         }
     }
 

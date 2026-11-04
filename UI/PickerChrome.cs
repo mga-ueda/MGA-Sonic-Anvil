@@ -330,8 +330,16 @@ internal static class PickerChrome
         ReleaseInputOnBlankClick(menu);
     }
 
-    public static double MeasureFormRow(MenuItem item) =>
-        item.Padding.Left + item.Padding.Right + MeasureHeader(item.Header) + 2;
+    /// <summary>
+    /// フォーム用 MenuItem の必要幅。
+    /// <c>DarkMenuItemStyle</c> は Icon が無くても IconPresenter 列（幅 22 + 右マージン 8）を残すため、
+    /// ヘッダー実寸にそのガターを足す（足さないと単位やチェック文言が見切れる）。
+    /// </summary>
+    public static double MeasureFormRow(MenuItem item)
+    {
+        const double iconGutter = 22 + 8;
+        return item.Padding.Left + item.Padding.Right + iconGutter + MeasureHeader(item.Header) + 2;
+    }
 
     public static Border Gutter() =>
         new()
@@ -435,11 +443,12 @@ internal static class PickerChrome
 
     public static double MeasureMenuRow(MenuItem item)
     {
-        var icon = item.Icon is null ? 0 : 22 + 8;
+        // SubmenuItem では Icon が無くても IconPresenter（22+8）が残る。
+        const double iconGutter = 22 + 8;
         var gesture = string.IsNullOrEmpty(item.InputGestureText)
             ? 0
             : 16 + 4 + MeasureUiText(item.InputGestureText);
-        return item.Padding.Left + item.Padding.Right + icon + MeasureHeader(item.Header) + gesture + 2;
+        return item.Padding.Left + item.Padding.Right + iconGutter + MeasureHeader(item.Header) + gesture + 2;
     }
 
     public static double MeasureUiText(string text)

@@ -29,6 +29,7 @@ internal enum WaveMenuCommand
     Paste,
     PasteHistory,
     Delete,
+    Trim,
     SilenceSelection,
     InsertSilence,
     DetectSilence,
@@ -647,6 +648,11 @@ internal static class WaveformContextMenuBuilder
             WaveMenuCommand.Delete,
             MenuGestures.Delete,
             SingleFileOnly(m) && m.CanEdit && (m.HasSelection || m.HasSelectedMarkers || m.HasSelectedRegions)),
+        Cmd(
+            UiStrings.WaveMenuTrim,
+            WaveMenuCommand.Trim,
+            MenuGestures.Trim,
+            SingleFileOnly(m) && m.CanEdit && m.HasSelection),
         Cmd(
             UiStrings.WaveMenuSilenceSelection,
             WaveMenuCommand.SilenceSelection,

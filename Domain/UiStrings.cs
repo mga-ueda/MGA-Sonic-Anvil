@@ -345,6 +345,7 @@ internal static partial class UiStrings
     public static string LabelToolbarTimeStretch => WithoutAccessKey(WaveMenuTimeStretch);
     public static string LabelToolbarReverse => WithoutAccessKey(WaveMenuReverse);
     public static string LabelToolbarDelete => WithoutAccessKey(WaveMenuDelete);
+    public static string LabelToolbarTrim => WithoutAccessKey(WaveMenuTrim);
     public static string LabelToolbarNew => WithoutAccessKey(WaveMenuNew);
     public static string LabelToolbarOpen => WithoutAccessKey(WaveMenuOpen);
     public static string LabelToolbarSave => WithoutAccessKey(WaveMenuSave);
@@ -1269,6 +1270,7 @@ internal static partial class UiStrings
     public static string TooltipFadeOut => Get("フェードアウト (O)", "Fade out (O)");
     public static string TooltipNormalize => Get("ノーマライズ (N)", "Normalize (N)");
     public static string TooltipDelete => Get("部分削除 (Delete)", "Ripple delete (Delete)");
+    public static string TooltipTrim => Get("トリム — 選択範囲外を削除 (Ctrl+T)", "Trim — delete outside selection (Ctrl+T)");
     public static string TooltipSave => Get("保存 (Ctrl+S)  複数選択時は選択ファイル全部", "Save (Ctrl+S)  all selected files when several tabs are selected");
     public static string TooltipSaveMp3 => Get("MP3 として保存 (Ctrl+Shift+M)", "Save as MP3 (Ctrl+Shift+M)");
     public static string TooltipExportWave => Get("Wave で書き出す", "Export as Wave");
@@ -1744,6 +1746,7 @@ internal static partial class UiStrings
         "Time Stretch" => Get("タイムストレッチ", "Time Stretch"),
         "Reverse" => Get("リバース", "Reverse"),
         "Delete" => Get("削除", "Delete"),
+        "Trim" => Get("トリム", "Trim"),
         "Silence" => Get("無音化", "Silence"),
         "Delete Silence" => Get("無音検出（削除）", "Detect Silence (Delete)"),
         "Insert Silence" => Get("無音を挿入", "Insert Silence"),

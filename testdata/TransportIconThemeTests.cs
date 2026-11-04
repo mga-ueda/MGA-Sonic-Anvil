@@ -162,6 +162,7 @@ public sealed class TransportIconThemeTests
                 TransportIcon.Cut,
                 TransportIcon.Copy,
                 TransportIcon.Paste,
+                TransportIcon.Trim,
                 TransportIcon.SilenceSelection,
                 TransportIcon.InsertSilence,
                 TransportIcon.DetectSilence,

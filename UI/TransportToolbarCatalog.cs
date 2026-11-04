@@ -76,6 +76,8 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.Paste, () => UiStrings.LabelToolbarPaste, () => UiStrings.TooltipPaste),
         new(TransportCommand.Delete, TransportIcon.Delete,
             WaveMenuCommand.Delete, () => UiStrings.LabelToolbarDelete, () => UiStrings.TooltipDelete),
+        new(TransportCommand.Trim, TransportIcon.Trim,
+            WaveMenuCommand.Trim, () => UiStrings.LabelToolbarTrim, () => UiStrings.TooltipTrim),
         new(TransportCommand.SilenceSelection, TransportIcon.SilenceSelection,
             WaveMenuCommand.SilenceSelection, () => UiStrings.LabelToolbarSilenceSelection, () => UiStrings.TooltipSilenceSelection),
         new(TransportCommand.InsertSilence, TransportIcon.InsertSilence,

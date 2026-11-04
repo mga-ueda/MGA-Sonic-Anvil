@@ -8,6 +8,7 @@ internal static class MenuGestures
 {
     public const string Redo = "Ctrl+Y / Ctrl+Shift+Z";
     public const string Delete = "Delete";
+    public const string Trim = "Ctrl+T";
     public const string Volume = "V / Ctrl+Shift+V";
     public const string VolumePlayer = "Ctrl+Shift+V";
     public const string AddMarker = "M / Ins";

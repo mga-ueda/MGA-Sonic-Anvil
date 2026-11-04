@@ -318,6 +318,7 @@ internal static class LibraryPlayerMode
             (Key.N or Key.P or Key.R or Key.T or Key.S or Key.B or Key.C or Key.V
                 or Key.I or Key.O, ModifierKeys.None) => true,
             (Key.D, ModifierKeys.Control) => true,
+            (Key.T, ModifierKeys.Control) => true,
             (Key.Insert, ModifierKeys.Control) => true,
             _ => false,
         };
