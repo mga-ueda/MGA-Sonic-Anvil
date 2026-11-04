@@ -70,13 +70,6 @@ public sealed class AudioOutputFlushTests
     }
 
     [Fact]
-    public void MutedSettle_IsMuchShorterThanPipelineWait()
-    {
-        Assert.InRange(AudioOutputFlush.MutedSettleMilliseconds, 1, 200);
-        Assert.True(AudioOutputFlush.MutedSettleMilliseconds < AudioOutputFlush.MinMilliseconds);
-    }
-
-    [Fact]
     public void Bind_KeepsPausedSoAsioDoesNotResume()
     {
         var samples = new float[4800];
@@ -101,6 +94,60 @@ public sealed class AudioOutputFlushTests
         Assert.Equal(0, AudioOutputFlush.RemainingMilliseconds(0, start, later));
         Assert.Equal(500, AudioOutputFlush.RemainingMilliseconds(2000, start, later));
         Assert.Equal(0, AudioOutputFlush.RemainingMilliseconds(1000, start, later));
+    }
+
+    [Fact]
+    public void ShouldRestore_RecoversSilencedSession()
+    {
+        // 旧版の終了洗い流しは Mute と Volume=0 を同時に書くので、Volume≈0 で拾う。
+        Assert.True(AudioSessionRestore.ShouldRestore(muted: true, volume: 0f));
+        Assert.True(AudioSessionRestore.ShouldRestore(muted: false, volume: 0f));
+        Assert.True(AudioSessionRestore.ShouldRestore(
+            muted: false,
+            volume: AudioSessionRestore.SilenceEpsilon));
+    }
+
+    [Fact]
+    public void ShouldRestore_LeavesHealthyUserVolumeUntouched()
+    {
+        // 意図的なミュート（音量は残したまま）や下げた音量は触らない。
+        Assert.False(AudioSessionRestore.ShouldRestore(muted: true, volume: 1f));
+        Assert.False(AudioSessionRestore.ShouldRestore(muted: false, volume: 1f));
+        Assert.False(AudioSessionRestore.ShouldRestore(muted: false, volume: 0.5f));
+        Assert.False(AudioSessionRestore.ShouldRestore(muted: false, volume: 0.01f));
+    }
+
+    [Fact]
+    public void SetPaused_KeepsFeedingSilenceWithoutStoppingDevice()
+    {
+        // Pause / Stop は WaveOut / WASAPI でもデバイスを止めず、この無音ゲートで
+        // 流し続ける。連続した Read が毎回満杯の無音を返し、カーソルも進まないので、
+        // 動いたままのデバイスがドライバ／ミキサの先読みを無音で上書きし続けられる
+        // （次の再生の頭に前の曲の尾が混じらない＝ジャジャーン対策の土台）。
+        var samples = new float[48000 * 2];
+        Array.Fill(samples, 0.5f);
+        var document = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.Bind(document, 0, null, loop: false);
+
+        var buffer = new float[960];
+        Assert.Equal(960, provider.Read(buffer, 0, buffer.Length));
+        var advanced = provider.CursorFrame;
+        Assert.True(advanced > 0);
+
+        provider.SetPaused(true);
+        for (var i = 0; i < 5; i++)
+        {
+            Array.Fill(buffer, 1f);
+            Assert.Equal(960, provider.Read(buffer, 0, buffer.Length));
+            Assert.All(buffer, sample => Assert.Equal(0f, sample));
+            Assert.Equal(advanced, provider.CursorFrame);
+        }
+
+        // 再生再開（ゲートを閉じる）とカーソルがまた進む。
+        provider.SetPaused(false);
+        Assert.Equal(960, provider.Read(buffer, 0, buffer.Length));
+        Assert.True(provider.CursorFrame > advanced);
     }
 
     [Fact]

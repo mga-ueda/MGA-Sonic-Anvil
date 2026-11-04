@@ -19,11 +19,6 @@ internal static class AudioOutputFlush
     /// <summary>巨大バッファでも終了待ちを伸ばしすぎない。</summary>
     public const int MaxMilliseconds = 5000;
 
-    /// <summary>
-    /// WaveOut / WASAPI はセッション音量を 0 にしたあと、適用を待つだけ。
-    /// </summary>
-    public const int MutedSettleMilliseconds = 80;
-
     /// <summary>WASAPI / 最終出力 1 ホップ程度。</summary>
     public const int DeviceTailMilliseconds = 150;
 
