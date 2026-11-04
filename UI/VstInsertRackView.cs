@@ -1050,6 +1050,7 @@ internal sealed class VstInsertRackView : Grid
 
     /// <param name="allTabs">
     /// true のとき、同じスロット番号かつ表示名が一致するプラグインだけ全タブから外す。
+    /// 永続中は「全てのタブにインサート」扱いなので、false でも全タブから外す。
     /// </param>
     private void ClearSlot(int index, bool allTabs)
     {
@@ -1076,7 +1077,8 @@ internal sealed class VstInsertRackView : Grid
             AppStorage.Save();
         }
 
-        if (allTabs && _clearMatchingSlotOnAllTabs is not null)
+        // 永続化は全タブ共通。メニューの「全てのタブから削除」をグレーにする前提と揃える。
+        if (ShouldClearSlotAcrossTabs(allTabs, persisted) && _clearMatchingSlotOnAllTabs is not null)
         {
             _clearMatchingSlotOnAllTabs(index, displayName, pluginPath, classId);
         }
@@ -1100,19 +1102,29 @@ internal sealed class VstInsertRackView : Grid
         var clearedPersist = false;
         for (var i = 0; i < VstInsertChain.MaxSlots; i++)
         {
-            if (_session.VstInserts.Slots[i].IsEmpty)
+            var slot = _session.VstInserts.Slots[i];
+            if (slot.IsEmpty)
             {
                 continue;
             }
 
-            // 「すべて削除」は今のタブのみ。永続記憶だけは外して着色と再適用を止める。
-            if (SlotIsPersisted(i))
+            // 「すべて削除」の非永続は今のタブのみ。永続は全タブ挿入扱いなので他タブも空ける。
+            var persisted = SlotIsPersisted(i);
+            if (persisted)
             {
                 DocumentSessionStore.ClearDefaultInsertSlot(settings, i);
                 clearedPersist = true;
             }
 
-            _session.VstInserts.ClearSlot(i);
+            if (ShouldClearSlotAcrossTabs(allTabsRequested: false, persisted)
+                && _clearMatchingSlotOnAllTabs is not null)
+            {
+                _clearMatchingSlotOnAllTabs(i, slot.DisplayName, slot.PluginPath, slot.ClassId);
+            }
+            else
+            {
+                _session.VstInserts.ClearSlot(i);
+            }
         }
 
         if (clearedPersist)
@@ -1123,6 +1135,12 @@ internal sealed class VstInsertRackView : Grid
         Refresh();
         _onChanged?.Invoke();
     }
+
+    /// <summary>
+    /// 永続中は「全てのタブにインサート」扱い。削除要求が単タブでも全タブから外す。
+    /// </summary>
+    internal static bool ShouldClearSlotAcrossTabs(bool allTabsRequested, bool persisted) =>
+        allTabsRequested || persisted;
 
     /// <summary>表示名が取れるときは名前一致。無いときだけパス／ClassId。</summary>
     internal static bool SlotMatchesPluginForClear(
