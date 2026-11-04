@@ -99,6 +99,71 @@ internal static class VstInsertPluginMenu
             ? UiStrings.LabelVstInsertVendorUnknown
             : entry.Vendor.Trim();
 
+    /// <summary>
+    /// 検索ヒット。ライブラリと同じ構文（空白 AND、<c>|</c> OR、引用、* / ?）。
+    /// プラグイン名は常に対象。メーカー表示ではメーカー名だけ、種別表示では種別ノード名だけを
+    /// 追加で見る（交差しない。AND 語は対象フィールドをまたいでよい）。
+    /// </summary>
+    public static bool MatchesPickerFilter(
+        VstPickerEntry plugin,
+        string filter,
+        VstInsertPickerGroupMode mode) =>
+        MatchesPickerFilter(plugin, LibrarySearchQuery.Parse(filter), mode);
+
+    public static bool MatchesPickerFilter(
+        VstPickerEntry plugin,
+        IReadOnlyList<string[]> groups,
+        VstInsertPickerGroupMode mode)
+    {
+        if (groups.Count == 0)
+        {
+            return true;
+        }
+
+        return TileSearchQuery.MatchesAny(PickerFilterTexts(plugin, mode), groups);
+    }
+
+    /// <summary>表示モードごとの照合テキスト（ライブラリの行テキスト相当）。</summary>
+    public static IEnumerable<string> PickerFilterTexts(
+        VstPickerEntry plugin,
+        VstInsertPickerGroupMode mode)
+    {
+        yield return plugin.Name;
+        if (mode == VstInsertPickerGroupMode.Vendor)
+        {
+            yield return VendorKey(plugin);
+            yield break;
+        }
+
+        foreach (var label in CategoryFilterLabels(plugin.Category))
+        {
+            yield return label;
+        }
+    }
+
+    /// <summary>種別ツリーに出るノード名（先頭 Fx を除いた各段）。</summary>
+    public static IEnumerable<string> CategoryFilterLabels(string? category)
+    {
+        var paths = CategoryTreePaths(category);
+        if (paths.Count == 0)
+        {
+            yield return UiStrings.LabelVstInsertCategoryUnknown;
+            yield break;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var segments in paths)
+        {
+            foreach (var segment in segments)
+            {
+                if (seen.Add(segment))
+                {
+                    yield return segment;
+                }
+            }
+        }
+    }
+
     public static IReadOnlyList<IGrouping<string, VstPickerEntry>> GroupPickerByVendor(
         IEnumerable<VstPickerEntry> plugins) =>
         plugins

@@ -231,6 +231,9 @@ internal static partial class UiStrings
     public static string LabelVstInsertPickerTitle => Get("インサート", "Insert");
     public static string LabelVstInsertPickerGroupVendor => Get("メーカー名(_M)", "Vendor(_M)");
     public static string LabelVstInsertPickerGroupCategory => Get("種別(_T)", "Category(_T)");
+    public static string LabelVstInsertPickerSearchHint => Get(
+        "検索（Ctrl+F / Alt+F）",
+        "Find (Ctrl+F / Alt+F)");
     public static string LabelVstInsertNoneRecognized => Get(
         "認識済みプラグインがありません（設定 → VST）",
         "No recognized plug-ins (Settings → VST)");
