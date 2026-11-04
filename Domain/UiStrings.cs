@@ -239,10 +239,6 @@ internal static partial class UiStrings
     public static string TooltipVstInsertSlot => Get(
         "クリックでインサート／全てのタブにインサート / Ctrl+Shift+1–8 でも操作",
         "Click for Insert / Insert to All Tabs / also Ctrl+Shift+1–8");
-    /// <summary>カテゴリ表記。VST の Fx|Reverb は内部区切りで、UI では入れ子／"Fx / Reverb" と出す。</summary>
-    public static string TipVstCategoryPipe => Get(
-        "「Fx|Reverb」などは VST の種別タグです。選択ウィンドウでは入れ子、または「Fx / Reverb」と表示します。",
-        "Tags like Fx|Reverb are VST category labels; the picker nests them or shows Fx / Reverb.");
     public static string TooltipVstInsertSlotFilled => Get(
         "クリックで UI / 空きスロットへドラッグで移動（使用中どうしは入れ替え） / 右クリックでメニュー / Ctrl+クリックでバイパス / Ctrl+Shift+1–8 でも操作",
         "Click for UI / drag to an empty slot to move (swap if occupied) / right-click for menu / Ctrl+click to bypass / also Ctrl+Shift+1–8");
@@ -255,9 +251,6 @@ internal static partial class UiStrings
     public static string ErrorVstInsertEditorFailed => Get(
         "プラグインの UI を開けませんでした。音声処理は使える場合があります。",
         "Could not open the plug-in UI. Audio processing may still work.");
-    public static string LabelVstInsertWaveShell => Get(
-        "Waves（Shell 展開）",
-        "Waves (Shell expanded)");
     public static string LabelUiColorSettings => Get("色設定", "Color settings");
     public static string HintUiColorSettings => Get(
         "波形や UI の配色を編集します。開いたままメイン画面を見ながら変更できます。",

@@ -3944,9 +3944,6 @@ public partial class MainWindow
         _ = PlayLibrarySessionAsync(session);
     }
 
-    private static string SessionName(DocumentSession? session) =>
-        session is null ? "(null)" : Path.GetFileName(session.Document.SourcePath) ?? session.DisplayName;
-
     private Task RegisterLibraryPathsAsync(IReadOnlyList<string> paths) =>
         RegisterLibraryPathsAsync(paths, play: true);
 

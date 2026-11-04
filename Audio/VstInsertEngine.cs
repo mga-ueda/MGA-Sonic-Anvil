@@ -21,7 +21,6 @@ internal sealed class VstInsertEngine : IDisposable
     /// <summary>エディタ createView／attach 中。bypass と別（dry を通さず無音にする）。</summary>
     private readonly bool[] _uiSuspended = new bool[VstInsertChain.MaxSlots];
     private readonly IVstSlotProcessor?[] _processScratch = new IVstSlotProcessor?[VstInsertChain.MaxSlots];
-    private readonly bool[] _bypassScratch = new bool[VstInsertChain.MaxSlots];
     /// <summary>非アクティブ文書のライブ退避。キーは DocumentSession など owner。</summary>
     private readonly Dictionary<object, IVstSlotProcessor?[]> _parked = new();
     private string _structuralKey = string.Empty;
@@ -902,7 +901,6 @@ internal sealed class VstInsertEngine : IDisposable
                 }
 
                 _processScratch[i] = _live[i];
-                _bypassScratch[i] = false;
                 liveCount++;
             }
 
