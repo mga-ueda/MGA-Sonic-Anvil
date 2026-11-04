@@ -5,9 +5,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using MgaSonicAnvil.Audio;
-using MgaSonicAnvil.Config;
-using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
@@ -1469,12 +1466,7 @@ public partial class MainWindow
             return true;
         }
 
-        // エディタ: Alt+Shift+I＝Include Tail。Ctrl+Shift+1–8＝VST インサート（空き＝選択／バイパス解除／GUI 開閉）。
-        if (!IsLibraryMaximized && TryHandleVstBounceIncludeTailShortcut(key, modifiers))
-        {
-            return true;
-        }
-
+        // エディタ: Ctrl+Shift+1–8＝VST インサート（空き＝選択／バイパス解除／GUI 開閉）。
         if (!IsLibraryMaximized && TryHandleVstInsertSlotShortcut(key, modifiers))
         {
             return true;
@@ -1488,22 +1480,6 @@ public partial class MainWindow
         }
 
         return false;
-    }
-
-    /// <summary>Alt+Shift+I。バウンス時の Include Tail をトグル。</summary>
-    private bool TryHandleVstBounceIncludeTailShortcut(Key key, ModifierKeys modifiers)
-    {
-        if (!IsVstInsertUiEnabled()
-            || BlocksOutsideFadeToolActions
-            || modifiers != LibraryPlayerMode.AltShift
-            || key != Key.I
-            || VstInsertRack.Visibility != Visibility.Visible)
-        {
-            return false;
-        }
-
-        VstInsertRack.ToggleIncludeTail();
-        return true;
     }
 
     /// <summary>Ctrl+Shift+上段 1–8。空き＝挿入、バイパス中＝解除、それ以外＝GUI 開閉。</summary>

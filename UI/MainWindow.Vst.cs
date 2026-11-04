@@ -584,6 +584,24 @@ public partial class MainWindow
             return;
         }
 
+        // チェックボックスは出さず、実行時にテイルを残すか問う（既定は残す）。
+        var includeTailChoice = OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ConfirmVstBounceIncludeTail,
+            UiStrings.TitleVstBounceIncludeTail,
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question,
+            MessageBoxResult.Yes,
+            UiStrings.ButtonVstBounceKeepTail,
+            UiStrings.ButtonVstBounceCutTail,
+            orangeNo: true);
+        if (includeTailChoice == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
+        var includeTail = includeTailChoice != MessageBoxResult.No;
+
         var activeBefore = _activeSession;
         StopPlaybackForEdit();
         _player.VstInserts.CaptureAppliedStates();
@@ -617,7 +635,7 @@ public partial class MainWindow
                     ReportBakeGlassProgress(targets, jobProgress, index, jobProgress[index]);
                 });
 
-                if (!await BakeOneSessionAsync(session, progress).ConfigureAwait(true))
+                if (!await BakeOneSessionAsync(session, progress, includeTail).ConfigureAwait(true))
                 {
                     return;
                 }
@@ -755,7 +773,10 @@ public partial class MainWindow
     /// <summary>
     /// 1 ファイルだけオフライン処理して履歴へ載せる。共有エンジンのため呼び出し側で直列化する。
     /// </summary>
-    private async Task<bool> BakeOneSessionAsync(DocumentSession session, IProgress<double> progress)
+    private async Task<bool> BakeOneSessionAsync(
+        DocumentSession session,
+        IProgress<double> progress,
+        bool includeTail)
     {
         var document = session.Document;
         var restoreOnUndo = new bool[VstInsertChain.MaxSlots];
@@ -771,7 +792,6 @@ public partial class MainWindow
         await Dispatcher.Yield(DispatcherPriority.Background);
 
         var channels = Math.Max(1, document.Channels);
-        var includeTail = AppStorage.Settings.ResolveVstBounceIncludeTail();
         var source = includeTail
             ? document.Interleaved
             : (float[])document.Interleaved.Clone();

@@ -28,12 +28,14 @@ internal static class OwnerCenteredMessageBox
         MessageBoxImage icon = MessageBoxImage.None,
         MessageBoxResult defaultResult = MessageBoxResult.None,
         string? yesText = null,
-        string? noText = null)
+        string? noText = null,
+        bool orangeNo = false)
     {
         PlayFor(icon);
         if (ConfirmChoiceWindow.UsesAppButtons(buttons))
         {
-            return ConfirmChoiceWindow.Show(owner, text, caption, buttons, defaultResult, yesText, noText);
+            return ConfirmChoiceWindow.Show(
+                owner, text, caption, buttons, defaultResult, yesText, noText, orangeNo: orangeNo);
         }
 
         if (owner is null)
