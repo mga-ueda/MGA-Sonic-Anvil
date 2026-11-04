@@ -747,8 +747,6 @@ public sealed class Vst3PluginScannerTests : IDisposable
     public void FactoryProbe_IsUnavailableUnderTestHost() =>
         Assert.False(Vst3FactoryProbe.IsOutOfProcessAvailable());
 
-#if DEBUG
     [Fact]
-    public void VstFeature_IsEnabledInDebug() => Assert.True(VstFeature.IsEnabled);
-#endif
+    public void VstFeature_IsEnabled() => Assert.True(VstFeature.IsEnabled);
 }
