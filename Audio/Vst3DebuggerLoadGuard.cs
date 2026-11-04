@@ -9,10 +9,10 @@ namespace MgaSonicAnvil.Audio;
 /// </summary>
 internal static class Vst3DebuggerLoadGuard
 {
-    public static bool IsDebuggerPresentLikely =>
+    private static bool IsDebuggerPresentLikely =>
         System.Diagnostics.Debugger.IsAttached || IsDebuggerPresent();
 
-    public static bool IsPaceRiskPlugin(string? pathOrName)
+    private static bool IsPaceRiskPlugin(string? pathOrName)
     {
         if (string.IsNullOrWhiteSpace(pathOrName))
         {

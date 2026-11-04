@@ -660,7 +660,7 @@
         <p>Shows several tabs on one screen for comparison.</p>
         <h4>Arrangement</h4>
         <ul>
-          <li><kbd>Shift</kbd>+<kbd>T</kbd> cycles side by side → stacked → grid → off (<kbd>Ctrl</kbd>+<kbd>T</kbd> is Trim). Arrangements that would look identical for the current file count, or would not fit the waveform area, are skipped. If side-by-side or stacked would not fit, grid is tried. If grid would not fit either, the shortcut does nothing.</li>
+          <li><kbd>Shift</kbd>+<kbd>T</kbd> cycles side by side → stacked → grid → off (editor only; ignored while the player is maximized; <kbd>Ctrl</kbd>+<kbd>T</kbd> is Trim). Arrangements that would look identical for the current file count, or would not fit the waveform area, are skipped. If side-by-side or stacked would not fit, grid is tried. If grid would not fit either, the shortcut does nothing.</li>
           <li>You can also pick one directly from waveform right-click → Tabs, or from the tab right-click menu: “Keep Tabs (B)” / “Side by Side (1)” / “Stacked (2)” / “Grid (3)”. Two or more tabs. Arrangements that would not fit stay disabled. The check marks the current arrangement.</li>
           <li>Tiling switches every tab to the analysis view of the current tab (waveform / spectrogram / overlay / loudness).</li>
           <li>Switching arrangements does not stop playback. Closing a tab while tiled removes its pane. When one tab remains, the view returns to normal.</li>
@@ -797,7 +797,7 @@
         <ul>
           <li>Pick from the Recognized list built on the Settings <a href="#settings-vst">VST</a> tab (click an empty slot, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd>). Candidates that do not fit the file’s channel count are hidden.</li>
           <li>The picker is a vendor / category tree. Focus starts in the search box (same syntax as the library: space = AND, <code>|</code> = OR, quotes, <code>*</code> / <code>?</code>). Matching text is highlighted in yellow. Vendor view also matches vendor names; category view also matches category nodes (not the other way around). <kbd>↓</kbd> moves to the tree; <kbd>Ctrl</kbd>+<kbd>F</kbd> / <kbd>Alt</kbd>+<kbd>F</kbd> return to search. <kbd>↑</kbd> on the first tree row and <kbd>↓</kbd> on the last also return to search. Keys: <a href="#shortcuts-vst">Shortcuts → VST inserts</a>.</li>
-          <li>Click a filled slot for the GUI; the same shortcut closes it when open. <kbd>Ctrl</kbd>+click toggles bypass. Right-click for Insert / Insert to All Tabs / Bypass / Persist / Remove, and so on.</li>
+          <li>Click a filled slot for the GUI; the same shortcut closes it when open. <kbd>Ctrl</kbd>+click toggles bypass. Right-click for Insert / Insert to All Tabs / Bypass / Persist / Remove, and so on. Plug-in GUIs stay in the topmost band so they remain above the host even when the host uses <kbd>F11</kbd> / <kbd>F12</kbd> or Always on Top.</li>
           <li>Drag to an empty slot to move, or swap two occupied slots. Persisted slots stay on the same index across every open tab.</li>
           <li><strong>Persist</strong> — remembers the plug-in, parameters, and bypass for every open tab and the next launch. <strong>Release persistence</strong> clears only that memory and leaves the plug-in on the current slot. <strong>Remove</strong> (and Clear All for persisted slots) acts like all-tabs insert, so the same name and index leave every open tab.</li>
           <li><strong>Bounce Selected</strong> (toolbar / Export menu / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) — bakes inserts into the waveform on the selected tabs (or the active tab) and bypasses those slots. Asks whether to include tails (Keep / Cut; Keep by default; Cancel aborts the bounce). Editor only. Undoable. Separate from <a href="#layout-tabs">Mixdown</a> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), which stacks tabs.</li>
@@ -1243,7 +1243,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Export MP3 (selected tabs, or the current tab; selected playlist rows in the player; does not save; waveform right-click → Export)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Quit (tabs left open and unsaved working copies come back on the next launch)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if unsaved; several unsaved tabs can be finished together)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Reopen a closed tab (newest first; tabs closed in this launch; more than one)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Reopen a closed tab (newest first; tabs closed in this launch; more than one; <strong>editor only</strong>; ignored while the player is maximized)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Close all tabs</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageDown</kbd> / numpad <kbd>6</kbd></td><td>Next tab (wraps from end to start; key-repeat pauses at the ends; wrap again only after release and repress; while the tile search filter is active, matched tabs only; numpad <kbd>6</kbd> is editor-only — next track in the player)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd> / numpad <kbd>4</kbd></td><td>Previous tab (same; numpad <kbd>4</kbd> is editor-only — previous track in the player)</td></tr>
@@ -1304,7 +1304,7 @@
           <tr><td><kbd>F10</kbd></td><td>Player mode. Not fullscreen. Pressing <kbd>F10</kbd> again does not leave the player (re-applies chrome only). Return to the editor with <kbd>F11</kbd> / <kbd>F12</kbd>. Entering from the editor with unsaved files shows a dialog; you cannot switch until nothing remains unsaved (Save / Don’t Save / Cancel; see <a href="#layout-player">Player mode</a>). During video / PDF real playback or video frame pause, stays in the player, drops to the dim background preview, and restores front chrome = the playlist. Screen, playback, library, and jacket are under the same section.</td></tr>
           <tr><td><kbd>F11</kbd></td><td>Fullscreen / restore the waveform area (hides the taskbar, like a browser; also hides WAAPI, channel names, and the dB scale; keeps tabs, the toolbar, and the overview; meters and status bar follow the preset; works while tiled; <kbd>F11</kbd> again restores; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
           <tr><td><kbd>F12</kbd></td><td>Fullscreen / restore with only the title bar hidden (tabs, toolbar, meters, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× on top of Windows display scaling and UI scale; works while tiled; <kbd>F12</kbd> again restores; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
-          <tr><td><kbd>Shift</kbd>+<kbd>T</kbd></td><td>Cycle the tile arrangement (side by side → stacked → grid → off; identical-looking or too-cramped arrangements are skipped; if side-by-side or stacked would not fit, grid is tried; if grid would not fit either, it does nothing; two or more tabs; not the same as <kbd>Ctrl</kbd>+<kbd>T</kbd> Trim)</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>T</kbd></td><td>Cycle the tile arrangement (side by side → stacked → grid → off; identical-looking or too-cramped arrangements are skipped; if side-by-side or stacked would not fit, grid is tried; if grid would not fit either, it does nothing; two or more tabs; <strong>editor only</strong>; ignored while the player is maximized; not the same as <kbd>Ctrl</kbd>+<kbd>T</kbd> Trim)</td></tr>
           <tr><td><kbd>A</kbd></td><td>Switch spectrogram / overlay (from loudness, goes to spectrogram; not a three-way cycle)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>Return to the waveform (from any view)</td></tr>
           <tr><td><kbd>Alt</kbd>+↑ / ↓</td><td>Lift spectrogram dark energy (hold to repeat)</td></tr>
@@ -1375,7 +1375,7 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd></td><td>Slot action: empty = pick a plug-in; bypassed = clear bypass; filled = open / close the GUI</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd></td><td>Slot action: empty = pick a plug-in; bypassed = clear bypass; filled = open / close the GUI (numpad digits are not used)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; asks Keep / Cut tails; Keep by default; Cancel aborts)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click (slot)</td><td>Toggle bypass</td></tr>
         </tbody>
@@ -1388,6 +1388,8 @@
           <tr><td><kbd>↓</kbd> in search</td><td>Move to the tree (first matching plug-in while filtering)</td></tr>
           <tr><td><kbd>↑</kbd> on the first tree row / <kbd>↓</kbd> on the last</td><td>Return to search</td></tr>
           <tr><td>Typing in search</td><td>Same filter syntax as the library (space = AND, <code>|</code> = OR, quotes, <code>*</code> / <code>?</code>). Hits highlighted in yellow</td></tr>
+          <tr><td>Typing in the tree</td><td>Typeahead (same as the library tree; walks matching rows)</td></tr>
+          <tr><td><kbd>Space</kbd> / <kbd>Shift</kbd>+<kbd>Space</kbd> in the tree</td><td>Expand / collapse a group (same as the library tree)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Clear typeahead if any → clear search text if any → otherwise close</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Accept the selected plug-in (or expand a group)</td></tr>
         </tbody>
@@ -1481,6 +1483,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select every replayable step (Original is excluded)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Copy the selected steps (or every step up to the current position if none are selected)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Apply the copied history to this file (its history window does not need to be open)</td></tr>
+          <tr><td>Drag bottom-right</td><td>Resize (remembered; top-left stays fixed)</td></tr>
         </tbody>
       </table>
       <p>While picking a fade curve</p>
