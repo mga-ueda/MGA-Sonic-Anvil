@@ -232,7 +232,7 @@ internal static class AudioCaptureFactory
             return [];
         }
 
-        using var asio = new AsioOut(selected) { AutoStop = false };
+        using var asio = AsioOutFactory.Open(selected);
         return DevicePortNames.FromAsio(asio, input);
     }
 

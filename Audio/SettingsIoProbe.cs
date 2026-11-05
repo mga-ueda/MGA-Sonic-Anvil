@@ -375,7 +375,7 @@ internal sealed class SettingsIoProbe : IDisposable
             : names.FirstOrDefault(name => name.Equals(driverName, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException(UiStrings.ErrAsioDriverNotFound(driverName));
 
-        var asio = new AsioOut(selected) { AutoStop = false };
+        var asio = AsioOutFactory.Open(selected);
         var inputCount = Math.Max(1, asio.DriverInputChannelCount);
         var outputCount = Math.Max(1, asio.DriverOutputChannelCount);
         var rate = 48000;
