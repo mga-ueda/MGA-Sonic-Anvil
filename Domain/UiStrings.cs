@@ -208,6 +208,30 @@ internal static partial class UiStrings
         "Include effect tails when bouncing?\nKeep: extend the waveform until tails die out\nCut: keep the original length");
     public static string ButtonVstBounceKeepTail => Get("残す", "Keep");
     public static string ButtonVstBounceCutTail => Get("切る", "Cut");
+    public static string ErrorVstBounceNoInsert => Get(
+        "バウンスできるインサートがありません。",
+        "There are no inserts to bounce.");
+    public static string ErrorVstBounceBypassed => Get(
+        "インサートがバイパスされているためバウンスできません。",
+        "Cannot bounce because the inserts are bypassed.");
+    public static string ErrorVstBounceFaulted => Get(
+        "プラグインを読み込めないためバウンスできません。",
+        "Cannot bounce because a plug-in failed to load.");
+    public static string ErrorVstBounceEmptyWave => Get(
+        "波形が空のためバウンスできません。",
+        "Cannot bounce because the waveform is empty.");
+    public static string ErrorVstBounceFadeTool => Get(
+        "フェード調整中はバウンスできません。",
+        "Cannot bounce while the fade tool is open.");
+    public static string ErrorVstBounceRecording => Get(
+        "録音中はバウンスできません。",
+        "Cannot bounce while recording.");
+    public static string ErrorVstBounceBusy => Get(
+        "処理中はバウンスできません。",
+        "Cannot bounce while another operation is running.");
+    public static string ErrorVstBouncePlayer => Get(
+        "プレイヤー表示中はバウンスできません。",
+        "Cannot bounce in the player.");
     public static string OverlayVstInsertBake => Get("インサートをバウンス中", "Bouncing inserts");
     public static string OverlayVstInsertBakeFile(string name) => Format(
         "バウンス中: {0}",

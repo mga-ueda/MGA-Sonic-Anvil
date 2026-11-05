@@ -2515,11 +2515,7 @@ public partial class MainWindow
 
         if (key == Key.B && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            if (CanBounceSelectedVstInserts())
-            {
-                _ = BakeVstInsertsAsync();
-            }
-
+            _ = BakeVstInsertsAsync();
             return true;
         }
 

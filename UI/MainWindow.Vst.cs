@@ -557,12 +557,134 @@ public partial class MainWindow
         return candidates.Where(VstInsertRackView.SessionCanBake).ToArray();
     }
 
+    /// <summary>
+    /// バウンス操作を受け付けるか。焼けないときもメニューとツールバーは押せるようにし、
+    /// 実行時に理由のダイアログを出す。録音中・処理中・プレイヤー・VST 無効は押せない。
+    /// </summary>
     private bool CanBounceSelectedVstInserts() =>
         !IsUiBusy
         && !IsRecording
         && !IsLibraryMaximized
         && VstFeature.IsEnabled
-        && ResolveBounceTargets().Length > 0;
+        && (HasTabSelection || _activeSession is not null);
+
+    /// <summary>バウンスを始められないとき、理由を出して true。</summary>
+    private bool AbortBounceWithDialog()
+    {
+        var message = BounceBlockedMessage();
+        if (message is null)
+        {
+            return false;
+        }
+
+        if (IsLoaded)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                message,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        return true;
+    }
+
+    /// <summary>今バウンスできるなら null。できないならダイアログ本文。</summary>
+    private string? BounceBlockedMessage()
+    {
+        if (IsRecording)
+        {
+            return UiStrings.ErrorVstBounceRecording;
+        }
+
+        if (IsUiBusy)
+        {
+            return UiStrings.ErrorVstBounceBusy;
+        }
+
+        if (IsLibraryMaximized)
+        {
+            return UiStrings.ErrorVstBouncePlayer;
+        }
+
+        if (BlocksOutsideFadeToolActions)
+        {
+            return UiStrings.ErrorVstBounceFadeTool;
+        }
+
+        if (ResolveBounceTargets().Length > 0)
+        {
+            return null;
+        }
+
+        return MissingBounceTargetMessage();
+    }
+
+    /// <summary>焼けないタブの理由。有効スロットが無い・バイパス・読み込み失敗・空波形。</summary>
+    private string MissingBounceTargetMessage()
+    {
+        IEnumerable<DocumentSession> candidates = HasTabSelection
+            ? SelectedTabsInOrder()
+            : _activeSession is not null ? [_activeSession] : [];
+        var any = false;
+        var activeOnEmptyWave = false;
+        var bypassed = false;
+        var faulted = false;
+        foreach (var session in candidates)
+        {
+            any = true;
+            var hasFrames = session.Document.FrameCount > 0;
+            var slots = session.VstInserts.Slots;
+            for (var i = 0; i < slots.Length; i++)
+            {
+                var slot = slots[i];
+                if (slot.IsEmpty)
+                {
+                    continue;
+                }
+
+                if (slot.Faulted)
+                {
+                    faulted = true;
+                    continue;
+                }
+
+                if (slot.Bypassed)
+                {
+                    bypassed = true;
+                    continue;
+                }
+
+                if (!hasFrames)
+                {
+                    activeOnEmptyWave = true;
+                }
+            }
+        }
+
+        if (!any)
+        {
+            return UiStrings.ErrorNoDocument;
+        }
+
+        if (activeOnEmptyWave)
+        {
+            return UiStrings.ErrorVstBounceEmptyWave;
+        }
+
+        if (bypassed)
+        {
+            return UiStrings.ErrorVstBounceBypassed;
+        }
+
+        if (faulted)
+        {
+            return UiStrings.ErrorVstBounceFaulted;
+        }
+
+        return UiStrings.ErrorVstBounceNoInsert;
+    }
 
     /// <summary>ミックスダウン可能か（選択が 2 本以上。メニュー／ツールバー共通）。</summary>
     private bool CanMergeSelectedTabs() =>
@@ -572,7 +694,7 @@ public partial class MainWindow
 
     private async Task BakeVstInsertsAsync()
     {
-        if (IsUiBusy || RejectOutsideFadeToolAction())
+        if (AbortBounceWithDialog())
         {
             return;
         }
@@ -581,6 +703,16 @@ public partial class MainWindow
         var targets = ResolveBounceTargets();
         if (targets.Length == 0)
         {
+            if (IsLoaded)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    MissingBounceTargetMessage(),
+                    UiStrings.AppName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
             return;
         }
 

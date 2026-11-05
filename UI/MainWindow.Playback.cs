@@ -25,6 +25,12 @@ public partial class MainWindow
 
         if (BlocksOutsideFadeToolActions && !IsAllowedTransportDuringFadeTool(command))
         {
+            // フェード調整中はボタンが押せるままなので、無反応にせず理由を出す。
+            if (command == TransportCommand.Bounce)
+            {
+                _ = BakeVstInsertsAsync();
+            }
+
             return;
         }
 

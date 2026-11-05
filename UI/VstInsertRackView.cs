@@ -301,7 +301,7 @@ internal sealed class VstInsertRackView : Grid
         ApplySlotButtonLook(button, empty: false, persisted);
     }
 
-    /// <summary>メニュー／ツールバー／ショートカットの Bounce 有効判定。</summary>
+    /// <summary>このタブをオフラインで焼けるか（有効スロットがあり、波形が空でない）。</summary>
     internal static bool SessionCanBake(DocumentSession? session) =>
         session is not null
         && session.VstInserts.HasProcessableSlot
