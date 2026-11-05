@@ -223,7 +223,7 @@ internal sealed class AudioRecorder : IDisposable
             : names.FirstOrDefault(name => name.Equals(driverName, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException(UiStrings.ErrAsioDriverNotFound(driverName));
 
-        var asio = new AsioOut(selected) { AutoStop = false };
+        var asio = AsioOutFactory.Open(selected);
         var inputCount = Math.Max(1, asio.DriverInputChannelCount);
         var rate = _sampleRate >= 1000 ? _sampleRate : DefaultAudioFormat.SampleRate;
         try

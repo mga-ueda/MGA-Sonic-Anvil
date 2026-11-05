@@ -170,10 +170,7 @@ internal static class AudioOutputFactory
             : names.FirstOrDefault(n => n.Equals(driverName, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException(UiStrings.ErrAsioDriverNotFound(driverName));
 
-        return new AsioOut(selected)
-        {
-            AutoStop = false,
-        };
+        return AsioOutFactory.Open(selected);
     }
 
     private static List<AudioOutputDeviceInfo> EnumerateWaveOutDevices()
