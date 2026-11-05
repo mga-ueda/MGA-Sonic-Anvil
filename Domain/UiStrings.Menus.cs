@@ -110,8 +110,8 @@ internal static partial class UiStrings
     public static string WaveMenuClearLoopItem => Get("ループを削除(_C)", "_Clear Loop");
     /// <summary>再生カテゴリへ移動。ショートカット表示は Q。</summary>
     public static string WaveMenuRangeClick => Get("マーカークリック(_Q)", "Marker Click (_Q)");
-    public static string WaveMenuPrevMarker => Get("前のマーカーへ(_P)", "_Previous Marker");
-    public static string WaveMenuNextMarker => Get("次のマーカーへ(_X)", "Ne_xt Marker");
+    public static string WaveMenuPrevMarker => Get("前の地点へ(_P)", "_Previous Point");
+    public static string WaveMenuNextMarker => Get("次の地点へ(_X)", "Ne_xt Point");
 
     public static string WaveMenuPlay => Get("再生(_P)", "_Play");
     public static string WaveMenuStopToStart => Get("開始位置で停止(_P)", "Stop to Start (_P)");
@@ -122,7 +122,7 @@ internal static partial class UiStrings
     public static string WaveMenuPlayExit => Get("Play -E(_X)", "Play -E (_X)");
     /// <summary>再生カテゴリ内で Preroll(R) と重ならないよう U。ショートカット表示は Alt+Shift+R。</summary>
     public static string WaveMenuShuffle => Get("ランダム再生(_U)", "Sh_uffle");
-    /// <summary>再生カテゴリ内で Restart(A)／GoEnd(N) と重ならないよう M。ショートカット表示は Alt+Shift+N。</summary>
+    /// <summary>再生カテゴリ内で Restart(A) と重ならないよう M。ショートカット表示は Alt+Shift+N。</summary>
     public static string WaveMenuAutoPlayNext => Get("次の曲を自動再生(_M)", "Auto ne_xt");
     /// <summary>再生カテゴリ内。ショートカット表示は Alt+Shift+P。チェックはライブラリの Auto Play と同じ。</summary>
     public static string WaveMenuAutoPlay => Get("追加時に自動再生(_I)", "Auto Play on Add (_I)");
@@ -137,7 +137,8 @@ internal static partial class UiStrings
     public static string WaveMenuRestartTrack => Get("頭から再生(_D)", "Restart Track (_D)");
     public static string WaveMenuRecord => Get("録音(_C)", "Re_cord");
     public static string WaveMenuGoStart => Get("先頭へ(_H)", "Go to Start (_H)");
-    public static string WaveMenuGoEnd => Get("末尾へ(_N)", "Go to E_nd");
+    /// <summary>タイムライン直下。マーカー名(_N) と重ならないよう F。</summary>
+    public static string WaveMenuGoEnd => Get("末尾へ(_F)", "Go to End (_F)");
     public static string WaveMenuViewLeft => Get("画面左端へ(_Z)", "Go to View Left (_Z)");
     public static string WaveMenuViewRight => Get("画面右端へ(_T)", "Go to View Righ_t");
 

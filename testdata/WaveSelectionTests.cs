@@ -45,4 +45,56 @@ public sealed class WaveSelectionTests
         Assert.Equal(0, WaveSelection.ClampVisualPlayhead(-1, 400));
         Assert.Equal(200, WaveSelection.ClampVisualPlayhead(200, 400));
     }
+
+    [Fact]
+    public void JumpFrame_PrefersSelectionBoundsOverFartherCues()
+    {
+        var selection = new WaveSelection(20, 80);
+
+        Assert.Equal(20, selection.JumpFrame(0, 100, 1));
+        Assert.Equal(80, selection.JumpFrame(20, 100, 1));
+        Assert.Equal(100, selection.JumpFrame(80, 100, 1));
+        Assert.Equal(80, selection.JumpFrame(100, 0, -1));
+        Assert.Equal(20, selection.JumpFrame(80, 0, -1));
+        Assert.Equal(0, selection.JumpFrame(20, 0, -1));
+    }
+
+    [Fact]
+    public void JumpFrame_StopsAtCueBetweenSelectionBounds()
+    {
+        var selection = new WaveSelection(20, 80);
+
+        Assert.Equal(40, selection.JumpFrame(20, 40, 1));
+        Assert.Equal(80, selection.JumpFrame(40, 100, 1));
+        Assert.Equal(40, selection.JumpFrame(80, 40, -1));
+    }
+
+    [Fact]
+    public void JumpFrame_PrefersSelectionWhenCueWrapsBackward()
+    {
+        var selection = new WaveSelection(60, 80);
+
+        Assert.Equal(60, selection.JumpFrame(50, 10, 1));
+        Assert.Equal(10, selection.JumpFrame(90, 10, 1));
+    }
+
+    [Fact]
+    public void JumpFrame_EmptySelectionKeepsCue()
+    {
+        Assert.Equal(40, WaveSelection.Empty.JumpFrame(10, 40, 1));
+        Assert.False(WaveSelection.Empty.HasBoundInDirection(10, 1));
+    }
+
+    [Fact]
+    public void HasBoundInDirection_IsFalseOnceBothEdgesAreBehind()
+    {
+        var selection = new WaveSelection(20, 80);
+
+        Assert.True(selection.HasBoundInDirection(0, 1));
+        Assert.True(selection.HasBoundInDirection(20, 1));
+        Assert.False(selection.HasBoundInDirection(80, 1));
+        Assert.True(selection.HasBoundInDirection(100, -1));
+        Assert.True(selection.HasBoundInDirection(80, -1));
+        Assert.False(selection.HasBoundInDirection(20, -1));
+    }
 }

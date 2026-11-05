@@ -1244,8 +1244,8 @@ internal static partial class UiStrings
     public static string TooltipPlay => Get("再生 / 停止 (Space)", "Play / stop (Space)");
     public static string TooltipGoToStart => Get("先頭へ (Ctrl+Home)", "Go to start (Ctrl+Home)");
     public static string TooltipGoToEnd => Get("末尾へ (Ctrl+End)", "Go to end (Ctrl+End)");
-    public static string TooltipPreviousMarker => Get("前のマーカー", "Previous marker");
-    public static string TooltipNextMarker => Get("次のマーカー", "Next marker");
+    public static string TooltipPreviousMarker => Get("前の地点へ (Ctrl+Left)", "Previous point (Ctrl+Left)");
+    public static string TooltipNextMarker => Get("次の地点へ (Ctrl+Right)", "Next point (Ctrl+Right)");
     public static string TooltipJumpToTime => Get("時間へ移動 (G)", "Jump to time (G)");
     public static string TooltipUndo => Get("元に戻す (Ctrl+Z)", "Undo (Ctrl+Z)");
     public static string TooltipRedo => Get("やり直す (Ctrl+Y)", "Redo (Ctrl+Y)");

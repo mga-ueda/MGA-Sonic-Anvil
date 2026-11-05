@@ -121,18 +121,18 @@ public sealed class TransportToolbarSettingsTests
         ]);
         Assert.Equal(
             [
-                // 再生：同じかたまり → シーク サブメニュー
+                // 再生が先頭。先頭／末尾はタイムラインの移動サブメニュー。
                 nameof(TransportCommand.TogglePlayback),
                 nameof(TransportCommand.LoopPlay),
-                TransportToolbarCatalog.SectionSeparatorToken,
-                nameof(TransportCommand.GoToStart),
-                nameof(TransportCommand.GoToEnd),
                 TransportToolbarCatalog.SeparatorToken,
                 // 編集：元に戻す系 → セパレータ → クリップボード系
                 nameof(TransportCommand.Undo),
                 nameof(TransportCommand.Redo),
                 TransportToolbarCatalog.SectionSeparatorToken,
                 nameof(TransportCommand.Cut),
+                TransportToolbarCatalog.SeparatorToken,
+                nameof(TransportCommand.GoToStart),
+                nameof(TransportCommand.GoToEnd),
             ],
             layout);
     }
@@ -548,7 +548,7 @@ public sealed class TransportToolbarSettingsTests
     }
 
     [Fact]
-    public void SetCommandsEnabled_DisablesMarkerJumpWhenNoMarkers()
+    public void SetCommandsEnabled_KeepsPointJumpWithoutMarkers()
     {
         Exception? error = null;
         var thread = new Thread(() =>
@@ -583,8 +583,8 @@ public sealed class TransportToolbarSettingsTests
                     allowEdit: true,
                     new TransportBar.CommandAvailability(HasMarkers: false));
                 Assert.True(bar.ButtonFor(TransportCommand.TogglePlayback)!.IsEnabled);
-                Assert.False(bar.ButtonFor(TransportCommand.PreviousMarker)!.IsEnabled);
-                Assert.False(bar.ButtonFor(TransportCommand.NextMarker)!.IsEnabled);
+                Assert.True(bar.ButtonFor(TransportCommand.PreviousMarker)!.IsEnabled);
+                Assert.True(bar.ButtonFor(TransportCommand.NextMarker)!.IsEnabled);
                 Assert.False(bar.ButtonFor(TransportCommand.DeleteMarkers)!.IsEnabled);
 
                 bar.SetCommandsEnabled(
