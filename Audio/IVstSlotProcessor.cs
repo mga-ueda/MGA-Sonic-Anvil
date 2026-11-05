@@ -19,6 +19,17 @@ internal interface IVstSlotProcessor : IDisposable
     byte[]? CaptureState();
 
     /// <summary>
+    /// 次の <see cref="Process"/> に渡すトランスポート。ライブ再生が停止中なら Playing を落とす。
+    /// </summary>
+    void ApplyTransport(VstTransport transport) { }
+
+    /// <summary>IAudioProcessor::getLatencySamples。遅延補償しないプラグインは 0。</summary>
+    int LatencySamples => 0;
+
+    /// <summary>オフラインのファイル頭で、自走しているプロジェクト時刻を 0 に戻す。</summary>
+    void ResetTransportClock() { }
+
+    /// <summary>
     /// interleaved float をその場で処理。失敗したら false（呼び出し側が Faulted 扱い）。
     /// </summary>
     bool Process(float[] buffer, int offset, int sampleCount, int channels);

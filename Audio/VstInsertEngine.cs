@@ -63,6 +63,44 @@ internal sealed class VstInsertEngine : IDisposable
         }
     }
 
+    private int _cachedLatencyFrames;
+
+    /// <summary>直近に測った getLatencySamples 合計。描画スレッドはここを読む。</summary>
+    public int ActiveLatencyFrames
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _disposed || _playerBypass ? 0 : _cachedLatencyFrames;
+            }
+        }
+    }
+
+    /// <summary>再生コールバックから呼ぶ。プラグインに問い合わせてキャッシュを更新する。</summary>
+    public int RefreshActiveLatency()
+    {
+        double sampleRate;
+        lock (_gate)
+        {
+            if (_disposed || _playerBypass)
+            {
+                _cachedLatencyFrames = 0;
+                return 0;
+            }
+
+            sampleRate = _sampleRate > 0 ? _sampleRate : 48000;
+        }
+
+        var value = QueryActiveLatencyFrames(sampleRate);
+        lock (_gate)
+        {
+            _cachedLatencyFrames = value;
+        }
+
+        return value;
+    }
+
     public bool PlayerBypass
     {
         get
@@ -552,7 +590,12 @@ internal sealed class VstInsertEngine : IDisposable
         }
     }
 
-    public void Process(float[] buffer, int offset, int sampleCount, int channels)
+    public void Process(
+        float[] buffer,
+        int offset,
+        int sampleCount,
+        int channels,
+        VstTransport? transport = null)
     {
         if (sampleCount <= 0 || channels <= 0)
         {
@@ -570,7 +613,7 @@ internal sealed class VstInsertEngine : IDisposable
                 }
             }
 
-            ProcessActiveSlots(buffer, offset, sampleCount, channels);
+            ProcessActiveSlots(buffer, offset, sampleCount, channels, transport ?? VstTransport.FreeRunning);
         }
         finally
         {
@@ -586,6 +629,12 @@ internal sealed class VstInsertEngine : IDisposable
 
     /// <summary>テール延長の上限（秒）。無限残響プラグインへの保険。</summary>
     public const double OfflineTailMaxSeconds = 60;
+
+    /// <summary>
+    /// 初回 process が追いつかず付く先頭無音の補正上限（秒）。
+    /// getLatencySamples とは別。これを超える遅れは意図したディレイとみなし動かさない。
+    /// </summary>
+    public const double OfflineStartupMaxSeconds = 5;
 
     /// <summary>
     /// 再生コールバックを止めつつ、現在のライブチェーンで interleaved を処理する。
@@ -633,19 +682,40 @@ internal sealed class VstInsertEngine : IDisposable
             // 共有ライブのまま直列バウンスするため、ファイルごとに残留を捨てる。
             PrepareLiveSlotsForOffline(channels, maxBlock);
             cancellationToken.ThrowIfCancellationRequested();
+            var latency = QueryActiveLatencyFrames(sampleRate);
+            var totalFrames = interleaved.Length / channels;
+            var onsetThreshold = SilentSkip.LinearFromDb(OfflineTailThresholdDb);
+            var sourceOnset = VstOfflineStartupGap.FindOnset(
+                interleaved,
+                frameOffset: 0,
+                totalFrames,
+                channels,
+                onsetThreshold);
 
             if (!includeTail)
             {
+                var frames = totalFrames;
                 ProcessOfflineRange(
                     interleaved,
                     frameOffset: 0,
-                    frameCount: interleaved.Length / channels,
+                    frameCount: frames,
                     channels,
                     maxBlock,
                     progress,
                     progressStart: 0,
                     progressEnd: 1,
                     cancellationToken);
+                latency = Math.Max(latency, QueryActiveLatencyFrames(sampleRate));
+                CompensateLatency(interleaved, 0, frames, channels, latency, maxBlock);
+                CompensateStartupSilence(
+                    interleaved,
+                    sourceOnset,
+                    0,
+                    frames,
+                    channels,
+                    maxBlock,
+                    sampleRate,
+                    onsetThreshold);
                 progress?.Report(1);
                 return interleaved;
             }
@@ -671,6 +741,17 @@ internal sealed class VstInsertEngine : IDisposable
                 progressStart: 0,
                 progressEnd: 0.85,
                 cancellationToken);
+            latency = Math.Max(latency, QueryActiveLatencyFrames(sampleRate));
+            CompensateLatency(body, 0, sourceFrames, channels, latency, maxBlock);
+            CompensateStartupSilence(
+                body,
+                sourceOnset,
+                0,
+                sourceFrames,
+                channels,
+                maxBlock,
+                sampleRate,
+                onsetThreshold);
 
             var silence = new float[maxBlock * channels];
             // テールは可変長。無音ホールド分も含めて溜め、最後に可聴末尾へ切り詰める。
@@ -689,7 +770,7 @@ internal sealed class VstInsertEngine : IDisposable
                 Interlocked.Increment(ref _processUsers);
                 try
                 {
-                    ProcessActiveSlots(silence, 0, n * channels, channels);
+                    ProcessActiveSlots(silence, 0, n * channels, channels, VstTransport.FreeRunning);
                 }
                 finally
                 {
@@ -785,7 +866,7 @@ internal sealed class VstInsertEngine : IDisposable
             Interlocked.Increment(ref _processUsers);
             try
             {
-                ProcessActiveSlots(interleaved, frame * channels, n * channels, channels);
+                ProcessActiveSlots(interleaved, frame * channels, n * channels, channels, VstTransport.FreeRunning);
             }
             finally
             {
@@ -869,7 +950,7 @@ internal sealed class VstInsertEngine : IDisposable
             Interlocked.Increment(ref _processUsers);
             try
             {
-                ProcessActiveSlots(silence, 0, n * channels, channels);
+                ProcessActiveSlots(silence, 0, n * channels, channels, OfflinePrimeTransport);
             }
             finally
             {
@@ -878,9 +959,288 @@ internal sealed class VstInsertEngine : IDisposable
 
             remaining -= n;
         }
+
+        ResetActiveTransportClocks();
     }
 
-    private void ProcessActiveSlots(float[] buffer, int offset, int sampleCount, int channels)
+    /// <summary>残留フラッシュは無音なので、プロジェクト時刻を進めずファイル頭の 0 に留める。</summary>
+    private static readonly VstTransport OfflinePrimeTransport = VstTransport.Live(false, 0);
+
+    private void ResetActiveTransportClocks()
+    {
+        IVstSlotProcessor?[] slots;
+        lock (_gate)
+        {
+            slots = SnapshotActiveSlotsNoLock();
+        }
+
+        foreach (var live in slots)
+        {
+            if (live is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                live.ResetTransportClock();
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private int QueryActiveLatencyFrames(double sampleRate)
+    {
+        IVstSlotProcessor?[] slots;
+        lock (_gate)
+        {
+            slots = SnapshotActiveSlotsNoLock();
+        }
+
+        long sum = 0;
+        foreach (var live in slots)
+        {
+            if (live is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                sum += Math.Max(0, live.LatencySamples);
+            }
+            catch
+            {
+            }
+        }
+
+        var cap = (long)Math.Ceiling(Math.Max(1, sampleRate) * OfflineTailMaxSeconds);
+        return (int)Math.Min(Math.Max(0, sum), cap);
+    }
+
+    private IVstSlotProcessor?[] SnapshotActiveSlotsNoLock()
+    {
+        var slots = new IVstSlotProcessor?[_live.Length];
+        for (var i = 0; i < _live.Length; i++)
+        {
+            if (_uiSuspended[i] || _bypass[i] || _faulted[i] || _live[i] is null)
+            {
+                continue;
+            }
+
+            slots[i] = _live[i];
+        }
+
+        return slots;
+    }
+
+    /// <summary>
+    /// getLatencySamples 分だけ出力が遅れているので、先頭の無音を捨て、
+    /// 末尾に残った同じ長さを無音入力で回収して元の位置へ戻す。
+    /// </summary>
+    private void CompensateLatency(
+        float[] interleaved,
+        int frameOffset,
+        int frameCount,
+        int channels,
+        int latencyFrames,
+        int maxBlock)
+    {
+        if (latencyFrames <= 0 || frameCount <= 0)
+        {
+            return;
+        }
+
+        var recover = new float[latencyFrames * channels];
+        ProcessSilenceFrames(recover, latencyFrames, channels, maxBlock);
+        var dest = frameOffset * channels;
+        var count = frameCount * channels;
+        if (latencyFrames < frameCount)
+        {
+            var skip = latencyFrames * channels;
+            Array.Copy(interleaved, dest + skip, interleaved, dest, count - skip);
+            Array.Copy(recover, 0, interleaved, dest + count - skip, skip);
+            return;
+        }
+
+        Array.Copy(recover, (latencyFrames - frameCount) * channels, interleaved, dest, count);
+    }
+
+    /// <summary>
+    /// レイテンシー補正のあと、入力の出だしより出力が遅れている無音だけ戻す。
+    /// プラグインが初回ブロックを無音で埋めた分で、getLatencySamples には含まれない。
+    /// </summary>
+    private void CompensateStartupSilence(
+        float[] processed,
+        int sourceOnset,
+        int frameOffset,
+        int frameCount,
+        int channels,
+        int maxBlock,
+        double sampleRate,
+        float threshold)
+    {
+        if (sourceOnset < 0 || frameCount <= 0 || channels <= 0)
+        {
+            return;
+        }
+
+        var maxExtra = (int)Math.Min(
+            int.MaxValue / 4,
+            Math.Ceiling(Math.Max(1, sampleRate) * OfflineStartupMaxSeconds));
+        if (maxExtra <= 0)
+        {
+            return;
+        }
+
+        var scan = Math.Min(frameCount, sourceOnset + maxExtra + 1);
+        var outputOnset = VstOfflineStartupGap.FindOnset(
+            processed,
+            frameOffset,
+            scan,
+            channels,
+            threshold);
+        if (outputOnset >= 0)
+        {
+            var extra = VstOfflineStartupGap.ExtraFrames(sourceOnset, outputOnset, maxExtra);
+            if (extra > 0)
+            {
+                CompensateLatency(processed, frameOffset, frameCount, channels, extra, maxBlock);
+            }
+
+            return;
+        }
+
+        if (scan < frameCount || frameCount > maxExtra)
+        {
+            return;
+        }
+
+        RecoverStartupFromSilence(
+            processed,
+            frameOffset,
+            frameCount,
+            channels,
+            maxBlock,
+            sourceOnset,
+            maxExtra,
+            threshold);
+    }
+
+    /// <summary>
+    /// 本体が丸ごと無音のとき、遅れがファイルより長い。無音を足して出だしを探し、キャップ内なら戻す。
+    /// </summary>
+    private void RecoverStartupFromSilence(
+        float[] processed,
+        int frameOffset,
+        int frameCount,
+        int channels,
+        int maxBlock,
+        int sourceOnset,
+        int maxExtra,
+        float threshold)
+    {
+        var probe = new float[maxExtra * channels];
+        var produced = 0;
+        var onset = -1;
+        var block = Math.Max(16, maxBlock);
+        var need = 0;
+        while (produced < maxExtra)
+        {
+            var n = Math.Min(block, maxExtra - produced);
+            Interlocked.Increment(ref _processUsers);
+            try
+            {
+                ProcessActiveSlots(probe, produced * channels, n * channels, channels, VstTransport.FreeRunning);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _processUsers);
+            }
+
+            if (onset < 0)
+            {
+                var found = VstOfflineStartupGap.FindOnset(probe, produced, n, channels, threshold);
+                if (found >= 0)
+                {
+                    onset = produced + found;
+                    var extra = frameCount + onset - sourceOnset;
+                    if (extra <= 0 || extra > maxExtra)
+                    {
+                        return;
+                    }
+
+                    need = extra;
+                }
+            }
+
+            produced += n;
+            if (onset >= 0 && produced >= need)
+            {
+                break;
+            }
+        }
+
+        if (onset < 0)
+        {
+            return;
+        }
+
+        var shift = frameCount + onset - sourceOnset;
+        if (shift <= 0 || shift > produced)
+        {
+            return;
+        }
+
+        for (var i = 0; i < frameCount; i++)
+        {
+            var srcFrame = i + shift;
+            if (srcFrame < frameCount)
+            {
+                continue;
+            }
+
+            var probeFrame = srcFrame - frameCount;
+            if (probeFrame >= produced)
+            {
+                return;
+            }
+
+            Array.Copy(
+                probe,
+                probeFrame * channels,
+                processed,
+                (frameOffset + i) * channels,
+                channels);
+        }
+    }
+
+    private void ProcessSilenceFrames(float[] destination, int frameCount, int channels, int maxBlock)
+    {
+        var block = Math.Max(16, maxBlock);
+        for (var i = 0; i < frameCount; i += block)
+        {
+            var n = Math.Min(block, frameCount - i);
+            Interlocked.Increment(ref _processUsers);
+            try
+            {
+                ProcessActiveSlots(destination, i * channels, n * channels, channels, VstTransport.FreeRunning);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _processUsers);
+            }
+        }
+    }
+
+    private void ProcessActiveSlots(
+        float[] buffer,
+        int offset,
+        int sampleCount,
+        int channels,
+        VstTransport transport)
     {
         int liveCount;
         lock (_gate)
@@ -922,6 +1282,7 @@ internal sealed class VstInsertEngine : IDisposable
 
             try
             {
+                live.ApplyTransport(transport);
                 if (!live.Process(buffer, offset, sampleCount, channels))
                 {
                     lock (_gate)

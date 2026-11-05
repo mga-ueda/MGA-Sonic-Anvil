@@ -605,6 +605,91 @@ public sealed class VstInsertEngineTests
     }
 
     [Fact]
+    public async Task ProcessOffline_CompensatesPluginLatency()
+    {
+        var factory = new CountingFactory { Latency = 4 };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Limiter.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var buffer = new float[] { 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f };
+        await engine.ProcessOfflineAsync(buffer, channels: 1);
+        Assert.Equal(new float[] { 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f }, buffer);
+    }
+
+    [Fact]
+    public async Task ProcessOffline_CompensatesLatencyLongerThanBuffer()
+    {
+        var factory = new CountingFactory { Latency = 5, Gain = 2f };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Lookahead.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var buffer = new float[] { 0.3f, 0.9f };
+        await engine.ProcessOfflineAsync(buffer, channels: 1);
+        Assert.Equal(new float[] { 0.6f, 1.8f }, buffer);
+    }
+
+    [Fact]
+    public async Task ProcessOffline_RemovesStartupSilenceWithoutUsingReportedLatency()
+    {
+        var factory = new CountingFactory { StartupSilence = 4 };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Heavy.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var buffer = new float[] { 0.2f, 0.4f, 0.6f, 0.8f, 0.1f, 0.3f, 0.5f, 0.7f };
+        await engine.ProcessOfflineAsync(buffer, channels: 1);
+        Assert.Equal(0, factory.Last.LatencySamples);
+        Assert.Equal(new float[] { 0.2f, 0.4f, 0.6f, 0.8f, 0.1f, 0.3f, 0.5f, 0.7f }, buffer);
+    }
+
+    [Fact]
+    public async Task ProcessOffline_StartupSilenceKeepsIntentionalLeadIn()
+    {
+        var factory = new CountingFactory { StartupSilence = 3 };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Heavy.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var buffer = new float[] { 0f, 0f, 0f, 0f, 0.5f, 0f, 0f, 0f };
+        await engine.ProcessOfflineAsync(buffer, channels: 1);
+        Assert.Equal(new float[] { 0f, 0f, 0f, 0f, 0.5f, 0f, 0f, 0f }, buffer);
+    }
+
+    [Fact]
+    public async Task ProcessOffline_StartupSilenceStacksAfterReportedLatency()
+    {
+        var factory = new CountingFactory { Latency = 2, StartupSilence = 3 };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\HeavyLimit.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var buffer = new float[] { 0.25f, 0.5f, 0.75f, 1f, 0.125f, 0.375f };
+        await engine.ProcessOfflineAsync(buffer, channels: 1);
+        Assert.Equal(new float[] { 0.25f, 0.5f, 0.75f, 1f, 0.125f, 0.375f }, buffer);
+    }
+
+    [Fact]
+    public async Task ProcessOffline_StartupSilenceLongerThanBuffer_IsRecovered()
+    {
+        var factory = new CountingFactory { StartupSilence = 5 };
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Heavy.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var buffer = new float[] { 0.5f, 0.25f, 0.125f };
+        await engine.ProcessOfflineAsync(buffer, channels: 1);
+        Assert.Equal(new float[] { 0.5f, 0.25f, 0.125f }, buffer);
+    }
+
+    [Fact]
     public async Task ProcessOffline_ClearsResidueBeforeSecondPass()
     {
         // ライブ温存で同一プロセッサを直列バウンスしても、2 本目先頭へ wet が混ざらない。
@@ -801,6 +886,54 @@ public sealed class VstInsertEngineTests
     }
 
     [Fact]
+    public void PlaybackProvider_StoppedTransportDoesNotAdvance()
+    {
+        var factory = new CountingFactory();
+        using var engine = new VstInsertEngine(factory);
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Melodyne.vst3";
+        engine.Apply(new object(), chain, playerBypass: false);
+
+        var samples = new float[48000];
+        var document = new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.SetVstInsertEngine(engine);
+        provider.SetDeviceSampleRate(48000);
+        provider.Bind(document, 0, null, loop: false);
+        provider.SetPaused(true);
+
+        var buffer = new float[96];
+        provider.Read(buffer, 0, buffer.Length);
+        provider.Read(buffer, 0, buffer.Length);
+        Assert.False(factory.Last.LastTransport.Playing);
+        Assert.True(factory.Last.LastTransport.PositionValid);
+        Assert.Equal(0, factory.Last.LastTransport.ProjectTimeSamples);
+
+        provider.SeekFrame(1000);
+        provider.Read(buffer, 0, buffer.Length);
+        Assert.False(factory.Last.LastTransport.Playing);
+        Assert.Equal(1000, factory.Last.LastTransport.ProjectTimeSamples);
+        Assert.Equal(1000, provider.CursorFrame);
+
+        provider.SetPaused(false);
+        provider.Read(buffer, 0, buffer.Length);
+        Assert.True(factory.Last.LastTransport.Playing);
+        Assert.Equal(1000, factory.Last.LastTransport.ProjectTimeSamples);
+        provider.Read(buffer, 0, buffer.Length);
+        Assert.True(factory.Last.LastTransport.Playing);
+        Assert.Equal(1048, factory.Last.LastTransport.ProjectTimeSamples);
+
+        provider.BeginSilenceFlush();
+        provider.Read(buffer, 0, buffer.Length);
+        Assert.False(factory.Last.LastTransport.Playing);
+        Assert.Equal(provider.CursorFrame, factory.Last.LastTransport.ProjectTimeSamples);
+        var held = factory.Last.LastTransport.ProjectTimeSamples;
+        provider.Read(buffer, 0, buffer.Length);
+        Assert.False(factory.Last.LastTransport.Playing);
+        Assert.Equal(held, factory.Last.LastTransport.ProjectTimeSamples);
+    }
+
+    [Fact]
     public void ProcessDataLayout_MatchesMsvcX64()
     {
         Assert.Equal(24, Marshal.SizeOf<Vst3HostNative.ProcessSetup>());
@@ -918,6 +1051,11 @@ public sealed class VstInsertEngineTests
 
         public int DisposeDelayMs { get; set; }
 
+        public int Latency { get; set; }
+
+        /// <summary>再生中の初回だけ出力を遅らせる。getLatencySamples には出さない。</summary>
+        public int StartupSilence { get; set; }
+
         /// <summary>スロット ClassId が空のとき、実機同様に解決済み ID をプロセッサへ載せる。</summary>
         public string? ResolveClassIdWhenMissing { get; set; }
 
@@ -929,7 +1067,15 @@ public sealed class VstInsertEngineTests
             var classId = string.IsNullOrWhiteSpace(slot.ClassId)
                 ? ResolveClassIdWhenMissing
                 : slot.ClassId;
-            Last = new MockProcessor(slot.PluginPath!, classId, Gain, ProcessDelayMs, DisposeDelayMs, LeaveBleed);
+            Last = new MockProcessor(
+                slot.PluginPath!,
+                classId,
+                Gain,
+                ProcessDelayMs,
+                DisposeDelayMs,
+                LeaveBleed,
+                Latency,
+                StartupSilence);
             if (slot.StateBlob is not null)
             {
                 Last.ApplyState(slot.StateBlob);
@@ -945,6 +1091,10 @@ public sealed class VstInsertEngineTests
         private readonly int _delayMs;
         private readonly int _disposeDelayMs;
         private readonly bool _leaveBleed;
+        private float[] _delay = [];
+        private int _delayPos;
+        private float[] _startup = [];
+        private int _startupPos;
 
         public MockProcessor(
             string path,
@@ -952,7 +1102,9 @@ public sealed class VstInsertEngineTests
             float gain,
             int delayMs,
             int disposeDelayMs = 0,
-            bool leaveBleed = false)
+            bool leaveBleed = false,
+            int latency = 0,
+            int startupSilence = 0)
         {
             PluginPath = path;
             ClassId = classId;
@@ -961,7 +1113,13 @@ public sealed class VstInsertEngineTests
             _delayMs = delayMs;
             _disposeDelayMs = disposeDelayMs;
             _leaveBleed = leaveBleed;
+            LatencySamples = Math.Max(0, latency);
+            StartupSilenceFrames = Math.Max(0, startupSilence);
         }
+
+        public int StartupSilenceFrames { get; }
+
+        public int LatencySamples { get; }
 
         public string PluginPath { get; }
 
@@ -979,6 +1137,8 @@ public sealed class VstInsertEngineTests
 
         public float Bleed { get; private set; }
 
+        public VstTransport LastTransport { get; private set; } = VstTransport.FreeRunning;
+
         public void Reconfigure(double sampleRate, int maxBlockSize, int channels)
         {
         }
@@ -986,6 +1146,8 @@ public sealed class VstInsertEngineTests
         public void ApplyState(byte[]? stateBlob) => LastState = stateBlob is null ? null : (byte[])stateBlob.Clone();
 
         public byte[]? CaptureState() => LastState is null ? null : (byte[])LastState.Clone();
+
+        public void ApplyTransport(VstTransport transport) => LastTransport = transport;
 
         public bool Process(float[] buffer, int offset, int sampleCount, int channels)
         {
@@ -1015,6 +1177,12 @@ public sealed class VstInsertEngineTests
                 buffer[offset + i] *= _gain;
             }
 
+            DelayInPlace(buffer, offset, sampleCount, channels);
+            if (LastTransport.Playing)
+            {
+                DelayLine(buffer, offset, sampleCount, channels, StartupSilenceFrames, ref _startup, ref _startupPos);
+            }
+
             if (_leaveBleed)
             {
                 // 無音フラッシュでは再武装せず、入力にエネルギーがあるときだけ残す。
@@ -1028,6 +1196,53 @@ public sealed class VstInsertEngineTests
         {
             ResetProcessingCount++;
             Bleed = 0f;
+            _delay = [];
+            _delayPos = 0;
+            _startup = [];
+            _startupPos = 0;
+        }
+
+        private void DelayInPlace(float[] buffer, int offset, int sampleCount, int channels) =>
+            DelayLine(buffer, offset, sampleCount, channels, LatencySamples, ref _delay, ref _delayPos);
+
+        private static void DelayLine(
+            float[] buffer,
+            int offset,
+            int sampleCount,
+            int channels,
+            int latency,
+            ref float[] line,
+            ref int pos)
+        {
+            if (latency <= 0 || channels <= 0 || sampleCount < channels)
+            {
+                return;
+            }
+
+            if (line.Length != latency * channels)
+            {
+                line = new float[latency * channels];
+                pos = 0;
+            }
+
+            var frames = sampleCount / channels;
+            for (var i = 0; i < frames; i++)
+            {
+                var at = offset + i * channels;
+                var slot = pos * channels;
+                for (var c = 0; c < channels; c++)
+                {
+                    var delayed = line[slot + c];
+                    line[slot + c] = buffer[at + c];
+                    buffer[at + c] = delayed;
+                }
+
+                pos++;
+                if (pos >= latency)
+                {
+                    pos = 0;
+                }
+            }
         }
 
         public Vst3EditorSession? TryOpenEditor() => null;
