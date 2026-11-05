@@ -653,6 +653,107 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void SilencePreview_DisplayGainFitsThresholdAbovePeak()
+    {
+        var open = SilentSkip.LinearFromDb(-1);
+        Assert.Equal(
+            1f / open,
+            MgaSonicAnvil.UI.SilenceDetectWavePreview.DisplayGain([-0.1f], [0.1f], open),
+            5);
+        Assert.Equal(
+            4f,
+            MgaSonicAnvil.UI.SilenceDetectWavePreview.DisplayGain(
+                [-0.25f],
+                [0.25f],
+                SilentSkip.LinearFromDb(-60)),
+            5);
+    }
+
+    [Fact]
+    public void SilencePreview_FullScaleThresholdStaysInsideHandle()
+    {
+        const double height = 80;
+        var pad = MgaSonicAnvil.UI.SilenceDetectWavePreview.ThresholdEdgePadDip;
+        var handle = MgaSonicAnvil.UI.SilenceDetectWavePreview.ThresholdHandleDip;
+        var (pos, neg) = MgaSonicAnvil.UI.SilenceDetectWavePreview.ThresholdLinePair(height, pad, 1f);
+        Assert.Equal(pad, pos, 3);
+        Assert.Equal(height - pad, neg, 3);
+        Assert.True(pos - handle * 0.5 >= 0);
+        Assert.True(neg + handle * 0.5 <= height);
+
+        var nearTop = MgaSonicAnvil.UI.SilenceDetectWavePreview.ThresholdLinePair(
+            height,
+            pad,
+            SilentSkip.LinearFromDb(-1));
+        Assert.True(nearTop.Positive - handle * 0.5 >= 0);
+        Assert.True(nearTop.Negative + handle * 0.5 <= height);
+    }
+
+    [Fact]
+    public void SilencePreview_ZoomButtonsMatchEditorSteps()
+    {
+        RunSta(() =>
+        {
+            var preview = new MgaSonicAnvil.UI.SilenceDetectWavePreview
+            {
+                Range = new WaveSelection(0, 1000),
+            };
+            Assert.Equal(0, preview.ViewStart, 3);
+            Assert.Equal(1000, preview.ViewSpan, 3);
+
+            preview.ZoomTimeIn();
+            var span = 1000d / MgaSonicAnvil.UI.WaveformView.TimeZoomStep;
+            Assert.Equal(span, preview.ViewSpan, 3);
+            Assert.Equal(500, preview.ViewStart + preview.ViewSpan * 0.5, 3);
+
+            preview.ZoomTimeOut();
+            Assert.Equal(1000, preview.ViewSpan, 3);
+            Assert.Equal(0, preview.ViewStart, 3);
+
+            preview.ZoomAmpIn();
+            Assert.Equal(MgaSonicAnvil.UI.WaveformView.TimeZoomStep, preview.AmpZoom, 6);
+            preview.ZoomAmpOut();
+            Assert.Equal(1d, preview.AmpZoom, 6);
+        });
+    }
+
+    [Fact]
+    public void SilencePreview_ScrollMovesZoomedViewAndThumbMatchesSpan()
+    {
+        RunSta(() =>
+        {
+            var preview = new MgaSonicAnvil.UI.SilenceDetectWavePreview
+            {
+                Range = new WaveSelection(200, 1200),
+            };
+            preview.ZoomTimeIn();
+            var span = preview.ViewSpan;
+            Assert.True(span < 1000);
+
+            preview.SetViewStart(200 + 80);
+            Assert.Equal(280, preview.ViewStart, 3);
+            Assert.Equal(span, preview.ViewSpan, 3);
+            Assert.Equal(80, preview.ViewStart - 200, 3);
+
+            preview.SetViewStart(0);
+            Assert.Equal(200, preview.ViewStart, 3);
+
+            preview.SetViewStart(100000);
+            Assert.Equal(1200 - span, preview.ViewStart, 3);
+
+            preview.SetVisibleRange(250, span * 0.5);
+            Assert.Equal(250, preview.ViewStart, 3);
+            Assert.Equal(span * 0.5, preview.ViewSpan, 3);
+
+            var bar = new MgaSonicAnvil.UI.TimeScrollBar();
+            bar.Sync(preview.ViewStart - 200, preview.ViewSpan, 1000);
+            Assert.Equal(preview.ViewStart - 200, bar.Value, 3);
+            Assert.Equal(preview.ViewSpan, bar.ViewportSize, 3);
+            Assert.True(bar.IsEnabled);
+        });
+    }
+
+    [Fact]
     public void SilencePreview_ZoomAroundKeepsAnchorInsideRange()
     {
         var (start, span) = MgaSonicAnvil.UI.SilenceDetectWavePreview.ZoomAround(
