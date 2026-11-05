@@ -25,9 +25,15 @@ internal enum AcrylicOverlayKind
 /// </summary>
 internal sealed class AcrylicGlassPopup
 {
+    private static readonly object TrackGate = new();
+    private static readonly List<WeakReference<AcrylicGlassPopup>> Tracked = [];
+
     private readonly Popup _popup;
     private readonly Border _plate;
     private readonly bool _roundCorners;
+
+    /// <summary>色のライブ更新時にティントを加工する（フェード中は現在のαを保つ）。</summary>
+    public Func<Color, Color>? LiveTint { get; set; }
 
     public AcrylicGlassPopup()
         : this(AcrylicOverlayKind.Toast)
@@ -60,7 +66,30 @@ internal sealed class AcrylicGlassPopup
         AcrylicPopup.Attach(
             _popup,
             AcrylicBackdrop.ToastTintBrushKey,
-            roundCorners: _roundCorners);
+            roundCorners: _roundCorners,
+            paintChildBackground: false);
+        Track(this);
+    }
+
+    /// <summary>開いているトースト／タイムコードへ、今の <c>AcrylicToastTintBrush</c> を載せ直す。</summary>
+    public static void RefreshOpenTints()
+    {
+        AcrylicGlassPopup[] live;
+        lock (TrackGate)
+        {
+            PruneTracked();
+            live = Tracked
+                .Select(weak => weak.TryGetTarget(out var popup) ? popup : null)
+                .Where(popup => popup is not null)
+                .Cast<AcrylicGlassPopup>()
+                .ToArray();
+        }
+
+        var tint = AcrylicBackdrop.ResolveTintColor(AcrylicBackdrop.ToastTintBrushKey);
+        foreach (var popup in live)
+        {
+            popup.ApplyLiveTint(tint);
+        }
     }
 
     /// <summary>タイムコード専用ホスト（影なし）。</summary>
@@ -127,6 +156,49 @@ internal sealed class AcrylicGlassPopup
     /// <summary>開いているときだけティント色を載せ直す（αフェード用）。</summary>
     public bool TryApplyTint(Color tint) =>
         IsOpen && AcrylicBackdrop.TryApplyTintToVisual(_plate, tint, _roundCorners);
+
+    private void ApplyLiveTint(Color tint)
+    {
+        if (!IsOpen)
+        {
+            return;
+        }
+
+        if (LiveTint is not null)
+        {
+            tint = LiveTint(tint);
+        }
+
+        TryApplyTint(tint);
+    }
+
+    private static void Track(AcrylicGlassPopup popup)
+    {
+        lock (TrackGate)
+        {
+            PruneTracked();
+            foreach (var weak in Tracked)
+            {
+                if (weak.TryGetTarget(out var existing) && ReferenceEquals(existing, popup))
+                {
+                    return;
+                }
+            }
+
+            Tracked.Add(new WeakReference<AcrylicGlassPopup>(popup));
+        }
+    }
+
+    private static void PruneTracked()
+    {
+        for (var i = Tracked.Count - 1; i >= 0; i--)
+        {
+            if (!Tracked[i].TryGetTarget(out _))
+            {
+                Tracked.RemoveAt(i);
+            }
+        }
+    }
 
     /// <summary>
     /// PlacementTarget のレイアウト後に位置をやり直す。

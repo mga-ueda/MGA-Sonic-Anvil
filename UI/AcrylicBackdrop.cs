@@ -67,7 +67,7 @@ internal static class AcrylicBackdrop
         window.Closed += OnTrackedClosed;
     }
 
-    /// <summary>色設定のライブ更新後に、開いているすりガラス窓へティントを載せ直す。</summary>
+    /// <summary>色設定のライブ更新後に、開いているすりガラス窓とトーストへティントを載せ直す。</summary>
     public static void RefreshTracked()
     {
         Window[] live;
@@ -92,6 +92,8 @@ internal static class AcrylicBackdrop
 
             Apply(hwnd, TintBrushKey);
         }
+
+        AcrylicGlassPopup.RefreshOpenTints();
     }
 
     /// <summary>
@@ -208,12 +210,27 @@ internal static class AcrylicBackdrop
         }
     }
 
-    /// <summary>ACCENT GradientColor 用 ABGR。</summary>
-    internal static int ToAccentGradient(Color tint) =>
-        Math.Max((byte)1, tint.A) << 24
-        | tint.B << 16
-        | tint.G << 8
-        | tint.R;
+    /// <summary>
+    /// ACCENT GradientColor 用 ABGR。
+    /// Acrylic はアルファ 0 と 255 をティント色として無視するため、1 と 254 に丸める。
+    /// </summary>
+    internal static int ToAccentGradient(Color tint)
+    {
+        var alpha = tint.A;
+        if (alpha == 0)
+        {
+            alpha = 1;
+        }
+        else if (alpha == 255)
+        {
+            alpha = 254;
+        }
+
+        return alpha << 24
+            | tint.B << 16
+            | tint.G << 8
+            | tint.R;
+    }
 
     private static double TintLuma(Color tint) =>
         (0.2126 * tint.R + 0.7152 * tint.G + 0.0722 * tint.B) / 255d;

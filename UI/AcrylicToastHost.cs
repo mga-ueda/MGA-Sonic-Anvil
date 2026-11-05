@@ -35,6 +35,7 @@ internal sealed class AcrylicToastHost
         _text.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
         _glass.Padding = DesignMetrics.PlaylistPdfPageNumberPadding;
         _glass.Content = _text;
+        _glass.LiveTint = AdjustLiveTint;
     }
 
     public string Text
@@ -156,14 +157,30 @@ internal sealed class AcrylicToastHost
     private void OnFadeTick(object? sender, EventArgs e)
     {
         _fadeStep++;
-        var t = Math.Clamp(_fadeStep / (double)FadeSteps, 0, 1);
-        var alpha = (byte)Math.Max(1, (int)Math.Round(_fadeBase.A * (1 - t)));
-        var tint = Color.FromArgb(alpha, _fadeBase.R, _fadeBase.G, _fadeBase.B);
-        if (!_glass.TryApplyTint(tint) || _fadeStep >= FadeSteps)
+        if (!_glass.TryApplyTint(FadeTint(_fadeBase, _fadeStep)) || _fadeStep >= FadeSteps)
         {
             StopFade();
             _glass.IsOpen = false;
         }
+    }
+
+    /// <summary>表示中の色変更ではフェードの進みを保ったまま、新しいティント色へ載せ替える。</summary>
+    private Color AdjustLiveTint(Color tint)
+    {
+        if (_fadeTimer is not { IsEnabled: true })
+        {
+            return tint;
+        }
+
+        _fadeBase = tint;
+        return FadeTint(tint, _fadeStep);
+    }
+
+    private static Color FadeTint(Color tint, int step)
+    {
+        var t = Math.Clamp(step / (double)FadeSteps, 0, 1);
+        var alpha = (byte)Math.Max(1, (int)Math.Round(tint.A * (1 - t)));
+        return Color.FromArgb(alpha, tint.R, tint.G, tint.B);
     }
 
     private void StopFade()

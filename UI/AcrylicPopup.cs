@@ -171,6 +171,9 @@ internal static class AcrylicPopup
     {
         public string TintBrushKey = AcrylicBackdrop.TintBrushKey;
         public bool RoundCorners = true;
+
+        /// <summary>false のとき子の Background は呼び出し側のまま（トーストは Transparent）。</summary>
+        public bool PaintChildBackground = true;
     }
 
     /// <summary>色パレットなど、クラスハンドラ外の Popup 向け。</summary>
@@ -188,7 +191,17 @@ internal static class AcrylicPopup
     /// <param name="roundCorners">
     /// false はタイムコード専用（DWM 角丸／システム影なし）。
     /// </param>
-    public static void Attach(Popup popup, string? tintBrushKey, bool roundCorners)
+    public static void Attach(Popup popup, string? tintBrushKey, bool roundCorners) =>
+        Attach(popup, tintBrushKey, roundCorners, paintChildBackground: true);
+
+    /// <param name="paintChildBackground">
+    /// false はトースト／タイムコード。MenuPopupBackBrush で子を塗り潰さず、枠は Transparent のままにする。
+    /// </param>
+    public static void Attach(
+        Popup popup,
+        string? tintBrushKey,
+        bool roundCorners,
+        bool paintChildBackground)
     {
         ArgumentNullException.ThrowIfNull(popup);
         AttachedOptions.Remove(popup);
@@ -200,6 +213,7 @@ internal static class AcrylicPopup
                     ? AcrylicBackdrop.TintBrushKey
                     : tintBrushKey,
                 RoundCorners = roundCorners,
+                PaintChildBackground = paintChildBackground,
             });
 
         popup.Opened -= OnAttachedPopupOpened;
@@ -216,7 +230,12 @@ internal static class AcrylicPopup
         var options = AttachedOptions.TryGetValue(popup, out var stored)
             ? stored
             : new AttachOptions();
-        FrostPopupSurface(popup, options.TintBrushKey, options.RoundCorners);
+        FrostPopupSurface(
+            popup,
+            options.TintBrushKey,
+            options.RoundCorners,
+            PopupBackBrushKey,
+            options.PaintChildBackground);
     }
 
     private static void PrepareContextMenuHost(ContextMenu menu)
@@ -248,16 +267,28 @@ internal static class AcrylicPopup
     }
 
     private static void FrostPopupSurface(Popup popup, string tintBrushKey, bool roundCorners) =>
-        FrostPopupSurface(popup, tintBrushKey, roundCorners, PopupBackBrushKey);
+        FrostPopupSurface(popup, tintBrushKey, roundCorners, PopupBackBrushKey, paintChildBackground: true);
 
     private static void FrostPopupSurface(
         Popup popup,
         string tintBrushKey,
         bool roundCorners,
-        string backBrushKey)
+        string backBrushKey) =>
+        FrostPopupSurface(popup, tintBrushKey, roundCorners, backBrushKey, paintChildBackground: true);
+
+    private static void FrostPopupSurface(
+        Popup popup,
+        string tintBrushKey,
+        bool roundCorners,
+        string backBrushKey,
+        bool paintChildBackground)
     {
         TryDisableTransparency(popup);
-        ClearOpaqueFill(popup.Child, backBrushKey);
+        if (paintChildBackground)
+        {
+            ClearOpaqueFill(popup.Child, backBrushKey);
+        }
+
         ScheduleFrost(popup.Child as Visual ?? popup, tintBrushKey, roundCorners);
     }
 
