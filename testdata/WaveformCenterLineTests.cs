@@ -15,7 +15,7 @@ public sealed class WaveformCenterLineTests
     private const int WaveFill = unchecked((int)0xFF_C6_D9_FF);
 
     [Fact]
-    public void Envelope_KeepsZeroLineAboveFullScaleWave()
+    public void Envelope_FillsCenterWithoutZeroLine()
     {
         RunSta(() =>
         {
@@ -25,13 +25,14 @@ public sealed class WaveformCenterLineTests
             var pixels = new int[width * height];
             view.RasterizeWaveformForTest(pixels, width, height, 0, width, 0, 4096);
 
-            AssertCenterLine(pixels, width, height);
+            AssertCenterIsWave(pixels, width, height, 0, width);
             Assert.Equal(WaveFill, pixels[8 * width + 4]);
+            Assert.DoesNotContain(ZeroLine, pixels);
         });
     }
 
     [Fact]
-    public void PartialScrollStrip_RestoresZeroLineOnNewColumns()
+    public void PartialScrollStrip_FillsCenterOnlyOnNewColumns()
     {
         RunSta(() =>
         {
@@ -42,9 +43,11 @@ public sealed class WaveformCenterLineTests
             const int x0 = 40;
             view.RasterizeWaveformForTest(pixels, width, height, x0, width, 0, 4096);
 
-            AssertCenterLine(pixels, width, height);
+            AssertCenterIsWave(pixels, width, height, x0, width);
+            Assert.Equal(0, pixels[(height / 2) * width + 4]);
             Assert.Equal(0, pixels[8 * width + 4]);
             Assert.Equal(WaveFill, pixels[8 * width + 44]);
+            Assert.DoesNotContain(ZeroLine, pixels);
         });
     }
 
@@ -59,7 +62,12 @@ public sealed class WaveformCenterLineTests
             var pixels = new int[width * height];
             view.RasterizeWaveformForTest(pixels, width, height, 0, width, 0, 80);
 
-            AssertCenterLine(pixels, width, height);
+            var y = height / 2;
+            for (var x = 0; x < width; x++)
+            {
+                Assert.Equal(ZeroLine, pixels[y * width + x]);
+            }
+
             Assert.Contains(pixels, pixel => pixel == WaveFill);
         });
     }
@@ -82,12 +90,12 @@ public sealed class WaveformCenterLineTests
         });
     }
 
-    private static void AssertCenterLine(int[] pixels, int width, int height)
+    private static void AssertCenterIsWave(int[] pixels, int width, int height, int x0, int x1)
     {
         var y = height / 2;
-        for (var x = 0; x < width; x++)
+        for (var x = x0; x < x1; x++)
         {
-            Assert.Equal(ZeroLine, pixels[y * width + x]);
+            Assert.Equal(WaveFill, pixels[y * width + x]);
         }
     }
 
