@@ -301,10 +301,14 @@ internal sealed class OverviewView : FrameworkElement
         var frames = (double)_document.FrameCount;
         var x = _viewStart / frames * width;
         var w = Math.Max(2, _viewSpan / frames * width);
-        x = Math.Clamp(x, 0, Math.Max(0, width - 2));
-        if (x + w > width)
+        // センターロックで先頭より前を見ているときは、窓の左を負のまま残す。
+        if (x >= 0)
         {
-            w = width - x;
+            x = Math.Min(x, Math.Max(0, width - 2));
+            if (x + w > width)
+            {
+                w = width - x;
+            }
         }
 
         return new Rect(x, 0, w, ActualHeight);
@@ -543,18 +547,19 @@ internal sealed class OverviewView : FrameworkElement
     private void DrawVisibleWindow(DrawingContext dc, Rect bounds)
     {
         var window = VisibleWindow(bounds.Width);
-        if (window.Width >= bounds.Width - 0.5)
+        var left = Math.Max(0, window.X);
+        var right = Math.Min(bounds.Width, window.X + window.Width);
+        if (right - left >= bounds.Width - 0.5)
         {
             return;
         }
 
         var dim = WpfControlHelpers.FrozenBrush(Theme.Get("OverviewOutsideFillBrush"));
-        if (window.X > 0.5)
+        if (left > 0.5)
         {
-            dc.DrawRectangle(dim, null, new Rect(0, 0, window.X, bounds.Height));
+            dc.DrawRectangle(dim, null, new Rect(0, 0, left, bounds.Height));
         }
 
-        var right = window.X + window.Width;
         if (right < bounds.Width - 0.5)
         {
             dc.DrawRectangle(dim, null, new Rect(right, 0, bounds.Width - right, bounds.Height));

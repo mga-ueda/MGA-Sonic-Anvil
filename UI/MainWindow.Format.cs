@@ -391,7 +391,6 @@ public partial class MainWindow
             _playTimer.Start();
             StartMeterRendering();
             Transport.SetPlaying(true);
-            Waveform.UnlockCenter();
             Waveform.SetPlayheadFromPlayback(hostStartFrame);
             if (_document is not null)
             {

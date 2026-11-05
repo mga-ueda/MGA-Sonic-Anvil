@@ -274,7 +274,15 @@ internal sealed class SpectrogramRenderer
     {
         if (fromCache)
         {
-            RasterizeFromCache(viewStart, viewSpan, width, height, x0, x1, document.SampleRate);
+            RasterizeFromCache(
+                viewStart,
+                viewSpan,
+                width,
+                height,
+                x0,
+                x1,
+                document.SampleRate,
+                document.FrameCount);
         }
         else
         {
@@ -401,7 +409,8 @@ internal sealed class SpectrogramRenderer
         int height,
         int x0,
         int x1,
-        int sampleRate)
+        int sampleRate,
+        long frameCount)
     {
         // 画素ごとの TryLinearUnit（ロック＋メモリマップ読み×4＋二分探索）は
         // 深いズームの追従スクロールで支配的なコストになる。列ごとに LUT 列を
@@ -411,7 +420,8 @@ internal sealed class SpectrogramRenderer
         for (var x = x0; x < x1; x++)
         {
             var center = (long)Math.Round(viewStart + (x + 0.5) / width * viewSpan);
-            if (!_cache.TryReadColumnPair(center, _cacheCol0, _cacheCol1, out var txd))
+            // キャッシュは範囲外を 0 列へ寄せる。先頭より前は無音のままにする。
+            if (center < 0 || center >= frameCount || !_cache.TryReadColumnPair(center, _cacheCol0, _cacheCol1, out var txd))
             {
                 for (var y = 0; y < height; y++)
                 {
@@ -512,6 +522,18 @@ internal sealed class SpectrogramRenderer
         for (var x = x0; x < x1; x++)
         {
             var center = (long)Math.Round(viewStart + (x + 0.5) / width * viewSpan);
+            if (center < 0 || center >= frames)
+            {
+                var blank = 0;
+                for (var y = 0; y < height; y++)
+                {
+                    _units[blank + x] = 0;
+                    blank += width;
+                }
+
+                continue;
+            }
+
             SpectrogramEngine.FillMonoMix(samples, channels, center - half, frames, _mix);
             SpectrogramEngine.AnalyzeWindow(_mix, _window, _windowSum, _re, _im);
             var row = 0;

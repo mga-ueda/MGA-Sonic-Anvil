@@ -1060,7 +1060,6 @@ public partial class MainWindow
             StartMeterRendering();
             Waveform.SetTrailRecording(true);
             Transport.SetPlaying(true);
-            Waveform.UnlockCenter();
             Waveform.SetPlayheadFromPlayback(range.StartFrame);
         }
         catch (Exception ex)
@@ -1367,7 +1366,6 @@ public partial class MainWindow
             StartMeterRendering();
             Waveform.SetTrailRecording(true);
             Transport.SetPlaying(true);
-            Waveform.UnlockCenter();
             Waveform.SetPlayheadFromPlayback(range.StartFrame);
         }
         catch (Exception ex)
@@ -1525,7 +1523,6 @@ public partial class MainWindow
             StartMeterRendering();
             Waveform.SetTrailRecording(true);
             Transport.SetPlaying(true);
-            Waveform.UnlockCenter();
             Waveform.SetPlayheadFromPlayback(previewRange.StartFrame);
         }
         catch (Exception ex)

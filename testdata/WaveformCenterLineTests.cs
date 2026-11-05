@@ -64,6 +64,24 @@ public sealed class WaveformCenterLineTests
         });
     }
 
+    [Fact]
+    public void CenterLockLeadIn_DoesNotStretchWaveIntoBlank()
+    {
+        RunSta(() =>
+        {
+            const int width = 48;
+            const int height = 40;
+            var frames = width * (WaveformView.PolylineMaxSamplesPerPixel + 4);
+            var view = CreateView(frames);
+            var pixels = new int[width * height];
+            view.RasterizeWaveformForTest(pixels, width, height, 0, width, -frames / 2d, frames);
+
+            var y = 8;
+            Assert.Equal(0, pixels[y * width + 4]);
+            Assert.Equal(WaveFill, pixels[y * width + (width - 4)]);
+        });
+    }
+
     private static void AssertCenterLine(int[] pixels, int width, int height)
     {
         var y = height / 2;

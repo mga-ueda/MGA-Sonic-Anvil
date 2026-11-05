@@ -853,8 +853,8 @@ public partial class MainWindow
         Transport.SetPlaying(false);
         BeginMeterRelease();
         // 再生中 Tick は止まっているので、停止時に波形全体のオフライン計測へ戻す。
+        // センターロックはここでは外さない。オフは Z／メニュー／再生中の中央ボタンだけ。
         LoudnessMeter.RefreshOffline();
-        Waveform.UnlockCenter();
     }
 
     /// <summary>停止して再生開始位置へ戻す。<see cref="HaltPlaybackToStart"/> の別名。</summary>
@@ -2372,19 +2372,27 @@ public partial class MainWindow
         if (IsPlaybackActive())
         {
             DetachOverviewScrubKeepPlayback();
-            if (Waveform.CenterLocked)
-            {
-                Waveform.UnlockCenter();
-            }
-            else
-            {
-                Waveform.LockCenterToPlayhead();
-            }
-
+            ToggleCenterLock();
             return;
         }
 
         Waveform.CenterViewOnPlayhead();
+    }
+
+    /// <summary>センターロックを反転し、中央に ON／OFF を出す。停止中でも有効。スクロールや停止では外さない。</summary>
+    private void ToggleCenterLock()
+    {
+        var enabled = !Waveform.CenterLocked;
+        if (enabled)
+        {
+            Waveform.LockCenterToPlayhead();
+        }
+        else
+        {
+            Waveform.UnlockCenter();
+        }
+
+        ShowOptionToggleToast(UiStrings.LabelCenterLock, enabled);
     }
 
     private void ToggleAnalyzerMaximize() =>

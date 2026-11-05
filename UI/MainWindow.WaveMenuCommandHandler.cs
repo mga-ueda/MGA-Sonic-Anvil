@@ -328,15 +328,7 @@ public partial class MainWindow
                 Waveform.CenterViewOnPlayhead();
                 break;
             case WaveMenuCommand.CenterLock:
-                if (Waveform.CenterLocked)
-                {
-                    Waveform.UnlockCenter();
-                }
-                else
-                {
-                    Waveform.LockCenterToPlayhead();
-                }
-
+                ToggleCenterLock();
                 break;
             case WaveMenuCommand.ViewWaveform:
                 Waveform.SetAnalysisView(WaveformAnalysisView.Waveform);

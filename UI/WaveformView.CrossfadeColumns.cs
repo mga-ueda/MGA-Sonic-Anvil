@@ -450,7 +450,8 @@ internal sealed partial class WaveformView
     {
         var channels = document.Channels;
         var drawable = DrawableFrameCount(document);
-        var first = (long)Math.Floor(start);
+        // センターロックで先頭より前を見ているとき、負フレームをサンプル配列に渡さない。
+        var first = Math.Max(0L, (long)Math.Floor(start));
         var last = Math.Min(drawable - 1, (long)Math.Ceiling(start + span));
         if (last < first)
         {

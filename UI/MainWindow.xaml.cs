@@ -321,7 +321,6 @@ public partial class MainWindow : Window
         Transport.SetAnalysisView(Waveform.AnalysisView);
         Overview.ViewStartChanged += (_, start) =>
         {
-            Waveform.UnlockCenter();
             ScrubVisibleCenterAt(start);
             Waveform.PanViewStart(start);
         };
@@ -337,31 +336,20 @@ public partial class MainWindow : Window
         };
         TimeScroll.RangeChanged += (_, range) =>
         {
-            Waveform.UnlockCenter();
             Waveform.SetVisibleRange(range.ViewStart, range.ViewSpan);
+            if (Waveform.CenterLocked)
+            {
+                Waveform.CenterViewOnPlayhead();
+            }
         };
         TimeScrollStrip.AmpZoomIn += (_, _) => Waveform.ZoomAmpIn();
         TimeScrollStrip.AmpZoomOut += (_, _) => Waveform.ZoomAmpOut();
-        TimeScrollStrip.TimeZoomIn += (_, _) =>
-        {
-            Waveform.UnlockCenter();
-            Waveform.ZoomTimeIn(anchorPlayhead: false);
-        };
-        TimeScrollStrip.TimeZoomOut += (_, _) =>
-        {
-            Waveform.UnlockCenter();
-            Waveform.ZoomTimeOut(anchorPlayhead: false);
-        };
+        TimeScrollStrip.TimeZoomIn += (_, _) => Waveform.ZoomTimeIn(anchorPlayhead: false);
+        TimeScrollStrip.TimeZoomOut += (_, _) => Waveform.ZoomTimeOut(anchorPlayhead: false);
         TimeScrollStrip.ScrollLeft += (_, _) =>
-        {
-            Waveform.UnlockCenter();
             Waveform.PanByVisibleFraction(-TimeScrollRange.ScrollStepFraction);
-        };
         TimeScrollStrip.ScrollRight += (_, _) =>
-        {
-            Waveform.UnlockCenter();
             Waveform.PanByVisibleFraction(TimeScrollRange.ScrollStepFraction);
-        };
 
         _player.PlaybackEnded += (_, generation) => Dispatcher.BeginInvoke(() => OnPlaybackEnded(generation));
         _player.Diagnostic += (_, message) => Dispatcher.BeginInvoke(() =>
@@ -866,7 +854,6 @@ public partial class MainWindow : Window
         StopSeekNudge();
         StopVideoFrameStep();
         ResetMarkerDigitEntry();
-        Waveform.UnlockCenter();
         ClearSeekTrails();
     }
 
