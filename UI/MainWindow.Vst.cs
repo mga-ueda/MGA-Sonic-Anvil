@@ -359,7 +359,8 @@ public partial class MainWindow
             () => _player.VstInserts.CaptureAppliedStates(),
             () => _sessions.Count > 1,
             SyncPersistedVstInsertsAcrossTabs,
-            ClearMatchingVstInsertSlotAcrossTabs);
+            ClearMatchingVstInsertSlotAcrossTabs,
+            ConfirmPersistReplacingOtherTabs);
         if (show)
         {
             VstInsertRack.ApplyTheme();
@@ -372,6 +373,59 @@ public partial class MainWindow
     {
         SyncVstInsertEngine();
         RefreshTransportCommandsEnabled();
+    }
+
+    /// <summary>
+    /// 永続化で他タブのプラグインかパラメータが消えるとき、置き換えるか中止するかを問う。
+    /// 消えるものが無ければ OK。中止は Cancel。
+    /// </summary>
+    private MessageBoxResult ConfirmPersistReplacingOtherTabs(int index)
+    {
+        if (_activeSession is null || (uint)index >= VstInsertChain.MaxSlots)
+        {
+            return MessageBoxResult.Cancel;
+        }
+
+        var incoming = _activeSession.VstInserts.Slots[index];
+        var lines = new List<string>();
+        foreach (var session in _sessions)
+        {
+            if (ReferenceEquals(session, _activeSession))
+            {
+                continue;
+            }
+
+            var other = session.VstInserts.Slots[index];
+            if (!DocumentSessionStore.PersistReplacesSlotSettings(other, incoming))
+            {
+                continue;
+            }
+
+            lines.Add(UiStrings.VstPersistLossLine(session.DisplayName, VstInsertPluginLabel(other)));
+        }
+
+        if (lines.Count == 0)
+        {
+            return MessageBoxResult.OK;
+        }
+
+        return OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.WarnVstPersistReplacesOtherTabs(string.Join("\n", lines)),
+            UiStrings.TitleVstPersistReplace,
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel);
+    }
+
+    private static string VstInsertPluginLabel(VstInsertSlot slot)
+    {
+        if (!string.IsNullOrWhiteSpace(slot.DisplayName))
+        {
+            return slot.DisplayName.Trim();
+        }
+
+        return System.IO.Path.GetFileName(slot.PluginPath ?? string.Empty);
     }
 
     /// <summary>

@@ -28,6 +28,11 @@ internal sealed class VstInsertRackView : Grid
     /// <summary>永続内容／バイパスを全タブへ反映する（MainWindow）。</summary>
     private Action? _syncPersistedToAllTabs;
     /// <summary>
+    /// 永続化で他タブの設定が消えるとき、置き換えるか中止するかを問う（MainWindow）。
+    /// Cancel なら記憶しない。未設定なら確認せず進む。
+    /// </summary>
+    private Func<int, MessageBoxResult>? _confirmPersistReplace;
+    /// <summary>
     /// 全タブの同じ番号を空ける（MainWindow）。
     /// 引数はスロット番号と、消す対象の表示名／パス／ClassId（名前一致が必須）。
     /// </summary>
@@ -141,7 +146,8 @@ internal sealed class VstInsertRackView : Grid
         Action? captureStates = null,
         Func<bool>? canInsertAllTabs = null,
         Action? syncPersistedToAllTabs = null,
-        Action<int, string?, string?, string?>? clearMatchingSlotOnAllTabs = null)
+        Action<int, string?, string?, string?>? clearMatchingSlotOnAllTabs = null,
+        Func<int, MessageBoxResult>? confirmPersistReplace = null)
     {
         _session = session;
         _onChanged = onChanged;
@@ -152,6 +158,7 @@ internal sealed class VstInsertRackView : Grid
         _canInsertAllTabs = canInsertAllTabs;
         _syncPersistedToAllTabs = syncPersistedToAllTabs;
         _clearMatchingSlotOnAllTabs = clearMatchingSlotOnAllTabs;
+        _confirmPersistReplace = confirmPersistReplace;
         Refresh();
     }
 
@@ -815,8 +822,13 @@ internal sealed class VstInsertRackView : Grid
             return;
         }
 
-        // ライブで刺さっている state をスロットへ戻してから記憶する。
+        // ライブで刺さっている state をスロットへ戻してから、他タブを消すか確認する。
         _captureStates?.Invoke();
+        if (_confirmPersistReplace?.Invoke(index) == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
         DocumentSessionStore.SetDefaultInsertSlot(
             AppStorage.Settings,
             index,

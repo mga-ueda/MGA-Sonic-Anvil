@@ -854,6 +854,30 @@ internal static class DocumentSessionStore
         return changed;
     }
 
+    /// <summary>
+    /// 永続化で <paramref name="existing"/> のプラグインかパラメータが消えるか。
+    /// 空き、および同じプラグイン・同じパラメータ（バイパスだけ違う）は false。
+    /// </summary>
+    public static bool PersistReplacesSlotSettings(VstInsertSlot existing, VstInsertSlot incoming)
+    {
+        ArgumentNullException.ThrowIfNull(existing);
+        ArgumentNullException.ThrowIfNull(incoming);
+        if (existing.IsEmpty || incoming.IsEmpty)
+        {
+            return false;
+        }
+
+        var samePlugin =
+            string.Equals(existing.PluginPath, incoming.PluginPath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(existing.ClassId ?? string.Empty, incoming.ClassId ?? string.Empty, StringComparison.Ordinal);
+        if (!samePlugin)
+        {
+            return true;
+        }
+
+        return !StateBlobEquals(existing.StateBlob, incoming.StateBlob);
+    }
+
     private static bool StateBlobEquals(byte[]? a, byte[]? b)
     {
         if (ReferenceEquals(a, b))
