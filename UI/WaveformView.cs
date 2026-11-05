@@ -3607,6 +3607,36 @@ internal sealed partial class WaveformView : Grid
             wave.Height);
     }
 
+    internal void RasterizeWaveformForTest(
+        int[] pixels,
+        int width,
+        int height,
+        int x0,
+        int x1,
+        double start,
+        double span)
+    {
+        EnsureWavePens();
+        unsafe
+        {
+            fixed (int* buffer = pixels)
+            {
+                RasterizeWaveform(
+                    buffer,
+                    width,
+                    width,
+                    height,
+                    scaleX: 1,
+                    scaleY: 1,
+                    _document!,
+                    x0,
+                    x1,
+                    start,
+                    span);
+            }
+        }
+    }
+
     private void RasterizeWaveformPixels(
         int x0,
         int x1,
@@ -4021,31 +4051,6 @@ internal sealed partial class WaveformView : Grid
 
         if (!usePolyline)
         {
-            // ピーク未準備でも中心線は先に全幅へ描く（部分クリア後に半分だけ残るのを防ぐ）。
-            if (!monoWave)
-            {
-                for (var ch = 0; ch < drawChannels; ch++)
-                {
-                    var guideTop = laneOrigin + ch * (laneHeight + laneGap);
-                    var guideMid = guideTop + laneHeight * 0.5;
-                    if (!TryLaneClip(guideTop, laneHeight, height, out _, out _))
-                    {
-                        continue;
-                    }
-
-                    DrawLaneGuides(
-                        buffer,
-                        stride,
-                        width,
-                        height,
-                        guideTop,
-                        guideMid,
-                        drawLaneTop: true,
-                        0,
-                        width);
-                }
-            }
-
             var f0 = startFrame + (long)x0 * rangeFrames / width;
             var f1 = startFrame + (long)x1 * rangeFrames / width;
             if (f1 <= f0)
@@ -4062,49 +4067,59 @@ internal sealed partial class WaveformView : Grid
                 colCount,
                 peakChannels,
                 useRawColumns && !SeekAndSelectOnly);
-            if (count <= 0)
+            if (count > 0)
             {
-                return;
-            }
-
-            var packedChannels = peakChannels;
-            if (monoWave && packedChannels > 1)
-            {
-                // Mid だと逆相で消える。包絡の和集合でピークを残す。
-                ChannelMix.FoldPackedPeaksToUnion(_columnMins, _columnMaxs, count, packedChannels);
-                packedChannels = 1;
-            }
-            else if (monoWave)
-            {
-                packedChannels = 1;
-            }
-
-            for (var ch = 0; ch < drawChannels; ch++)
-            {
-                var top = laneOrigin + ch * (laneHeight + laneGap);
-                var mid = top + laneHeight * 0.5;
-                if (!TryLaneClip(top, laneHeight, height, out var clipTop, out var clipBottom))
+                var packedChannels = peakChannels;
+                if (monoWave && packedChannels > 1)
                 {
-                    continue;
+                    // Mid だと逆相で消える。包絡の和集合でピークを残す。
+                    ChannelMix.FoldPackedPeaksToUnion(_columnMins, _columnMaxs, count, packedChannels);
+                    packedChannels = 1;
+                }
+                else if (monoWave)
+                {
+                    packedChannels = 1;
                 }
 
-                RasterPeakEnvelope(
-                    buffer,
-                    stride,
-                    width,
-                    clipTop,
-                    clipBottom,
-                    ch,
-                    packedChannels,
-                    count,
-                    x0,
-                    top,
-                    laneHeight,
-                    ampHeight,
-                    mid,
-                    connectNeighbors: ShouldConnectEnvelopeNeighbors(rangeFrames, width));
+                for (var ch = 0; ch < drawChannels; ch++)
+                {
+                    var top = laneOrigin + ch * (laneHeight + laneGap);
+                    var mid = top + laneHeight * 0.5;
+                    if (!TryLaneClip(top, laneHeight, height, out var clipTop, out var clipBottom))
+                    {
+                        continue;
+                    }
+
+                    RasterPeakEnvelope(
+                        buffer,
+                        stride,
+                        width,
+                        clipTop,
+                        clipBottom,
+                        ch,
+                        packedChannels,
+                        count,
+                        x0,
+                        top,
+                        laneHeight,
+                        ampHeight,
+                        mid,
+                        connectNeighbors: ShouldConnectEnvelopeNeighbors(rangeFrames, width));
+                }
             }
 
+            // 中心線は波形のあと全幅へ描く。先に描くと包絡が中心画素を潰し、
+            // スクロール差分の再描画でだけ線が上に戻って見える。
+            DrawWaveLaneGuides(
+                buffer,
+                stride,
+                width,
+                height,
+                monoWave,
+                drawChannels,
+                laneOrigin,
+                laneHeight,
+                laneGap);
             return;
         }
 
@@ -4115,11 +4130,6 @@ internal sealed partial class WaveformView : Grid
             if (!TryLaneClip(top, laneHeight, height, out var clipTop, out var clipBottom))
             {
                 continue;
-            }
-
-            if (!monoWave)
-            {
-                DrawLaneGuides(buffer, stride, width, height, top, mid, drawLaneTop: true, 0, width);
             }
 
             RasterSamplePolyline(
@@ -4137,6 +4147,17 @@ internal sealed partial class WaveformView : Grid
                 mid,
                 scaleX);
         }
+
+        DrawWaveLaneGuides(
+            buffer,
+            stride,
+            width,
+            height,
+            monoWave,
+            drawChannels,
+            laneOrigin,
+            laneHeight,
+            laneGap);
     }
 
     private unsafe void RasterLoudnessDbWaveform(
@@ -4414,6 +4435,47 @@ internal sealed partial class WaveformView : Grid
     {
         _ = (editorMode, rangeFrames, width, timeZoom, EditorEnvelopeCoarseMinSamplesPerPixel);
         return 0;
+    }
+
+    /// <summary>
+    /// レーン境界と 0 線。部分更新でも全幅に引き、包絡のあとで上書きされないようにする。
+    /// </summary>
+    private unsafe void DrawWaveLaneGuides(
+        int* buffer,
+        int stride,
+        int width,
+        int height,
+        bool monoWave,
+        int drawChannels,
+        double laneOrigin,
+        double laneHeight,
+        double laneGap)
+    {
+        if (monoWave)
+        {
+            return;
+        }
+
+        for (var ch = 0; ch < drawChannels; ch++)
+        {
+            var guideTop = laneOrigin + ch * (laneHeight + laneGap);
+            var guideMid = guideTop + laneHeight * 0.5;
+            if (!TryLaneClip(guideTop, laneHeight, height, out _, out _))
+            {
+                continue;
+            }
+
+            DrawLaneGuides(
+                buffer,
+                stride,
+                width,
+                height,
+                guideTop,
+                guideMid,
+                drawLaneTop: true,
+                0,
+                width);
+        }
     }
 
     private unsafe void DrawLaneGuides(
