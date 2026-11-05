@@ -197,6 +197,34 @@ public sealed class TabMergeTests
     }
 
     [Fact]
+    public void WarnVstPersistReplacesOtherTabs_ListsTargetsAndUsesOkCancelWords()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("a.wav（EQ）", UiStrings.VstPersistLossLine("a.wav", "EQ"));
+            var japanese = UiStrings.WarnVstPersistReplacesOtherTabs("a.wav（EQ）\nb.wav（Comp）");
+            Assert.Contains("プラグインの設定が消えます", japanese);
+            Assert.Contains("対象:\na.wav（EQ）\nb.wav（Comp）", japanese);
+            Assert.Contains("\n\nOK:", japanese);
+            Assert.Contains("\nCancel:", japanese);
+
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("a.wav (EQ)", UiStrings.VstPersistLossLine("a.wav", "EQ"));
+            var english = UiStrings.WarnVstPersistReplacesOtherTabs("a.wav (EQ)");
+            Assert.Contains("erase plug-in settings", english);
+            Assert.Contains("Affected:\na.wav (EQ)", english);
+            Assert.Contains("\n\nOK:", english);
+            Assert.Contains("\nCancel:", english);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void FormatOverDb_RoundsOneDecibelToOne()
     {
         var peak = Math.Pow(10d, 1d / 20d);

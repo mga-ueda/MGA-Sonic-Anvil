@@ -638,6 +638,57 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
+    public void PersistReplacesSlotSettings_OnlyWhenPluginOrParametersWouldBeLost()
+    {
+        var incoming = new VstInsertSlot
+        {
+            PluginPath = @"C:\EQ.vst3",
+            ClassId = "a",
+            DisplayName = "EQ",
+            StateBlob = [1, 2],
+        };
+
+        Assert.False(DocumentSessionStore.PersistReplacesSlotSettings(new VstInsertSlot(), incoming));
+        Assert.False(DocumentSessionStore.PersistReplacesSlotSettings(incoming, new VstInsertSlot()));
+
+        var same = new VstInsertSlot
+        {
+            PluginPath = @"C:\eq.vst3",
+            ClassId = "a",
+            DisplayName = "EQ",
+            StateBlob = [1, 2],
+            Bypassed = true,
+        };
+        Assert.False(DocumentSessionStore.PersistReplacesSlotSettings(same, incoming));
+
+        var otherState = new VstInsertSlot
+        {
+            PluginPath = @"C:\EQ.vst3",
+            ClassId = "a",
+            DisplayName = "EQ",
+            StateBlob = [9],
+        };
+        Assert.True(DocumentSessionStore.PersistReplacesSlotSettings(otherState, incoming));
+
+        var otherPlugin = new VstInsertSlot
+        {
+            PluginPath = @"C:\Comp.vst3",
+            DisplayName = "Comp",
+            StateBlob = [1, 2],
+        };
+        Assert.True(DocumentSessionStore.PersistReplacesSlotSettings(otherPlugin, incoming));
+
+        var otherClass = new VstInsertSlot
+        {
+            PluginPath = @"C:\EQ.vst3",
+            ClassId = "b",
+            DisplayName = "EQ",
+            StateBlob = [1, 2],
+        };
+        Assert.True(DocumentSessionStore.PersistReplacesSlotSettings(otherClass, incoming));
+    }
+
+    [Fact]
     public void HasRestorableOpenDocuments_TrueWhenSourceExists()
     {
         var root = NewTempDir("has-restorable");

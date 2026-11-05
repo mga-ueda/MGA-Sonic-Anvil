@@ -28,6 +28,7 @@ internal sealed class VstPluginEditorWindow : Window
     private int _appliedClientH;
     private bool _userMoved;
     private bool _ignoreLocationChanged;
+    private bool _closeFromShortcut;
 
     public VstPluginEditorWindow(Window? owner, Vst3EditorSession session)
     {
@@ -54,6 +55,10 @@ internal sealed class VstPluginEditorWindow : Window
 
         session.ResizeFromPlugin += OnPluginResize;
         SourceInitialized += (_, _) => SyncFromPluginSize(notifyPlugin: false);
+        // プラグインの子 HWND がフォーカスを持つと WPF の KeyDown には届かない。
+        // スレッドのメッセージを先に見て、この窓（と所有ポップアップ）宛の Ctrl+W だけ閉じる。
+        ComponentDispatcher.ThreadFilterMessage += OnThreadFilterMessage;
+        Closed += (_, _) => ComponentDispatcher.ThreadFilterMessage -= OnThreadFilterMessage;
         SizeChanged += OnHostSizeChanged;
         LocationChanged += OnLocationChanged;
         Loaded += OnLoaded;
@@ -174,6 +179,104 @@ internal sealed class VstPluginEditorWindow : Window
             }
         }
     }
+
+    /// <summary>
+    /// Ctrl+W（Shift／Alt／Win なし）のキーダウンだけプラグイン窓を閉じる。
+    /// Ctrl+Shift+W などはタブ側のショートカットなのでここでは食わない。
+    /// </summary>
+    internal static bool IsPluginWindowCloseChord(
+        int message,
+        int virtualKey,
+        bool control,
+        bool shift,
+        bool alt,
+        bool win) =>
+        message == WmKeyDown
+        && virtualKey == VkW
+        && control
+        && !shift
+        && !alt
+        && !win;
+
+    /// <summary>キーの宛先が <paramref name="owner"/> 自身か、その子／所有ポップアップか。</summary>
+    internal static bool IsOwnedByWindow(IntPtr target, IntPtr owner)
+    {
+        if (target == IntPtr.Zero || owner == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var root = GetAncestor(target, GaRoot);
+        if (root == IntPtr.Zero)
+        {
+            root = target;
+        }
+
+        for (var hop = 0; hop < 8 && root != IntPtr.Zero; hop++)
+        {
+            if (root == owner)
+            {
+                return true;
+            }
+
+            root = GetWindow(root, GwOwner);
+        }
+
+        return false;
+    }
+
+    private void OnThreadFilterMessage(ref MSG msg, ref bool handled)
+    {
+        if (handled)
+        {
+            return;
+        }
+
+        var virtualKey = unchecked((int)(msg.wParam.ToInt64() & 0xFFFF));
+        if (!IsPluginWindowCloseChord(
+                msg.message,
+                virtualKey,
+                control: IsVkDown(VkControl),
+                shift: IsVkDown(VkShift),
+                alt: IsVkDown(VkMenu),
+                win: IsVkDown(VkLWin) || IsVkDown(VkRWin)))
+        {
+            return;
+        }
+
+        if (!IsOwnedByWindow(msg.hwnd, new WindowInteropHelper(this).Handle))
+        {
+            return;
+        }
+
+        // プラグインに渡さない。オートリピートでも閉じるのは一度。
+        handled = true;
+        if (_closing || _closeFromShortcut)
+        {
+            return;
+        }
+
+        _closeFromShortcut = true;
+        Dispatcher.BeginInvoke(CloseFromShortcut, DispatcherPriority.Input);
+    }
+
+    private void CloseFromShortcut()
+    {
+        if (_closing)
+        {
+            return;
+        }
+
+        try
+        {
+            Close();
+        }
+        catch
+        {
+        }
+    }
+
+    private static bool IsVkDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -584,7 +687,16 @@ internal sealed class VstPluginEditorWindow : Window
         }
     }
 
+    private const int WmKeyDown = 0x0100;
     private const int WmSize = 0x0005;
+    private const int VkShift = 0x10;
+    private const int VkControl = 0x11;
+    private const int VkMenu = 0x12;
+    private const int VkW = 0x57;
+    private const int VkLWin = 0x5B;
+    private const int VkRWin = 0x5C;
+    private const uint GaRoot = 2;
+    private const uint GwOwner = 4;
     private const int WmEraseBkgnd = 0x0014;
     private const int WsChild = 0x40000000;
     private const int WsVisible = 0x10000000;
@@ -623,6 +735,15 @@ internal sealed class VstPluginEditorWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool MoveWindow(IntPtr hWnd, int x, int y, int nWidth, int nHeight, bool bRepaint);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr hwnd, uint uCmd);
 
     [DllImport("user32.dll")]
     private static extern bool GetClientRect(IntPtr hWnd, out NativeRect lpRect);

@@ -249,8 +249,19 @@ internal static partial class UiStrings
     public static string LabelVstInsertRemoveAll => Get("すべて削除(_A)", "Remove _All");
     public static string LabelVstInsertOpenEditor => Get("エディタを開く(_O)", "_Open editor");
     public static string TooltipVstInsertPersist => Get(
-        "このスロットと、今刺さっているプラグインとパラメータを記憶します。タブを閉じても、別の波形を開くと同じスロットに同じ設定で有効になります",
-        "Remember this slot, plug-in, and its parameters. After you close the tab, opening any other waveform restores the same slot with the same settings");
+        "このスロットと、今刺さっているプラグインとパラメータを記憶します。タブを閉じても、別の波形を開くと同じスロットに同じ設定で有効になります。他のタブのプラグイン設定が消えるときは、置き換えるか中止するかを確認します",
+        "Remember this slot, plug-in, and its parameters. After you close the tab, opening any other waveform restores the same slot with the same settings. If that would erase plug-in settings on other tabs, you are asked whether to replace them or cancel");
+    public static string TitleVstPersistReplace => Get("永続化", "Persist");
+    /// <summary>永続化で他タブのプラグイン設定が消えるときの確認（OK＝上書き／Cancel＝中止）。</summary>
+    public static string WarnVstPersistReplacesOtherTabs(string list) => Format(
+        "このスロットを永続化すると、他のタブで使っているプラグインの設定が消えます。\n\n対象:\n{0}\n\nOK: 他のタブもこの設定に置き換えて永続化する\nCancel: 永続化しない",
+        "Persisting this slot would erase plug-in settings used on other tabs.\n\nAffected:\n{0}\n\nOK: replace the other tabs with this setup and persist it\nCancel: do not persist",
+        list);
+    public static string VstPersistLossLine(string tab, string plugin) => Format(
+        "{0}（{1}）",
+        "{0} ({1})",
+        tab,
+        plugin);
     public static string TooltipVstInsertPersistClear => Get(
         "このスロットとプラグインの組の記憶を消します。以降に開く波形には入りません",
         "Forget this slot and plug-in pair. Later waveforms won’t get it");
