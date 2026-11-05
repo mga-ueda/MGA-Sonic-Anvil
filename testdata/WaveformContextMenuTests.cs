@@ -194,7 +194,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.FadeIn, commands);
             Assert.Contains(WaveMenuCommand.AddMarker, commands);
             Assert.Equal(MenuGestures.AddMarker, Find(tree, WaveMenuCommand.AddMarker)?.Gesture);
-            Assert.Equal(MenuGestures.CenterPlayhead, Find(tree, WaveMenuCommand.CenterPlayhead)?.Gesture);
+            Assert.Null(Find(tree, WaveMenuCommand.CenterPlayhead)?.Gesture);
+            Assert.Equal(MenuGestures.CenterPlayhead, Find(tree, WaveMenuCommand.CenterLock)?.Gesture);
             Assert.Equal(MenuGestures.NextTab, Find(tree, WaveMenuCommand.NextTab)?.Gesture);
             Assert.Equal(MenuGestures.PrevTab, Find(tree, WaveMenuCommand.PrevTab)?.Gesture);
             Assert.Equal(MenuGestures.ViewWaveform, Find(tree, WaveMenuCommand.ViewWaveform)?.Gesture);
@@ -431,6 +432,8 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(ready, WaveMenuCommand.FadeIn)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.AddMarkerHere)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.Record)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.CenterPlayhead)?.Enabled);
+        Assert.True(Find(ready, WaveMenuCommand.CenterLock)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.NormalizePerRegion)?.Enabled);
         var withRegions = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
         {

@@ -196,7 +196,7 @@
           <li>Set transparency with the <span class="ui">Opacity</span> slider (0 = transparent … 255 = opaque) or an 8-digit Hex (<code>#AARRGGBB</code>). <span class="ui">Brightness</span> changes lightness only.</li>
           <li>Changes apply immediately and are saved automatically (there is no Cancel).</li>
           <li><span class="ui">Reset this color</span>, <span class="ui">Reset to defaults</span> (all colors; no confirmation), and color-scheme <span class="ui">Export</span> / <span class="ui">Import</span> are available.</li>
-          <li>The frosted-glass tint for dialogs and menus is <code>AcrylicDialogTintBrush</code> in the <span class="ui">Dialog</span> group (default <code>#C0000000</code>).</li>
+          <li>The frosted-glass tint for dialogs and menus is <code>AcrylicDialogTintBrush</code> in the <span class="ui">Dialog</span> group (default <code>#C0000000</code>). The list surface opened from the menu bar and the list surface of right-click menus and combo boxes are separate colors (Shared group: Menu list background and Pulldown list background).</li>
           <li>The panel stays open while you use the main window. It first opens centered on the app and remembers its position and size.</li>
         </ul>
       </article>
@@ -698,7 +698,7 @@
           <li><strong>Buttons shown</strong> — all of them by default. Remove some in Settings → Layout → <span class="ui">Customize toolbar…</span>. The order cannot be changed. The sample loop is one toggle button (clear icon while a loop is set; same family as the menu Set / Clear and <kbd>Shift</kbd>+<kbd>L</kbd>).</li>
           <li><strong>Icon size</strong> — Settings → Layout → <span class="ui">Icon size</span> scales toolbar icons 100–200% (separate from UI scale; unavailable while the toolbar is off).</li>
           <li><strong>Position</strong> — top (under the menu bar) / bottom (above the status bar) and left / center / right, chosen per F9–F12 mode (Settings → Layout presets; default top, center).</li>
-          <li><strong>Unavailable buttons</strong> — buttons that cannot be used right now are dimmed (for example editor-only commands in the player). Previous Point / Next Point stay available with no markers, because they can still land on a file edge. Marker delete is dimmed when there are no markers. A group with no usable button is hidden entirely.</li>
+          <li><strong>Unavailable buttons</strong> — buttons that cannot be used right now are dimmed (for example editor-only commands in the player). In the editor, Previous Point / Next Point stay available with no markers, because they can still land on a file edge. Marker delete is dimmed when there are no markers. A group with no usable button is hidden entirely.</li>
           <li><strong>Previous Point / Next Point</strong> — same as <kbd>Ctrl</kbd>+← / →. The icon is tick marks on a timeline and a chevron toward the landing tick (not a marker flag). The same commands are on the Timeline right-click and menu bar.</li>
           <li><strong>When it is hidden</strong> — when turned off in Settings, in the <kbd>F8</kbd> video mini, and during real video playback (it hides with the front chrome).</li>
           <li>The company logo and license are not shown on the toolbar. Other → Version opens a frosted-glass about dialog with the app icon, name, version, and rights links. GitHub opens the repository, MIT License this app’s full text, and LAME / FFmpeg / EffeTune / WinBlur each open their project site (browser). The Wwise® / Audiokinetic® trademark line is included. Other → License shows the bundled <code>THIRD_PARTY_NOTICES.md</code> (same trademarks, EffeTune / WinBlur, and more) in a frosted-glass dialog. See <a href="#trademarks">Trademarks and license</a>.</li>
@@ -801,7 +801,7 @@
           <li>Click a filled slot for the GUI; the same shortcut closes it when open. With focus in the plug-in GUI, <kbd>Ctrl</kbd>+<kbd>W</kbd> closes that window only (it does not close the tab). <kbd>Ctrl</kbd>+click toggles bypass. Right-click for Insert / Insert to All Tabs / Bypass / Persist / Remove, and so on. Plug-in GUIs stay in the topmost band so they remain above the host even when the host uses <kbd>F11</kbd> / <kbd>F12</kbd> or Always on Top.</li>
           <li>Drag to an empty slot to move, or swap two occupied slots. Persisted slots stay on the same index across every open tab.</li>
           <li><strong>Persist</strong> — remembers the plug-in, parameters, and bypass for every open tab and the next launch. If another tab would lose its plug-in or parameters, you are asked whether to replace those tabs and persist, or cancel (cancel is the default). <strong>Release persistence</strong> clears only that memory and leaves the plug-in on the current slot. <strong>Remove</strong> (and Clear All for persisted slots) acts like all-tabs insert, so the same name and index leave every open tab.</li>
-          <li><strong>Bounce Selected</strong> (toolbar / Export menu / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) — bakes inserts into the waveform on the selected tabs (or the active tab) and bypasses those slots. Asks whether to include tails (Keep / Cut; Keep by default; Cancel aborts the bounce). Editor only. Undoable. Separate from <a href="#layout-tabs">Mixdown</a> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), which stacks tabs.</li>
+          <li><strong>Bounce Selected</strong> (toolbar / Export menu / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) — bakes inserts into the waveform on the selected tabs (or the active tab) and bypasses those slots. Asks whether to include tails (Keep / Cut; Keep by default; Cancel aborts the bounce). If it cannot bounce, a dialog states why and stops (no insert, bypassed, plug-in failed to load, empty waveform, fade tool open, recording, another operation running, or the player). Editor only. Undoable. Separate from <a href="#layout-tabs">Mixdown</a> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), which stacks tabs.</li>
           <li>Some plug-ins (for example Altiverb) will not load under a debugger. Launch the exe without a debugger from Visual Studio / Cursor.</li>
         </ul>
       </article>
@@ -844,7 +844,7 @@
         <li><kbd>J</kbd> — skip 5 s back, <kbd>K</kbd> — skip 5 s forward (0.75 s crossfade; hold repeats after a short wait)</li>
         <li><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> — playback pitch up / down by one semitone (main keyboard or numpad; Shift may be held on the main <kbd>+</kbd> key). <kbd>Ctrl</kbd>+<kbd>0</kbd> (main keyboard or numpad) returns it to zero. A toast in the center shows the semitones. Heard on the audio that is playing, in the editor and the player. Length and the playhead stay put. Range is ±2 octaves. Starting another track forgets the shift.</li>
         <li><kbd>,</kbd> — rewind, <kbd>.</kbd> — fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</li>
-        <li><kbd>Z</kbd> or numpad <kbd>.</kbd> — center. Toggles center-lock while playing; clears it when stopped (the <kbd>.</kbd> key is fast-forward).</li>
+        <li><kbd>Z</kbd> or numpad <kbd>.</kbd> — toggle center-lock. It toggles while stopped too, and stop, jump, and scroll do not clear it. While on, the playhead stays at the center of the view even at the start and end of the file (the other side is blank). The <kbd>.</kbd> key is fast-forward. The toolbar center button toggles the same way while playing, and while stopped centers once without changing the lock. View → Center Playhead centers without changing the lock. View → Center Lock is the same toggle as <kbd>Z</kbd> (available while stopped).</li>
         <li><kbd>L</kbd> — jump to 3 seconds before the end of the selection (or the sample loop / <code>-L</code>) and loop forever (while stopped or while playing).</li>
         <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> — toggle <span class="ui">Single Loop</span> (status bar; same toggle in the editor; in the player the sample loop is ignored and playback restarts at the end; selection / A-B take priority; see <a href="#layout-single-loop">Single Loop</a>).</li>
         <li><kbd>Q</kbd> — in the editor, marker click. Plays clicks at marker / region edges (selection when present, otherwise the whole file). Toggle with <kbd>Q</kbd> (off by default; never auto-on). Also available from waveform right-click → Playback. In the player it is a Back key (real video playback, frame pause, bright PDF view → dim preview; F8 / argument mini → playlist).</li>
@@ -1014,7 +1014,8 @@
             <li>Drag the red ±threshold lines</li>
             <li>Wheel / ↑↓ on number fields: 0.1 dB (Shift for 1 dB)</li>
             <li>Wheel on the waveform zooms time around the cursor</li>
-            <li>With the waveform focused, movement matches the editor</li>
+            <li>Under the waveform, the strip matches the editor: amplitude + / − on the left (<kbd>Shift</kbd>+↑ / ↓), a time scrollbar in the middle (drag a thumb edge to change the span), and time + / − on the right (the buttons keep the center of the view fixed; ↑ / ↓ keep the seek position fixed)</li>
+            <li>With the waveform focused, ← / → seek, <kbd>Home</kbd> / <kbd>End</kbd> go to the view edges, <kbd>PageUp</kbd> / <kbd>PageDown</kbd> move 5% of the view, top-row <kbd>0</kbd>–<kbd>9</kbd> jump by view percent, and numpad <kbd>7</kbd> / <kbd>9</kbd> skip 5 s back / forward. <kbd>Ctrl</kbd>+← / → jumps to a detected cue (a hit, or an edge of a kept span; the analysis-range edge when there is none). <kbd>Ctrl</kbd>+↑ / ↓ is 32× / maximum time zoom and fit, and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑ / ↓ is amplitude maximum / reset. Selection extend and marker edits are not available (<kbd>Shift</kbd>+← / → does nothing)</li>
             <li>The window resizes in both directions; only the waveform area grows</li>
           </ul>
         </li>
@@ -1036,7 +1037,7 @@
         <li>Click a flag to select an edge. Shift+click for a range, Ctrl+click to add. Drag or ←/→ to move (Shift ×3).</li>
         <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red (only when you write it; the span after a loop or sample loop is not painted red automatically). <code>-R</code> is gray. See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
-        <li><kbd>Ctrl</kbd>+← / → — Previous Point / Next Point. Moves to the nearest marker, region edge, sample-loop edge, selection start or end, or file edge in that direction. The selection stays while an edge remains ahead, and clears once both edges are passed. File edges work with no markers. The same commands are on Timeline in the right-click menu and menu bar, and on the toolbar buttons of the same name. The icon is timeline ticks and a chevron.</li>
+        <li><kbd>Ctrl</kbd>+← / → — Previous Point / Next Point. In the editor, moves to the nearest marker, region edge, sample-loop edge, selection start or end, or file edge in that direction. The selection stays while an edge remains ahead, and clears once both edges are passed. File edges work with no markers. In the player this jump runs only while temporary markers exist; markers wrap to the other end and do not stop on a file edge (selection edges still count). The same commands are on Timeline in the right-click menu and menu bar, and on the toolbar buttons of the same name. The icon is timeline ticks and a chevron.</li>
         <li>Right-click, or <kbd>Ctrl</kbd>+<kbd>Del</kbd>, deletes markers. Delete all markers and delete all regions are on Timeline. Go to Start / End / View Left / View Right sit directly under Timeline (not in a Seek submenu, and not under Playback).</li>
       </ul>
 
@@ -1241,7 +1242,7 @@
           <tr><td><kbd>F2</kbd></td><td>Rename the file (double-clicking the file name on a tab / tile strip, tab right-click → Rename File (N), or waveform right-click → File → Rename File (F) does the same)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate the file (opens in the next tab)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>Mixdown two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; only when formats match; warns if any VST insert is active; if the sum exceeds ±1, cancel or lower the mix before writing; same key and menu gesture in the player; per-tab VST inserts are not applied)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; asks Keep / Cut tails; Keep by default; Cancel aborts; <strong>editor only</strong>; selected tabs, or the active tab; see <a href="#layout-vst">VST inserts</a>)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; asks Keep / Cut tails; Keep by default; Cancel aborts; if it cannot bounce, a dialog states why and stops; <strong>editor only</strong>; selected tabs, or the active tab; see <a href="#layout-vst">VST inserts</a>)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Export MP3 (selected tabs, or the current tab; selected playlist rows in the player; does not save; waveform right-click → Export)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Quit (tabs left open and unsaved working copies come back on the next launch)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close tab (asks to save if unsaved; several unsaved tabs can be finished together). When a plug-in GUI has focus, closes that window only</td></tr>
@@ -1282,7 +1283,7 @@
           <tr><td><kbd>,</kbd> / <kbd>.</kbd></td><td>Rewind / fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</td></tr>
           <tr><td><kbd>Q</kbd></td><td>In the editor, marker click (clicks at marker / region edges; selection when present, otherwise the whole file; off by default; never auto-on; also via waveform right-click → Playback). In the player it is a Back key (real video playback, frame pause, bright PDF view → dim preview; F8 / argument mini → playlist; <kbd>Q</kbd> goes back even when In/Out is set)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Record (asks Silent Skip first; overwrite from the seek bar in the current format; Undo restores; press again / Space / Enter / Esc to stop)</td></tr>
-          <tr><td><kbd>Z</kbd> / numpad <kbd>.</kbd></td><td>Center. Toggles center-lock while playing; clears it when stopped (the <kbd>.</kbd> key is fast-forward)</td></tr>
+          <tr><td><kbd>Z</kbd> / numpad <kbd>.</kbd></td><td>Toggle center-lock (also while stopped; stop, jump, and scroll do not clear it; while on, the playhead stays centered even at the file edges; the <kbd>.</kbd> key is fast-forward; the toolbar center button toggles only while playing and, while stopped, centers once without changing the lock; View → Center Lock is the same toggle)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>Go to the start of the file</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>Go to the end of the file</td></tr>
         </tbody>
@@ -1325,7 +1326,7 @@
         <tbody>
           <tr><td>← / →</td><td>Seek. Hold during playback for 3× shuttle (Silent Skip pauses). Moves a selected marker / region edge / loop edge (1 sample when dots are shown; a selection edge that coincides with that boundary follows by the same amount). Player mode does not shuttle with the arrows (during real video playback or frame pause, steps one frame)</td></tr>
           <tr><td><kbd>Shift</kbd>+← / →</td><td>Extend the selection. Moves a selected edge ×3 (1 sample when dots are shown; a coinciding selection edge follows by the same amount)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+← / →</td><td>Previous Point / Next Point (the nearest marker, region edge, sample-loop edge, selection edge, or file edge in that direction; the selection stays while an edge remains ahead. Same commands on Timeline in the right-click menu / menu bar, and on the toolbar)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+← / →</td><td>Previous Point / Next Point (editor: the nearest marker, region edge, sample-loop edge, selection edge, or file edge in that direction; the selection stays while an edge remains ahead; file edges work with no markers. Player: only while temporary markers exist; markers wrap and do not stop on a file edge. Same commands on Timeline in the right-click menu / menu bar, and on the toolbar)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+← / →</td><td>Extend the selection to the previous / next marker or edge</td></tr>
           <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>View edge</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>Home</kbd> / <kbd>End</kbd></td><td>Extend the selection to the view edge</td></tr>
@@ -1379,7 +1380,7 @@
         <tbody>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+top-row <kbd>1</kbd>–<kbd>8</kbd></td><td>Slot action: empty = pick a plug-in; bypassed = clear bypass; filled = open / close the GUI (numpad digits are not used)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd> (plug-in GUI)</td><td>Close the focused plug-in window (does not close the tab; Shift or Alt chords are ignored)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; asks Keep / Cut tails; Keep by default; Cancel aborts)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; asks Keep / Cut tails; Keep by default; Cancel aborts; if it cannot bounce, a dialog states why and stops)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click (slot)</td><td>Toggle bypass</td></tr>
         </tbody>
       </table>
@@ -1510,6 +1511,25 @@
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd> / <kbd>E</kbd> / <kbd>P</kbd> / <kbd>T</kbd></td><td>Move to the Start / End / Pre / Post value box (works while editing a value)</td></tr>
           <tr><td>← / →</td><td>Nudge the focused value by 1 sample</td></tr>
           <tr><td><kbd>Space</kbd></td><td>Main transport play / stop (sample-loop infinite playback)</td></tr>
+        </tbody>
+      </table>
+      <p>While the Silence &amp; Hit Detection waveform preview has focus (see <a href="#silence-hit">Silence &amp; Hit Detection</a>; selection extend and marker edits are not available)</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>← / →</td><td>Seek</td></tr>
+          <tr><td><kbd>Shift</kbd>+← / →</td><td>Does nothing (does not extend the selection)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+← / →</td><td>Jump to a detected cue (a hit, or an edge of a kept span; the analysis-range edge when there is none)</td></tr>
+          <tr><td>↑ / ↓</td><td>Time zoom (keeps the seek position fixed; the + / − buttons under the wave keep the center of the view fixed)</td></tr>
+          <tr><td><kbd>Shift</kbd>+↑ / ↓</td><td>Amplitude zoom (same as the + / − buttons on the left)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+↑ / ↓</td><td>32× / maximum time zoom, or fit</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+↑ / ↓</td><td>Amplitude maximum / reset</td></tr>
+          <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>View edge (<kbd>Shift</kbd> does the same; does not extend the selection)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd> / <kbd>End</kbd></td><td>Start / end of the analysis range (<kbd>Ctrl</kbd>+<kbd>Shift</kbd> does the same)</td></tr>
+          <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Seek 5% of the view (<kbd>Shift</kbd> does the same)</td></tr>
+          <tr><td>Top-row <kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to 0%–90% of the view</td></tr>
+          <tr><td>Numpad <kbd>7</kbd> / <kbd>9</kbd></td><td>Skip 5 s back / forward</td></tr>
+          <tr><td>Wheel</td><td>Time zoom around the cursor</td></tr>
         </tbody>
       </table>
       <p>While the volume menu is open</p>

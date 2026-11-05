@@ -55,7 +55,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("Esc", UiStrings.TooltipSpectrogramView);
         Assert.Contains("Shift+A", UiStrings.TooltipSpectrogramView);
         Assert.Contains("Shift+V", UiStrings.TooltipSpectrogramView);
-        Assert.Contains("(Z)", UiStrings.TooltipCenterPlayhead);
+        Assert.Contains("(Z", UiStrings.TooltipCenterPlayhead);
         Assert.Contains("(U)", UiStrings.TooltipHistory);
         Assert.Contains("F10", UiStrings.TooltipLibraryMaximize);
         Assert.Contains("F12", UiStrings.TooltipAnalyzerMaximize);
