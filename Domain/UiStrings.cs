@@ -1355,7 +1355,9 @@ internal static partial class UiStrings
     public static string TooltipLoudnessPen => Get(
         "ペンで描く (E)  離すと音量になる。描いているあいだ元の曲線は残る。取り消しは Ctrl+Z。曲線の右クリックでも切り替え",
         "Draw with the pen (E)  volume changes when you release. The curve stays while you draw. Undo with Ctrl+Z. Also right-click the curve");
-    public static string TooltipCenterPlayhead => Get("中央寄せ / センターロック (Z)", "Center / center-lock (Z)");
+    public static string TooltipCenterPlayhead => Get(
+        "停止中は中央へ寄せる。再生中はセンターロック (Z は停止中も切替)",
+        "Center while stopped. Toggle center-lock while playing (Z toggles even when stopped)");
     /// <summary>センターロックのトグルトースト。UI 言語に関わらず英語。</summary>
     public static string LabelCenterLock => "Center Lock";
     public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
