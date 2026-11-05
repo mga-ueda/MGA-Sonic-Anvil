@@ -244,9 +244,7 @@ internal partial class TransportBar : UserControl
     private static bool IsCommandAvailable(TransportCommand command, CommandAvailability a) =>
         command switch
         {
-            TransportCommand.PreviousMarker
-                or TransportCommand.NextMarker
-                or TransportCommand.DeleteMarkers
+            TransportCommand.DeleteMarkers
                 or TransportCommand.DeleteAllMarkers => a.HasMarkers,
             TransportCommand.DeleteRegions => a.HasSelectedRegions && a.AllowsRegionsAndLoops,
             TransportCommand.DeleteAllRegions => a.HasRegions && a.AllowsRegionsAndLoops,

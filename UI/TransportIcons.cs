@@ -557,12 +557,10 @@ internal static class TransportIconDrawing
                 DrawChevron(dc, pen, cx - 2, cy, left: false);
                 break;
             case TransportIcon.PreviousMarker:
-                DrawChevron(dc, pen, cx - 5, cy, left: true);
-                DrawMarkerFlag(dc, markerBrush, markerPen, cx + 2, cy - 9, cy + 9, 7);
+                DrawJumpPoint(dc, pen, cx, cy, previous: true);
                 break;
             case TransportIcon.NextMarker:
-                DrawMarkerFlag(dc, markerBrush, markerPen, cx - 7, cy - 9, cy + 9, 7);
-                DrawChevron(dc, pen, cx + 5, cy, left: false);
+                DrawJumpPoint(dc, pen, cx, cy, previous: false);
                 break;
             case TransportIcon.Undo:
                 DrawUndoRedoArrow(dc, pen, cx, cy, redo: false);
@@ -1049,6 +1047,30 @@ internal static class TransportIconDrawing
         };
         pen.Freeze();
         return pen;
+    }
+
+    /// <summary>
+    /// 前後の地点へ。時間軸上の目盛り（マーカー・選択端・ループ端・ファイル端を区別しない点）と、
+    /// 着地の目盛りへ向かう山形。旗は描かない。previous は左右反転。
+    /// </summary>
+    private static void DrawJumpPoint(DrawingContext dc, Pen pen, double cx, double cy, bool previous)
+    {
+        if (previous)
+        {
+            dc.PushTransform(new ScaleTransform(-1, 1, cx, cy));
+        }
+
+        var axisY = cy + 8;
+        dc.DrawLine(pen, new Point(cx - 9, axisY), new Point(cx + 9, axisY));
+        dc.DrawLine(pen, new Point(cx - 9, axisY), new Point(cx - 9, cy + 2));
+        dc.DrawLine(pen, new Point(cx - 5, axisY), new Point(cx - 5, cy - 1));
+        dc.DrawLine(pen, new Point(cx + 9, axisY), new Point(cx + 9, cy - 8));
+        DrawChevron(dc, pen, cx + 2, cy - 1, left: false);
+
+        if (previous)
+        {
+            dc.Pop();
+        }
     }
 
     /// <summary>波形上のマーカー旗と同じ形（棒の上端に、外側の角だけ丸めた塗り旗）。</summary>

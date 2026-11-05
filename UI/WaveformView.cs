@@ -1946,7 +1946,11 @@ internal sealed partial class WaveformView : Grid
         ExtendSelectionTo(ClampFrame(_playheadFrame + (long)Math.Round(ViewSpanFrames * fraction)));
     }
 
-    /// <summary>前後のマーカーへシーク。波形選択とマーカー／端のフォーカスは外す。</summary>
+    /// <summary>
+    /// 前後のマーカー、および波形選択の前後端へシーク。
+    /// 進行方向に選択端が残るあいだ選択は維持し、通り過ぎたら外す。
+    /// マーカー／端のフォーカスは外す。
+    /// </summary>
     public void SeekToMarker(int direction)
     {
         if (_document is null)
@@ -1954,10 +1958,16 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        var target = UsesPlayerScratch
-            ? ClampFrame(ScratchCues.AdjacentMarkerFrame(_playheadFrame, direction))
-            : ClampFrame(_document.AdjacentMarkerFrame(_playheadFrame, direction));
-        ClearSelection();
+        var selection = _document.Selection;
+        var cue = UsesPlayerScratch
+            ? ScratchCues.AdjacentMarkerFrame(_playheadFrame, direction)
+            : _document.AdjacentMarkerFrame(_playheadFrame, direction);
+        var target = ClampFrame(selection.JumpFrame(_playheadFrame, cue, direction));
+        if (!selection.HasBoundInDirection(_playheadFrame, direction))
+        {
+            ClearSelection();
+        }
+
         ClearMarkerSelection();
         _keyboardSelectAnchor = null;
         KeepPlayheadAtScreenOffset(target);

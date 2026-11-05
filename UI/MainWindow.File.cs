@@ -502,6 +502,10 @@ public partial class MainWindow
         {
             RefreshExportEnabled();
         }
+
+        // 復元／オープン中の BindWorkspace は _openBusy のままでメニューを組む。
+        // ここで直さないと、タイムライン等が灰色のまま残り、波形選択まで有効にならない。
+        RefreshTransportCommandsEnabled();
     }
 
     private void SetOpenJobRunning(int index)

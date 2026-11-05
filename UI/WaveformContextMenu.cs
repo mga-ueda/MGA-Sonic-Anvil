@@ -782,12 +782,14 @@ internal static class WaveformContextMenuBuilder
             UiStrings.WaveMenuPrevMarker,
             WaveMenuCommand.PrevMarker,
             "Ctrl+Left",
-            SingleFileOnly(m) && m.CanNavigate && m.HasMarkers),
+            SingleFileOnly(m) && m.CanNavigate),
         Cmd(
             UiStrings.WaveMenuNextMarker,
             WaveMenuCommand.NextMarker,
             "Ctrl+Right",
-            SingleFileOnly(m) && m.CanNavigate && m.HasMarkers),
+            SingleFileOnly(m) && m.CanNavigate),
+        WaveMenuSeparatorEntry.Instance,
+        ..SeekPlaybackItems(m),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             UiStrings.WaveMenuAddMarker,
@@ -868,7 +870,6 @@ internal static class WaveformContextMenuBuilder
             MenuGestures.PitchReset,
             SingleFileOnly(m) && m.HasDocument && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
-        Sub(UiStrings.WaveMenuCatSeek, SeekPlaybackItems(m)),
         Cmd(
             UiStrings.WaveMenuFocusTime,
             WaveMenuCommand.FocusTime,

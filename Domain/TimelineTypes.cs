@@ -117,4 +117,58 @@ internal readonly record struct WaveSelection(long StartFrame, long EndFrame)
             Math.Min(StartFrame, other.StartFrame),
             Math.Max(EndFrame, other.EndFrame));
     }
+
+    /// <summary>進行方向に、まだ通過していない選択端がある。</summary>
+    public bool HasBoundInDirection(long from, int direction)
+    {
+        if (IsEmpty || direction == 0)
+        {
+            return false;
+        }
+
+        return direction > 0
+            ? StartFrame > from || EndFrame > from
+            : StartFrame < from || EndFrame < from;
+    }
+
+    /// <summary>
+    /// Ctrl+左右の着地。選択の開始・終了が進行方向にあり、
+    /// <paramref name="cueFrame"/> より手前ならその端を返す。
+    /// キューが進行方向に無いときは選択端を優先し、端も無ければキューを返す。
+    /// </summary>
+    public long JumpFrame(long from, long cueFrame, int direction)
+    {
+        if (IsEmpty || direction == 0)
+        {
+            return cueFrame;
+        }
+
+        long? bound = null;
+        Consider(StartFrame);
+        Consider(EndFrame);
+        if (bound is long edge
+            && (direction > 0
+                ? cueFrame <= from || edge < cueFrame
+                : cueFrame >= from || edge > cueFrame))
+        {
+            return edge;
+        }
+
+        return cueFrame;
+
+        void Consider(long frame)
+        {
+            if (direction > 0)
+            {
+                if (frame > from && (bound is null || frame < bound))
+                {
+                    bound = frame;
+                }
+            }
+            else if (frame < from && (bound is null || frame > bound))
+            {
+                bound = frame;
+            }
+        }
+    }
 }
