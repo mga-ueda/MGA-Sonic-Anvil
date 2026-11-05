@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -64,6 +65,8 @@ internal sealed class SilenceDetectDialog : Window
     private readonly Slider _riseSlider;
     private readonly TextBlock _riseValueText;
     private readonly RoundedButton _applyButton;
+    private readonly TimeScrollBar _timeScroll = new();
+    private bool _syncingScroll;
     private SilenceDetectOptions _options;
     private bool _updatingText;
 
@@ -132,7 +135,6 @@ internal sealed class SilenceDetectDialog : Window
             Options = _options,
             Height = DesignMetrics.From96(160),
             MinHeight = DesignMetrics.From96(80),
-            Margin = new Thickness(0, 0, 0, 10),
             VerticalAlignment = VerticalAlignment.Stretch,
         };
         _preview.ThresholdChanged += OnPreviewThresholdChanged;
@@ -331,10 +333,20 @@ internal sealed class SilenceDetectDialog : Window
         var bottom = new Grid { Margin = new Thickness(0, 4, 0, 0) };
         bottom.Children.Add(settings);
 
+        var waveHost = new DockPanel
+        {
+            LastChildFill = true,
+            Margin = new Thickness(0, 0, 0, 10),
+        };
+        var zoomStrip = CreatePreviewZoomStrip();
+        DockPanel.SetDock(zoomStrip, Dock.Bottom);
+        waveHost.Children.Add(zoomStrip);
+        waveHost.Children.Add(_preview);
+
         var root = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(bottom, Dock.Bottom);
         root.Children.Add(bottom);
-        root.Children.Add(_preview);
+        root.Children.Add(waveHost);
 
         AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
         PreviewMouseLeftButtonDown += OnBlankClickReleaseFieldFocus;
@@ -916,6 +928,93 @@ internal sealed class SilenceDetectDialog : Window
         return row;
     }
 
+    /// <summary>
+    /// エディタ波形下と同じ並び。左が振幅＋－、中央が時間スクロール、右が時間＋－。
+    /// スクロールは <see cref="TimeScrollBar"/>（TimeScrollBarStyle）をそのまま使う。
+    /// </summary>
+    private Grid CreatePreviewZoomStrip()
+    {
+        var strip = new Grid
+        {
+            Height = DesignMetrics.WaveformScrollBarHeight,
+            MinHeight = DesignMetrics.WaveformScrollBarHeight,
+            MaxHeight = DesignMetrics.WaveformScrollBarHeight,
+            ClipToBounds = true,
+            SnapsToDevicePixels = true,
+            UseLayoutRounding = true,
+            Background = System.Windows.Media.Brushes.Transparent,
+        };
+        strip.ColumnDefinitions.Add(ZoomButtonColumn());
+        strip.ColumnDefinitions.Add(ZoomButtonColumn());
+        strip.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        strip.ColumnDefinitions.Add(ZoomButtonColumn());
+        strip.ColumnDefinitions.Add(ZoomButtonColumn());
+
+        var enabled = !_range.IsEmpty;
+        PlaceZoomButton(strip, WaveformScrollButtonKind.Plus, 0, UiStrings.TooltipAmpZoomIn, enabled, _preview.ZoomAmpIn);
+        PlaceZoomButton(strip, WaveformScrollButtonKind.Minus, 1, UiStrings.TooltipAmpZoomOut, enabled, _preview.ZoomAmpOut);
+        _timeScroll.Margin = new Thickness(2, 0, 2, 0);
+        _timeScroll.ValueChanged += (_, _) =>
+        {
+            if (_syncingScroll || _timeScroll.IsRangeResizing)
+            {
+                return;
+            }
+
+            _preview.SetViewStart(_range.StartFrame + _timeScroll.Value);
+        };
+        _timeScroll.RangeChanged += (_, range) =>
+            _preview.SetVisibleRange(_range.StartFrame + range.ViewStart, range.ViewSpan);
+        _preview.ViewChanged += (_, _) =>
+        {
+            if (!_timeScroll.IsRangeResizing)
+            {
+                SyncPreviewScroll();
+            }
+        };
+        Grid.SetColumn(_timeScroll, 2);
+        strip.Children.Add(_timeScroll);
+        PlaceZoomButton(strip, WaveformScrollButtonKind.Plus, 3, UiStrings.TooltipTimeZoomIn, enabled, _preview.ZoomTimeIn);
+        PlaceZoomButton(strip, WaveformScrollButtonKind.Minus, 4, UiStrings.TooltipTimeZoomOut, enabled, _preview.ZoomTimeOut);
+        SyncPreviewScroll();
+        return strip;
+    }
+
+    private void SyncPreviewScroll()
+    {
+        _syncingScroll = true;
+        try
+        {
+            var origin = _range.StartFrame;
+            _timeScroll.Sync(_preview.ViewStart - origin, _preview.ViewSpan, _range.Length);
+        }
+        finally
+        {
+            _syncingScroll = false;
+        }
+    }
+
+    private static ColumnDefinition ZoomButtonColumn() =>
+        new() { Width = DesignMetrics.WaveformScrollButtonWidthGrid };
+
+    private static void PlaceZoomButton(
+        Grid strip,
+        WaveformScrollButtonKind kind,
+        int column,
+        string name,
+        bool enabled,
+        Action zoom)
+    {
+        var button = new WaveformScrollButton(kind)
+        {
+            IsEnabled = enabled,
+        };
+        button.SetValue(AutomationProperties.NameProperty, name);
+        button.Click += (_, _) => zoom();
+        Grid.SetColumn(button, column);
+        strip.Children.Add(button);
+    }
+
     private RoundedButton CreateButton(string text, bool accept, bool accent = false, bool isDefault = false, bool isCancel = false)
     {
         var button = new RoundedButton
@@ -1125,16 +1224,18 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
                 return;
             }
 
+            RefreshDisplayGain();
             RefreshKeepsFromEnvelope();
             MarkWaveDirty();
             InvalidateVisual();
         }
     }
 
-    /// <summary>しきい値線だけ描き直す。検出範囲は変えない。</summary>
+    /// <summary>しきい値線だけ描き直す。検出範囲は変えない。線が端で欠けない倍率には揃える。</summary>
     public void ShowThreshold(SilenceDetectOptions options)
     {
         _options = options.Normalized();
+        RefreshDisplayGain();
         InvalidateVisual();
     }
 
@@ -1316,6 +1417,24 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
     internal double AmpZoom => _ampZoom;
 
+    internal double ViewStart => _viewStart;
+
+    internal double ViewSpan => _viewSpan;
+
+    public event EventHandler? ViewChanged;
+
+    /// <summary>エディタの振幅＋。Shift+↑ と同じ段。</summary>
+    public void ZoomAmpIn() => SetAmpZoom(_ampZoom * WaveformView.TimeZoomStep);
+
+    /// <summary>エディタの振幅－。Shift+↓ と同じ段。</summary>
+    public void ZoomAmpOut() => SetAmpZoom(_ampZoom / WaveformView.TimeZoomStep);
+
+    /// <summary>エディタの時間＋。表示中央を固定する（再生ヘッドには寄せない）。</summary>
+    public void ZoomTimeIn() => ZoomTimeBy(WaveformView.TimeZoomStep, anchorViewCenter: true);
+
+    /// <summary>エディタの時間－。表示中央を固定する。</summary>
+    public void ZoomTimeOut() => ZoomTimeBy(1d / WaveformView.TimeZoomStep, anchorViewCenter: true);
+
     private void SetAmpZoom(double zoom)
     {
         var next = Math.Clamp(zoom, 1d, WaveformView.AmpZoomMax);
@@ -1334,24 +1453,30 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
     private long SeekFrame => _seekFrame >= 0 ? _seekFrame : ViewEdgeFrame(0);
 
-    private void ZoomTimeBy(double factor) =>
-        ZoomTimeTo(Math.Clamp(CurrentTimeZoom * factor, 1d, WaveformView.TimeZoomMax));
+    private void ZoomTimeBy(double factor, bool anchorViewCenter = false) =>
+        ZoomTimeTo(Math.Clamp(CurrentTimeZoom * factor, 1d, WaveformView.TimeZoomMax), anchorViewCenter);
 
-    private void ZoomTimeTo(double zoom)
+    private void ZoomTimeTo(double zoom, bool anchorViewCenter = false)
     {
+        if (_range.IsEmpty)
+        {
+            return;
+        }
+
         zoom = Math.Clamp(zoom, 1d, WaveformView.TimeZoomMax);
         var span = Math.Max(1d, _range.Length / zoom);
-        var seek = SeekFrame;
-        if (_seekFrame < 0)
+        var anchor = anchorViewCenter ? _viewStart + _viewSpan * 0.5 : SeekFrame;
+        if (!anchorViewCenter && _seekFrame < 0)
         {
-            _seekFrame = seek;
+            _seekFrame = (long)Math.Round(anchor);
         }
 
         _viewSpan = span;
         var maxStart = Math.Max((double)_range.StartFrame, _range.EndFrame - span);
-        _viewStart = Math.Clamp(seek - span * 0.5, _range.StartFrame, maxStart);
+        _viewStart = Math.Clamp(anchor - span * 0.5, _range.StartFrame, maxStart);
         MarkWaveDirty();
         InvalidateVisual();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void BeginSeekNudge(int direction)
@@ -1592,6 +1717,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         _viewStart = clamped;
         MarkWaveDirty();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
     }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
@@ -1669,6 +1795,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         }
 
         _dragging = false;
+        RefreshDisplayGain();
         RefreshKeepsFromEnvelope();
         MarkWaveDirty();
         InvalidateVisual();
@@ -1720,6 +1847,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             minSpan);
         MarkWaveDirty();
         InvalidateVisual();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
         return true;
     }
 
@@ -1769,8 +1897,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         var thresholdBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterClipOnBrush"));
         dc.DrawRectangle(back, null, new Rect(0, 0, width, height));
 
-        var mid = height * 0.5;
-        var amp = height * 0.5;
+        GetWaveAxes(height, out var mid, out var amp);
         var gain = DrawnGain;
 
         EnsureWaveBitmap(width, height);
@@ -1911,10 +2038,49 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
         _seekCore.Freeze();
     }
 
-    /// <summary>表示範囲のピークが上下いっぱいに見える倍率。スレッショルド線も同じ倍率。</summary>
-    internal static float DisplayGain(float[] mins, float[] maxs)
+    /// <summary>端の赤いハンドル一辺。線の中心から半分だけ外へ出る。</summary>
+    internal const double ThresholdHandleDip = 6;
+
+    /// <summary>
+    /// 振幅 1（0 dBFS、または表示ゲイン後のピーク）の赤線とハンドルが
+    /// ClipToBounds で欠けない余白。−1 dB 付近は正規化後にちょうど端へ乗る。
+    /// </summary>
+    internal const double ThresholdEdgePadDip = ThresholdHandleDip * 0.5 + 1;
+
+    /// <summary>レーン高さの半分より内側に収まる余白。</summary>
+    internal static double EffectiveEdgePad(double size, double pad)
     {
-        float peak = 0;
+        var limit = Math.Max(0, size * 0.5 - 1);
+        if (pad <= 0)
+        {
+            return 0;
+        }
+
+        return pad < limit ? pad : limit;
+    }
+
+    /// <summary>振幅 1 が端から <paramref name="pad"/> だけ内側に来る半振幅。</summary>
+    internal static double WaveHalfAmplitude(double size, double pad) =>
+        Math.Max(1, size * 0.5 - EffectiveEdgePad(size, pad));
+
+    /// <summary>表示ゲイン適用後の線形振幅に対する上下のしきい値線。</summary>
+    internal static (double Positive, double Negative) ThresholdLinePair(
+        double height,
+        double pad,
+        float linearTimesGain)
+    {
+        var mid = height * 0.5;
+        var amp = WaveHalfAmplitude(height, pad);
+        return (mid - linearTimesGain * amp, mid + linearTimesGain * amp);
+    }
+
+    /// <summary>
+    /// ピークとスレッショルドの高い方がレーン端（余白の内側）に来る倍率。
+    /// スレッショルド線も同じ倍率。ピークより高い −1 dB 付近でも赤線が外に出ない。
+    /// </summary>
+    internal static float DisplayGain(float[] mins, float[] maxs, float floorLinear = 0)
+    {
+        float peak = floorLinear > 0f ? floorLinear : 0f;
         var count = Math.Min(mins.Length, maxs.Length);
         for (var i = 0; i < count; i++)
         {
@@ -1924,6 +2090,16 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         return peak > 1e-6f ? 1f / peak : 1f;
     }
+
+    private void GetWaveAxes(double height, out double mid, out double amp)
+    {
+        mid = height * 0.5;
+        amp = WaveHalfAmplitude(height, ThresholdEdgePadDip);
+    }
+
+    /// <summary>描いている赤線のうち、レーンからはみ出しうる側。クローズはオープン以下。</summary>
+    private float ThresholdFitLinear() =>
+        SilentSkip.LinearFromDb(_options.OpenThresholdDb);
 
     private static void DrawThresholdPair(
         DrawingContext dc,
@@ -1950,7 +2126,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             return;
         }
 
-        var handle = 6.0;
+        var handle = ThresholdHandleDip;
         dc.DrawRectangle(brush, null, new Rect(0, yPos - handle * 0.5, handle, handle));
         dc.DrawRectangle(brush, null, new Rect(width - handle, yPos - handle * 0.5, handle, handle));
         dc.DrawRectangle(brush, null, new Rect(0, yNeg - handle * 0.5, handle, handle));
@@ -1981,8 +2157,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             yield break;
         }
 
-        var mid = height * 0.5;
-        var amp = height * 0.5;
+        GetWaveAxes(height, out var mid, out var amp);
         var gain = DrawnGain;
         foreach (var y in PairYs(mid, amp, SilentSkip.LinearFromDb(_options.OpenThresholdDb) * gain))
         {
@@ -2015,8 +2190,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             return true;
         }
 
-        var mid = ActualHeight * 0.5;
-        var amp = ActualHeight * 0.5;
+        GetWaveAxes(ActualHeight, out var mid, out var amp);
         var gain = DrawnGain;
         var openY = mid - SilentSkip.LinearFromDb(_options.OpenThresholdDb) * gain * amp;
         var closeY = mid - SilentSkip.LinearFromDb(_options.CloseThresholdDb) * gain * amp;
@@ -2033,9 +2207,10 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             return;
         }
 
-        var mid = height * 0.5;
-        var amp = height * 0.5;
-        var gain = DrawnGain;
+        GetWaveAxes(height, out var mid, out var amp);
+        var pad = EffectiveEdgePad(height, ThresholdEdgePadDip);
+        y = Math.Clamp(y, pad, Math.Max(pad, height - pad));
+        var gain = Math.Max(DrawnGain, 1e-6f);
         var linear = Math.Clamp(Math.Abs(y - mid) / amp / gain, 1e-6, 1.0);
         var db = 20.0 * Math.Log10(linear);
         ThresholdChanged?.Invoke(SilentSkip.ClampThresholdDb(db), _dragOpen);
@@ -2045,6 +2220,54 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
     {
         _viewStart = _range.StartFrame;
         _viewSpan = Math.Max(1, _range.Length);
+        ViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>スクロールバーの値。対象範囲の先頭からの位置を、表示幅を保って動かす。</summary>
+    public void SetViewStart(double start)
+    {
+        if (_range.IsEmpty)
+        {
+            return;
+        }
+
+        var span = Math.Max(1d, _viewSpan);
+        var maxStart = Math.Max((double)_range.StartFrame, _range.EndFrame - span);
+        var next = Math.Clamp(start, _range.StartFrame, maxStart);
+        if (Math.Abs(next - _viewStart) < 0.0001)
+        {
+            return;
+        }
+
+        _viewStart = next;
+        MarkWaveDirty();
+        InvalidateVisual();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>スクロールバー両端の拡縮。エディタの TimeScrollBar と同じく表示範囲を置き換える。</summary>
+    public void SetVisibleRange(double viewStart, double viewSpan)
+    {
+        if (_range.IsEmpty)
+        {
+            return;
+        }
+
+        var length = Math.Max(1d, _range.Length);
+        var minSpan = Math.Max(1d, length / WaveformView.TimeZoomMax);
+        var span = Math.Clamp(viewSpan, minSpan, length);
+        var maxStart = Math.Max((double)_range.StartFrame, _range.EndFrame - span);
+        var start = Math.Clamp(viewStart, _range.StartFrame, maxStart);
+        if (Math.Abs(start - _viewStart) < 0.0001 && Math.Abs(span - _viewSpan) < 0.0001)
+        {
+            return;
+        }
+
+        _viewStart = start;
+        _viewSpan = span;
+        MarkWaveDirty();
+        InvalidateVisual();
+        ViewChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void MarkWaveDirty() => _waveDirty = true;
@@ -2054,21 +2277,26 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
     private void RefreshDisplayGain()
     {
-        if (_document is null || _range.IsEmpty)
+        var next = 1f;
+        if (_document is not null && !_range.IsEmpty)
         {
-            _displayGain = 1;
+            var count = FillVisibleColumns(512, _range.StartFrame, _range.EndFrame);
+            float peak = ThresholdFitLinear();
+            for (var i = 0; i < count; i++)
+            {
+                peak = Math.Max(peak, Math.Abs(_columnMins[i]));
+                peak = Math.Max(peak, Math.Abs(_columnMaxs[i]));
+            }
+
+            next = peak > 1e-6f ? 1f / peak : 1f;
+        }
+
+        if (Math.Abs(next - _displayGain) < 1e-6f)
+        {
             return;
         }
 
-        var count = FillVisibleColumns(512, _range.StartFrame, _range.EndFrame);
-        float peak = 0;
-        for (var i = 0; i < count; i++)
-        {
-            peak = Math.Max(peak, Math.Abs(_columnMins[i]));
-            peak = Math.Max(peak, Math.Abs(_columnMaxs[i]));
-        }
-
-        _displayGain = peak > 1e-6f ? 1f / peak : 1f;
+        _displayGain = next;
         MarkWaveDirty();
     }
 
@@ -2116,7 +2344,8 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             }
 
             var mid = pxH * 0.5;
-            var amp = pxH * 0.5 * DrawnGain;
+            var pad = ThresholdEdgePadDip * dpi.DpiScaleY;
+            var amp = WaveHalfAmplitude(pxH, pad) * DrawnGain;
             if (traceSamples)
             {
                 PaintSampleTrace(buffer, stride, pxW, pxH, start, end, mid, amp, wave, dpi.DpiScaleX, width);
