@@ -4248,7 +4248,8 @@ internal sealed partial class WaveformView : Grid
                     drawChannels,
                     laneOrigin,
                     laneHeight,
-                    laneGap);
+                    laneGap,
+                    drawCenterLine: false);
                 return;
             }
 
@@ -4301,8 +4302,9 @@ internal sealed partial class WaveformView : Grid
                 }
             }
 
-            // 中心線は波形のあと全幅へ描く。先に描くと包絡が中心画素を潰し、
+            // レーン境界は波形のあと全幅へ描く。先に描くと包絡が境界画素を潰し、
             // スクロール差分の再描画でだけ線が上に戻って見える。
+            // 包絡の中心へ半透明の 0 線を置くと、背景が透けて黒い線になる。ここには描かない。
             DrawWaveLaneGuides(
                 buffer,
                 stride,
@@ -4312,7 +4314,8 @@ internal sealed partial class WaveformView : Grid
                 drawChannels,
                 laneOrigin,
                 laneHeight,
-                laneGap);
+                laneGap,
+                drawCenterLine: false);
             return;
         }
 
@@ -4341,6 +4344,7 @@ internal sealed partial class WaveformView : Grid
                 scaleX);
         }
 
+        // サンプルまで拡大したときの白い 0 線。折れ線のあと全幅へ描く。
         DrawWaveLaneGuides(
             buffer,
             stride,
@@ -4350,7 +4354,8 @@ internal sealed partial class WaveformView : Grid
             drawChannels,
             laneOrigin,
             laneHeight,
-            laneGap);
+            laneGap,
+            drawCenterLine: true);
     }
 
     private unsafe void RasterLoudnessDbWaveform(
@@ -4636,7 +4641,7 @@ internal sealed partial class WaveformView : Grid
     }
 
     /// <summary>
-    /// レーン境界と 0 線。部分更新でも全幅に引き、包絡のあとで上書きされないようにする。
+    /// レーン境界と、サンプル拡大時だけの 0 線。部分更新でも全幅に引く。
     /// </summary>
     private unsafe void DrawWaveLaneGuides(
         int* buffer,
@@ -4647,7 +4652,8 @@ internal sealed partial class WaveformView : Grid
         int drawChannels,
         double laneOrigin,
         double laneHeight,
-        double laneGap)
+        double laneGap,
+        bool drawCenterLine)
     {
         if (monoWave)
         {
@@ -4670,7 +4676,7 @@ internal sealed partial class WaveformView : Grid
                 height,
                 guideTop,
                 guideMid,
-                drawLaneTop: true,
+                drawCenterLine,
                 0,
                 width);
         }
@@ -4683,19 +4689,17 @@ internal sealed partial class WaveformView : Grid
         int height,
         double top,
         double mid,
-        bool drawLaneTop,
+        bool drawCenterLine,
         int x0,
         int x1)
     {
-        var yMid = (int)Math.Round(mid);
-        if ((uint)yMid < (uint)height)
+        if (drawCenterLine)
         {
-            FillHLine(buffer, stride, width, x0, x1, yMid, _zeroBgra);
-        }
-
-        if (!drawLaneTop)
-        {
-            return;
+            var yMid = (int)Math.Round(mid);
+            if ((uint)yMid < (uint)height)
+            {
+                FillHLine(buffer, stride, width, x0, x1, yMid, _zeroBgra);
+            }
         }
 
         var yTop = (int)Math.Round(top);
