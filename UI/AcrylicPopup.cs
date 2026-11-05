@@ -23,9 +23,14 @@ internal static class AcrylicPopup
         "HookupParentPopup",
         BindingFlags.Instance | BindingFlags.NonPublic);
 
+    /// <summary>メニューバーから開くメニューのリスト面。</summary>
+    private const string MenuListBackBrushKey = "MenuListBackBrush";
+
+    /// <summary>コンテキストメニューとコンボのリスト面。</summary>
+    private const string PopupBackBrushKey = "MenuPopupBackBrush";
+
     /// <summary>
-    /// Acrylic HWND では Background=Transparent の空白がヒットしない。
-    /// ほぼ透明だがヒットする塗り（見た目はティントのまま）。
+    /// リソースが無いときのヒット用。Acrylic HWND では Background=Transparent の空白がヒットしない。
     /// </summary>
     private static readonly Brush HitFill = CreateHitFill();
 
@@ -121,7 +126,11 @@ internal static class AcrylicPopup
             return;
         }
 
-        FrostPopupSurface(popup, AcrylicBackdrop.TintBrushKey, roundCorners: true);
+        FrostPopupSurface(
+            popup,
+            AcrylicBackdrop.TintBrushKey,
+            roundCorners: true,
+            IsUnderContextMenu(item) ? PopupBackBrushKey : MenuListBackBrushKey);
     }
 
     private static void OnMenuItemMouseEnter(object sender, MouseEventArgs e)
@@ -238,34 +247,97 @@ internal static class AcrylicPopup
         }
     }
 
-    private static void FrostPopupSurface(Popup popup, string tintBrushKey, bool roundCorners)
+    private static void FrostPopupSurface(Popup popup, string tintBrushKey, bool roundCorners) =>
+        FrostPopupSurface(popup, tintBrushKey, roundCorners, PopupBackBrushKey);
+
+    private static void FrostPopupSurface(
+        Popup popup,
+        string tintBrushKey,
+        bool roundCorners,
+        string backBrushKey)
     {
         TryDisableTransparency(popup);
-        ClearOpaqueFill(popup.Child);
+        ClearOpaqueFill(popup.Child, backBrushKey);
         ScheduleFrost(popup.Child as Visual ?? popup, tintBrushKey, roundCorners);
     }
 
-    private static void ClearOpaqueFill(UIElement? child)
+    private static void ClearOpaqueFill(UIElement? child) =>
+        ClearOpaqueFill(child, PopupBackBrushKey);
+
+    private static void ClearOpaqueFill(UIElement? child, string backBrushKey)
     {
         switch (child)
         {
             case Border border:
-                border.Background = HitFill;
+                ApplyPopupBack(border, Border.BackgroundProperty, backBrushKey);
+                ApplyScrollViewerBack(border, backBrushKey);
                 break;
             case ContextMenu menu:
-                menu.Background = HitFill;
+                ApplyPopupBack(menu, Control.BackgroundProperty, backBrushKey);
                 break;
             case Panel panel:
                 foreach (UIElement element in panel.Children)
                 {
                     if (element is Border fill && fill.BorderThickness.Left < 0.5)
                     {
-                        fill.Background = HitFill;
+                        ApplyPopupBack(fill, Border.BackgroundProperty, backBrushKey);
                     }
                 }
 
+                ApplyScrollViewerBack(panel, backBrushKey);
                 break;
         }
+    }
+
+    private static void ApplyScrollViewerBack(DependencyObject root, string backBrushKey)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is ScrollViewer viewer)
+            {
+                ApplyPopupBack(viewer, Control.BackgroundProperty, backBrushKey);
+            }
+
+            ApplyScrollViewerBack(child, backBrushKey);
+        }
+    }
+
+    /// <summary>コンテキストメニュー配下のサブメニューはプルダウン側の色を保つ。</summary>
+    private static bool IsUnderContextMenu(DependencyObject item)
+    {
+        DependencyObject? current = item;
+        while (current is not null)
+        {
+            if (current is ContextMenu)
+            {
+                return true;
+            }
+
+            if (current is Menu)
+            {
+                return false;
+            }
+
+            current = VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current);
+        }
+
+        return false;
+    }
+
+    private static void ApplyPopupBack(
+        FrameworkElement target,
+        DependencyProperty property,
+        string backBrushKey)
+    {
+        if (Application.Current?.TryFindResource(backBrushKey) is Brush)
+        {
+            target.SetResourceReference(property, backBrushKey);
+            return;
+        }
+
+        target.SetValue(property, HitFill);
     }
 
     private static void TryDisableTransparency(Popup popup)

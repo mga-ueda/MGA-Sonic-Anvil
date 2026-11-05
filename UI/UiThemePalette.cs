@@ -27,6 +27,8 @@ internal static class UiThemePalette
         "MenuHighlightBackBrush",
         "MenuDisabledForeBrush",
         "MainMenuBarBackBrush",
+        "MenuListBackBrush",
+        "MenuPopupBackBrush",
         "WaveformBackBrush",
         "WaveformRecordBackBrush",
         "WaveFillBrush",
