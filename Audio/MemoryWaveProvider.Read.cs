@@ -11,8 +11,11 @@ internal sealed partial class PlaybackSampleProvider
     public int Read(float[] buffer, int offset, int count)
     {
         int written;
+        VstTransport transport;
         lock (_gate)
         {
+            var projectTime = ProjectTimeSamplesNoLock();
+            var latency = _vstInserts?.RefreshActiveLatency() ?? 0;
             written = ReadCore(buffer, offset, count);
             ApplyFlushFade(buffer, offset, written);
             if (_flushFadeTotal > 0)
@@ -23,10 +26,15 @@ internal sealed partial class PlaybackSampleProvider
             {
                 ApplySeekCrossfade(buffer, offset, ref written);
             }
+
+            var playing = !_paused && !_silenceOnly;
+            transport = VstTransport.Live(
+                playing,
+                VstTransport.AudibleProjectSamples(projectTime, latency, playing));
         }
 
         // VST は provider ロックの外（エンジン側ロックのみ）。UI Apply と順序が交差しても死なない。
-        ApplyVstInserts(buffer, offset, written);
+        ApplyVstInserts(buffer, offset, written, transport);
 
         lock (_gate)
         {
@@ -108,7 +116,7 @@ internal sealed partial class PlaybackSampleProvider
     private double PlaybackStep(bool resampled) =>
         (resampled ? _sourceRate / (double)_deviceRate : 1d) * _playbackSpeed;
 
-    private void ApplyVstInserts(float[] buffer, int offset, int written)
+    private void ApplyVstInserts(float[] buffer, int offset, int written, VstTransport transport)
     {
         if (written <= 0)
         {
@@ -123,7 +131,40 @@ internal sealed partial class PlaybackSampleProvider
             channels = Math.Max(1, _outputChannels);
         }
 
-        engine?.Process(buffer, offset, written, channels);
+        engine?.Process(buffer, offset, written, channels, transport);
+    }
+
+    /// <summary>
+    /// WaveOut / WASAPI は停止でコールバックが止まる。最後の process が再生中のままだと
+    /// Melodyne がシークバーを自走させるので、止めたあと停止位置を一度送る。
+    /// </summary>
+    internal void NotifyVstTransportStopped()
+    {
+        VstInsertEngine? engine;
+        int channels;
+        long projectTime;
+        lock (_gate)
+        {
+            engine = _vstInserts;
+            channels = Math.Max(1, _outputChannels);
+            projectTime = ProjectTimeSamplesNoLock();
+        }
+
+        if (engine is null)
+        {
+            return;
+        }
+
+        var silence = new float[64 * channels];
+        engine.Process(silence, 0, silence.Length, channels, VstTransport.Live(false, projectTime));
+    }
+
+    private long ProjectTimeSamplesNoLock()
+    {
+        var sourceRate = Math.Max(1, _sourceRate);
+        var deviceRate = Math.Max(1, _deviceRate);
+        var frame = _sourceFrame < 0 ? 0 : _sourceFrame;
+        return (long)Math.Round(frame * deviceRate / (double)sourceRate);
     }
 
     private void ApplyPlaybackPitch(float[] buffer, int offset, int written)

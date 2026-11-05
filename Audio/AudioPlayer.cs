@@ -99,7 +99,7 @@ internal sealed class AudioPlayer : IDisposable
         {
             _provider.ReadPlaybackVisuals(
                 out var raw, out _, out _, out var speed, out var sourceRate, out var playEnd);
-            return SmoothFrom(raw, speed, sourceRate, playEnd);
+            return OffsetPlayheadForPluginLatency(SmoothFrom(raw, speed, sourceRate, playEnd), sourceRate);
         }
     }
 
@@ -110,7 +110,17 @@ internal sealed class AudioPlayer : IDisposable
         playhead = fading
             ? WaveSelection.ClampVisualPlayhead(raw, playEnd)
             : SmoothFrom(raw, speed, sourceRate, playEnd);
+        playhead = OffsetPlayheadForPluginLatency(playhead, sourceRate);
     }
+
+    /// <summary>挿入プラグインの遅延分、描画カーソルを聞こえている位置へ戻す。</summary>
+    private long OffsetPlayheadForPluginLatency(long frame, int sourceRate) =>
+        VstTransport.AudibleSourceFrame(
+            frame,
+            _vstInserts.ActiveLatencyFrames,
+            sourceRate,
+            _provider.DeviceSampleRate,
+            _playing && !_scrubbing);
 
     private long SmoothFrom(long raw, double speed, int sourceRate, long playEndFrame)
     {
@@ -938,6 +948,7 @@ internal sealed class AudioPlayer : IDisposable
         }
 
         _discardQueuedOutput = true;
+        _provider.NotifyVstTransportStopped();
     }
 
     public void EnsureOutputDevice()

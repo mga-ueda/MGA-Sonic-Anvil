@@ -390,6 +390,7 @@ internal static class Vst3HostNative
     // ProcessContext::StatesAndFlags
     public const int ProcessContextPlaying = 1 << 1;
     public const int ProcessContextSystemTimeValid = 1 << 8;
+    public const int ProcessContextProjectTimeMusicValid = 1 << 9;
     public const int ProcessContextContTimeValid = 1 << 17;
     public const int ProcessContextTempoValid = 1 << 10;
     public const int ProcessContextTimeSigValid = 1 << 13;

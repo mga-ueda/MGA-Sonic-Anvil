@@ -44,6 +44,8 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
     private int _numInputBuses = 1;
     private int _numOutputBuses = 1;
     private IntPtr _processContext = IntPtr.Zero;
+    private VstTransport _transport = VstTransport.FreeRunning;
+    private int _transportFrameCursor;
     private long _projectTimeSamples;
     private long _continuousTimeSamples;
 
@@ -345,6 +347,47 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         }
     }
 
+    public void ApplyTransport(VstTransport transport) => _transport = transport;
+
+    public int LatencySamples
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_disposed || _faulted || _processor == IntPtr.Zero)
+                {
+                    return 0;
+                }
+
+                try
+                {
+                    unsafe
+                    {
+                        var vt = *(IntPtr**)_processor;
+                        var getLatency = Marshal.GetDelegateForFunctionPointer<GetLatencySamplesFn>(vt[6]);
+                        var samples = getLatency(_processor);
+                        return samples > int.MaxValue ? int.MaxValue : (int)samples;
+                    }
+                }
+                catch
+                {
+                    return 0;
+                }
+            }
+        }
+    }
+
+    public void ResetTransportClock()
+    {
+        lock (_gate)
+        {
+            _projectTimeSamples = 0;
+            _continuousTimeSamples = 0;
+            _transportFrameCursor = 0;
+        }
+    }
+
     public bool Process(float[] buffer, int offset, int sampleCount, int channels)
     {
         lock (_gate)
@@ -354,6 +397,7 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
                 return !_faulted;
             }
 
+            _transportFrameCursor = 0;
             var frames = sampleCount / Math.Max(1, channels);
             if (frames <= 0)
             {
@@ -414,6 +458,7 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
                 _projectTimeSamples = 0;
                 _continuousTimeSamples = 0;
+                _transportFrameCursor = 0;
             }
             catch
             {
@@ -1083,7 +1128,7 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         // UI（performEdit）→ このブロックの IParameterChanges へ
         _inputParamChanges.BeginProcessBlock();
         _outputParamChanges.BeginOutputBlock();
-        WriteProcessContextNoLock();
+        var transportStep = WriteProcessContextNoLock(frames);
 
         var data = new Vst3HostNative.ProcessData
         {
@@ -1108,8 +1153,9 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         }
 
         ForwardOutputParamsToControllerNoLock();
-        _projectTimeSamples += frames;
-        _continuousTimeSamples += frames;
+        _projectTimeSamples = transportStep.NextFreeProjectTime;
+        _continuousTimeSamples = transportStep.NextContinuousTime;
+        _transportFrameCursor = transportStep.NextFrameCursor;
 
         // プラグイン planar → ホスト interleaved（Mono 出力は L/R に複製）
         if (pout == 1 && hostCh >= 2)
@@ -1148,27 +1194,24 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
         return true;
     }
 
-    private void WriteProcessContextNoLock()
+    private VstTransportClock.Step WriteProcessContextNoLock(int frames)
     {
-        // FabFilter 等のスペアナは ProcessContext（再生時刻）無しだと描画を止めることがある。
-        // 音声バッファ自体は通っていても（EQ は効く）スペアナだけ欠ける。
-        var ctx = new Vst3HostNative.ProcessContext
-        {
-            State = unchecked((uint)(
-                Vst3HostNative.ProcessContextPlaying
-                | Vst3HostNative.ProcessContextSystemTimeValid
-                | Vst3HostNative.ProcessContextContTimeValid
-                | Vst3HostNative.ProcessContextTempoValid
-                | Vst3HostNative.ProcessContextTimeSigValid)),
-            SampleRate = _sampleRate > 0 ? _sampleRate : 48000,
-            ProjectTimeSamples = _projectTimeSamples,
-            SystemTime = (long)(Stopwatch.GetTimestamp() * (1_000_000_000.0 / Stopwatch.Frequency)),
-            ContinousTimeSamples = _continuousTimeSamples,
-            Tempo = 120,
-            TimeSigNumerator = 4,
-            TimeSigDenominator = 4,
-        };
+        // FabFilter 等のスペアナは ProcessContext（再生時刻）無しだと描画を止める。
+        // 再生中は kPlaying と進む時刻を今まで通り渡す。
+        // 停止中の無音 process（ASIO はデバイスを止めない）で時刻を進めると、
+        // Melodyne のシークバーがホスト停止後も走り続ける。
+        var step = VstTransportClock.Advance(
+            _transport,
+            _projectTimeSamples,
+            _continuousTimeSamples,
+            _transportFrameCursor,
+            frames);
+        var ctx = VstTransportClock.Context(
+            step,
+            _sampleRate,
+            (long)(Stopwatch.GetTimestamp() * (1_000_000_000.0 / Stopwatch.Frequency)));
         Marshal.StructureToPtr(ctx, _processContext, false);
+        return step;
     }
 
     private void ForwardOutputParamsToControllerNoLock()
@@ -1806,6 +1849,8 @@ internal sealed class Vst3ProcessorInstance : IVstSlotProcessor
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int CanProcessSampleSizeFn(IntPtr self, int symbolicSampleSize);
+
+    private delegate uint GetLatencySamplesFn(IntPtr self);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private unsafe delegate int SetupProcessingFn(IntPtr self, Vst3HostNative.ProcessSetup* setup);
