@@ -55,6 +55,8 @@ internal static class ColorDevCatalog
             ("MenuHighlightBackBrush", ColorDevGroup.Shared),
             ("MenuDisabledForeBrush", ColorDevGroup.Shared),
             ("MainMenuBarBackBrush", ColorDevGroup.Shared),
+            ("MenuListBackBrush", ColorDevGroup.Shared),
+            ("MenuPopupBackBrush", ColorDevGroup.Shared),
 
             ("PlayerFallbackWashNavyBrush", ColorDevGroup.AmbientWash),
             ("PlayerFallbackWashBlueBrush", ColorDevGroup.AmbientWash),

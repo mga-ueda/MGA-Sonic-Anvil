@@ -18,7 +18,11 @@
     <SolidColorBrush x:Key="ControlHoverBorderBrush" Color="#FF505050" />
     <SolidColorBrush x:Key="DialogInputBackBrush" Color="#FF1C1C1E" />
     <SolidColorBrush x:Key="MenuSeparatorBrush" Color="#FF3A3A3E" />
-    <SolidColorBrush x:Key="MenuHighlightBackBrush" Color="#FF37373A" />
+    <SolidColorBrush x:Key="MenuHighlightBackBrush" Color="#3300A9FF" />
+    <!-- メニューバーから開くメニューのリスト面。 -->
+    <SolidColorBrush x:Key="MenuListBackBrush" Color="#01000000" />
+    <!-- コンテキストメニューとコンボのリスト面。完全透明だと行の空白がヒットしない。 -->
+    <SolidColorBrush x:Key="MenuPopupBackBrush" Color="#FF343434" />
     <SolidColorBrush x:Key="MenuDisabledForeBrush" Color="#FF8C8C90" />
     <!-- ウィンドウ上部メニューバー背景。薄い黒（約 23%）。 -->
     <SolidColorBrush x:Key="MainMenuBarBackBrush" Color="#3A000000" />

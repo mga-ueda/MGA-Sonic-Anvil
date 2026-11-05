@@ -174,6 +174,7 @@
 
     <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
+        <!-- リスト面はポップアップ側。行はヒット用のほぼ透明にして、色設定を二重に塗らない。 -->
         <Setter Property="Background" Value="#01000000" />
         <Setter Property="Padding" Value="8,4" />
         <Setter Property="Margin" Value="0" />
@@ -291,13 +292,13 @@
                                AllowsTransparency="False"
                                Focusable="False"
                                PopupAnimation="Slide">
-                            <Border Background="#01000000"
+                            <Border Background="{DynamicResource MenuPopupBackBrush}"
                                     BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <ScrollViewer Margin="0" Background="#01000000" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="0" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -599,14 +600,14 @@
                                PopupAnimation="Slide">
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <Border Background="#01000000"
+                                <Border Background="{DynamicResource MenuPopupBackBrush}"
                                         CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
-                                <ScrollViewer Margin="1" Background="#01000000" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="1" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -753,14 +754,14 @@
                                PopupAnimation="Slide">
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <Border Background="#01000000"
+                                <Border Background="{DynamicResource MenuPopupBackBrush}"
                                         CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
                                         IsHitTestVisible="False" />
-                                <ScrollViewer Margin="1" Background="#01000000" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="1" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -1132,7 +1133,7 @@
     <Style x:Key="DarkContextMenuStyle" TargetType="ContextMenu">
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <!-- Acrylic 用。完全 Transparent だと行の空白がヒットせず文字上だけ反応する。 -->
-        <Setter Property="Background" Value="#01000000" />
+        <Setter Property="Background" Value="{DynamicResource MenuPopupBackBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource PlayerComboDropBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -1196,7 +1197,7 @@
     <Style x:Key="DarkMenuItemStyle" TargetType="MenuItem">
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <Setter Property="Foreground" Value="{DynamicResource PrimaryForeBrush}" />
-        <!-- #01… で行全体をヒット対象に（Acrylic HWND では Transparent が文字だけ反応する）。 -->
+        <!-- メニューバーは MainMenuBarBackBrush。行はヒット用のほぼ透明（Transparent だと文字だけ反応する）。 -->
         <Setter Property="Background" Value="#01000000" />
         <Setter Property="Padding" Value="12,4" />
         <Setter Property="MinHeight" Value="28" />
@@ -1283,7 +1284,7 @@
                                HorizontalOffset="-1"
                                VerticalOffset="-2"
                                IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
-                            <Border Background="#01000000"
+                            <Border Background="{DynamicResource MenuListBackBrush}"
                                     BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
@@ -1291,7 +1292,7 @@
                                     MinWidth="200"
                                     SnapsToDevicePixels="True"
                                     Grid.IsSharedSizeScope="True">
-                                <ScrollViewer Background="#01000000" CanContentScroll="True">
+                                <ScrollViewer Background="{DynamicResource MenuListBackBrush}" CanContentScroll="True">
                                     <!-- Aero2 既定と同じ Contained。Cycle だと葉の ←→ が親 Menu へバブルする前に食いやすい。 -->
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"
                                                     Margin="0"

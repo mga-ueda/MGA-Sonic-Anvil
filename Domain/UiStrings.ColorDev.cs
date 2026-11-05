@@ -83,6 +83,8 @@ internal static partial class UiStrings
             "MenuHighlightBack" => Get("メニューハイライト", "Menu highlight"),
             "MenuDisabledFore" => Get("メニュー無効文字", "Menu disabled text"),
             "MainMenuBarBack" => Get("メニューバー背景", "Menu bar background"),
+            "MenuListBack" => Get("メニューのリスト背景", "Menu list background"),
+            "MenuPopupBack" => Get("プルダウンのリスト背景", "Pulldown list background"),
             "ProjectBarBack" => Get("控えめクロームのボタン枠", "Quiet-chrome button well"),
             "OverviewOutsideFill" => Get("表示範囲外", "Outside the view"),
             "WaveformBack" => Get("エリア背景", "Area background"),
