@@ -12,6 +12,7 @@ public sealed class AcrylicBackdropTests
         Assert.Equal(unchecked((int)0x40000000), AcrylicBackdrop.ToAccentGradient(Color.FromArgb(0x40, 0, 0, 0)));
         Assert.Equal(unchecked((int)0x01FFFFFF), AcrylicBackdrop.ToAccentGradient(Color.FromArgb(0, 255, 255, 255)));
         Assert.Equal(unchecked((int)0x80AABBCC), AcrylicBackdrop.ToAccentGradient(Color.FromArgb(0x80, 0xCC, 0xBB, 0xAA)));
+        Assert.Equal(unchecked((int)0xFE0000FF), AcrylicBackdrop.ToAccentGradient(Color.FromArgb(255, 255, 0, 0)));
     }
 
     [Fact]
