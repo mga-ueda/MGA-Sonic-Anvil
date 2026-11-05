@@ -380,6 +380,7 @@ internal sealed partial class WaveformView : Grid
     private Brush? _mouseGuideOnSelectionBrush;
     private bool _dragging;
     private bool _scrubbing;
+    private double _centerScrubX;
     private bool _selecting;
     private Point _dragStart;
     private long _anchorFrame;
@@ -550,7 +551,6 @@ internal sealed partial class WaveformView : Grid
                 _playheadFrame = 0;
             }
 
-            CenterLocked = false;
             _liveRecording = false;
             SetTrailRecording(false);
             EndMarkerCommentEdit(commit: false);
@@ -608,6 +608,7 @@ internal sealed partial class WaveformView : Grid
             }
 
             InvalidatePlayheadOnlyIfDue();
+            HoldCenterOn(value, smooth: true);
         }
     }
 
@@ -631,6 +632,7 @@ internal sealed partial class WaveformView : Grid
         }
 
         InvalidatePlayheadOnlyIfDue();
+        HoldCenterOn(frame, smooth: true);
     }
 
     /// <summary>
@@ -1264,12 +1266,107 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
+        if (CenterLocked)
+        {
+            CenterViewOnPlayhead();
+            return;
+        }
+
         SetViewStart(_viewStart);
     }
 
     /// <summary>編集後などに ViewStart が新 FrameCount を超えないよう揃える式。</summary>
     internal static double ClampViewStart(double viewStart, long frameCount, double viewSpanFrames) =>
         Math.Clamp(viewStart, 0d, Math.Max(0d, frameCount - viewSpanFrames));
+
+    /// <summary>
+    /// センターロック中。再生ヘッドを画面中央に置けるよう、先頭・末尾の外側へ半画面まで出す。
+    /// </summary>
+    internal static double ClampCenteredViewStart(double viewStart, long frameCount, double viewSpanFrames)
+    {
+        var half = Math.Max(0d, viewSpanFrames) * 0.5;
+        var min = -half;
+        var max = Math.Max(min, frameCount - half);
+        return Math.Clamp(viewStart, min, max);
+    }
+
+    /// <summary>
+    /// ビットマップ列をフレームへ対応づける。窓がファイル外にはみ出すときは、
+    /// サンプルのある列だけを返し、先頭より前・末尾より後は空のままにする。
+    /// </summary>
+    internal static bool TryMapWaveColumns(
+        double viewStart,
+        double viewSpan,
+        int bitmapWidth,
+        long frameCount,
+        int pixelStart,
+        int pixelEnd,
+        out long frameStart,
+        out long frameEnd,
+        out int columnPixel,
+        out int columnCount)
+    {
+        frameStart = 0;
+        frameEnd = 0;
+        columnPixel = 0;
+        columnCount = 0;
+        if (viewSpan <= 0 || bitmapWidth <= 0 || frameCount < 0 || pixelEnd <= pixelStart)
+        {
+            return false;
+        }
+
+        var overhang = viewStart < -1e-6 || viewStart + viewSpan > frameCount + 1e-6;
+        if (!overhang)
+        {
+            var startFrame = Math.Clamp((long)Math.Floor(viewStart), 0, frameCount);
+            var endFrame = Math.Clamp((long)Math.Ceiling(viewStart + viewSpan), startFrame, frameCount);
+            var rangeFrames = endFrame - startFrame;
+            if (rangeFrames <= 0)
+            {
+                return false;
+            }
+
+            frameStart = startFrame + (long)pixelStart * rangeFrames / bitmapWidth;
+            frameEnd = startFrame + (long)pixelEnd * rangeFrames / bitmapWidth;
+            if (frameEnd <= frameStart)
+            {
+                frameEnd = frameStart + 1;
+            }
+
+            columnPixel = pixelStart;
+            columnCount = pixelEnd - pixelStart;
+            return columnCount > 0;
+        }
+
+        var audioPx0 = (int)Math.Floor(Math.Max(0d, (0d - viewStart) / viewSpan * bitmapWidth));
+        var audioPx1 = (int)Math.Ceiling(Math.Min(bitmapWidth, (frameCount - viewStart) / viewSpan * bitmapWidth));
+        audioPx0 = Math.Clamp(audioPx0, 0, bitmapWidth);
+        audioPx1 = Math.Clamp(audioPx1, 0, bitmapWidth);
+        var draw0 = Math.Max(pixelStart, audioPx0);
+        var draw1 = Math.Min(pixelEnd, audioPx1);
+        if (draw1 <= draw0)
+        {
+            return false;
+        }
+
+        frameStart = (long)Math.Floor(viewStart + (double)draw0 / bitmapWidth * viewSpan);
+        frameEnd = (long)Math.Ceiling(viewStart + (double)draw1 / bitmapWidth * viewSpan);
+        frameStart = Math.Clamp(frameStart, 0, frameCount);
+        frameEnd = Math.Clamp(frameEnd, frameStart, frameCount);
+        if (frameEnd <= frameStart)
+        {
+            frameEnd = Math.Min(frameCount, frameStart + 1);
+        }
+
+        if (frameEnd <= frameStart)
+        {
+            return false;
+        }
+
+        columnPixel = draw0;
+        columnCount = draw1 - draw0;
+        return true;
+    }
 
     /// <summary>
     /// ピークの途中描画。静的層は Render 優先で入力より先に走るので、
@@ -1860,6 +1957,14 @@ internal sealed partial class WaveformView : Grid
 
     public void PanByVisibleFraction(double fraction)
     {
+        if (CenterLocked)
+        {
+            // 表示だけずらすとヘッドが中央から外れる。同じ量だけシークして中央を保つ。
+            var frame = ClampFrame(_playheadFrame + (long)Math.Round(ViewSpanFrames * fraction));
+            CommitCursor(frame);
+            return;
+        }
+
         SetViewStart(_viewStart + ViewSpanFrames * fraction);
     }
 
@@ -2109,7 +2214,7 @@ internal sealed partial class WaveformView : Grid
 
         if (CenterLocked)
         {
-            SetViewStart(frame - span * 0.5);
+            HoldCenterOn(frame, smooth: false);
             return;
         }
 
@@ -2143,12 +2248,27 @@ internal sealed partial class WaveformView : Grid
         SetViewStart(frame - offset);
     }
 
-    public void PanTimeToStart() => SetViewStart(0);
+    public void PanTimeToStart()
+    {
+        if (CenterLocked)
+        {
+            CenterViewOnPlayhead();
+            return;
+        }
+
+        SetViewStart(0);
+    }
 
     public void PanTimeToEnd()
     {
         if (_document is null)
         {
+            return;
+        }
+
+        if (CenterLocked)
+        {
+            CenterViewOnPlayhead();
             return;
         }
 
@@ -2160,13 +2280,45 @@ internal sealed partial class WaveformView : Grid
         SetViewStart(_playheadFrame - ViewSpanFrames * 0.5);
     }
 
+    /// <summary>
+    /// センターロック中だけ、指定フレームが画面中央に来るよう表示を動かす。
+    /// 再生追従の小移動は間引き、ジャンプはすぐ波形を読み直す。
+    /// </summary>
+    private void HoldCenterOn(long frame, bool smooth)
+    {
+        if (!CenterLocked)
+        {
+            return;
+        }
+
+        var span = ViewSpanFrames;
+        if (span <= 1)
+        {
+            return;
+        }
+
+        var target = frame - span * 0.5;
+        var jump = Math.Abs(target - _viewStart);
+        SetViewStart(target, playbackFollow: smooth && jump < span * 0.25);
+    }
+
     public void LockCenterToPlayhead()
     {
         CenterLocked = true;
         CenterViewOnPlayhead();
     }
 
-    public void UnlockCenter() => CenterLocked = false;
+    public void UnlockCenter()
+    {
+        if (!CenterLocked)
+        {
+            return;
+        }
+
+        CenterLocked = false;
+        // 先頭の外側に出していた窓を、通常のスクロール範囲へ戻す。
+        SetViewStart(_viewStart);
+    }
 
     public void JumpVisiblePercent(double percent)
     {
@@ -2879,11 +3031,27 @@ internal sealed partial class WaveformView : Grid
         if (_dragging && _scrubbing && _document is not null)
         {
             Cursor = Cursors.ScrollWE;
-            var scrubFrame = FrameAt(pos.X);
-            if (scrubFrame != _playheadFrame)
+            if (CenterLocked)
             {
-                PreviewInteraction(scrubFrame);
-                ScrubPreviewed?.Invoke(this, scrubFrame);
+                var width = Math.Max(1d, ContentWidth);
+                var dx = pos.X - _centerScrubX;
+                _centerScrubX = pos.X;
+                var scrubFrame = ClampFrame(_playheadFrame + (long)Math.Round(dx / width * ViewSpanFrames));
+                if (scrubFrame != _playheadFrame)
+                {
+                    PreviewInteraction(scrubFrame);
+                    EnsureFrameVisible(scrubFrame);
+                    ScrubPreviewed?.Invoke(this, scrubFrame);
+                }
+
+                return;
+            }
+
+            var frameAtPointer = FrameAt(pos.X);
+            if (frameAtPointer != _playheadFrame)
+            {
+                PreviewInteraction(frameAtPointer);
+                ScrubPreviewed?.Invoke(this, frameAtPointer);
             }
 
             return;
@@ -2999,6 +3167,11 @@ internal sealed partial class WaveformView : Grid
         if (wasSelecting)
         {
             PreviewInteraction(frame);
+            if (CenterLocked)
+            {
+                EnsureFrameVisible(frame);
+            }
+
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
         else
@@ -4003,7 +4176,12 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        var usePolyline = !SeekAndSelectOnly && hasPcm && IsPolylineZoom(rangeFrames, width);
+        // センターロックで先頭・末尾の外を見ているとき、ズーム判定は見える幅（空白込み）で行う。
+        var overhang = start < -1e-6 || start + span > drawable + 1e-6;
+        var zoomFrames = overhang
+            ? Math.Max(1L, (long)Math.Ceiling(start + span) - (long)Math.Floor(start))
+            : rangeFrames;
+        var usePolyline = !SeekAndSelectOnly && hasPcm && IsPolylineZoom(zoomFrames, width);
         // クロス編集中は raw 全走査を避け、ピーク＋局所パッチのみ（ピーク無し時は raw にフォールバック）。
         var crossfadePreferPeaks = _crossfadeDraft is { IsActive: true } && !document.Peaks.IsEmpty;
         // 短尺でもピークが使えるなら長尺と同じ PeakPyramid エンベロープに寄せる。
@@ -4014,7 +4192,7 @@ internal sealed partial class WaveformView : Grid
             hasPcm,
             usePolyline,
             peaksUsableForEnvelope,
-            rangeFrames,
+            zoomFrames,
             width);
         var canSplitLanes = peaksMatchLanes || usePolyline || useRawColumns;
         var drawChannels = monoWave ? 1 : (canSplitLanes ? sourceChannels : peakChannels);
@@ -4041,8 +4219,6 @@ internal sealed partial class WaveformView : Grid
                 x1,
                 start,
                 span,
-                startFrame,
-                rangeFrames,
                 sourceChannels,
                 usePolyline,
                 useRawColumns);
@@ -4051,14 +4227,31 @@ internal sealed partial class WaveformView : Grid
 
         if (!usePolyline)
         {
-            var f0 = startFrame + (long)x0 * rangeFrames / width;
-            var f1 = startFrame + (long)x1 * rangeFrames / width;
-            if (f1 <= f0)
+            if (!TryMapWaveColumns(
+                    start,
+                    span,
+                    width,
+                    drawable,
+                    x0,
+                    x1,
+                    out var f0,
+                    out var f1,
+                    out var colX,
+                    out var colCount))
             {
-                f1 = f0 + 1;
+                DrawWaveLaneGuides(
+                    buffer,
+                    stride,
+                    width,
+                    height,
+                    monoWave,
+                    drawChannels,
+                    laneOrigin,
+                    laneHeight,
+                    laneGap);
+                return;
             }
 
-            var colCount = x1 - x0;
             EnsureColumnBuffers(colCount * Math.Max(sourceChannels, peakChannels));
             var count = FillWaveColumnPeaks(
                 document,
@@ -4099,12 +4292,12 @@ internal sealed partial class WaveformView : Grid
                         ch,
                         packedChannels,
                         count,
-                        x0,
+                        colX,
                         top,
                         laneHeight,
                         ampHeight,
                         mid,
-                        connectNeighbors: ShouldConnectEnvelopeNeighbors(rangeFrames, width));
+                        connectNeighbors: ShouldConnectEnvelopeNeighbors(zoomFrames, width));
                 }
             }
 
@@ -4170,8 +4363,6 @@ internal sealed partial class WaveformView : Grid
         int x1,
         double start,
         double span,
-        long startFrame,
-        long rangeFrames,
         int sourceChannels,
         bool usePolyline,
         bool useRawColumns)
@@ -4182,14 +4373,21 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        var f0 = startFrame + (long)x0 * rangeFrames / width;
-        var f1 = startFrame + (long)x1 * rangeFrames / width;
-        if (f1 <= f0)
+        if (!TryMapWaveColumns(
+                start,
+                span,
+                width,
+                document.FrameCount,
+                x0,
+                x1,
+                out var f0,
+                out var f1,
+                out var colX,
+                out var colCount))
         {
-            f1 = f0 + 1;
+            return;
         }
 
-        var colCount = x1 - x0;
         EnsureColumnBuffers(colCount * sourceChannels);
         var count = FillWaveColumnPeaks(
             document,
@@ -4205,10 +4403,10 @@ internal sealed partial class WaveformView : Grid
 
         ChannelMix.FoldPackedPeaksToMid(_columnMins, _columnMaxs, count, sourceChannels);
         EnsureColumnEdges(width);
-        var px1 = Math.Min(width, x0 + count);
+        var px1 = Math.Min(width, colX + count);
         for (var i = 0; i < count; i++)
         {
-            var px = x0 + i;
+            var px = colX + i;
             if ((uint)px >= (uint)width)
             {
                 break;
@@ -4217,7 +4415,7 @@ internal sealed partial class WaveformView : Grid
             _columnYHi[px] = LoudnessPeakToY(AbsPeak(_columnMins[i], _columnMaxs[i]), height);
         }
 
-        DrawLoudnessConnected(buffer, stride, width, height, x0, px1);
+        DrawLoudnessConnected(buffer, stride, width, height, colX, px1);
     }
 
     private unsafe void RasterLoudnessDbPolyline(
@@ -4229,7 +4427,7 @@ internal sealed partial class WaveformView : Grid
         double start,
         double span)
     {
-        var first = (long)Math.Floor(start);
+        var first = Math.Max(0L, (long)Math.Floor(start));
         var last = Math.Min(document.FrameCount - 1, (long)Math.Ceiling(start + span));
         if (last < first)
         {
@@ -6187,8 +6385,14 @@ internal sealed partial class WaveformView : Grid
         _selecting = false;
         CaptureMouse();
         Cursor = Cursors.ScrollWE;
+        _centerScrubX = start.X;
         var frame = FrameAt(start.X);
         PreviewInteraction(frame, force: true);
+        if (CenterLocked)
+        {
+            EnsureFrameVisible(frame);
+        }
+
         ScrubStarted?.Invoke(this, frame);
     }
 
@@ -6199,6 +6403,7 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
+        var fromWaveformDrag = _dragging;
         _scrubbing = false;
         _dragging = false;
         _selecting = false;
@@ -6208,10 +6413,14 @@ internal sealed partial class WaveformView : Grid
         }
 
         RestoreIdleCursor();
-        frame = ClampFrame(frame);
+        frame = ClampFrame(fromWaveformDrag && CenterLocked ? _playheadFrame : frame);
         if (_document is not null)
         {
             PreviewInteraction(frame, force: true);
+            if (CenterLocked)
+            {
+                EnsureFrameVisible(frame);
+            }
         }
 
         ScrubEnded?.Invoke(this, (frame, commit));
@@ -7602,7 +7811,12 @@ internal sealed partial class WaveformView : Grid
         _timeZoom = nextZoom;
         var newSpan = ViewSpanFrames;
         var max = Math.Max(0d, _document.FrameCount - newSpan);
-        _viewStart = Math.Clamp(anchorFrame - newSpan * ratio, 0d, max);
+        var rawStart = CenterLocked
+            ? _playheadFrame - newSpan * 0.5
+            : anchorFrame - newSpan * ratio;
+        _viewStart = CenterLocked
+            ? ClampCenteredViewStart(rawStart, _document.FrameCount, newSpan)
+            : Math.Clamp(rawStart, 0d, max);
         _deferWaveReload = false;
         _waveDirty = true;
         // オーバーレイが先に描くと古い反転が「現在」扱いになるので、拡縮時点で無効化する。
@@ -7669,7 +7883,9 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        var next = ClampViewStart(start, _document.FrameCount, ViewSpanFrames);
+        var next = CenterLocked
+            ? ClampCenteredViewStart(start, _document.FrameCount, ViewSpanFrames)
+            : ClampViewStart(start, _document.FrameCount, ViewSpanFrames);
         if (Math.Abs(next - _viewStart) < 0.0001)
         {
             return;
@@ -7758,6 +7974,12 @@ internal sealed partial class WaveformView : Grid
         _viewStart = Math.Clamp(viewStart, 0d, max);
         _playheadFrame = Math.Clamp(playhead, 0, _document.FrameCount);
         _document.CursorFrame = _playheadFrame;
+        if (CenterLocked)
+        {
+            var span = ViewSpanFrames;
+            _viewStart = ClampCenteredViewStart(_playheadFrame - span * 0.5, _document.FrameCount, span);
+        }
+
         InvalidateStaticLayer();
         RaiseViewChanged();
     }

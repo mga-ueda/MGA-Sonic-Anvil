@@ -1052,26 +1052,15 @@ public partial class MainWindow
             return true;
         }
 
-        // .（OemPeriod）は早送り。中央寄せは Z とテンキー .（Decimal）。
+        // .（OemPeriod）は早送り。センターロックは Z とテンキー .（Decimal）。停止中もオンのままシークに追従する。
         if ((key is Key.Z or Key.Decimal) && modifiers == ModifierKeys.None)
         {
             if (IsPlaybackActive())
             {
                 DetachOverviewScrubKeepPlayback();
-                if (Waveform.CenterLocked)
-                {
-                    Waveform.UnlockCenter();
-                }
-                else
-                {
-                    Waveform.LockCenterToPlayhead();
-                }
-            }
-            else
-            {
-                Waveform.CenterViewOnPlayhead();
             }
 
+            ToggleCenterLock();
             return true;
         }
 
