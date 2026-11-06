@@ -586,6 +586,46 @@ public sealed class WaveformContextMenuTests
     }
 
     [Fact]
+    public void Build_LibraryMaximized_EmptyPlaylist_DisablesFileCommands()
+    {
+        var tree = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            LibraryMaximized = true,
+        });
+        Assert.False(Find(tree, WaveMenuCommand.FadeIn)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.FadeOut)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.InsertSilence)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.DetectSilence)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.Volume)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.Normalize)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.NormalizePerRegion)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.Pitch)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.TimeStretch)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.Reverse)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.SampleRate)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.BitDepth)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.Channels)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.AddMarker)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.TogglePlayback)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.Save)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.ExportWave)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.PreviousTrack)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.NextTrack)?.Enabled);
+        Assert.False(Category(tree, UiStrings.WaveMenuCatAudio).Enabled);
+        Assert.False(Category(tree, UiStrings.WaveMenuCatFormat).Enabled);
+        Assert.False(Category(tree, UiStrings.WaveMenuCatEdit).Enabled);
+        Assert.False(Category(tree, UiStrings.WaveMenuCatTimeline).Enabled);
+        Assert.False(Category(tree, UiStrings.WaveMenuCatExport).Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Open)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Settings)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.MaximizeLibrary)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.SilentSkip)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.AutoPlay)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.Shuffle)?.Enabled);
+    }
+
+    [Fact]
     public void Build_DisablesTileArrangesThatDoNotFit()
     {
         var tree = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel

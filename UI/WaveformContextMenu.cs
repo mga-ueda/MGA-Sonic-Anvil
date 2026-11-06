@@ -560,6 +560,13 @@ internal static class WaveformContextMenuBuilder
     /// <summary>複数ファイル選択時は、単体の波形／再生位置にしか効かない項目を無効化する。</summary>
     private static bool SingleFileOnly(WaveformContextMenuModel m) => !m.HasMultipleSelectedTabs;
 
+    /// <summary>
+    /// 開いているファイルを変える操作。
+    /// プレイヤーはプレイリストに曲が無い（ドキュメントが無い）とき無効。
+    /// </summary>
+    private static bool CanEditOpenFile(WaveformContextMenuModel m) =>
+        m.CanEdit || (m.LibraryMaximized && m.HasDocument);
+
     private static void AddContextual(List<WaveMenuEntry> items, WaveformContextMenuModel m)
     {
         if (m.Hit.HitMarker)
@@ -567,7 +574,7 @@ internal static class WaveformContextMenuBuilder
             items.Add(Cmd(
                 m.Hit.MarkerFrames.Count > 1 ? UiStrings.WaveMenuClearMarkers : UiStrings.WaveMenuClearMarker,
                 WaveMenuCommand.ClearMarkers,
-                enabled: SingleFileOnly(m) && (m.CanEdit || m.LibraryMaximized)));
+                enabled: SingleFileOnly(m) && CanEditOpenFile(m)));
         }
 
         if (m.Hit.HitRegion)
@@ -583,7 +590,7 @@ internal static class WaveformContextMenuBuilder
             items.Add(Cmd(
                 UiStrings.WaveMenuClearLoop,
                 WaveMenuCommand.ClearLoop,
-                enabled: SingleFileOnly(m) && (m.CanEdit || m.LibraryMaximized)));
+                enabled: SingleFileOnly(m) && CanEditOpenFile(m)));
         }
     }
 
@@ -627,12 +634,12 @@ internal static class WaveformContextMenuBuilder
             m.HasSelectedTabs ? UiStrings.WaveMenuUndoSelected : UiStrings.WaveMenuUndo,
             WaveMenuCommand.Undo,
             "Ctrl+Z",
-            m.CanUndo && (m.CanEdit || m.LibraryMaximized)),
+            m.CanUndo && CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuRedoSelected : UiStrings.WaveMenuRedo,
             WaveMenuCommand.Redo,
             MenuGestures.Redo,
-            m.CanRedo && (m.CanEdit || m.LibraryMaximized)),
+            m.CanRedo && CanEditOpenFile(m)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuCut, WaveMenuCommand.Cut, "Ctrl+X", SingleFileOnly(m) && m.CanEdit && m.HasSelection),
         Cmd(UiStrings.WaveMenuCopy, WaveMenuCommand.Copy, "Ctrl+C", SingleFileOnly(m) && m.CanEdit && m.HasSelection),
@@ -662,7 +669,7 @@ internal static class WaveformContextMenuBuilder
             m.HasSelectedTabs ? UiStrings.WaveMenuInsertSilenceSelected : UiStrings.WaveMenuInsertSilence,
             WaveMenuCommand.InsertSilence,
             "Ctrl+Ins",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.WaveMenuSelectAll, WaveMenuCommand.SelectAll, "Ctrl+A", SingleFileOnly(m) && m.CanNavigate),
         Cmd(
@@ -702,12 +709,12 @@ internal static class WaveformContextMenuBuilder
             m.HasSelectedTabs ? UiStrings.WaveMenuFadeInSelected : UiStrings.WaveMenuFadeIn,
             WaveMenuCommand.FadeIn,
             "I",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuFadeOutSelected : UiStrings.WaveMenuFadeOut,
             WaveMenuCommand.FadeOut,
             "O",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(UiStrings.WaveMenuFadeAround, WaveMenuCommand.FadeAround, "X", SingleFileOnly(m) && m.CanEdit),
         Cmd(
             UiStrings.WaveMenuCrossfadeEdit,
@@ -723,38 +730,38 @@ internal static class WaveformContextMenuBuilder
                 : (m.HasSelectedTabs ? UiStrings.WaveMenuVolumeSelected : UiStrings.WaveMenuVolume),
             WaveMenuCommand.Volume,
             MenuGestures.Volume,
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuDetectSilenceSelected : UiStrings.WaveMenuDetectSilence,
             WaveMenuCommand.DetectSilence,
             "Ctrl+D",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuNormalizeSelected : UiStrings.WaveMenuNormalize,
             WaveMenuCommand.Normalize,
             "N",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuNormalizePerRegionSelected : UiStrings.WaveMenuNormalizePerRegion,
             WaveMenuCommand.NormalizePerRegion,
-            enabled: (m.CanEdit || m.LibraryMaximized)
+            enabled: CanEditOpenFile(m)
                 && (m.HasSelectedTabs || m.LibraryMaximized || (m.HasRegions && m.AllowsRegionsAndLoops))),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuPitchSelected : UiStrings.WaveMenuPitch,
             WaveMenuCommand.Pitch,
             "P",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuTimeStretchSelected : UiStrings.WaveMenuTimeStretch,
             WaveMenuCommand.TimeStretch,
             "T",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuReverseSelected : UiStrings.WaveMenuReverse,
             WaveMenuCommand.Reverse,
             "R",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> FormatItems(WaveformContextMenuModel m) =>
@@ -763,17 +770,17 @@ internal static class WaveformContextMenuBuilder
             m.HasSelectedTabs ? UiStrings.WaveMenuSampleRateSelected : UiStrings.WaveMenuSampleRate,
             WaveMenuCommand.SampleRate,
             "S",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuBitDepthSelected : UiStrings.WaveMenuBitDepth,
             WaveMenuCommand.BitDepth,
             "B",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
         Cmd(
             m.HasSelectedTabs ? UiStrings.WaveMenuChannelsSelected : UiStrings.WaveMenuChannels,
             WaveMenuCommand.Channels,
             "C",
-            m.CanEdit || m.LibraryMaximized),
+            CanEditOpenFile(m)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> TimelineItems(WaveformContextMenuModel m) =>
@@ -795,21 +802,21 @@ internal static class WaveformContextMenuBuilder
             UiStrings.WaveMenuAddMarker,
             WaveMenuCommand.AddMarker,
             MenuGestures.AddMarker,
-            SingleFileOnly(m) && (m.CanEdit || m.LibraryMaximized)),
+            SingleFileOnly(m) && CanEditOpenFile(m)),
         Cmd(
             UiStrings.WaveMenuRenameMarker,
             WaveMenuCommand.RenameMarker,
             "Ctrl+Shift+R",
-            SingleFileOnly(m) && (m.CanEdit || m.LibraryMaximized) && m.CanRenameMarker),
+            SingleFileOnly(m) && CanEditOpenFile(m) && m.CanRenameMarker),
         Cmd(
             UiStrings.WaveMenuDeleteMarkers,
             WaveMenuCommand.DeleteMarkers,
             "Ctrl+Delete",
-            SingleFileOnly(m) && (m.CanEdit || m.LibraryMaximized) && m.HasMarkers),
+            SingleFileOnly(m) && CanEditOpenFile(m) && m.HasMarkers),
         Cmd(
             UiStrings.WaveMenuDeleteAllMarkers,
             WaveMenuCommand.DeleteAllMarkers,
-            enabled: (m.CanEdit || m.LibraryMaximized)
+            enabled: CanEditOpenFile(m)
                 && (m.HasMarkers || m.SelectedTabsHaveMarkers)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
@@ -830,7 +837,7 @@ internal static class WaveformContextMenuBuilder
             UiStrings.WaveMenuDeleteAllRegions,
             WaveMenuCommand.DeleteAllRegions,
             enabled: (m.CanEdit && m.HasRegions && m.AllowsRegionsAndLoops)
-                || ((m.CanEdit || m.LibraryMaximized) && m.SelectedTabsHaveRegions)),
+                || (CanEditOpenFile(m) && m.SelectedTabsHaveRegions)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             UiStrings.WaveMenuSetLoop,
@@ -841,7 +848,7 @@ internal static class WaveformContextMenuBuilder
             UiStrings.WaveMenuClearLoopItem,
             WaveMenuCommand.ClearLoopItem,
             enabled: (m.CanEdit && m.HasSampleLoop)
-                || ((m.CanEdit || m.LibraryMaximized) && m.SelectedTabsHaveSampleLoop)),
+                || (CanEditOpenFile(m) && m.SelectedTabsHaveSampleLoop)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> PlaybackItems(WaveformContextMenuModel m) =>

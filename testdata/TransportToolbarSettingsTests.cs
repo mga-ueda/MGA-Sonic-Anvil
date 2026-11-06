@@ -731,6 +731,23 @@ public sealed class TransportToolbarSettingsTests
         Assert.False(mp3);
         Assert.True(TransportBar.TryMenuEnabled(noMp3, TransportCommand.SampleRate, playerMode: true, out var stillRate));
         Assert.True(stillRate);
+
+        var emptyPlaylist = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            LibraryMaximized = true,
+        });
+        Assert.True(TransportBar.TryMenuEnabled(emptyPlaylist, TransportCommand.FadeIn, playerMode: true, out var emptyFade));
+        Assert.False(emptyFade);
+        Assert.True(TransportBar.TryMenuEnabled(emptyPlaylist, TransportCommand.Volume, playerMode: true, out var emptyVolume));
+        Assert.False(emptyVolume);
+        Assert.True(TransportBar.TryMenuEnabled(emptyPlaylist, TransportCommand.SampleRate, playerMode: true, out var emptyRate));
+        Assert.False(emptyRate);
+        Assert.True(TransportBar.TryMenuEnabled(emptyPlaylist, TransportCommand.InsertSilence, playerMode: true, out var emptySilence));
+        Assert.False(emptySilence);
+        Assert.True(TransportBar.TryMenuEnabled(emptyPlaylist, TransportCommand.AddMarker, playerMode: true, out var emptyMarker));
+        Assert.False(emptyMarker);
+        Assert.True(TransportBar.TryMenuEnabled(emptyPlaylist, TransportCommand.Open, playerMode: true, out var emptyOpen));
+        Assert.True(emptyOpen);
     }
 
     [Fact]
