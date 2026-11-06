@@ -145,10 +145,10 @@ internal sealed partial class WaveformView : Grid
     }
 
     /// <summary>
-    /// プレイヤーモードで確保するマーカーレーン行数。
-    /// 捨てキューが無くても1行にし、打刻や本再生／F8 切替で波形高さが縮まないようにする。
+    /// プレイヤーモードで波形の上に確保するマーカーレーン行数。
+    /// 空行は波形を下へずらすだけなので 0。捨てキューの旗はタイムルーラー直下へ重ね、有無で高さを変えない。
     /// </summary>
-    internal const int PlayerModeFlagLaneRows = 1;
+    internal const int PlayerModeFlagLaneRows = 0;
 
     private int FlagLaneCount
     {
@@ -159,7 +159,7 @@ internal sealed partial class WaveformView : Grid
                 return 0;
             }
 
-            // エディタ以外（F10／F8／ミニ）専用: レーンを先に確保し、マーカー有無で描画高が変わらないようにする。
+            // エディタ以外（F10／F8／ミニ）: 空のマーカー行は取らない。旗は波形上端へ重ねる。
             // 旗の描画自体は UsesPlayerScratch 時だけ（暗いプレビューでは出さない）。
             if (SeekAndSelectOnly)
             {
@@ -5383,8 +5383,24 @@ internal sealed partial class WaveformView : Grid
         return new Rect(left, top, ScaleContentWidth(bounds), Math.Max(0, bounds.Height - top));
     }
 
-    private Rect MarkerLaneBounds(Rect bounds) =>
-        new(ScaleLeft(bounds), 0, ScaleContentWidth(bounds), Math.Min(MarkerLaneHeight, bounds.Height));
+    private Rect MarkerLaneBounds(Rect bounds)
+    {
+        if (SeekAndSelectOnly)
+        {
+            // レイアウト行は取らない。旗だけタイムルーラーの直下、波形の上に置く。
+            var top = Math.Min(ScaledTimeLaneHeight, Math.Max(0, bounds.Height));
+            var height = Math.Min(
+                MarkerLaneHeightForRows(1) * ChromeScale,
+                Math.Max(0, bounds.Height - top));
+            return new Rect(ScaleLeft(bounds), top, ScaleContentWidth(bounds), height);
+        }
+
+        return new Rect(
+            ScaleLeft(bounds),
+            0,
+            ScaleContentWidth(bounds),
+            Math.Min(MarkerLaneHeight, bounds.Height));
+    }
 
     internal const double FlagProximityPad = 8;
 
@@ -5495,6 +5511,10 @@ internal sealed partial class WaveformView : Grid
 
     internal static Rect LaneFlagRect(double x, double width, double laneHeight, bool split, bool top) =>
         split ? SplitFlagRect(x, width, laneHeight, top) : FullFlagRect(x, width, laneHeight);
+
+    /// <summary>旗矩形はレーン上端を 0 として作る。レーンがタイムルーラーの下にあるときは足す。</summary>
+    private static Rect OffsetFlagIntoLane(Rect box, double laneY) =>
+        laneY == 0 ? box : new Rect(box.X, box.Y + laneY, box.Width, box.Height);
 
     /// <summary>旗の軸辺をポールの内側に合わせる（アンチエイリアスのはみ出し防止）。</summary>
     internal static Rect AlignFlagToStem(Rect box, double stemX, bool growLeft, double inset = 0)
@@ -5764,7 +5784,8 @@ internal sealed partial class WaveformView : Grid
         double laneHeight,
         bool split,
         bool topRow,
-        bool pack)
+        bool pack,
+        double laneY = 0)
     {
         if (row.Count == 0)
         {
@@ -5777,7 +5798,9 @@ internal sealed partial class WaveformView : Grid
         for (var i = 0; i < row.Count; i++)
         {
             var item = row[i];
-            var box = LaneFlagRect(packed[i].Left, packed[i].Width, laneHeight, split, topRow);
+            var box = OffsetFlagIntoLane(
+                LaneFlagRect(packed[i].Left, packed[i].Width, laneHeight, split, topRow),
+                laneY);
             if (item.Region)
             {
                 _regionFlagLayout[(item.Range, item.Frame)] = box;
@@ -5953,7 +5976,8 @@ internal sealed partial class WaveformView : Grid
         }
 
         var pixelsPerDip = UiDpi.Get(this).PixelsPerDip;
-        var laneHeight = MarkerLaneBounds(bounds).Height;
+        var lane = MarkerLaneBounds(bounds);
+        var laneHeight = lane.Height;
         var markers = ScratchCues.ToWaveMarkers();
         var row = new List<(bool Region, WaveSelection Range, long Frame, PackedTimelineFlag Flag)>(
             markers.Length + 2);
@@ -5981,7 +6005,7 @@ internal sealed partial class WaveformView : Grid
         CollectPlayerAbFlag(row, bounds, start, span, ScratchCues.AbIn, "In", abInLayoutKey, pixelsPerDip);
         CollectPlayerAbFlag(row, bounds, start, span, ScratchCues.AbOut, "Out", abOutLayoutKey, pixelsPerDip);
 
-        ApplyPackedRow(row, laneHeight, split: false, topRow: true, pack: row.Count > 1);
+        ApplyPackedRow(row, laneHeight, split: false, topRow: true, pack: row.Count > 1, lane.Y);
         if (_markerFlagLayout.TryGetValue(abInLayoutKey, out var inBox))
         {
             _playerAbFlagLayout[true] = inBox;
@@ -6095,7 +6119,9 @@ internal sealed partial class WaveformView : Grid
         {
             var boxW = MeasureFlagWidth(label, pixelsPerDip);
             var left = growLeft ? x - boxW : x;
-            box = LaneFlagRect(left, boxW, lane.Height, split: false, top: true);
+            box = OffsetFlagIntoLane(
+                LaneFlagRect(left, boxW, lane.Height, split: false, top: true),
+                lane.Y);
         }
         else if (!growLeft && Math.Abs(box.Right - x) <= 0.51)
         {
@@ -6202,7 +6228,9 @@ internal sealed partial class WaveformView : Grid
             {
                 var boxW = MeasureFlagWidth(marker.Id.ToString(CultureInfo.InvariantCulture), pixelsPerDip);
                 var left = growLeft ? x - boxW : x;
-                box = LaneFlagRect(left, boxW, lane.Height, SplitFlagLanes, top: !SplitFlagLanes);
+                box = OffsetFlagIntoLane(
+                    LaneFlagRect(left, boxW, lane.Height, SplitFlagLanes, top: !SplitFlagLanes),
+                    lane.Y);
             }
             else if (!growLeft && Math.Abs(box.Right - x) <= 0.51)
             {

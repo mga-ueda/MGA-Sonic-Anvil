@@ -461,12 +461,12 @@ public sealed class RegionTests
     }
 
     [Fact]
-    public void PlayerModeFlagLaneRows_ReservesOneEvenWithoutCues()
+    public void PlayerModeFlagLaneRows_DoesNotReserveEmptyRow()
     {
-        // プレイヤー: 捨てキュー無しでも1行。打刻で MarkerLaneHeight が跳ねない。
-        Assert.Equal(1, WaveformView.PlayerModeFlagLaneRows);
+        // プレイヤー: 空のマーカー行は波形を下へずらすので確保しない。旗は波形上端へ重ねる。
+        Assert.Equal(0, WaveformView.PlayerModeFlagLaneRows);
         Assert.Equal(
-            DesignMetrics.MarkerLaneRowHeight,
+            0,
             WaveformView.MarkerLaneHeightForRows(WaveformView.PlayerModeFlagLaneRows));
     }
 
