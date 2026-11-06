@@ -135,152 +135,6 @@
               </Grid>
             </Grid>
 
-            <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaper}"
-                       FontWeight="Bold"
-                       FontSize="11.333"
-                       Margin="0,16,0,6" />
-            <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperPath}"
-                       Margin="0,0,0,3" />
-            <Grid Margin="0,0,0,8">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <ui:StretchSlot>
-                <TextBox x:Name="WallpaperPathBox"
-                         Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                         Style="{StaticResource DarkTextBoxStyle}"
-                         Padding="6,1"
-                         FontSize="11.333"
-                         VerticalContentAlignment="Center" />
-              </ui:StretchSlot>
-              <ui:RoundedButton x:Name="WallpaperBrowseButton"
-                                Grid.Column="1"
-                                Content="{x:Static domain:UiStrings.ButtonBrowse}"
-                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                MinWidth="64"
-                                Margin="8,0,0,0"
-                                Click="WallpaperBrowseButton_Click" />
-              <ui:RoundedButton x:Name="WallpaperClearButton"
-                                Grid.Column="2"
-                                Content="{x:Static domain:UiStrings.ButtonWallpaperClear}"
-                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                MinWidth="64"
-                                Margin="8,0,0,0"
-                                Click="WallpaperClearButton_Click" />
-            </Grid>
-            <Grid Margin="0,0,0,4">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperOpacity}"
-                         VerticalAlignment="Center"
-                         Margin="0,0,8,0" />
-              <TextBox x:Name="WallpaperOpacityBox"
-                       Grid.Column="1"
-                       Width="56"
-                       Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                       Style="{StaticResource DarkTextBoxStyle}"
-                       Padding="6,1"
-                       FontSize="11.333"
-                       TextAlignment="Center"
-                       VerticalContentAlignment="Center"
-                       HorizontalContentAlignment="Center" />
-              <TextBlock Grid.Column="2"
-                         Text="%"
-                         VerticalAlignment="Center"
-                         Margin="6,0,0,0" />
-            </Grid>
-            <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperHint}"
-                       FontSize="11.333"
-                       Foreground="{DynamicResource MutedForeBrush}"
-                       TextWrapping="Wrap"
-                       Margin="0,0,0,8" />
-            <CheckBox x:Name="EnableBackgroundAnimationBox"
-                      Style="{StaticResource DarkCheckBoxStyle}"
-                      Content="{x:Static domain:UiStrings.LabelEnableBackgroundAnimation}"
-                      HorizontalAlignment="Left"
-                      Margin="0,0,0,8" />
-            <Grid Margin="0,0,0,4">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <TextBlock x:Name="BackgroundAnimationSpeedLabel"
-                         Text="{x:Static domain:UiStrings.LabelBackgroundAnimationSpeed}"
-                         VerticalAlignment="Center"
-                         Margin="0,0,8,0" />
-              <Slider x:Name="BackgroundAnimationSpeedSlider"
-                      Grid.Column="1"
-                      Style="{StaticResource SilenceDetectRiseSliderStyle}"
-                      SmallChange="5"
-                      LargeChange="25"
-                      TickFrequency="5"
-                      IsSnapToTickEnabled="True"
-                      IsMoveToPointEnabled="True"
-                      VerticalAlignment="Center"
-                      FocusVisualStyle="{x:Null}"
-                      Cursor="Hand" />
-              <TextBlock x:Name="BackgroundAnimationSpeedValueText"
-                         Grid.Column="2"
-                         MinWidth="44"
-                         VerticalAlignment="Center"
-                         Margin="8,0,0,0"
-                         TextAlignment="Right" />
-              <ui:RoundedButton x:Name="BackgroundAnimationSpeedResetButton"
-                                Grid.Column="3"
-                                Content="{x:Static domain:UiStrings.ButtonTransportToolbarResetLayout}"
-                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                MinWidth="88"
-                                Padding="12,0"
-                                Margin="8,0,0,0"
-                                VerticalAlignment="Center"
-                                Click="BackgroundAnimationSpeedResetButton_Click" />
-            </Grid>
-            <Grid Margin="0,8,0,4">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <TextBlock x:Name="ControlCornerRadiusLabel"
-                         Text="{x:Static domain:UiStrings.LabelControlCornerRadius}"
-                         VerticalAlignment="Center"
-                         Margin="0,0,8,0" />
-              <Slider x:Name="ControlCornerRadiusSlider"
-                      Grid.Column="1"
-                      Style="{StaticResource SilenceDetectRiseSliderStyle}"
-                      SmallChange="1"
-                      LargeChange="1"
-                      TickFrequency="1"
-                      IsSnapToTickEnabled="True"
-                      IsMoveToPointEnabled="True"
-                      VerticalAlignment="Center"
-                      FocusVisualStyle="{x:Null}"
-                      Cursor="Hand" />
-              <TextBlock x:Name="ControlCornerRadiusValueText"
-                         Grid.Column="2"
-                         MinWidth="28"
-                         VerticalAlignment="Center"
-                         Margin="8,0,0,0"
-                         TextAlignment="Right" />
-              <ui:RoundedButton x:Name="ControlCornerRadiusResetButton"
-                                Grid.Column="3"
-                                Content="{x:Static domain:UiStrings.ButtonTransportToolbarResetLayout}"
-                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                MinWidth="88"
-                                Padding="12,0"
-                                Margin="8,0,0,0"
-                                VerticalAlignment="Center"
-                                Click="ControlCornerRadiusResetButton_Click" />
-            </Grid>
-
             <TextBlock x:Name="AssociationHeader"
                        Text="{x:Static domain:UiStrings.LabelFileAssociations}"
                        FontWeight="Bold"
@@ -338,7 +192,7 @@
               </StackPanel>
               <StackPanel Orientation="Horizontal"
                           HorizontalAlignment="Left"
-                          Margin="0,0,0,16">
+                          Margin="0,0,0,8">
                 <CheckBox x:Name="ShowTransportToolbarBox"
                           Style="{StaticResource DarkCheckBoxStyle}"
                           Content="{x:Static domain:UiStrings.LabelShowTransportToolbar}"
@@ -364,6 +218,149 @@
                                   VerticalAlignment="Center"
                                   Click="TransportToolbarCustomizeButton_Click" />
               </StackPanel>
+              <StackPanel Orientation="Horizontal"
+                          HorizontalAlignment="Left"
+                          Margin="0,0,0,16">
+                <CheckBox x:Name="EnableBackgroundAnimationBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelEnableBackgroundAnimation}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,12,0" />
+                <TextBlock x:Name="BackgroundAnimationSpeedLabel"
+                           Text="{x:Static domain:UiStrings.LabelBackgroundAnimationSpeed}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <Slider x:Name="BackgroundAnimationSpeedSlider"
+                        Style="{StaticResource SilenceDetectRiseSliderStyle}"
+                        SmallChange="5"
+                        LargeChange="25"
+                        TickFrequency="5"
+                        IsSnapToTickEnabled="True"
+                        IsMoveToPointEnabled="True"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Left"
+                        FocusVisualStyle="{x:Null}"
+                        Cursor="Hand" />
+                <TextBlock x:Name="BackgroundAnimationSpeedValueText"
+                           MinWidth="44"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0"
+                           TextAlignment="Right" />
+                <ui:RoundedButton x:Name="BackgroundAnimationSpeedResetButton"
+                                  Content="{x:Static domain:UiStrings.ButtonTransportToolbarResetLayout}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="88"
+                                  Padding="12,0"
+                                  Margin="8,0,0,0"
+                                  VerticalAlignment="Center"
+                                  Click="BackgroundAnimationSpeedResetButton_Click" />
+              </StackPanel>
+              <Grid Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperPath}"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Right"
+                           Margin="0,0,8,4" />
+                <ui:StretchSlot Grid.Column="1"
+                                Margin="0,0,0,4">
+                  <TextBox x:Name="WallpaperPathBox"
+                           Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                           Style="{StaticResource DarkTextBoxStyle}"
+                           Padding="6,1"
+                           FontSize="11.333"
+                           VerticalContentAlignment="Center" />
+                </ui:StretchSlot>
+                <ui:RoundedButton x:Name="WallpaperBrowseButton"
+                                  Grid.Column="2"
+                                  Content="{x:Static domain:UiStrings.ButtonBrowse}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="64"
+                                  Margin="8,0,0,4"
+                                  Click="WallpaperBrowseButton_Click" />
+                <ui:RoundedButton x:Name="WallpaperClearButton"
+                                  Grid.Column="3"
+                                  Content="{x:Static domain:UiStrings.ButtonWallpaperClear}"
+                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                  MinWidth="64"
+                                  Margin="8,0,0,4"
+                                  Click="WallpaperClearButton_Click" />
+                <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperOpacity}"
+                           Grid.Row="1"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Right"
+                           Margin="0,4,8,4" />
+                <StackPanel Grid.Row="1"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,4,0,4">
+                  <Slider x:Name="WallpaperOpacitySlider"
+                          Style="{StaticResource SilenceDetectRiseSliderStyle}"
+                          Minimum="0"
+                          Maximum="100"
+                          SmallChange="1"
+                          LargeChange="10"
+                          TickFrequency="1"
+                          IsSnapToTickEnabled="True"
+                          IsMoveToPointEnabled="True"
+                          VerticalAlignment="Center"
+                          HorizontalAlignment="Left"
+                          FocusVisualStyle="{x:Null}"
+                          Cursor="Hand" />
+                  <TextBlock x:Name="WallpaperOpacityValueText"
+                             MinWidth="44"
+                             VerticalAlignment="Center"
+                             Margin="8,0,0,0"
+                             TextAlignment="Right" />
+                </StackPanel>
+                <TextBlock x:Name="ControlCornerRadiusLabel"
+                           Grid.Row="2"
+                           Text="{x:Static domain:UiStrings.LabelControlCornerRadius}"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Right"
+                           Margin="0,8,8,0" />
+                <StackPanel Grid.Row="2"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="3"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,8,0,0">
+                  <Slider x:Name="ControlCornerRadiusSlider"
+                          Style="{StaticResource SilenceDetectRiseSliderStyle}"
+                          SmallChange="1"
+                          LargeChange="1"
+                          TickFrequency="1"
+                          IsSnapToTickEnabled="True"
+                          IsMoveToPointEnabled="True"
+                          VerticalAlignment="Center"
+                          HorizontalAlignment="Left"
+                          FocusVisualStyle="{x:Null}"
+                          Cursor="Hand" />
+                  <TextBlock x:Name="ControlCornerRadiusValueText"
+                             MinWidth="44"
+                             VerticalAlignment="Center"
+                             Margin="8,0,0,0"
+                             TextAlignment="Right" />
+                  <ui:RoundedButton x:Name="ControlCornerRadiusResetButton"
+                                    Content="{x:Static domain:UiStrings.ButtonTransportToolbarResetLayout}"
+                                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                    MinWidth="88"
+                                    Padding="12,0"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Click="ControlCornerRadiusResetButton_Click" />
+                </StackPanel>
+              </Grid>
               <StackPanel x:Name="LayoutPresetsHost" />
             </StackPanel>
           </ScrollViewer>

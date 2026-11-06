@@ -192,6 +192,7 @@ internal partial class AudioSettingsWindow : Window
     private readonly int _backgroundAnimationSpeedOpenedAt;
     private readonly double _controlCornerRadiusOpenedAt;
     private bool _updatingControlCornerRadius;
+    private bool _updatingWallpaperOpacity;
     private Slider _controlCornerRadiusSlider = null!;
     private TextBlock _controlCornerRadiusValue = null!;
     private RoundedButton _controlCornerRadiusResetButton = null!;
@@ -502,29 +503,27 @@ internal partial class AudioSettingsWindow : Window
         LameOptionsBox.Text = Mp3Encode.ResolveLameOptions(SelectedLameOptions);
         FillExportParallelism(SelectedExportParallelism);
         WallpaperPathBox.Text = SelectedWallpaperPath;
-        WallpaperOpacityBox.Text = AppSettings.FormatWallpaperOpacityPercent(SelectedWallpaperOpacity);
+        SetWallpaperOpacitySlider(SelectedWallpaperOpacity);
         WallpaperPathBox.TextChanged += (_, _) => PreviewWallpaperPath();
-        WallpaperOpacityBox.TextChanged += (_, _) => PreviewWallpaperOpacity();
-        WallpaperOpacityBox.PreviewMouseWheel += (_, e) =>
+        WallpaperOpacitySlider.ValueChanged += (_, _) => OnWallpaperOpacitySliderChanged();
+        WallpaperOpacitySlider.PreviewMouseWheel += (_, e) =>
         {
             if (e.Delta == 0)
             {
                 return;
             }
 
-            NudgeWallpaperOpacity(Math.Sign(e.Delta));
             e.Handled = true;
-        };
-        WallpaperOpacityBox.PreviewKeyDown += (_, e) =>
-        {
-            var key = e.Key == Key.System ? e.SystemKey : e.Key;
-            if (key is not (Key.Up or Key.Down))
+            var next = AppSettings.NudgeWallpaperOpacityPercent(
+                (int)Math.Round(WallpaperOpacitySlider.Value),
+                Math.Sign(e.Delta));
+            if ((int)Math.Round(WallpaperOpacitySlider.Value) == next)
             {
                 return;
             }
 
-            NudgeWallpaperOpacity(key == Key.Up ? 1 : -1);
-            e.Handled = true;
+            SetWallpaperOpacitySlider(next / 100d);
+            PreviewWallpaperPath();
         };
         EnableBackgroundAnimationBox.IsChecked = SelectedEnableBackgroundAnimation;
         EnableBackgroundAnimationBox.Checked += (_, _) => PreviewEnableBackgroundAnimation(true);
@@ -1614,21 +1613,9 @@ internal partial class AudioSettingsWindow : Window
         SelectedLaunchMode = LaunchModeCombo.SelectedItem is LaunchModeItem launchItem
             ? launchItem.Slot
             : AppLaunchModes.DefaultSlot;
-        if (!AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out var wallpaperOpacity))
-        {
-            OwnerCenteredMessageBox.Show(
-                this,
-                UiStrings.ErrorWallpaperOpacityRange,
-                UiStrings.DialogSettingsTitle,
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            WallpaperOpacityBox.Focus();
-            WallpaperOpacityBox.SelectAll();
-            return;
-        }
-
         SelectedWallpaperPath = WallpaperPathBox.Text.Trim().Trim('"');
-        SelectedWallpaperOpacity = wallpaperOpacity;
+        SelectedWallpaperOpacity = AppSettings.ClampWallpaperOpacity(
+            Math.Round(WallpaperOpacitySlider.Value) / 100d);
         SelectedBackgroundAnimationSpeedPercent = AppSettings.ClampBackgroundAnimationSpeedPercent(
             (int)Math.Round(BackgroundAnimationSpeedSlider.Value));
         SelectedControlCornerRadius = AppSettings.ClampControlCornerRadius(_controlCornerRadiusSlider.Value);
@@ -1819,25 +1806,40 @@ internal partial class AudioSettingsWindow : Window
         DialogResult = true;
     }
 
-    private void PreviewWallpaperOpacity()
+    private void OnWallpaperOpacitySliderChanged()
     {
-        if (!AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out _))
+        if (_updatingWallpaperOpacity)
         {
             return;
         }
 
+        var percent = (int)Math.Round(WallpaperOpacitySlider.Value);
+        WallpaperOpacityValueText.Text = FormatWallpaperOpacity(percent);
+        SelectedWallpaperOpacity = AppSettings.ClampWallpaperOpacity(percent / 100d);
         PreviewWallpaperPath();
     }
 
-    private void NudgeWallpaperOpacity(int direction)
+    private void SetWallpaperOpacitySlider(double opacity)
     {
-        var current = AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out var opacity)
-            ? (int)Math.Round(opacity * 100d)
-            : (int)Math.Round(_wallpaperOpacityOpenedAt * 100d);
-        WallpaperOpacityBox.Text = AppSettings.NudgeWallpaperOpacityPercent(current, direction)
-            .ToString(CultureInfo.InvariantCulture);
-        WallpaperOpacityBox.SelectAll();
+        var percent = int.Parse(
+            AppSettings.FormatWallpaperOpacityPercent(opacity),
+            CultureInfo.InvariantCulture);
+        _updatingWallpaperOpacity = true;
+        try
+        {
+            WallpaperOpacitySlider.Value = percent;
+        }
+        finally
+        {
+            _updatingWallpaperOpacity = false;
+        }
+
+        WallpaperOpacityValueText.Text = FormatWallpaperOpacity(percent);
+        SelectedWallpaperOpacity = percent / 100d;
     }
+
+    private static string FormatWallpaperOpacity(int percent) =>
+        percent.ToString(CultureInfo.InvariantCulture) + UiStrings.LabelPercent;
 
     private void PreviewWallpaperPath()
     {
@@ -1847,10 +1849,7 @@ internal partial class AudioSettingsWindow : Window
             return;
         }
 
-        var opacity = AppSettings.TryParseWallpaperOpacityPercent(WallpaperOpacityBox.Text, out var parsed)
-            ? parsed
-            : _wallpaperOpacityOpenedAt;
-        window.LibraryBrowser.ApplyWallpaper(path, opacity);
+        window.LibraryBrowser.ApplyWallpaper(path, SelectedWallpaperOpacity);
     }
 
     private void RevertWallpaperPreview()

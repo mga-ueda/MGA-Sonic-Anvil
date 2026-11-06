@@ -679,17 +679,14 @@ internal static partial class UiStrings
     public static string LabelDefaultBitDepth => Get("ビット深度", "Bit depth");
     public static string LabelDefaultChannelLayout => Get("チャンネル", "Channels");
     public static string LabelWallpaper => Get("壁紙", "Wallpaper");
-    public static string LabelWallpaperPath => Get("画像", "Image");
-    public static string LabelWallpaperOpacity => Get("不透明度", "Opacity");
-    public static string LabelWallpaperHint => Get(
-        "空欄は壁紙なし。比率を保って中央に広げ、画面全体を覆います。",
-        "Leave blank for no wallpaper. The image keeps its aspect ratio, stays centered, and covers the window.");
+    public static string LabelWallpaperPath => Get("壁紙画像", "Wallpaper image");
+    public static string LabelWallpaperOpacity => Get("壁紙の不透明度", "Wallpaper opacity");
     /// <summary>設定・一般。ジャケット由来の動的背景色の動き。</summary>
     public static string LabelEnableBackgroundAnimation => Get(
         "背景色アニメーション(_B)",
         "Background color _animation");
     public static string LabelBackgroundAnimationSpeed => Get("速度", "Speed");
-    public static string LabelControlCornerRadius => Get("角の丸み", "Corner radius");
+    public static string LabelControlCornerRadius => Get("GUI の角の丸み", "GUI corner radius");
     public static string ButtonWallpaperClear => Get("クリア", "Clear");
     public static string FilterWallpaperImage => Get(
         "画像|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff|すべてのファイル|*.*",
