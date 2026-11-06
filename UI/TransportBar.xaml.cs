@@ -250,6 +250,49 @@ internal partial class TransportBar : UserControl
         Visibility = HasVisibleCommands ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>
+    /// ボタンの有効状態を、同じコマンドのメニュー項目に合わせる。
+    /// プレイヤーではメニューの実行拒否（<see cref="LibraryPlayerMode.BlocksWaveMenu"/>）も重ねる。
+    /// </summary>
+    public void ApplyMenuEnabled(IReadOnlyList<WaveMenuEntry> menu, bool playerMode)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        foreach (var (command, button) in _buttons)
+        {
+            if (!TryMenuEnabled(menu, command, playerMode, out var menuEnabled))
+            {
+                continue;
+            }
+
+            button.IsEnabled = menuEnabled;
+        }
+
+        RefreshGroupVisibility();
+        Visibility = HasVisibleCommands ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>メニュー項目の Enabled。プレイヤーでは実行拒否のコマンドをグレーにする。</summary>
+    public static bool TryMenuEnabled(
+        IReadOnlyList<WaveMenuEntry> menu,
+        TransportCommand command,
+        bool playerMode,
+        out bool enabled)
+    {
+        enabled = false;
+        if (!TransportToolbarCatalog.TryGetItem(command, out var item)
+            || !WaveformContextMenuBuilder.TryGetCommandEnabled(menu, item.MenuCommand, out enabled))
+        {
+            return false;
+        }
+
+        if (playerMode && LibraryPlayerMode.BlocksWaveMenu(item.MenuCommand))
+        {
+            enabled = false;
+        }
+
+        return true;
+    }
+
     private static bool IsCommandAvailable(TransportCommand command, CommandAvailability a) =>
         command switch
         {

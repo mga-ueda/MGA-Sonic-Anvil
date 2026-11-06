@@ -3170,6 +3170,9 @@ public partial class MainWindow
                 CanMergeTabs: CanMergeSelectedTabs()));
         Transport.SetSampleLoopPresent(hasSampleLoop);
         Transport.SetRangeClick(_rangeClickEnabled);
+        Transport.ApplyMenuEnabled(
+            WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(CaptureMenuBarHit())),
+            playerMode: IsLibraryMaximized);
         // 押せるボタンが無いグループを畳んだあと、ツールバー領域自体の表示も合わせる。
         ApplyTransportToolbarVisibility();
         // ツールバーと同じタイミングで、タイムライン等のルート有効状態も直す。

@@ -373,6 +373,12 @@ public sealed class TransportToolbarSettingsTests
             UiStrings.NoteToolbarEditorModeOnly,
             TransportToolbarCatalog.Describe(play),
             StringComparison.Ordinal);
+
+        Assert.True(TransportToolbarCatalog.TryGetItem(TransportCommand.SampleRate, out var sampleRate));
+        Assert.DoesNotContain(
+            UiStrings.NoteToolbarEditorModeOnly,
+            TransportToolbarCatalog.Describe(sampleRate),
+            StringComparison.Ordinal);
     }
 
     [Theory]
@@ -676,6 +682,55 @@ public sealed class TransportToolbarSettingsTests
         {
             throw new Exception(error.ToString());
         }
+    }
+
+    [Fact]
+    public void TryMenuEnabled_MatchesMenuItemAndPlayerGate()
+    {
+        var player = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            CanEdit = false,
+            CanNavigate = true,
+            LibraryMaximized = true,
+            CanExportMp3 = true,
+            CanBounce = true,
+            CanMergeTabs = true,
+            HasMarkers = true,
+            SelectedTabsHaveRegions = true,
+            SelectedTabsHaveSampleLoop = true,
+        });
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.SampleRate, playerMode: true, out var sampleRate));
+        Assert.True(sampleRate);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.BitDepth, playerMode: true, out var bits));
+        Assert.True(bits);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.Channels, playerMode: true, out var channels));
+        Assert.True(channels);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.FadeIn, playerMode: true, out var fadeIn));
+        Assert.True(fadeIn);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.Volume, playerMode: true, out var volume));
+        Assert.True(volume);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.Bounce, playerMode: true, out var bounce));
+        Assert.True(bounce);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.Cut, playerMode: true, out var cut));
+        Assert.False(cut);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.Save, playerMode: true, out var save));
+        Assert.False(save);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.CenterPlayhead, playerMode: true, out var center));
+        Assert.False(center);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.JumpToTime, playerMode: true, out var jump));
+        Assert.False(jump);
+
+        var noMp3 = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            HasDocument = true,
+            LibraryMaximized = true,
+            CanExportMp3 = false,
+        });
+        Assert.True(TransportBar.TryMenuEnabled(noMp3, TransportCommand.SaveMp3, playerMode: true, out var mp3));
+        Assert.False(mp3);
+        Assert.True(TransportBar.TryMenuEnabled(noMp3, TransportCommand.SampleRate, playerMode: true, out var stillRate));
+        Assert.True(stillRate);
     }
 
     [Fact]
