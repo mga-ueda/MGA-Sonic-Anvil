@@ -285,6 +285,9 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ExportWave));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.MergeTabs));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.Bounce));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SampleRate));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.BitDepth));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.Channels));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleMinimalChrome));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.MaximizeWaveform));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SeekViewLeft));
@@ -296,22 +299,29 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleLoudnessView));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleAnalysis));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.Record));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.FadeIn));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.FadeOut));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.FadeIn));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.FadeOut));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.FadeAround));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.Normalize));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.Volume));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.Pitch));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.Normalize));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.Volume));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.Pitch));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.TimeZoomIn));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.NewDocument));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleWaapi));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.AddMarker));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.DeleteMarkers));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.DeleteAllMarkers));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SelectToStart));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.SelectToStart));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CloseTab));
-        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.LoopPlay));
+        Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.LoopPlay));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.RangeClick));
+        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.JumpToTime));
+        foreach (var item in TransportToolbarCatalog.All)
+        {
+            Assert.Equal(
+                LibraryPlayerMode.BlocksWaveMenu(item.MenuCommand),
+                LibraryPlayerMode.BlocksTransport(item.Command));
+        }
     }
 
     [Fact]

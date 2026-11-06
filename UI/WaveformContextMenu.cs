@@ -1194,6 +1194,36 @@ internal static class WaveformContextMenuBuilder
         };
     }
 
+    /// <summary>メニュー木からコマンドの有効状態を取る。ツールバーはこれをボタンの IsEnabled に使う。</summary>
+    public static bool TryGetCommandEnabled(
+        IReadOnlyList<WaveMenuEntry> entries,
+        WaveMenuCommand command,
+        out bool enabled)
+    {
+        foreach (var entry in entries)
+        {
+            if (entry is not WaveMenuItemEntry item)
+            {
+                continue;
+            }
+
+            if (item.Command == command)
+            {
+                enabled = item.Enabled;
+                return true;
+            }
+
+            if (item.Children is { Count: > 0 } children
+                && TryGetCommandEnabled(children, command, out enabled))
+            {
+                return true;
+            }
+        }
+
+        enabled = false;
+        return false;
+    }
+
     private static WaveMenuItemEntry Cmd(
         string header,
         WaveMenuCommand command,

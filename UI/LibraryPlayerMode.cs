@@ -131,6 +131,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.InsertSilence
             or WaveMenuCommand.DetectSilence
             or WaveMenuCommand.MergeTabs
+            or WaveMenuCommand.Bounce
             or WaveMenuCommand.ExportByChannels
             or WaveMenuCommand.ExportMp3
             or WaveMenuCommand.ExportWave
@@ -143,42 +144,28 @@ internal static class LibraryPlayerMode
         _ => true,
     };
 
-    public static bool BlocksTransport(TransportCommand command) => command switch
+    /// <summary>
+    /// プレイヤーでツールバーから拒否するコマンド。
+    /// メニューに対応するものは <see cref="BlocksWaveMenu"/> と同じ（有効条件の差はメニューの Enabled）。
+    /// メニューに無いものだけここで決める。
+    /// </summary>
+    public static bool BlocksTransport(TransportCommand command)
     {
-        TransportCommand.TogglePlayback
-            or TransportCommand.Stop
-            or TransportCommand.JumpToTime
-            or TransportCommand.GoToStart
-            or TransportCommand.PreviousPage
-            or TransportCommand.PreviousMarker
-            or TransportCommand.NextMarker
-            or TransportCommand.NextPage
-            or TransportCommand.GoToEnd
-            or TransportCommand.SeekViewLeft
-            or TransportCommand.SeekViewRight
-            or TransportCommand.PreviousTrack
-            or TransportCommand.NextTrack
-            or TransportCommand.Open
-            or TransportCommand.OpenColorPanel
-            or TransportCommand.OpenSettings
-            or TransportCommand.OpenManual
-            or TransportCommand.ToggleWaapi
-            or TransportCommand.ToggleMinimalChrome
-            or TransportCommand.MaximizeWaveform
-            or TransportCommand.ToggleLibraryMaximize
-            or TransportCommand.ToggleAnalyzerMaximize
-            or TransportCommand.SaveMp3
-            or TransportCommand.ExportWave
-            // ミックスダウン／バウンスは CommandAvailability で条件判定（未達ならグレー）。
-            or TransportCommand.MergeTabs
-            or TransportCommand.Bounce
-            // 捨てマーカー（右クリックメニューと同じくプレイヤーでも可）。
-            or TransportCommand.AddMarker
-            or TransportCommand.DeleteMarkers
-            or TransportCommand.DeleteAllMarkers
-            => false,
-        _ => true,
-    };
+        if (TransportToolbarCatalog.TryGetItem(command, out var item))
+        {
+            return BlocksWaveMenu(item.MenuCommand);
+        }
+
+        return command switch
+        {
+            TransportCommand.Stop
+                or TransportCommand.PreviousPage
+                or TransportCommand.NextPage
+                or TransportCommand.ToggleWaapi
+                => false,
+            _ => true,
+        };
+    }
 
     /// <summary>
     /// プレイヤーで通すキー。↑↓・Home／End・PageUp／PageDown はファイル選択として別処理するので含めない。
