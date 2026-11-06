@@ -66,6 +66,7 @@ public partial class MainWindow
             batch ? static _ => { } : shape => OnFadeCurveHighlighted(fadeIn, shape),
             initial);
         _fadeMenu = menu;
+        LibraryBrowser.ArmContextMenuDismissGuard(menu);
         menu.Closed += (_, _) =>
         {
             _fadeReplayOnHighlight = false;
@@ -151,6 +152,7 @@ public partial class MainWindow
             PreviewVolume,
             OnVolumeGainChanged);
         _volumeMenu = menu;
+        LibraryBrowser.ArmContextMenuDismissGuard(menu);
         menu.Closed += (_, _) =>
         {
             StopVolumePreview(restoreCursor: true);
@@ -839,6 +841,7 @@ public partial class MainWindow
             batch ? static _ => { } : PreviewTimeStretch,
             batch ? static _ => { } : OnTimeStretchChanged);
         _timeStretchMenu = menu;
+        LibraryBrowser.ArmContextMenuDismissGuard(menu);
         menu.Closed += (_, _) =>
         {
             StopTimeStretchPreview(restoreCursor: true);
@@ -895,6 +898,7 @@ public partial class MainWindow
         _silenceInsertFrame = Math.Clamp(frame, 0, document.FrameCount);
         var menu = SilenceInsertPicker.Show(this, ApplyInsertSilence);
         _silenceMenu = menu;
+        LibraryBrowser.ArmContextMenuDismissGuard(menu);
         menu.Closed += (_, _) =>
         {
             if (ReferenceEquals(_silenceMenu, menu))
@@ -2171,6 +2175,7 @@ public partial class MainWindow
         var seconds = _document.SampleRate > 0 ? range.Length / (double)_document.SampleRate : 0;
         var menu = SilenceSelectionPicker.Show(this, seconds, ApplySilenceSelection);
         _silenceSelectionMenu = menu;
+        LibraryBrowser.ArmContextMenuDismissGuard(menu);
         menu.Closed += (_, _) =>
         {
             if (ReferenceEquals(_silenceSelectionMenu, menu))

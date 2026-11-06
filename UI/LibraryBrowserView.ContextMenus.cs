@@ -444,6 +444,13 @@ internal sealed partial class LibraryBrowserView
                 () => ContinueContextMenuDismissGuardRelease(epoch),
                 DispatcherPriority.ApplicationIdle);
         };
+        // Show が先に IsOpen した場合、Opened は既に済んでいる。
+        // その時点でガードを立て、直前に閉じた別メニューの Idle 解除で下ろさない。
+        if (menu.IsOpen)
+        {
+            _contextMenuDismissGuard = true;
+            _contextMenuDismissReleaseEpoch++;
+        }
     }
 
     /// <summary>
