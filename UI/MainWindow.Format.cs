@@ -87,6 +87,7 @@ public partial class MainWindow
                 : null,
             value => PreviewFormatConvertSize(kind, value));
         _formatMenu = menu;
+        LibraryBrowser.ArmContextMenuDismissGuard(menu);
         menu.Closed += (_, _) =>
         {
             ClearFormatSizePreview();

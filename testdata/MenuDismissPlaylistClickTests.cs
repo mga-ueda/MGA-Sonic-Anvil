@@ -91,6 +91,72 @@ public sealed class MenuDismissPlaylistClickTests
     }
 
     /// <summary>
+    /// サンプルレート変換など、プレイリスト以外で開いたメニューを外側クリックで閉じたときも
+    /// 同じ貫通を握りつぶす。ガードが無いと選択以外のトラックが落ちる。
+    /// </summary>
+    [Fact]
+    public void ExternalMenuDismiss_SwallowsPlaylistRowClick()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new List<DocumentSession>();
+            for (var i = 0; i < 6; i++)
+            {
+                sessions.Add(Session($"{i:00} track.wav"));
+            }
+
+            var view = new LibraryBrowserView();
+            var host = new Button { Content = "Sample rate", Height = 32 };
+            var menu = new ContextMenu { PlacementTarget = host };
+            menu.Items.Add(new MenuItem { Header = "44100" });
+            host.ContextMenu = menu;
+            var root = new DockPanel();
+            DockPanel.SetDock(host, Dock.Bottom);
+            root.Children.Add(host);
+            root.Children.Add(view);
+            var window = new Window
+            {
+                Content = root,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.FocusList();
+            Flush();
+
+            var activations = 0;
+            view.SessionActivated += (_, _) => activations++;
+
+            menu.IsOpen = true;
+            view.ArmContextMenuDismissGuard(menu);
+            Assert.True(menu.IsOpen);
+            Assert.True(view.IsContextMenuDismissGuardActive);
+
+            menu.IsOpen = false;
+            Assert.False(menu.IsOpen);
+            Assert.True(view.IsContextMenuDismissGuardActive);
+
+            var grid = view.FileGrid;
+            var args = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+            };
+            grid.RaiseEvent(args);
+            Assert.True(args.Handled, "変換メニューの dismiss クリックがプレイリストへ貫通している。");
+            Assert.Equal(0, activations);
+            Assert.Equal(sessions.Count, view.BoundRowCount);
+
+            window.Close();
+        });
+    }
+
+    /// <summary>
     /// Idle が先に回っても左ボタン押下中はガードが残り、行クリックを握りつぶす。
     /// </summary>
     [Fact]
