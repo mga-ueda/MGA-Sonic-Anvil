@@ -364,6 +364,8 @@ internal static partial class UiStrings
     public static string IconStateRecording => Get("録音中", "Recording");
     public static string IconStateNoLoop => Get("ループなし", "No loop");
     public static string IconStateHasLoop => Get("ループあり", "Loop set");
+    public static string IconStateMarkerClickOff => Get("オフ", "Off");
+    public static string IconStateMarkerClickOn => Get("オン", "On");
     // ツールバー表示名はメニュー文言を正本にし、アクセスキーだけ除く（表記揺れ防止）。
     public static string LabelToolbarPlay => WithoutAccessKey(WaveMenuPlay);
     public static string LabelToolbarRecord => WithoutAccessKey(WaveMenuRecord);
@@ -410,6 +412,7 @@ internal static partial class UiStrings
     public static string LabelToolbarLoopPlay => WithoutAccessKey(WaveMenuLoopPlay);
     public static string LabelToolbarRestart => WithoutAccessKey(WaveMenuRestart);
     public static string LabelToolbarPreroll => WithoutAccessKey(WaveMenuPreroll);
+    public static string LabelToolbarMarkerClick => WithoutAccessKey(WaveMenuRangeClick).Trim();
     public static string LabelToolbarWaveformMaximize => LabelLayoutPresetF11;
     public static string LabelToolbarMinimalChrome => LabelLayoutPresetF9;
     public static string LabelToolbarAddMarker => WithoutAccessKey(WaveMenuAddMarker);
@@ -1332,6 +1335,7 @@ internal static partial class UiStrings
     public static string TooltipLoopPlay => Get("ループ再生 (L)", "Loop play (L)");
     public static string TooltipRestart => Get("やり直し再生 (Alt+Enter)", "Restart playback (Alt+Enter)");
     public static string TooltipPreroll => Get("3秒前から再生 (Ctrl+Space)", "Play from 3s before (Ctrl+Space)");
+    public static string TooltipMarkerClick => Get("マーカークリック (Q)", "Marker click (Q)");
     public static string TooltipWaveformMaximize => LabelLayoutPresetF11;
     public static string TooltipMinimalChrome => LabelLayoutPresetF9;
     public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");
@@ -1360,6 +1364,8 @@ internal static partial class UiStrings
         "Center while stopped. Toggle center-lock while playing (Z toggles even when stopped)");
     /// <summary>センターロックのトグルトースト。UI 言語に関わらず英語。</summary>
     public static string LabelCenterLock => "Center Lock";
+    /// <summary>マーカークリックのトグルトースト。UI 言語に関わらず英語。</summary>
+    public static string LabelMarkerClick => "Marker Click";
     public static string TooltipHistory => Get("編集履歴 (U)", "Edit history (U)");
     public static string TooltipLibraryMaximize => LabelLayoutPresetF10;
     public static string TooltipAnalyzerMaximize => LabelLayoutPresetF12;

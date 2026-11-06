@@ -314,6 +314,7 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains(TransportCommand.MaximizeWaveform, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.SelectToStart, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.LoopPlay, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.RangeClick, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.ExportByMarkers, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.CopyFileName, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.MergeTabs, TransportToolbarCatalog.AllCommands);
@@ -378,6 +379,7 @@ public sealed class TransportToolbarSettingsTests
     [InlineData(nameof(TransportCommand.TogglePlayback))]
     [InlineData(nameof(TransportCommand.Record))]
     [InlineData(nameof(TransportCommand.SetLoop))]
+    [InlineData(nameof(TransportCommand.RangeClick))]
     public void IconVariants_ListEveryStateStartingWithCatalogIcon(string commandName)
     {
         Assert.True(TransportToolbarCatalog.TryGetItem(commandName, out var item));

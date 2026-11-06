@@ -3169,6 +3169,7 @@ public partial class MainWindow
                 CanBounce: CanBounceSelectedVstInserts(),
                 CanMergeTabs: CanMergeSelectedTabs()));
         Transport.SetSampleLoopPresent(hasSampleLoop);
+        Transport.SetRangeClick(_rangeClickEnabled);
         // 押せるボタンが無いグループを畳んだあと、ツールバー領域自体の表示も合わせる。
         ApplyTransportToolbarVisibility();
         // ツールバーと同じタイミングで、タイムライン等のルート有効状態も直す。

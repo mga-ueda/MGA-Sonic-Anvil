@@ -96,6 +96,8 @@ internal enum TransportIcon
     PreviousTrack,
     NextTrack,
     CopyAllTabTimes,
+    /// <summary>マーカー旗と八分音符。オンは旗をマーカー色にする。</summary>
+    RangeClick,
 }
 
 internal enum TransportCommand
@@ -188,6 +190,7 @@ internal enum TransportCommand
     PreviousTrack,
     NextTrack,
     CopyAllTabTimes,
+    RangeClick,
 }
 
 /// <summary>メニュー／リスト用のトランスポートアイコン。ツールバーと同じ <see cref="TransportIconDrawing"/> を描く。</summary>
@@ -712,6 +715,18 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(cx + 5.5, cy + 1), new Point(cx + 5.5, cy + 9));
                 dc.DrawLine(pen, new Point(cx + 1.5, cy + 5), new Point(cx + 9.5, cy + 5));
                 break;
+            case TransportIcon.RangeClick:
+                // 左にマーカー旗、右に八分音符。オンのときだけ旗をマーカー色にする。
+                DrawMarkerFlag(
+                    dc,
+                    latched ? markerBrush : brush,
+                    pen,
+                    cx - 10,
+                    cy - 8,
+                    cy + 8,
+                    7);
+                DrawEighthNote(dc, pen, cx + 3.2, cy + 5);
+                break;
             case TransportIcon.SetLoop:
                 DrawCassetteAutoReverse(dc, pen, loopFill);
                 break;
@@ -1071,6 +1086,16 @@ internal static class TransportIconDrawing
         {
             dc.Pop();
         }
+    }
+
+    /// <summary>八分音符。頭の中心を渡す。ピッチアイコンと同じ線画。</summary>
+    private static void DrawEighthNote(DrawingContext dc, Pen pen, double headX, double headY)
+    {
+        dc.DrawEllipse(null, pen, new Point(headX, headY), 3.2, 2.2);
+        var stemX = headX + 3.2;
+        var stemTop = headY - 13;
+        dc.DrawLine(pen, new Point(stemX, headY), new Point(stemX, stemTop));
+        dc.DrawLine(pen, new Point(stemX, stemTop), new Point(stemX + 5.5, stemTop + 3));
     }
 
     /// <summary>波形上のマーカー旗と同じ形（棒の上端に、外側の角だけ丸めた塗り旗）。</summary>

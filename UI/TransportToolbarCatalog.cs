@@ -59,6 +59,8 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.Restart, () => UiStrings.LabelToolbarRestart, () => UiStrings.TooltipRestart),
         new(TransportCommand.Preroll, TransportIcon.Preroll,
             WaveMenuCommand.Preroll, () => UiStrings.LabelToolbarPreroll, () => UiStrings.TooltipPreroll),
+        new(TransportCommand.RangeClick, TransportIcon.RangeClick,
+            WaveMenuCommand.RangeClick, () => UiStrings.LabelToolbarMarkerClick, () => UiStrings.TooltipMarkerClick),
         new(TransportCommand.PreviousTrack, TransportIcon.PreviousTrack,
             WaveMenuCommand.PreviousTrack, () => UiStrings.LabelToolbarPreviousTrack, () => UiStrings.TooltipPreviousTrack),
         new(TransportCommand.NextTrack, TransportIcon.NextTrack,
@@ -160,7 +162,7 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.DeleteRegions, () => UiStrings.LabelToolbarDeleteRegions, () => UiStrings.TooltipDeleteRegions),
         new(TransportCommand.DeleteAllRegions, TransportIcon.DeleteAllRegions,
             WaveMenuCommand.DeleteAllRegions, () => UiStrings.LabelToolbarDeleteAllRegions, () => UiStrings.TooltipDeleteAllRegions),
-        // マーカークリック・最前面・タイル・WAAPI 等のメニュー Check トグルは非掲載
+        // 最前面・タイル・WAAPI 等のメニュー Check トグルは非掲載
 
         new(TransportCommand.SampleRate, TransportIcon.SampleRate,
             WaveMenuCommand.SampleRate, () => UiStrings.LabelToolbarSampleRate, () => UiStrings.TooltipSampleRate),
@@ -335,6 +337,11 @@ internal static class TransportToolbarCatalog
             [
                 new(TransportIcon.SetLoop, () => UiStrings.IconStateNoLoop),
                 new(TransportIcon.ClearLoop, () => UiStrings.IconStateHasLoop, Latched: true),
+            ],
+            TransportCommand.RangeClick =>
+            [
+                new(TransportIcon.RangeClick, () => UiStrings.IconStateMarkerClickOff),
+                new(TransportIcon.RangeClick, () => UiStrings.IconStateMarkerClickOn, Latched: true),
             ],
             _ => [],
         };

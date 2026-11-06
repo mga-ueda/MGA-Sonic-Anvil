@@ -197,6 +197,9 @@ public partial class MainWindow
             case TransportCommand.Preroll:
                 StartPrerollPlayback();
                 break;
+            case TransportCommand.RangeClick:
+                ToggleRangeClick();
+                break;
             case TransportCommand.SeekViewLeft:
                 Waveform.SeekToViewEdge(-1);
                 break;
@@ -1294,6 +1297,8 @@ public partial class MainWindow
     {
         _rangeClickEnabled = !_rangeClickEnabled;
         SyncRangeClicks();
+        Transport.SetRangeClick(_rangeClickEnabled);
+        ShowOptionToggleToast(UiStrings.LabelMarkerClick, _rangeClickEnabled);
         Waveform.Focus();
     }
 

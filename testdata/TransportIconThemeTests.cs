@@ -172,6 +172,7 @@ public sealed class TransportIconThemeTests
                 TransportIcon.NormalizePerRegion,
                 TransportIcon.ClearLoop,
                 TransportIcon.DeleteMarkers,
+                TransportIcon.RangeClick,
                 TransportIcon.SampleRate,
                 TransportIcon.BitDepth,
                 TransportIcon.Channels,

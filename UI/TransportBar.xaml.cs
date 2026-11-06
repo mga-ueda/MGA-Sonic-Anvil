@@ -49,6 +49,15 @@ internal partial class TransportBar : UserControl
         _play.InvalidateVisual();
     }
 
+    public void SetRangeClick(bool enabled)
+    {
+        if (_buttons.TryGetValue(TransportCommand.RangeClick, out var button))
+        {
+            button.IsLatched = enabled;
+            button.InvalidateVisual();
+        }
+    }
+
     public void SetRecording(bool recording)
     {
         if (_buttons.TryGetValue(TransportCommand.Record, out var button))
