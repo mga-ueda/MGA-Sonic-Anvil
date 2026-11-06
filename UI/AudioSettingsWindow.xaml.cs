@@ -192,6 +192,9 @@ internal partial class AudioSettingsWindow : Window
     private readonly int _backgroundAnimationSpeedOpenedAt;
     private readonly double _controlCornerRadiusOpenedAt;
     private bool _updatingControlCornerRadius;
+    private Slider _controlCornerRadiusSlider = null!;
+    private TextBlock _controlCornerRadiusValue = null!;
+    private RoundedButton _controlCornerRadiusResetButton = null!;
     private readonly bool _showMainMenuBarOpenedAt;
     private readonly LayoutMainMenuBarAlign _mainMenuBarAlignOpenedAt;
     private readonly DispatcherTimer _backgroundAnimationSpeedPreviewTimer = new()
@@ -380,6 +383,9 @@ internal partial class AudioSettingsWindow : Window
         _playbackOutputMap = [.. speaker.PlaybackOutputMap ?? []];
         _fileChannelMap = [.. speaker.FileChannelMap ?? []];
         InitializeComponent();
+        _controlCornerRadiusSlider = (Slider)FindName("ControlCornerRadiusSlider")!;
+        _controlCornerRadiusValue = (TextBlock)FindName("ControlCornerRadiusValueText")!;
+        _controlCornerRadiusResetButton = (RoundedButton)FindName("ControlCornerRadiusResetButton")!;
         _meterTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = TimeSpan.FromMilliseconds(33),
@@ -424,7 +430,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(WallpaperBrowseButton);
         ActionButtonLooks.ApplyClear(WallpaperClearButton);
         ActionButtonLooks.ApplyClear(BackgroundAnimationSpeedResetButton);
-        ActionButtonLooks.ApplyClear(ControlCornerRadiusResetButton);
+        ActionButtonLooks.ApplyClear(_controlCornerRadiusResetButton);
         ActionButtonLooks.ApplyClear(TransportToolbarCustomizeButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
@@ -553,11 +559,11 @@ internal partial class AudioSettingsWindow : Window
             ApplyBackgroundAnimationSpeedPreview();
         };
         SyncBackgroundAnimationSpeedEnabled();
-        ControlCornerRadiusSlider.Minimum = AppSettings.ControlCornerRadiusMin;
-        ControlCornerRadiusSlider.Maximum = AppSettings.ControlCornerRadiusMax;
+        _controlCornerRadiusSlider.Minimum = AppSettings.ControlCornerRadiusMin;
+        _controlCornerRadiusSlider.Maximum = AppSettings.ControlCornerRadiusMax;
         SetControlCornerRadiusSlider(SelectedControlCornerRadius);
-        ControlCornerRadiusSlider.ValueChanged += (_, _) => OnControlCornerRadiusSliderChanged();
-        ControlCornerRadiusSlider.PreviewMouseWheel += (_, e) =>
+        _controlCornerRadiusSlider.ValueChanged += (_, _) => OnControlCornerRadiusSliderChanged();
+        _controlCornerRadiusSlider.PreviewMouseWheel += (_, e) =>
         {
             if (e.Delta == 0)
             {
@@ -565,8 +571,8 @@ internal partial class AudioSettingsWindow : Window
             }
 
             e.Handled = true;
-            var next = AppSettings.NudgeControlCornerRadius(ControlCornerRadiusSlider.Value, Math.Sign(e.Delta));
-            if (Math.Abs(ControlCornerRadiusSlider.Value - next) < 0.001)
+            var next = AppSettings.NudgeControlCornerRadius(_controlCornerRadiusSlider.Value, Math.Sign(e.Delta));
+            if (Math.Abs(_controlCornerRadiusSlider.Value - next) < 0.001)
             {
                 return;
             }
@@ -1625,7 +1631,7 @@ internal partial class AudioSettingsWindow : Window
         SelectedWallpaperOpacity = wallpaperOpacity;
         SelectedBackgroundAnimationSpeedPercent = AppSettings.ClampBackgroundAnimationSpeedPercent(
             (int)Math.Round(BackgroundAnimationSpeedSlider.Value));
-        SelectedControlCornerRadius = AppSettings.ClampControlCornerRadius(ControlCornerRadiusSlider.Value);
+        SelectedControlCornerRadius = AppSettings.ClampControlCornerRadius(_controlCornerRadiusSlider.Value);
         SelectedUiScalePercent = UiScaleCombo.SelectedItem is ScaleItem scaleItem
             ? scaleItem.Percent
             : UiScale.DefaultPercent;
@@ -2789,8 +2795,8 @@ internal partial class AudioSettingsWindow : Window
             return;
         }
 
-        var radius = AppSettings.ClampControlCornerRadius(ControlCornerRadiusSlider.Value);
-        ControlCornerRadiusValueText.Text = AppSettings.FormatControlCornerRadius(radius);
+        var radius = AppSettings.ClampControlCornerRadius(_controlCornerRadiusSlider.Value);
+        _controlCornerRadiusValue.Text = AppSettings.FormatControlCornerRadius(radius);
         SelectedControlCornerRadius = radius;
         ApplyControlCornerRadiusPreview();
     }
@@ -2823,14 +2829,14 @@ internal partial class AudioSettingsWindow : Window
         _updatingControlCornerRadius = true;
         try
         {
-            ControlCornerRadiusSlider.Value = radius;
+            _controlCornerRadiusSlider.Value = radius;
         }
         finally
         {
             _updatingControlCornerRadius = false;
         }
 
-        ControlCornerRadiusValueText.Text = AppSettings.FormatControlCornerRadius(radius);
+        _controlCornerRadiusValue.Text = AppSettings.FormatControlCornerRadius(radius);
         SelectedControlCornerRadius = radius;
     }
 
