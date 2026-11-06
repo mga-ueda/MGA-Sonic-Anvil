@@ -1128,7 +1128,7 @@ public partial class MainWindow
                 && !IsLibraryMaximized
                 && (Waveform.HasSelectedRegions || document.Regions.Count > 0),
             HasSolo = (_activeSession?.SoloMask ?? 0) != 0,
-            CenterLocked = Waveform.CenterLocked,
+            CenterLocked = !IsLibraryMaximized && Waveform.CenterLocked,
             SilentSkip = SilentSkipCheck.IsChecked == true,
             AlwaysOnTop = AlwaysOnTopCheck.IsChecked == true,
             WaapiVisible = _waapiPanelVisible,

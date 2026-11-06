@@ -2385,9 +2385,14 @@ public partial class MainWindow
         Waveform.CenterViewOnPlayhead();
     }
 
-    /// <summary>センターロックを反転し、中央に ON／OFF を出す。停止中でも有効。スクロールや停止では外さない。</summary>
+    /// <summary>センターロックを反転し、中央に ON／OFF を出す。停止中でも有効。スクロールや停止では外さない。プレイヤーでは切替しない。</summary>
     private void ToggleCenterLock()
     {
+        if (IsLibraryMaximized)
+        {
+            return;
+        }
+
         var enabled = !Waveform.CenterLocked;
         if (enabled)
         {
