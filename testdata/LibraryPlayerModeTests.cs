@@ -311,6 +311,7 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.SelectToStart));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CloseTab));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.LoopPlay));
+        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.RangeClick));
     }
 
     [Fact]

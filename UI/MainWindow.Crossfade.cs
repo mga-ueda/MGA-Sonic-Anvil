@@ -39,6 +39,7 @@ public partial class MainWindow
             or TransportCommand.LoopPlay
             or TransportCommand.Restart
             or TransportCommand.Preroll
+            or TransportCommand.RangeClick
             or TransportCommand.TimeZoomIn
             or TransportCommand.TimeZoomOut
             or TransportCommand.TimeZoomMax
