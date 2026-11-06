@@ -174,11 +174,11 @@ internal sealed class HsvColorPicker : Grid
         _hexBox.Margin = new Thickness(0, 0, 8, 0);
         _previewBack.Width = 36;
         _previewBack.Height = 28;
-        _previewBack.CornerRadius = new CornerRadius(6);
+        DesignMetrics.BindCorner(_previewBack);
         _previewBack.Background = CheckerboardBrush();
         _preview.Width = 36;
         _preview.Height = 28;
-        _preview.CornerRadius = new CornerRadius(6);
+        DesignMetrics.BindCorner(_preview);
         _preview.BorderThickness = new Thickness(1);
         var previewHost = new Grid();
         previewHost.Children.Add(_previewBack);

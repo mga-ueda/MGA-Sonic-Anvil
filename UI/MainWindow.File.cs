@@ -2252,7 +2252,8 @@ public partial class MainWindow
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F11),
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F12),
             settings.ResolvedVst3SearchPaths(),
-            settings.Vst3UseSteinbergHostCache)
+            settings.Vst3UseSteinbergHostCache,
+            settings.ResolvedControlCornerRadius())
         {
             Owner = this,
             OpenColorSettings = ShowColorDevPanel,
@@ -2309,6 +2310,8 @@ public partial class MainWindow
         settings.EnableBackgroundAnimation = dialog.SelectedEnableBackgroundAnimation;
         settings.BackgroundAnimationSpeedPercent = dialog.SelectedBackgroundAnimationSpeedPercent;
         LibraryBrowser.ApplyBackgroundAnimationSetting();
+        settings.ControlCornerRadius = dialog.SelectedControlCornerRadius;
+        DesignMetrics.ApplyControlCornerRadius(settings.ResolvedControlCornerRadius());
         settings.GaplessPlayback = dialog.SelectedGaplessPlayback;
         Mp3Gapless.Enabled = settings.GaplessPlayback;
         settings.ShowMainMenuBar = dialog.SelectedShowMainMenuBar;

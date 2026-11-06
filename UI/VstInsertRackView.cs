@@ -90,6 +90,7 @@ internal sealed class VstInsertRackView : Grid
             },
             RenderTransform = _dragGhostOffset,
         };
+        DesignMetrics.BindCorner(_dragGhost);
         Panel.SetZIndex(_dragGhost, 100);
 
         // スロット 1–4 | スロット 5–8（各列 4 段）。Bounce はメニュー／ツールバー／ショートカット。
@@ -473,7 +474,6 @@ internal sealed class VstInsertRackView : Grid
         _dragGhost.BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get(
             persisted ? "VstInsertSlotPersistBackBrush" : "VstInsertSlotFilledBackBrush"));
         _dragGhost.BorderThickness = new Thickness(1);
-        _dragGhost.CornerRadius = new CornerRadius(DesignMetrics.ControlCornerRadius);
         // 元スロットと同じ大きさのカードを持ち上げる。
         _dragGhost.Width = Math.Max(1, source.ActualWidth);
         _dragGhost.Height = Math.Max(1, source.ActualHeight);

@@ -24,16 +24,15 @@ internal static class OverlayCaption
     {
         var mark = new CloseMark();
         mark.SetResourceReference(CloseMark.ForegroundProperty, "MutedForeBrush");
-        var hit = new Border
+        var hit = DesignMetrics.BindCorner(new Border
         {
             Width = 22,
             Height = 22,
-            CornerRadius = new CornerRadius(2),
             BorderThickness = new Thickness(1),
             Cursor = Cursors.Hand,
             Child = mark,
             Style = CloseStyle(clearRest),
-        };
+        });
         hit.MouseEnter += (_, _) =>
             mark.SetResourceReference(CloseMark.ForegroundProperty, "PrimaryForeBrush");
         hit.MouseLeave += (_, _) =>

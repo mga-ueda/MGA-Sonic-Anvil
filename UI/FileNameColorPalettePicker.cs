@@ -19,7 +19,6 @@ internal sealed class FileNameColorPalettePicker : Border
         Width = 72;
         Height = DesignMetrics.AudioInputHeight;
         Margin = new Thickness(8, 0, 8, 0);
-        CornerRadius = DesignMetrics.ControlCorner;
         BorderThickness = new Thickness(1);
         Cursor = Cursors.Hand;
         Focusable = true;
@@ -37,17 +36,17 @@ internal sealed class FileNameColorPalettePicker : Border
             SnapsToDevicePixels = true,
             IsHitTestVisible = false,
         };
+        DesignMetrics.BindCorner(this);
         Child = _chip;
 
         _board = new FileNameColorPaletteBoard { Margin = new Thickness(4, 2, 4, 4) };
-        var drop = new Border
+        var drop = DesignMetrics.BindCorner(new Border
         {
-            CornerRadius = DesignMetrics.ControlCorner,
             BorderThickness = new Thickness(1),
             Padding = new Thickness(0, 2, 0, 0),
             Child = _board,
             SnapsToDevicePixels = true,
-        };
+        });
         drop.Background = Brushes.Transparent;
         drop.SetResourceReference(BorderBrushProperty, "PlayerComboDropBorderBrush");
         _popup = new Popup

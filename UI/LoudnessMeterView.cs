@@ -598,15 +598,14 @@ internal sealed class LoudnessMeterView : Grid
             VerticalAlignment = VerticalAlignment.Center,
             TextAlignment = TextAlignment.Right,
         };
-        var box = new Border
+        var box = DesignMetrics.BindCorner(new Border
         {
             Child = value,
-            CornerRadius = DesignMetrics.ControlCorner,
             Padding = new Thickness(3, 1, 3, 1),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(6, 0, 4, 0),
             Background = Brushes.Transparent,
-        };
+        });
         return (box, value);
     }
 

@@ -47,11 +47,11 @@ internal sealed class AcrylicGlassPopup
         {
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(1),
-            CornerRadius = DesignMetrics.ControlCorner,
             SnapsToDevicePixels = true,
             IsHitTestVisible = false,
             Effect = null,
         };
+        DesignMetrics.BindCorner(_plate);
         _plate.SetResourceReference(Border.BorderBrushProperty, "PlayerComboDropBorderBrush");
 
         _popup = new Popup
