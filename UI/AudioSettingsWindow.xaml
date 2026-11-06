@@ -242,6 +242,44 @@
                                 VerticalAlignment="Center"
                                 Click="BackgroundAnimationSpeedResetButton_Click" />
             </Grid>
+            <Grid Margin="0,8,0,4">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="ControlCornerRadiusLabel"
+                         Text="{x:Static domain:UiStrings.LabelControlCornerRadius}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,8,0" />
+              <Slider x:Name="ControlCornerRadiusSlider"
+                      Grid.Column="1"
+                      Style="{StaticResource SilenceDetectRiseSliderStyle}"
+                      SmallChange="1"
+                      LargeChange="1"
+                      TickFrequency="1"
+                      IsSnapToTickEnabled="True"
+                      IsMoveToPointEnabled="True"
+                      VerticalAlignment="Center"
+                      FocusVisualStyle="{x:Null}"
+                      Cursor="Hand" />
+              <TextBlock x:Name="ControlCornerRadiusValueText"
+                         Grid.Column="2"
+                         MinWidth="28"
+                         VerticalAlignment="Center"
+                         Margin="8,0,0,0"
+                         TextAlignment="Right" />
+              <ui:RoundedButton x:Name="ControlCornerRadiusResetButton"
+                                Grid.Column="3"
+                                Content="{x:Static domain:UiStrings.ButtonTransportToolbarResetLayout}"
+                                Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                MinWidth="88"
+                                Padding="12,0"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                Click="ControlCornerRadiusResetButton_Click" />
+            </Grid>
 
             <TextBlock x:Name="AssociationHeader"
                        Text="{x:Static domain:UiStrings.LabelFileAssociations}"

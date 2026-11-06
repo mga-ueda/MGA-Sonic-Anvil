@@ -24,7 +24,6 @@ internal sealed class CrossfadeEditWindow : Window
         BorderThickness = new Thickness(1),
         Padding = new Thickness(0),
         Margin = new Thickness(0, 0, 8, 0),
-        CornerRadius = DesignMetrics.ControlCorner,
         HorizontalAlignment = HorizontalAlignment.Stretch,
         VerticalAlignment = VerticalAlignment.Stretch,
     };
@@ -104,6 +103,7 @@ internal sealed class CrossfadeEditWindow : Window
 
     public CrossfadeEditWindow(Window owner)
     {
+        DesignMetrics.BindCorner(_spliceFrame);
         Owner = owner;
         Title = UiStrings.CrossfadeEditTitle;
         // 規定サイズ＝最小サイズ（これより小さくリサイズ不可）。
@@ -1623,7 +1623,6 @@ internal sealed class CrossfadeEditWindow : Window
             FontSize = 11,
             FontWeight = FontWeights.SemiBold,
             MinHeight = 28,
-            CornerRadius = DesignMetrics.ControlCornerRadius,
         };
         ActionButtonLooks.ApplyClear(btn);
         return btn;
@@ -1654,7 +1653,6 @@ internal sealed class CrossfadeEditWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             VerticalContentAlignment = VerticalAlignment.Center,
             HorizontalContentAlignment = HorizontalAlignment.Center,
-            CornerRadius = DesignMetrics.ControlCornerRadius,
         };
         ActionButtonLooks.ApplyClear(btn);
         btn.Click += (_, _) => click();
@@ -1676,7 +1674,6 @@ internal sealed class CrossfadeEditWindow : Window
             MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             Margin = new Thickness(8, 0, 0, 0),
-            CornerRadius = DesignMetrics.ControlCornerRadius,
         };
         AppDialogKeys.PrepareActionButton(btn, isDefault, isCancel);
         if (accent)

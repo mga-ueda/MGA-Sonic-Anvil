@@ -200,13 +200,12 @@ internal static class FadeCurveIcons
     /// </summary>
     public static Border CreateChoiceButton(FadeShape shape, bool isFadeIn, string? toolTip = null)
     {
-        var border = new Border
+        var border = DesignMetrics.BindCorner(new Border
         {
             Tag = shape,
             Width = ChoiceButtonSide,
             Height = ChoiceButtonSide,
             Margin = new Thickness(0, 0, 3, 0),
-            CornerRadius = DesignMetrics.ControlCorner,
             BorderThickness = new Thickness(1),
             BorderBrush = WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")),
             Background = WpfControlHelpers.FrozenBrush(Theme.Get("DialogInputBackBrush")),
@@ -220,7 +219,7 @@ internal static class FadeCurveIcons
                 VerticalAlignment = VerticalAlignment.Center,
                 SnapsToDevicePixels = true,
             },
-        };
+        });
         ApplyChoiceButtonChrome(border, selected: false);
         return border;
     }

@@ -689,6 +689,7 @@ internal static partial class UiStrings
         "背景色アニメーション(_B)",
         "Background color _animation");
     public static string LabelBackgroundAnimationSpeed => Get("速度", "Speed");
+    public static string LabelControlCornerRadius => Get("角の丸み", "Corner radius");
     public static string ButtonWallpaperClear => Get("クリア", "Clear");
     public static string FilterWallpaperImage => Get(
         "画像|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff|すべてのファイル|*.*",

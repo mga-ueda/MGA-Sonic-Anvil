@@ -114,6 +114,15 @@ internal sealed class AppSettings
 
     public int BackgroundAnimationSpeedPercent { get; set; } = BackgroundAnimationSpeedPercentDefault;
 
+    /// <summary>ボタンや入力欄など、アプリ全体の角丸（dip）。既定 5。範囲 0〜16。</summary>
+    public const double ControlCornerRadiusDefault = 5;
+
+    public const double ControlCornerRadiusMin = 0;
+
+    public const double ControlCornerRadiusMax = 16;
+
+    public double ControlCornerRadius { get; set; } = ControlCornerRadiusDefault;
+
     public bool AlwaysOnTop { get; set; }
 
     /// <summary>ウィンドウ上部のメニューバーを出す。既定オン。波形右クリックと同じ内容。</summary>
@@ -933,6 +942,28 @@ internal sealed class AppSettings
 
         const int step = 5;
         return ClampBackgroundAnimationSpeedPercent(current + (direction > 0 ? step : -step));
+    }
+
+    public double ResolvedControlCornerRadius() => ClampControlCornerRadius(ControlCornerRadius);
+
+    public static double ClampControlCornerRadius(double radius) =>
+        double.IsFinite(radius)
+            ? Math.Clamp(radius, ControlCornerRadiusMin, ControlCornerRadiusMax)
+            : ControlCornerRadiusDefault;
+
+    public static string FormatControlCornerRadius(double radius) =>
+        ClampControlCornerRadius(radius).ToString("0.#", System.Globalization.CultureInfo.CurrentCulture);
+
+    /// <summary>角丸を 1 刻みで動かし、範囲に収める。</summary>
+    public static double NudgeControlCornerRadius(double current, int direction)
+    {
+        var value = ClampControlCornerRadius(current);
+        if (direction == 0)
+        {
+            return value;
+        }
+
+        return ClampControlCornerRadius(value + (direction > 0 ? 1 : -1));
     }
 
     public static double ClampWallpaperOpacity(double opacity) =>

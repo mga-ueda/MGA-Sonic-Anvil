@@ -67,7 +67,8 @@ internal sealed class LoudnessPenButton : ToggleButton
             Theme.Get(latched || IsMouseOver ? "ControlHoverBorderBrush" : "ChromeBorderBrush"));
         var outline = new Pen(border, 1);
         outline.Freeze();
-        dc.DrawRoundedRectangle(back, outline, new Rect(0.5, 0.5, bounds.Width - 1, bounds.Height - 1), 2, 2);
+        var radius = DesignMetrics.ControlCornerRadius;
+        dc.DrawRoundedRectangle(back, outline, new Rect(0.5, 0.5, bounds.Width - 1, bounds.Height - 1), radius, radius);
 
         var fore = WpfControlHelpers.FrozenBrush(Theme.Get(latched ? "PrimaryForeBrush" : "MutedForeBrush"));
         var hint = HintText(VisualTreeHelper.GetDpi(this).PixelsPerDip, fore);

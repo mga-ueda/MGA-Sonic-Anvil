@@ -485,10 +485,9 @@ internal sealed partial class WaapiStatusBar : UserControl
             {
                 Width = width,
                 Height = height,
-                RadiusX = DesignMetrics.ControlCornerRadius,
-                RadiusY = DesignMetrics.ControlCornerRadius,
                 Fill = WpfControlHelpers.FrozenBrush(_badgeBack),
             };
+            DesignMetrics.BindRadii(rect);
             Canvas.SetTop(rect, (BadgeCanvas.ActualHeight - height) / 2);
             BadgeCanvas.Children.Add(rect);
         }

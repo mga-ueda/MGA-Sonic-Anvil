@@ -41,7 +41,7 @@ internal sealed class EditHistoryOverlay : Border
         Background = Brushes.Transparent;
         SetResourceReference(BorderBrushProperty, "PlayerComboDropBorderBrush");
         BorderThickness = new Thickness(1);
-        CornerRadius = DesignMetrics.ControlCorner;
+        DesignMetrics.BindCorner(this);
         SnapsToDevicePixels = true;
         Focusable = false;
 

@@ -432,10 +432,9 @@ internal partial class TransportBar : UserControl
 
     private static Border CreateGroupVeil(UIElement content)
     {
-        var veil = new Border
+        var veil = DesignMetrics.BindCorner(new Border
         {
             Child = content,
-            CornerRadius = DesignMetrics.ControlCorner,
             Padding = new Thickness(
                 DesignMetrics.From96(4),
                 DesignMetrics.From96(2),
@@ -448,7 +447,7 @@ internal partial class TransportBar : UserControl
                 DesignMetrics.From96(1)),
             VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true,
-        };
+        });
         veil.SetResourceReference(BackgroundProperty, "TransportToolbarGroupVeilBrush");
         return veil;
     }

@@ -1,5 +1,11 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -46,10 +52,83 @@ internal static class DesignMetrics
 
     public static double StatusOutputPathHeight => From96(22);
 
-    /// <summary>入力欄・ボタン・バッジ・マーカー旗など共通の角丸。</summary>
-    public const double ControlCornerRadius = 3;
+    /// <summary>入力欄・ボタン・バッジ・マーカー旗など、アプリ全体で共有する角丸。既定は 5。</summary>
+    public const double ControlCornerRadiusDefault = AppSettings.ControlCornerRadiusDefault;
 
-    public static CornerRadius ControlCorner { get; } = new(ControlCornerRadius);
+    public static CornerChrome Chrome { get; } = new();
+
+    public static double ControlCornerRadius => Chrome.Radius;
+
+    public static CornerRadius ControlCorner => Chrome.Corner;
+
+    public static void ApplyControlCornerRadius(double radius) =>
+        Chrome.Radius = AppSettings.ClampControlCornerRadius(radius);
+
+    public static Binding CornerBinding() => new(nameof(CornerChrome.Corner))
+    {
+        Source = Chrome,
+        Mode = BindingMode.OneWay,
+    };
+
+    public static Binding RadiusBinding() => new(nameof(CornerChrome.Radius))
+    {
+        Source = Chrome,
+        Mode = BindingMode.OneWay,
+    };
+
+    public static Border BindCorner(Border border)
+    {
+        BindingOperations.SetBinding(border, Border.CornerRadiusProperty, CornerBinding());
+        return border;
+    }
+
+    public static void BindCorner(RoundedButton button) =>
+        BindingOperations.SetBinding(button, RoundedButton.CornerRadiusProperty, RadiusBinding());
+
+    public static void BindRadii(Rectangle rectangle)
+    {
+        BindingOperations.SetBinding(rectangle, Rectangle.RadiusXProperty, RadiusBinding());
+        BindingOperations.SetBinding(rectangle, Rectangle.RadiusYProperty, RadiusBinding());
+    }
+
+    public static void RefreshOpenVisuals()
+    {
+        var app = Application.Current;
+        if (app is null)
+        {
+            return;
+        }
+
+        var seen = new HashSet<DependencyObject>();
+        foreach (Window window in app.Windows)
+        {
+            RefreshTree(window, seen);
+        }
+    }
+
+    private static void RefreshTree(DependencyObject node, HashSet<DependencyObject> seen)
+    {
+        if (!seen.Add(node))
+        {
+            return;
+        }
+
+        if (node is UIElement element)
+        {
+            element.InvalidateVisual();
+        }
+
+        if (node is Popup { Child: DependencyObject child })
+        {
+            RefreshTree(child, seen);
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(node);
+        for (var i = 0; i < count; i++)
+        {
+            RefreshTree(VisualTreeHelper.GetChild(node, i), seen);
+        }
+    }
 
     public static double DocumentTabBarHeight => From96(22);
 
@@ -492,5 +571,41 @@ internal static class DesignMetrics
         }
 
         return Math.Clamp(width, LevelMeterWidth, LevelMeterSurroundLayout.FilledColumnWidth(channels));
+    }
+}
+
+/// <summary>角丸の単一の値。<see cref="DesignMetrics.ControlCornerRadius"/> とバインディングの源。</summary>
+internal sealed class CornerChrome : DependencyObject
+{
+    public static readonly DependencyProperty RadiusProperty =
+        DependencyProperty.Register(
+            nameof(Radius),
+            typeof(double),
+            typeof(CornerChrome),
+            new PropertyMetadata(DesignMetrics.ControlCornerRadiusDefault, OnRadiusChanged));
+
+    public static readonly DependencyProperty CornerProperty =
+        DependencyProperty.Register(
+            nameof(Corner),
+            typeof(CornerRadius),
+            typeof(CornerChrome),
+            new PropertyMetadata(new CornerRadius(DesignMetrics.ControlCornerRadiusDefault)));
+
+    public double Radius
+    {
+        get => (double)GetValue(RadiusProperty);
+        set => SetValue(RadiusProperty, value);
+    }
+
+    public CornerRadius Corner
+    {
+        get => (CornerRadius)GetValue(CornerProperty);
+        private set => SetValue(CornerProperty, value);
+    }
+
+    private static void OnRadiusChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        ((CornerChrome)d).Corner = new CornerRadius((double)e.NewValue);
+        DesignMetrics.RefreshOpenVisuals();
     }
 }

@@ -13,7 +13,7 @@ internal sealed class RoundedButton : Button
 
     public static readonly DependencyProperty CornerRadiusProperty =
         DependencyProperty.Register(nameof(CornerRadius), typeof(double), typeof(RoundedButton),
-            new FrameworkPropertyMetadata(DesignMetrics.ControlCornerRadius, FrameworkPropertyMetadataOptions.AffectsRender));
+            new FrameworkPropertyMetadata(DesignMetrics.ControlCornerRadiusDefault, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty HoverBackColorProperty =
         DependencyProperty.Register(nameof(HoverBackColor), typeof(Color?), typeof(RoundedButton),
@@ -84,6 +84,7 @@ internal sealed class RoundedButton : Button
         KeyboardNavigation.SetAcceptsReturn(this, true);
         IsEnabledChanged += (_, _) => InvalidateVisual();
         Loaded += (_, _) => InvalidateVisual();
+        DesignMetrics.BindCorner(this);
     }
 
     public double CornerRadius

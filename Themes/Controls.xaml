@@ -34,7 +34,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                            CornerRadius="{ui:ControlCorner}"
                             SnapsToDevicePixels="True">
                         <ScrollViewer x:Name="PART_ContentHost"
                                       Margin="{TemplateBinding Padding}"
@@ -97,7 +97,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                CornerRadius="{ui:ControlCorner}"
                                 IsHitTestVisible="False" />
                         <ScrollViewer x:Name="PART_ContentHost"
                                       Margin="{TemplateBinding Padding}"
@@ -239,7 +239,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}">
+                                CornerRadius="{ui:ControlCorner}">
                             <Grid>
                                 <ToggleButton Style="{StaticResource DarkComboBoxToggleButtonStyle}"
                                               Focusable="False"
@@ -295,7 +295,7 @@
                             <Border Background="{DynamicResource MenuPopupBackBrush}"
                                     BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                    CornerRadius="{ui:ControlCorner}"
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                 <ScrollViewer Margin="0" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
@@ -333,7 +333,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
                     <Border Background="{DynamicResource PrimaryForeBrush}"
-                            CornerRadius="2"
+                            CornerRadius="{ui:ControlCorner}"
                             Margin="1" />
                 </ControlTemplate>
             </Setter.Value>
@@ -398,7 +398,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
                     <Border Background="{DynamicResource PrimaryForeBrush}"
-                            CornerRadius="2"
+                            CornerRadius="{ui:ControlCorner}"
                             Margin="1" />
                 </ControlTemplate>
             </Setter.Value>
@@ -543,7 +543,7 @@
                                 Background="{DynamicResource PlayerComboFillBrush}"
                                 BorderBrush="{DynamicResource PlayerComboFillBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                CornerRadius="{ui:ControlCorner}"
                                 IsHitTestVisible="False" />
                         <Border x:Name="Border" Background="Transparent" BorderThickness="0">
                             <Grid>
@@ -601,11 +601,11 @@
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                 <Border Background="{DynamicResource MenuPopupBackBrush}"
-                                        CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                        CornerRadius="{ui:ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                        CornerRadius="{ui:ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <ScrollViewer Margin="1" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
@@ -659,7 +659,7 @@
                                 Background="{DynamicResource PlayerComboFillBrush}"
                                 BorderBrush="{DynamicResource PlayerComboFillBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                CornerRadius="{ui:ControlCorner}"
                                 IsHitTestVisible="False" />
                         <Border Background="Transparent" BorderThickness="0">
                             <ScrollViewer x:Name="PART_ContentHost"
@@ -697,7 +697,7 @@
                                 Background="{DynamicResource StatusTimecodeFillBrush}"
                                 BorderBrush="{DynamicResource StatusTimecodeFillBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                CornerRadius="{ui:ControlCorner}"
                                 IsHitTestVisible="False" />
                         <Border Background="Transparent" BorderThickness="0">
                             <Grid>
@@ -755,11 +755,11 @@
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                 <Border Background="{DynamicResource MenuPopupBackBrush}"
-                                        CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                        CornerRadius="{ui:ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                        CornerRadius="{ui:ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <ScrollViewer Margin="1" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
@@ -796,7 +796,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
                     <Border Background="{DynamicResource PrimaryForeBrush}"
-                            CornerRadius="2"
+                            CornerRadius="{ui:ControlCorner}"
                             Margin="{x:Static ui:DesignMetrics.WaveformScrollThumbMargin}" />
                 </ControlTemplate>
             </Setter.Value>
@@ -856,7 +856,7 @@
                         <Border x:Name="TrackBack"
                                 Width="{x:Static ui:DesignMetrics.SpectrogramBoostBarWidth}"
                                 HorizontalAlignment="Center"
-                                CornerRadius="4"
+                                CornerRadius="{ui:ControlCorner}"
                                 SnapsToDevicePixels="True" />
                         <!-- 下が 0（オフ）、上が最大。 -->
                         <Track x:Name="PART_Track">
@@ -898,7 +898,7 @@
                 <ControlTemplate TargetType="RepeatButton">
                     <Border Background="{DynamicResource ScrollThumbBackBrush}"
                             Height="{x:Static ui:DesignMetrics.SilenceDetectRiseSliderTrackHeight}"
-                            CornerRadius="2"
+                            CornerRadius="{ui:ControlCorner}"
                             VerticalAlignment="Center"
                             Opacity="0.95"
                             SnapsToDevicePixels="True" />
@@ -986,7 +986,7 @@
                                 Background="{DynamicResource TimelineWellBackBrush}"
                                 BorderBrush="{DynamicResource ChromeBorderBrush}"
                                 BorderThickness="1"
-                                CornerRadius="2"
+                                CornerRadius="{ui:ControlCorner}"
                                 SnapsToDevicePixels="True" />
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
@@ -1094,7 +1094,7 @@
                                 Background="Transparent"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                CornerRadius="{ui:ControlCorner}"
                                 SnapsToDevicePixels="True">
                             <Viewbox Width="10" Height="10"
                                      HorizontalAlignment="Center"
@@ -1148,7 +1148,7 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                            CornerRadius="{ui:ControlCorner}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True"
                             ClipToBounds="False">
@@ -1287,7 +1287,7 @@
                             <Border Background="{DynamicResource MenuListBackBrush}"
                                     BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="{x:Static ui:DesignMetrics.ControlCorner}"
+                                    CornerRadius="{ui:ControlCorner}"
                                     Padding="0,2"
                                     MinWidth="200"
                                     SnapsToDevicePixels="True"

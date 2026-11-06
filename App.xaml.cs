@@ -1,4 +1,5 @@
 using System.Windows;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.UI;
 
 namespace MgaSonicAnvil;
@@ -12,6 +13,7 @@ public partial class App : Application
             typeof(Window),
             FrameworkElement.LoadedEvent,
             new RoutedEventHandler(ApplyDarkTitleBarOnWindowLoaded));
+        DesignMetrics.ApplyControlCornerRadius(AppStorage.Settings.ResolvedControlCornerRadius());
         EditorContextMenuTheme.Apply(Resources);
         AcrylicPopup.Install();
         SlidingTabAccent.Install();

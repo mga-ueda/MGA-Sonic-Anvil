@@ -168,14 +168,13 @@ internal partial class ColorDevPanelWindow : Window
 
     private ColorRow CreateRow(UiColorEntry entry, string groupTitle)
     {
-        var host = new Border
+        var host = DesignMetrics.BindCorner(new Border
         {
             Padding = new Thickness(4, 3, 6, 3),
             Margin = new Thickness(0, 0, 0, 1),
-            CornerRadius = new CornerRadius(6),
             Cursor = Cursors.Hand,
             Background = Brushes.Transparent,
-        };
+        });
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
@@ -184,22 +183,20 @@ internal partial class ColorDevPanelWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var accent = new Border
+        var accent = DesignMetrics.BindCorner(new Border
         {
             Width = 3,
             Height = 22,
-            CornerRadius = new CornerRadius(1.5),
             VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Hidden,
-        };
-        var swatch = new Border
+        });
+        var swatch = DesignMetrics.BindCorner(new Border
         {
             Width = 22,
             Height = 22,
-            CornerRadius = new CornerRadius(5),
             BorderThickness = new Thickness(1),
             VerticalAlignment = VerticalAlignment.Center,
-        };
+        });
         var name = new TextBlock
         {
             Text = entry.Label,
