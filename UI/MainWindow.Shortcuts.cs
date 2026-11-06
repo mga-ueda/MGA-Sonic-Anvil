@@ -1053,8 +1053,14 @@ public partial class MainWindow
         }
 
         // .（OemPeriod）は早送り。センターロックは Z とテンキー .（Decimal）。停止中もオンのままシークに追従する。
+        // プレイヤーではセンターロックしない。
         if ((key is Key.Z or Key.Decimal) && modifiers == ModifierKeys.None)
         {
+            if (IsLibraryMaximized)
+            {
+                return true;
+            }
+
             if (IsPlaybackActive())
             {
                 DetachOverviewScrubKeepPlayback();

@@ -327,7 +327,7 @@ public partial class MainWindow : Window
         Overview.DragEnded += (_, _) => EndOverviewScrub();
         TimeScroll.ValueChanged += (_, _) =>
         {
-            if (_syncingScroll || TimeScroll.IsRangeResizing || Waveform.CenterLocked)
+            if (_syncingScroll || TimeScroll.IsRangeResizing || (Waveform.CenterLocked && !Waveform.SeekAndSelectOnly))
             {
                 return;
             }
@@ -337,7 +337,7 @@ public partial class MainWindow : Window
         TimeScroll.RangeChanged += (_, range) =>
         {
             Waveform.SetVisibleRange(range.ViewStart, range.ViewSpan);
-            if (Waveform.CenterLocked)
+            if (Waveform.CenterLocked && !Waveform.SeekAndSelectOnly)
             {
                 Waveform.CenterViewOnPlayhead();
             }

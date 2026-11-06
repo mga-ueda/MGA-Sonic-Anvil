@@ -940,13 +940,13 @@ internal static class WaveformContextMenuBuilder
         Cmd(
             UiStrings.WaveMenuCenterPlayhead,
             WaveMenuCommand.CenterPlayhead,
-            enabled: SingleFileOnly(m) && m.CanNavigate),
+            enabled: SingleFileOnly(m) && m.CanNavigate && !m.LibraryMaximized),
         Check(
             UiStrings.WaveMenuCenterLock,
             WaveMenuCommand.CenterLock,
             MenuGestures.CenterPlayhead,
             m.CenterLocked,
-            SingleFileOnly(m) && m.CanNavigate && !m.IsBusy),
+            SingleFileOnly(m) && m.CanNavigate && !m.IsBusy && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Sub(UiStrings.WaveMenuCatSolo, SoloViewItems(m)),
         Sub(UiStrings.WaveMenuCatVideo, VideoChromeItems(m)),

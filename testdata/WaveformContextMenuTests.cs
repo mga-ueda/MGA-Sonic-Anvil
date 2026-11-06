@@ -516,6 +516,8 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(tree, WaveMenuCommand.DeleteMarkers)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.TimeZoomIn)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.CenterPlayhead)?.Enabled);
+        Assert.False(Find(tree, WaveMenuCommand.CenterLock)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.Record)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.NewDocument)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.RenameFile)?.Enabled);

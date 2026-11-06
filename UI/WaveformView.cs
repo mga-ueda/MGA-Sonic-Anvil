@@ -702,6 +702,12 @@ internal sealed partial class WaveformView : Grid
 
     public bool CenterLocked { get; private set; }
 
+    /// <summary>
+    /// 再生ヘッドを画面中央に固定するか。
+    /// プレイヤー（<see cref="SeekAndSelectOnly"/>）ではエディタのオンを適用しない。
+    /// </summary>
+    private bool UsesCenterLock => CenterLocked && !SeekAndSelectOnly;
+
     /// <summary>プレイヤー用の捨て A-B／マーカー。ドキュメントにはその場では書かない。</summary>
     public PlayerScratchCues ScratchCues { get; } = new();
 
@@ -759,6 +765,15 @@ internal sealed partial class WaveformView : Grid
                 ScratchHistory.Clear();
                 ClearMarkerSelection();
                 _playerScratchEnabled = false;
+                if (CenterLocked)
+                {
+                    CenterViewOnPlayhead();
+                }
+            }
+            else if (CenterLocked)
+            {
+                // プレイヤーはセンターロックしない。先頭・末尾の外側に出していた窓を戻す。
+                SetViewStart(_viewStart);
             }
 
             // スクロール中の遅延ビットマップをプレイヤー描画に流用すると、全体表示へ戻した瞬間に画面外へずれる。
@@ -1266,7 +1281,7 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        if (CenterLocked)
+        if (UsesCenterLock)
         {
             CenterViewOnPlayhead();
             return;
@@ -1957,7 +1972,7 @@ internal sealed partial class WaveformView : Grid
 
     public void PanByVisibleFraction(double fraction)
     {
-        if (CenterLocked)
+        if (UsesCenterLock)
         {
             // 表示だけずらすとヘッドが中央から外れる。同じ量だけシークして中央を保つ。
             var frame = ClampFrame(_playheadFrame + (long)Math.Round(ViewSpanFrames * fraction));
@@ -2212,7 +2227,7 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        if (CenterLocked)
+        if (UsesCenterLock)
         {
             HoldCenterOn(frame, smooth: false);
             return;
@@ -2242,7 +2257,7 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        var offset = CenterLocked
+        var offset = UsesCenterLock
             ? span * 0.5
             : Math.Clamp((double)_playheadFrame - _viewStart, 0d, span);
         SetViewStart(frame - offset);
@@ -2250,7 +2265,7 @@ internal sealed partial class WaveformView : Grid
 
     public void PanTimeToStart()
     {
-        if (CenterLocked)
+        if (UsesCenterLock)
         {
             CenterViewOnPlayhead();
             return;
@@ -2266,7 +2281,7 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        if (CenterLocked)
+        if (UsesCenterLock)
         {
             CenterViewOnPlayhead();
             return;
@@ -2286,7 +2301,7 @@ internal sealed partial class WaveformView : Grid
     /// </summary>
     private void HoldCenterOn(long frame, bool smooth)
     {
-        if (!CenterLocked)
+        if (!UsesCenterLock)
         {
             return;
         }
@@ -2304,6 +2319,11 @@ internal sealed partial class WaveformView : Grid
 
     public void LockCenterToPlayhead()
     {
+        if (SeekAndSelectOnly)
+        {
+            return;
+        }
+
         CenterLocked = true;
         CenterViewOnPlayhead();
     }
@@ -2385,7 +2405,7 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        if (CenterLocked)
+        if (UsesCenterLock)
         {
             SetViewStart(_playheadFrame - span * 0.5, playbackFollow: true);
             return;
@@ -3031,7 +3051,7 @@ internal sealed partial class WaveformView : Grid
         if (_dragging && _scrubbing && _document is not null)
         {
             Cursor = Cursors.ScrollWE;
-            if (CenterLocked)
+            if (UsesCenterLock)
             {
                 var width = Math.Max(1d, ContentWidth);
                 var dx = pos.X - _centerScrubX;
@@ -3167,7 +3187,7 @@ internal sealed partial class WaveformView : Grid
         if (wasSelecting)
         {
             PreviewInteraction(frame);
-            if (CenterLocked)
+            if (UsesCenterLock)
             {
                 EnsureFrameVisible(frame);
             }
@@ -6392,7 +6412,7 @@ internal sealed partial class WaveformView : Grid
         _centerScrubX = start.X;
         var frame = FrameAt(start.X);
         PreviewInteraction(frame, force: true);
-        if (CenterLocked)
+        if (UsesCenterLock)
         {
             EnsureFrameVisible(frame);
         }
@@ -6417,11 +6437,11 @@ internal sealed partial class WaveformView : Grid
         }
 
         RestoreIdleCursor();
-        frame = ClampFrame(fromWaveformDrag && CenterLocked ? _playheadFrame : frame);
+        frame = ClampFrame(fromWaveformDrag && UsesCenterLock ? _playheadFrame : frame);
         if (_document is not null)
         {
             PreviewInteraction(frame, force: true);
-            if (CenterLocked)
+            if (UsesCenterLock)
             {
                 EnsureFrameVisible(frame);
             }
@@ -7815,10 +7835,10 @@ internal sealed partial class WaveformView : Grid
         _timeZoom = nextZoom;
         var newSpan = ViewSpanFrames;
         var max = Math.Max(0d, _document.FrameCount - newSpan);
-        var rawStart = CenterLocked
+        var rawStart = UsesCenterLock
             ? _playheadFrame - newSpan * 0.5
             : anchorFrame - newSpan * ratio;
-        _viewStart = CenterLocked
+        _viewStart = UsesCenterLock
             ? ClampCenteredViewStart(rawStart, _document.FrameCount, newSpan)
             : Math.Clamp(rawStart, 0d, max);
         _deferWaveReload = false;
@@ -7887,7 +7907,7 @@ internal sealed partial class WaveformView : Grid
             return;
         }
 
-        var next = CenterLocked
+        var next = UsesCenterLock
             ? ClampCenteredViewStart(start, _document.FrameCount, ViewSpanFrames)
             : ClampViewStart(start, _document.FrameCount, ViewSpanFrames);
         if (Math.Abs(next - _viewStart) < 0.0001)
@@ -7978,7 +7998,7 @@ internal sealed partial class WaveformView : Grid
         _viewStart = Math.Clamp(viewStart, 0d, max);
         _playheadFrame = Math.Clamp(playhead, 0, _document.FrameCount);
         _document.CursorFrame = _playheadFrame;
-        if (CenterLocked)
+        if (UsesCenterLock)
         {
             var span = ViewSpanFrames;
             _viewStart = ClampCenteredViewStart(_playheadFrame - span * 0.5, _document.FrameCount, span);
