@@ -152,7 +152,6 @@ internal static partial class UiStrings
     public static string WaveMenuAmpZoomOut => Get("振幅縮小(_S)", "Amplitude Zoom Out (_S)");
     public static string WaveMenuAmpZoomMax => Get("振幅最大(_V)", "Amplitude Zoom Max (_V)");
     public static string WaveMenuAmpZoomReset => Get("振幅リセット(_B)", "Reset Amplitude (_B)");
-    public static string WaveMenuCenterPlayhead => Get("再生ヘッドを中央へ(_C)", "_Center Playhead");
     public static string WaveMenuCenterLock => Get("センターロック(_K)", "Center Loc_k");
     public static string WaveMenuViewWaveform => Get("波形(_W)", "_Waveform");
     public static string WaveMenuViewSpectrogram => Get("スペクトログラム(_S)", "_Spectrogram");

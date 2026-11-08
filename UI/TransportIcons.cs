@@ -59,7 +59,6 @@ internal enum TransportIcon
     Analysis,
     Overlay,
     Loudness,
-    Center,
     History,
     ColorPalette,
     Settings,
@@ -827,13 +826,6 @@ internal static class TransportIconDrawing
                 break;
             case TransportIcon.Loudness:
                 DrawLoudnessCurve(dc, pen, cx, cy);
-                break;
-            case TransportIcon.Center:
-                dc.DrawLine(playheadPen, new Point(cx, cy - 9), new Point(cx, cy - 4));
-                dc.DrawLine(playheadPen, new Point(cx, cy + 4), new Point(cx, cy + 9));
-                dc.DrawLine(pen, new Point(cx - 8, cy), new Point(cx - 3, cy));
-                dc.DrawLine(pen, new Point(cx + 3, cy), new Point(cx + 8, cy));
-                dc.DrawEllipse(null, pen, new Point(cx, cy), 4.5, 4.5);
                 break;
             case TransportIcon.History:
                 DrawHistoryClock(dc, pen, cx, cy);

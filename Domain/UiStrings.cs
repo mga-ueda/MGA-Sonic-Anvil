@@ -516,7 +516,6 @@ internal static partial class UiStrings
     public static string LabelToolbarJumpToTime => WithoutAccessKey(WaveMenuFocusTime);
     public static string LabelToolbarSpectrogram => WithoutAccessKey(WaveMenuViewSpectrogram);
     public static string LabelToolbarLoudness => WithoutAccessKey(WaveMenuViewLoudness);
-    public static string LabelToolbarCenter => WithoutAccessKey(WaveMenuCenterPlayhead);
     public static string LabelToolbarHistory => WithoutAccessKey(WaveMenuHistory);
     public static string LabelToolbarLibraryMaximize => LabelLayoutPresetF10;
     public static string LabelToolbarAnalyzerMaximize => LabelLayoutPresetF12;
@@ -772,9 +771,6 @@ internal static partial class UiStrings
     public static string FilterWallpaperImage => Get(
         "画像|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff|すべてのファイル|*.*",
         "Image|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff|All files|*.*");
-    public static string ErrorWallpaperOpacityRange => Get(
-        "壁紙の不透明度は 0 から 100 です。",
-        "Wallpaper opacity must be from 0 to 100.");
     public static string LabelFileAssociations => Get("関連付け", "File associations");
     public static string ButtonFileAssociationsAllOn => Get("すべてオン", "All on");
     public static string ButtonFileAssociationsAllOff => Get("すべてオフ", "All off");
@@ -1445,9 +1441,6 @@ internal static partial class UiStrings
     public static string TooltipLoudnessPen => Get(
         "ペンで描く (E)  離すと音量になる。描いているあいだ元の曲線は残る。取り消しは Ctrl+Z。曲線の右クリックでも切り替え",
         "Draw with the pen (E)  volume changes when you release. The curve stays while you draw. Undo with Ctrl+Z. Also right-click the curve");
-    public static string TooltipCenterPlayhead => Get(
-        "再生ヘッドを中央へ寄せる",
-        "Center the playhead in view");
     /// <summary>センターロックのトグルトースト。UI 言語に関わらず英語。</summary>
     public static string LabelCenterLock => "Center Lock";
     /// <summary>マーカークリックのトグルトースト。UI 言語に関わらず英語。</summary>
