@@ -249,7 +249,7 @@ internal partial class StatusTimeStrip : UserControl
                 : UiStrings.MenuCopySelectionTimePath;
             copyTimeItem.IsEnabled = canCopySelection;
             copyTimePathItem.IsEnabled = canCopySelection;
-                                                                                };
+        };
         return menu;
     }
 

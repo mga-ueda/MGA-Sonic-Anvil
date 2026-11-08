@@ -16,10 +16,7 @@ internal sealed class EditorPositionTimecodeView : FrameworkElement
         Focusable = false;
         IsHitTestVisible = true;
         SnapsToDevicePixels = true;
-        ClipToBounds = false;
     }
-
-    public string Text => _text;
 
     public void SetDisplay(string text)
     {

@@ -332,7 +332,6 @@
                    HorizontalAlignment="Stretch"
                    VerticalAlignment="Stretch"
                    Margin="0,4"
-                   ClipToBounds="False"
                    IsHitTestVisible="True">
             <ui:EditorPositionTimecodeView x:Name="EditorPositionTimecode" />
           </Viewbox>

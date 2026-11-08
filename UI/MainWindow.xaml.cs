@@ -1166,7 +1166,7 @@ public partial class MainWindow : Window
             _document.FrameCount,
             _document.SampleRate,
             hasDocument: true);
-        WriteEditorPositionTimecode(
+        EditorPositionTimecode.SetDisplay(
             UiStrings.FormatStatusTime(now, _document.SampleRate, StatusTimes.ShowSamples));
         RefreshPlaylistVideoTimecode(
             now,
@@ -1174,10 +1174,6 @@ public partial class MainWindow : Window
             _document.FrameCount,
             _document.SampleRate);
     }
-
-    private void WriteEditorPositionTimecode(string text) =>
-        EditorPositionTimecode.SetDisplay(text);
-
 
     private void ApplyEditorPositionTimecodeWidth()
     {
