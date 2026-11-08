@@ -3426,6 +3426,8 @@ public partial class MainWindow
         // ピークも列幅と同じ倍率で LayoutTransform（レイアウトが逆変換するので Stretch でも枠内に収まる）。
         LevelMeter.LayoutTransform = meterTransform;
         LoudnessMeter.LayoutTransform = meterTransform;
+        HistoryStrip.LayoutTransform = meterTransform;
+        VstInsertRack.LayoutTransform = meterTransform;
         VectorScope.LayoutTransform = meterTransform;
         Spectrum.LayoutTransform = meterTransform;
         MonitorToggles.LayoutTransform = meterTransform;

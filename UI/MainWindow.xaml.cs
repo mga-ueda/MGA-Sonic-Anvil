@@ -989,6 +989,7 @@ public partial class MainWindow : Window
         LevelMeter.InvalidateVisual();
         LoudnessMeter.ApplyLocalizedText();
         MonitorToggles.ApplyLocalizedText();
+        VstInsertRack.ApplyTheme();
         _colorDevPanel?.ApplyLocalizedText();
         _tabTimeTable?.ApplyLocalizedText();
         LibraryBrowser.ApplyLocalizedText();

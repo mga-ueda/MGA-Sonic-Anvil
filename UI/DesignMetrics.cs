@@ -467,11 +467,14 @@ internal static class DesignMetrics
 
     /// <summary>スロット 1 列の幅（左右に 4 段ずつ）。</summary>
     public static double VstInsertSlotColumnWidth => From96(150);
-    /// <summary>各インサートスロットの四方マージン。</summary>
-    public static double VstInsertSlotMargin => From96(3);
+    /// <summary>各インサートセル（プリセット／スロット）共通の四方マージン。</summary>
+    public static double VstInsertSlotMargin => From96(2);
 
     /// <summary>インサート 1 スロットの高さ。</summary>
     public static double VstInsertSlotHeight => From96(14);
+
+    /// <summary>インサートラック内の文字サイズ（プリセット／スロット共通）。</summary>
+    public static double VstInsertRackFontSize => 10;
 
     /// <summary>VST プラグイン選択メニューの最大高さ（超えたらスクロール）。</summary>
     public static double VstInsertMenuMaxHeight => From96(560);

@@ -20,6 +20,10 @@ internal sealed class VstInsertRackView : Grid
     private static VstInsertSlotSnapshot? _settingsClipboard;
 
     private readonly RoundedButton[] _slots = new RoundedButton[VstInsertChain.MaxSlots];
+    private readonly Grid _content;
+    private readonly ComboBox _presetCombo;
+    private readonly RoundedButton _presetSaveButton;
+    private readonly RoundedButton _presetDeleteButton;
     private DocumentSession? _session;
     private Action? _onChanged;
     private Action<int>? _openEditor;
@@ -55,6 +59,18 @@ internal sealed class VstInsertRackView : Grid
     /// 他スロットは触らない。
     /// </summary>
     private Action<int, VstInsertSlotSnapshot, bool>? _pasteSettingsToAllTabs;
+    /// <summary>
+    /// プリセット適用で使用中スロットが消えるとき、置き換えるか中止するかを問う（MainWindow）。
+    /// 第 2 引数は全タブ適用か。Cancel なら適用しない。
+    /// </summary>
+    private Func<VstInsertSlotSnapshot[], bool, MessageBoxResult>? _confirmPresetOverwrite;
+    /// <summary>プリセットのスロット組を今のタブ／全タブへ載せる（MainWindow）。</summary>
+    private Action<VstInsertSlotSnapshot[], bool>? _applyPresetChain;
+    private bool _suppressPresetSelection;
+    /// <summary>プルダウンを開いた時点の選択 Id。閉じたときに変わっていれば適用する。</summary>
+    private string? _presetIdAtDropDownOpen;
+    /// <summary>コンボ先頭の空欄（設定には保存しない）。適用後はここに戻して再適用できるようにする。</summary>
+    private const string PresetBlankId = "__blank__";
     private Point _dragStart;
     /// <summary>掴んだ位置（元ボタン内座標）。ゴーストを指の下に貼り付ける。</summary>
     private Point _dragGrabOffset;
@@ -80,13 +96,47 @@ internal sealed class VstInsertRackView : Grid
         MinWidth = DesignMetrics.VstInsertRackWidth;
         Height = DesignMetrics.SpectrumHeight;
         VerticalAlignment = VerticalAlignment.Stretch;
+        ClipToBounds = true;
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
         ToolTip = UiStrings.TooltipVstInsertSlot;
-        // スロット並べ替えは OLE DragDrop ではなく、ラック上の Capture＋ヒットテストで行う。
         PreviewMouseMove += Rack_PreviewMouseMove;
         PreviewMouseLeftButtonUp += Rack_PreviewMouseLeftButtonUp;
         LostMouseCapture += Rack_LostMouseCapture;
+
+        const int slotRows = VstInsertChain.MaxSlots / 2;
+        const int gridRows = slotRows + 1;
+        var cellMargin = new Thickness(DesignMetrics.VstInsertSlotMargin);
+        var fontSize = DesignMetrics.VstInsertRackFontSize;
+        var presetRowHeight = DesignMetrics.SpectrumHeight / gridRows;
+        var slotsDesignHeight = DesignMetrics.SpectrumHeight - presetRowHeight;
+
+        // プリセット行は Viewbox の外（他コンボと同じポップアップ見た目・ヒット）。
+        // スロットだけ Viewbox で SpectrumHeight 内へ収める。
+        RowDefinitions.Add(new RowDefinition { Height = new GridLength(presetRowHeight) });
+        RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var presetRow = new Grid
+        {
+            SnapsToDevicePixels = true,
+            UseLayoutRounding = true,
+        };
+        presetRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        presetRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        _content = new Grid
+        {
+            Width = DesignMetrics.VstInsertRackWidth,
+            Height = slotsDesignHeight,
+            SnapsToDevicePixels = true,
+            UseLayoutRounding = true,
+        };
+        _content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (var r = 0; r < slotRows; r++)
+        {
+            _content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        }
 
         _dragGhost = new Border
         {
@@ -99,7 +149,7 @@ internal sealed class VstInsertRackView : Grid
             Effect = _dragGhostShadow,
             Child = new TextBlock
             {
-                FontSize = 11,
+                FontSize = fontSize,
                 FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -111,17 +161,68 @@ internal sealed class VstInsertRackView : Grid
         DesignMetrics.BindCorner(_dragGhost);
         Panel.SetZIndex(_dragGhost, 100);
 
-        // スロット 1–4 | スロット 5–8（各列 4 段）。Bounce はメニュー／ツールバー／ショートカット。
-        // Include Tail はバウンス実行時に確認する。
-        const int slotRows = VstInsertChain.MaxSlots / 2;
-        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        for (var i = 0; i < slotRows; i++)
+        // プルダウン内は他コンボと同じ LibraryComboBoxStyle / DarkComboBoxItemStyle に揃える。
+        _presetCombo = new ComboBox
         {
-            RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        }
+            MinHeight = 0,
+            MaxHeight = presetRowHeight,
+            Margin = cellMargin,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            ToolTip = UiStrings.TooltipVstInsertPreset,
+            DisplayMemberPath = nameof(VstInsertChainPreset.Name),
+        };
+        _presetCombo.SetResourceReference(StyleProperty, "LibraryComboBoxStyle");
+        _presetCombo.SetResourceReference(ItemsControl.ItemContainerStyleProperty, "DarkComboBoxItemStyle");
+        _presetCombo.SelectedValuePath = nameof(VstInsertChainPreset.Id);
+        _presetCombo.DropDownOpened += PresetCombo_DropDownOpened;
+        _presetCombo.DropDownClosed += PresetCombo_DropDownClosed;
+        _presetCombo.SelectionChanged += (_, _) => UpdatePresetActionEnabled();
+        _presetCombo.MouseDoubleClick += (_, _) => RenameSelectedPreset();
 
-        var slotMargin = DesignMetrics.VstInsertSlotMargin;
+        var renameItem = new MenuItem { Header = UiStrings.LabelVstInsertPresetRename };
+        renameItem.Click += (_, _) => RenameSelectedPreset();
+        _presetCombo.ContextMenu = new ContextMenu { Items = { renameItem } };
+
+        // Save＝青（Accent）、Del＝赤（Clear）。ダイアログの OK／Cancel と同系。
+        _presetSaveButton = CreateRackButton(
+            UiStrings.LabelVstInsertPresetSave,
+            UiStrings.TooltipVstInsertPresetSave,
+            accent: true,
+            onClick: SavePresetFromCurrentSlots);
+        _presetSaveButton.FontSize = fontSize;
+        _presetSaveButton.MinHeight = 0;
+        _presetSaveButton.Margin = cellMargin;
+        _presetSaveButton.Padding = new Thickness(1, 0, 1, 0);
+        _presetSaveButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _presetSaveButton.VerticalAlignment = VerticalAlignment.Stretch;
+
+        _presetDeleteButton = CreateRackButton(
+            UiStrings.LabelVstInsertPresetDelete,
+            UiStrings.TooltipVstInsertPresetDelete,
+            accent: false,
+            onClick: DeleteSelectedPreset);
+        _presetDeleteButton.FontSize = fontSize;
+        _presetDeleteButton.MinHeight = 0;
+        _presetDeleteButton.Margin = cellMargin;
+        _presetDeleteButton.Padding = new Thickness(1, 0, 1, 0);
+        _presetDeleteButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _presetDeleteButton.VerticalAlignment = VerticalAlignment.Stretch;
+
+        var presetActions = new Grid();
+        presetActions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        presetActions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(_presetSaveButton, 0);
+        Grid.SetColumn(_presetDeleteButton, 1);
+        presetActions.Children.Add(_presetSaveButton);
+        presetActions.Children.Add(_presetDeleteButton);
+
+        Grid.SetColumn(_presetCombo, 0);
+        Grid.SetColumn(presetActions, 1);
+        presetRow.Children.Add(_presetCombo);
+        presetRow.Children.Add(presetActions);
+
         for (var i = 0; i < VstInsertChain.MaxSlots; i++)
         {
             var index = i;
@@ -132,27 +233,38 @@ internal sealed class VstInsertRackView : Grid
                 onClick: null);
             ApplySlotButtonLook(button, empty: true, persisted: false);
             button.Tag = index;
+            button.FontSize = fontSize;
+            button.MinHeight = 0;
             button.HorizontalContentAlignment = HorizontalAlignment.Center;
-            // 空き／Ctrl+クリックは Click。使用中の並べ替えは Preview＋ラック Capture。
             button.Click += (_, _) => Slot_ClickFromButton(index);
             button.PreviewMouseLeftButtonDown += Slot_PreviewMouseLeftButtonDown;
             button.MouseRightButtonUp += Slot_MouseRightButtonUp;
             _slots[i] = button;
-            // 左列 0–3、右列 4–7。四方に余白を付けてつめつめを避ける。
-            SetColumn(button, i < slotRows ? 0 : 1);
-            SetRow(button, i % slotRows);
-            button.Margin = new Thickness(slotMargin);
-
-            Children.Add(button);
+            Grid.SetColumn(button, i < slotRows ? 0 : 1);
+            Grid.SetRow(button, i % slotRows);
+            button.Margin = cellMargin;
+            _content.Children.Add(button);
         }
 
-        // 掴んだプラグイン名をポインタに追従させるゴースト。
-        SetColumn(_dragGhost, 0);
-        SetColumnSpan(_dragGhost, 2);
-        SetRow(_dragGhost, 0);
-        SetRowSpan(_dragGhost, slotRows);
-        Children.Add(_dragGhost);
+        Grid.SetColumn(_dragGhost, 0);
+        Grid.SetColumnSpan(_dragGhost, 2);
+        Grid.SetRow(_dragGhost, 0);
+        Grid.SetRowSpan(_dragGhost, slotRows);
+        _content.Children.Add(_dragGhost);
 
+        var slotsHost = new Viewbox
+        {
+            Stretch = Stretch.Uniform,
+            StretchDirection = StretchDirection.DownOnly,
+            Child = _content,
+        };
+
+        Grid.SetRow(presetRow, 0);
+        Grid.SetRow(slotsHost, 1);
+        Children.Add(presetRow);
+        Children.Add(slotsHost);
+
+        ReloadPresetCombo(selectId: null);
         ApplyTheme();
     }
 
@@ -168,8 +280,11 @@ internal sealed class VstInsertRackView : Grid
         Action<int, string?, string?, string?>? clearMatchingSlotOnAllTabs = null,
         Func<int, MessageBoxResult>? confirmPersistReplace = null,
         Action<int, VstInsertSlotSnapshot, bool>? pasteSettingsToAllTabs = null,
-        Func<int, bool, MessageBoxResult>? confirmPasteReplace = null)
+        Func<int, bool, MessageBoxResult>? confirmPasteReplace = null,
+        Func<VstInsertSlotSnapshot[], bool, MessageBoxResult>? confirmPresetOverwrite = null,
+        Action<VstInsertSlotSnapshot[], bool>? applyPresetChain = null)
     {
+        var gainedSession = _session is null && session is not null;
         _session = session;
         _onChanged = onChanged;
         _openEditor = openEditor;
@@ -182,7 +297,14 @@ internal sealed class VstInsertRackView : Grid
         _confirmPersistReplace = confirmPersistReplace;
         _pasteSettingsToAllTabs = pasteSettingsToAllTabs;
         _confirmPasteReplace = confirmPasteReplace;
+        _confirmPresetOverwrite = confirmPresetOverwrite;
+        _applyPresetChain = applyPresetChain;
         Refresh();
+        // エディタ表示に戻ったとき、設定ファイル上のプリセットをコンボへ載せる。
+        if (gainedSession)
+        {
+            ReloadPresetsFromSettings();
+        }
     }
 
     private static RoundedButton CreateRackButton(string label, string tip, bool accent, Action? onClick)
@@ -252,6 +374,8 @@ internal sealed class VstInsertRackView : Grid
         {
             PaintSlot(i, dropTarget: i == _dragHover);
         }
+
+        UpdatePresetActionEnabled();
     }
 
     /// <summary>
@@ -340,6 +464,406 @@ internal sealed class VstInsertRackView : Grid
     public void ApplyTheme()
     {
         Refresh();
+        _presetCombo.ToolTip = UiStrings.TooltipVstInsertPreset;
+        _presetSaveButton.Content = UiStrings.LabelVstInsertPresetSave;
+        _presetSaveButton.ToolTip = UiStrings.TooltipVstInsertPresetSave;
+        ApplyRackLook(_presetSaveButton, accent: true);
+        _presetDeleteButton.Content = UiStrings.LabelVstInsertPresetDelete;
+        _presetDeleteButton.ToolTip = UiStrings.TooltipVstInsertPresetDelete;
+        ApplyRackLook(_presetDeleteButton, accent: false);
+        if (_presetCombo.ContextMenu?.Items.OfType<MenuItem>().FirstOrDefault() is { } rename)
+        {
+            rename.Header = UiStrings.LabelVstInsertPresetRename;
+        }
+
+        // 空欄の表示名（Effect Preset）もテーマ／言語切替で更新する。
+        ReloadPresetCombo(CurrentPresetComboId());
+        UpdatePresetActionEnabled();
+    }
+
+    /// <summary>設定ファイル上のプリセット一覧をコンボへ載せ直す（選択は維持）。</summary>
+    public void ReloadPresetsFromSettings() =>
+        ReloadPresetCombo(CurrentPresetComboId());
+
+    private static VstInsertChainPreset CreateBlankPresetItem() => new()
+    {
+        Id = PresetBlankId,
+        Name = UiStrings.LabelVstInsertPresetBlank,
+        Slots = [],
+    };
+
+    private static bool IsBlankPresetId(string? id) =>
+        string.IsNullOrEmpty(id) || string.Equals(id, PresetBlankId, StringComparison.Ordinal);
+
+    private static bool IsBlankPreset(VstInsertChainPreset? preset) =>
+        preset is null || IsBlankPresetId(preset.Id);
+
+    private string? CurrentPresetComboId() =>
+        (_presetCombo.SelectedItem as VstInsertChainPreset)?.Id
+        ?? _presetCombo.SelectedValue as string;
+
+    /// <summary>空欄以外の、設定に保存されている選択中プリセット。</summary>
+    private VstInsertChainPreset? TryGetSelectedStoredPreset()
+    {
+        if (_presetCombo.SelectedItem is not VstInsertChainPreset selected || IsBlankPreset(selected))
+        {
+            return null;
+        }
+
+        return VstInsertChainPreset.FindById(AppStorage.Settings.VstInsertChainPresets, selected.Id)
+            ?? selected;
+    }
+
+    private void ReloadPresetCombo(string? selectId)
+    {
+        _suppressPresetSelection = true;
+        try
+        {
+            var presets = VstInsertChainPreset.NormalizeList(AppStorage.Settings.VstInsertChainPresets);
+            AppStorage.Settings.VstInsertChainPresets = presets;
+            var blank = CreateBlankPresetItem();
+            var items = new VstInsertChainPreset[presets.Length + 1];
+            items[0] = blank;
+            Array.Copy(presets, 0, items, 1, presets.Length);
+
+            _presetCombo.ItemsSource = null;
+            _presetCombo.ItemsSource = items;
+
+            // null / 空欄 Id → 先頭の空欄。それ以外は保存済みプリセット。
+            if (IsBlankPresetId(selectId))
+            {
+                _presetCombo.SelectedItem = blank;
+                _presetCombo.SelectedValue = blank.Id;
+                _presetCombo.SelectedIndex = 0;
+            }
+            else
+            {
+                var selected = VstInsertChainPreset.FindById(items, selectId);
+                if (selected is not null && !IsBlankPreset(selected))
+                {
+                    _presetCombo.SelectedValue = selected.Id;
+                    _presetCombo.SelectedItem = selected;
+                }
+                else
+                {
+                    _presetCombo.SelectedItem = blank;
+                    _presetCombo.SelectedValue = blank.Id;
+                    _presetCombo.SelectedIndex = 0;
+                }
+            }
+        }
+        finally
+        {
+            _suppressPresetSelection = false;
+        }
+
+        UpdatePresetActionEnabled();
+    }
+
+    private void UpdatePresetActionEnabled()
+    {
+        var selected = TryGetSelectedStoredPreset();
+        var hasStoredSelection = selected is not null;
+        _presetDeleteButton.IsEnabled = hasStoredSelection;
+        if (_presetCombo.ContextMenu is { } menu)
+        {
+            menu.IsEnabled = hasStoredSelection;
+        }
+
+        _presetSaveButton.IsEnabled = CanSavePreset(selected);
+    }
+
+    /// <summary>
+    /// 選中プリセットと同じ内容なら Save 不要。空欄でスロットも空なら新規保存する物もない。
+    /// </summary>
+    private bool CanSavePreset(VstInsertChainPreset? selected)
+    {
+        if (_session is null)
+        {
+            return false;
+        }
+
+        var current = DocumentSessionStore.CaptureChain(_session.VstInserts);
+        if (selected is not null)
+        {
+            return !DocumentSessionStore.ChainSnapshotsEqual(current, selected.Slots);
+        }
+
+        return DocumentSessionStore.SnapshotHasAnyPlugin(current);
+    }
+
+    private void PresetCombo_DropDownOpened(object? sender, EventArgs e)
+    {
+        _presetIdAtDropDownOpen = CurrentPresetComboId();
+        // 開いているあいだはラック全体のスロット用 Tip が前面に出ないようにする。
+        ToolTip = null;
+        _presetCombo.ToolTip = null;
+    }
+
+    private void PresetCombo_DropDownClosed(object? sender, EventArgs e)
+    {
+        ToolTip = UiStrings.TooltipVstInsertSlot;
+        _presetCombo.ToolTip = UiStrings.TooltipVstInsertPreset;
+        if (_suppressPresetSelection || _session is null)
+        {
+            return;
+        }
+
+        if (_presetCombo.SelectedItem is not VstInsertChainPreset preset)
+        {
+            ReloadPresetCombo(PresetBlankId);
+            return;
+        }
+
+        // 開いたときと同じ項目のまま閉じた（Escape など）ときは何もしない。
+        if (string.Equals(preset.Id, _presetIdAtDropDownOpen, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // 空欄へ戻しただけ。適用はしない。
+        if (IsBlankPreset(preset))
+        {
+            return;
+        }
+
+        ApplySelectedPreset(preset, _presetIdAtDropDownOpen);
+    }
+
+    private void ApplySelectedPreset(VstInsertChainPreset preset, string? previousSelectedId)
+    {
+        if (IsBlankPreset(preset))
+        {
+            ReloadPresetCombo(PresetBlankId);
+            return;
+        }
+
+        if (_session is null || _applyPresetChain is null)
+        {
+            ReloadPresetCombo(previousSelectedId);
+            return;
+        }
+
+        // コンボ上の参照ではなく、設定に保存された最新スナップショットを使う。
+        var stored = VstInsertChainPreset.FindById(AppStorage.Settings.VstInsertChainPresets, preset.Id)
+            ?? preset;
+        var slots = DocumentSessionStore.NormalizeDefaultInserts(stored.Slots);
+        var allTabs = false;
+        if (_canInsertAllTabs?.Invoke() == true)
+        {
+            var scope = OwnerCenteredMessageBox.Show(
+                Window.GetWindow(this),
+                UiStrings.AskVstInsertPresetApplyScope,
+                UiStrings.TitleVstInsertPresetApply,
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question,
+                MessageBoxResult.Yes,
+                UiStrings.ButtonVstInsertPresetThisTab,
+                UiStrings.ButtonVstInsertPresetAllTabs);
+            if (scope == MessageBoxResult.Cancel)
+            {
+                // 適用はしないが選択は残す（続けて削除／改名できるようにする）。
+                ReloadPresetCombo(stored.Id);
+                return;
+            }
+
+            allTabs = scope == MessageBoxResult.No;
+        }
+
+        if (_confirmPresetOverwrite?.Invoke(slots, allTabs) == MessageBoxResult.Cancel)
+        {
+            ReloadPresetCombo(stored.Id);
+            return;
+        }
+
+        _captureStates?.Invoke();
+        _applyPresetChain(slots, allTabs);
+        // 適用後も選択を残す（削除／改名ができるようにする）。
+        // 同じプリセットの再適用は、いったん Effect Preset（空欄）を選んでから選び直す。
+        ReloadPresetCombo(stored.Id);
+    }
+
+    private void SavePresetFromCurrentSlots()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _captureStates?.Invoke();
+        var slots = DocumentSessionStore.CaptureChain(_session.VstInserts);
+        var selected = TryGetSelectedStoredPreset();
+        var owner = Window.GetWindow(this);
+        var name = LibraryNameWindow.Ask(
+            owner,
+            UiStrings.TitleVstInsertPresetSave,
+            selected?.Name ?? string.Empty,
+            selectStem: false);
+        if (name is null)
+        {
+            return;
+        }
+
+        name = name.Trim();
+        if (name.Length == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                owner,
+                UiStrings.ErrorVstInsertPresetNameEmpty,
+                UiStrings.TitleVstInsertPresetSave,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var presets = VstInsertChainPreset.NormalizeList(AppStorage.Settings.VstInsertChainPresets)
+            .Select(p => p.Clone())
+            .ToList();
+
+        // 選択中と同名ならそのプリセットを更新。別名で既存があれば上書き確認。
+        VstInsertChainPreset? target = null;
+        if (selected is not null
+            && string.Equals(selected.Name, name, StringComparison.OrdinalIgnoreCase))
+        {
+            target = presets.FirstOrDefault(p =>
+                string.Equals(p.Id, selected.Id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        target ??= VstInsertChainPreset.FindByName(presets, name);
+        if (target is not null
+            && (selected is null
+                || !string.Equals(target.Id, selected.Id, StringComparison.OrdinalIgnoreCase)))
+        {
+            var replace = OwnerCenteredMessageBox.Show(
+                owner,
+                UiStrings.WarnVstInsertPresetReplaceName(target.Name),
+                UiStrings.TitleVstInsertPresetReplace,
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning,
+                MessageBoxResult.Cancel);
+            if (replace != MessageBoxResult.OK)
+            {
+                return;
+            }
+        }
+
+        if (target is null)
+        {
+            target = VstInsertChainPreset.Create(name, slots);
+            presets.Add(target);
+        }
+        else
+        {
+            target.Name = name;
+            target.Slots = DocumentSessionStore.NormalizeDefaultInserts(slots);
+        }
+
+        AppStorage.Settings.VstInsertChainPresets = [.. presets];
+        AppStorage.Save();
+        // 保存したプリセットを選択したままにする（続けて削除／改名できるようにする）。
+        ReloadPresetCombo(target.Id);
+    }
+
+    private void DeleteSelectedPreset()
+    {
+        var selected = TryGetSelectedStoredPreset();
+        if (selected is null)
+        {
+            return;
+        }
+
+        var owner = Window.GetWindow(this);
+        var confirm = OwnerCenteredMessageBox.Show(
+            owner,
+            UiStrings.WarnVstInsertPresetDelete(selected.Name),
+            UiStrings.TitleVstInsertPresetDelete,
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel);
+        if (confirm != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        var presets = VstInsertChainPreset.NormalizeList(AppStorage.Settings.VstInsertChainPresets)
+            .Where(p => !string.Equals(p.Id, selected.Id, StringComparison.OrdinalIgnoreCase))
+            .Select(p => p.Clone())
+            .ToArray();
+        AppStorage.Settings.VstInsertChainPresets = presets;
+        AppStorage.Save();
+        ReloadPresetCombo(PresetBlankId);
+    }
+
+    private void RenameSelectedPreset()
+    {
+        var selected = TryGetSelectedStoredPreset();
+        if (selected is null)
+        {
+            return;
+        }
+
+        var owner = Window.GetWindow(this);
+        var name = LibraryNameWindow.Ask(
+            owner,
+            UiStrings.TitleVstInsertPresetRename,
+            selected.Name,
+            selectStem: false);
+        if (name is null)
+        {
+            return;
+        }
+
+        name = name.Trim();
+        if (name.Length == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                owner,
+                UiStrings.ErrorVstInsertPresetNameEmpty,
+                UiStrings.TitleVstInsertPresetRename,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (string.Equals(selected.Name, name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var presets = VstInsertChainPreset.NormalizeList(AppStorage.Settings.VstInsertChainPresets)
+            .Select(p => p.Clone())
+            .ToList();
+        var target = presets.FirstOrDefault(p =>
+            string.Equals(p.Id, selected.Id, StringComparison.OrdinalIgnoreCase));
+        if (target is null)
+        {
+            return;
+        }
+
+        var conflict = VstInsertChainPreset.FindByName(presets, name);
+        if (conflict is not null
+            && !string.Equals(conflict.Id, target.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            var replace = OwnerCenteredMessageBox.Show(
+                owner,
+                UiStrings.WarnVstInsertPresetReplaceName(conflict.Name),
+                UiStrings.TitleVstInsertPresetReplace,
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning,
+                MessageBoxResult.Cancel);
+            if (replace != MessageBoxResult.OK)
+            {
+                return;
+            }
+
+            presets.RemoveAll(p =>
+                string.Equals(p.Id, conflict.Id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        target.Name = name;
+        AppStorage.Settings.VstInsertChainPresets = [.. presets];
+        AppStorage.Save();
+        ReloadPresetCombo(target.Id);
     }
 
     /// <summary>
@@ -421,7 +945,7 @@ internal sealed class VstInsertRackView : Grid
 
         _dragFrom = index;
         _dragSource = button;
-        _dragStart = e.GetPosition(this);
+        _dragStart = e.GetPosition(_content);
         _dragGrabOffset = e.GetPosition(button);
         // ラック全体で Capture。小さなボタン外へ出ても Move/Up を取りこぼさない。
         CaptureMouse();
@@ -435,7 +959,7 @@ internal sealed class VstInsertRackView : Grid
             return;
         }
 
-        var pos = e.GetPosition(this);
+        var pos = e.GetPosition(_content);
         if (!_dragMoved)
         {
             if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance
@@ -533,7 +1057,7 @@ internal sealed class VstInsertRackView : Grid
         e.Handled = true;
         var from = _dragFrom;
         var moved = _dragMoved;
-        var to = moved ? HitTestSlotIndex(e.GetPosition(this)) : -1;
+        var to = moved ? HitTestSlotIndex(e.GetPosition(_content)) : -1;
         EndDragArm();
 
         if (moved)
@@ -589,7 +1113,7 @@ internal sealed class VstInsertRackView : Grid
         for (var i = 0; i < _slots.Length; i++)
         {
             var slot = _slots[i];
-            var topLeft = slot.TranslatePoint(new Point(0, 0), this);
+            var topLeft = slot.TranslatePoint(new Point(0, 0), _content);
             var bounds = new Rect(topLeft, slot.RenderSize);
             // Margin 内側の見た目に合わせ、少し広げて掴みやすくする。
             bounds.Inflate(2, 2);
