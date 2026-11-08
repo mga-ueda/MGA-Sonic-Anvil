@@ -165,17 +165,10 @@ internal sealed partial class LibraryVisualStage : Grid
         SnapsToDevicePixels = false,
     };
 
-    private readonly VisualBrush _hudDimBrush = new()
-    {
-        Stretch = Stretch.None,
-        AlignmentX = AlignmentX.Left,
-        AlignmentY = AlignmentY.Top,
-        TileMode = TileMode.None,
-        ViewboxUnits = BrushMappingMode.Absolute,
-        ViewportUnits = BrushMappingMode.Absolute,
-    };
-
-    private readonly Grid _hudDimFeather = new()
+    /// <summary>
+    /// ツリー内でぼかす暗幕本体。VisualBrush＋非接続 Visual だと D3DImage 同居時に描画が落ちる。
+    /// </summary>
+    private readonly Grid _hudDimLayer = new()
     {
         IsHitTestVisible = false,
         UseLayoutRounding = false,
@@ -187,6 +180,9 @@ internal sealed partial class LibraryVisualStage : Grid
             RenderingBias = RenderingBias.Performance,
         },
     };
+
+    private static readonly Brush HudDimBrush =
+        WpfControlHelpers.FrozenBrush(Color.FromArgb(HudDimAlpha, 0, 0, 0));
 
     private Size _hudFrostMaskSize;
 
@@ -261,9 +257,7 @@ internal sealed partial class LibraryVisualStage : Grid
         _spillHost.SetBinding(
             OpacityProperty,
             new Binding(nameof(Opacity)) { Source = _dxgiHost, Mode = BindingMode.OneWay });
-        _glassHost.Background = WpfControlHelpers.FrozenBrush(Color.FromArgb(HudDimAlpha, 0, 0, 0));
-        _hudDimBrush.Visual = _hudDimFeather;
-        _glassHost.OpacityMask = _hudDimBrush;
+        _glassHost.Children.Add(_hudDimLayer);
         _pdfHost.Children.Add(_pdf);
         // 光漏れ → DXGI 映像 → HUD の薄い暗幕 → PDF → dim で暗く → 格子。
         Children.Add(_spillHost);
@@ -1424,10 +1418,10 @@ internal sealed partial class LibraryVisualStage : Grid
         _glassHost.Visibility = Visibility.Collapsed;
         _hudFrostFeatherSignature = null;
         _hudFrostMaskSize = default;
-        _hudDimFeather.Children.Clear();
+        _hudDimLayer.Children.Clear();
     }
 
-    /// <summary>縁のなじませ。ビットマップへ焼かず、合成側でぼかす。</summary>
+    /// <summary>縁のなじませ。ツリー内 BlurEffect でぼかす（D3DImage 同居でも描く）。</summary>
     private void ApplyHudFrostMask(Geometry clip, Size stageSize, string signature)
     {
         var pad = HudFrostFeather;
@@ -1435,19 +1429,14 @@ internal sealed partial class LibraryVisualStage : Grid
         bounds.Intersect(new Rect(0, 0, stageSize.Width, stageSize.Height));
         if (bounds.Width < 1 || bounds.Height < 1)
         {
+            HideHudFrost();
             return;
         }
 
         _hudFrostFeatherSignature = signature;
         _hudFrostMaskSize = stageSize;
-        _hudDimFeather.Children.Clear();
-        _hudDimFeather.Width = bounds.Width;
-        _hudDimFeather.Height = bounds.Height;
-        AddHudFrostFeatherRects(_hudDimFeather, clip, bounds.Location);
-        _hudDimFeather.Measure(new Size(bounds.Width, bounds.Height));
-        _hudDimFeather.Arrange(new Rect(0, 0, bounds.Width, bounds.Height));
-        _hudDimBrush.Viewbox = new Rect(0, 0, bounds.Width, bounds.Height);
-        _hudDimBrush.Viewport = bounds;
+        _hudDimLayer.Children.Clear();
+        AddHudFrostDimRects(_hudDimLayer, clip);
     }
 
     private static bool NearlySameSize(Size a, Size b) =>
@@ -1491,13 +1480,13 @@ internal sealed partial class LibraryVisualStage : Grid
         text.Append(';');
     }
 
-    private static void AddHudFrostFeatherRects(Panel mask, Geometry clip, Point origin)
+    private static void AddHudFrostDimRects(Panel mask, Geometry clip)
     {
         if (clip is GeometryGroup group)
         {
             foreach (var child in group.Children)
             {
-                AddHudFrostFeatherRects(mask, child, origin);
+                AddHudFrostDimRects(mask, child);
             }
 
             return;
@@ -1511,12 +1500,12 @@ internal sealed partial class LibraryVisualStage : Grid
         var bounds = rect.Rect;
         mask.Children.Add(new Border
         {
-            Background = Brushes.White,
+            Background = HudDimBrush,
             Width = bounds.Width,
             Height = bounds.Height,
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(bounds.X - origin.X, bounds.Y - origin.Y, 0, 0),
+            Margin = new Thickness(bounds.X, bounds.Y, 0, 0),
             IsHitTestVisible = false,
         });
     }
