@@ -71,10 +71,11 @@
     <SolidColorBrush x:Key="MarkerLabelForeBrush" Color="#FF1A1208" />
     <SolidColorBrush x:Key="PlayerAbInBrush" Color="#FF32CD32" />
     <SolidColorBrush x:Key="PlayerAbOutBrush" Color="#FFFF0000" />
-    <SolidColorBrush x:Key="RegionWaveFillAnacrusisBrush" Color="#FF344620" />
-    <SolidColorBrush x:Key="RegionWaveFillLoopBrush" Color="#FF1A3E5E" />
-    <SolidColorBrush x:Key="RegionWaveFillExitBrush" Color="#FF441E1E" />
-    <SolidColorBrush x:Key="RegionWaveFillExcludedBrush" Color="#FF3A3A3E" />
+    <!-- リージョン／サンプルループ波形塗りと同じ半透明（α=0x33）。RGB は役割色。 -->
+    <SolidColorBrush x:Key="RegionWaveFillAnacrusisBrush" Color="#339CCC84" />
+    <SolidColorBrush x:Key="RegionWaveFillLoopBrush" Color="#334A9AE8" />
+    <SolidColorBrush x:Key="RegionWaveFillExitBrush" Color="#33E85858" />
+    <SolidColorBrush x:Key="RegionWaveFillExcludedBrush" Color="#33686870" />
 
     <SolidColorBrush x:Key="LevelMeterTrackBackBrush" Color="#FF242629" />
     <SolidColorBrush x:Key="LevelMeterTrackBorderBrush" Color="#FF1A221A" />
