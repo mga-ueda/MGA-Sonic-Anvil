@@ -3532,6 +3532,7 @@ internal partial class AudioSettingsWindow : Window
         borderFactory.SetValue(Border.BackgroundProperty, Brushes.Transparent);
         borderFactory.SetValue(Border.BorderBrushProperty, Brushes.Transparent);
         borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+        borderFactory.SetBinding(Border.CornerRadiusProperty, DesignMetrics.CornerBinding());
         borderFactory.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
         borderFactory.SetValue(Border.SnapsToDevicePixelsProperty, true);
         var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));

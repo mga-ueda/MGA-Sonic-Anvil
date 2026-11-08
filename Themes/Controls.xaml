@@ -1541,6 +1541,7 @@
                             Background="Transparent"
                             BorderBrush="Transparent"
                             BorderThickness="0"
+                            CornerRadius="{ui:ControlCorner}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <ContentPresenter ContentSource="Header"
