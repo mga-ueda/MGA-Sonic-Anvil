@@ -68,6 +68,9 @@ internal sealed partial class LibraryBrowserView : UserControl
     internal static byte PaneFocusLineAlpha =>
         PlayerChrome.Get("PlayerPaneFocusLineBrush", UiTheme.Dark).A;
     internal const string PlaylistRowBandName = "PlaylistRowBand";
+
+    /// <summary>ツリー子のインデント。選択帯をルート左端へ揃える基準。</summary>
+    internal const double TreeChildIndent = 16;
     internal static Color FallbackWashNavy => PlayerChrome.Get("PlayerFallbackWashNavyBrush");
     internal static Color FallbackWashBlue => PlayerChrome.Get("PlayerFallbackWashBlueBrush");
     internal static Color FallbackWashCyan => PlayerChrome.Get("PlayerFallbackWashCyanBrush");
@@ -5445,6 +5448,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(2, 1, 4, 1)));
         itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+        itemStyle.Setters.Add(new Setter(UIElement.ClipToBoundsProperty, false));
         itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
         itemStyle.Setters.Add(new Setter(Control.TemplateProperty, TreeNavTemplate(hover, selected)));
         itemStyle.Setters.Add(new EventSetter(
@@ -5930,6 +5934,12 @@ internal sealed partial class LibraryBrowserView : UserControl
         typeof(LibraryBrowserView),
         new FrameworkPropertyMetadata(SelectionBandEdge.None));
 
+    internal static readonly DependencyProperty TreeIndentDepthProperty = DependencyProperty.RegisterAttached(
+        "TreeIndentDepth",
+        typeof(int),
+        typeof(LibraryBrowserView),
+        new FrameworkPropertyMetadata(0));
+
     internal static readonly DependencyProperty PlaylistBandLeftProperty = DependencyProperty.RegisterAttached(
         "PlaylistBandLeft",
         typeof(double),
@@ -5976,9 +5986,29 @@ internal sealed partial class LibraryBrowserView : UserControl
         var bd = new FrameworkElementFactory(typeof(Border));
         bd.Name = "Bd";
         bd.SetValue(Border.BackgroundProperty, Brushes.Transparent);
-        bd.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
         bd.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+        bd.SetValue(UIElement.ClipToBoundsProperty, false);
         bd.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        // インデント分だけ左へ伸ばし、選択帯の左端をルート行に揃える（階段状の直角を消す）。
+        bd.SetBinding(
+            FrameworkElement.MarginProperty,
+            new Binding
+            {
+                Path = new PropertyPath(TreeIndentDepthProperty),
+                RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+                Converter = TreeBandBleedMarginConverter.Instance,
+            });
+        var treePadding = new MultiBinding { Converter = TreeBandBleedPaddingConverter.Instance };
+        treePadding.Bindings.Add(new Binding(nameof(Control.Padding))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        treePadding.Bindings.Add(new Binding
+        {
+            Path = new PropertyPath(TreeIndentDepthProperty),
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        bd.SetBinding(Border.PaddingProperty, treePadding);
         var treeCorners = new MultiBinding { Converter = TreeNavCornerConverter.Instance };
         treeCorners.Bindings.Add(new Binding
         {
@@ -6004,9 +6034,11 @@ internal sealed partial class LibraryBrowserView : UserControl
 
         var items = new FrameworkElementFactory(typeof(ItemsPresenter));
         items.Name = "ItemsHost";
-        items.SetValue(FrameworkElement.MarginProperty, new Thickness(16, 0, 0, 0));
+        items.SetValue(FrameworkElement.MarginProperty, new Thickness(TreeChildIndent, 0, 0, 0));
+        items.SetValue(UIElement.ClipToBoundsProperty, false);
 
         var root = new FrameworkElementFactory(typeof(StackPanel));
+        root.SetValue(UIElement.ClipToBoundsProperty, false);
         root.AppendChild(bd);
         root.AppendChild(items);
 
@@ -6114,6 +6146,41 @@ internal sealed partial class LibraryBrowserView : UserControl
         return template;
     }
 
+    private sealed class TreeBandBleedMarginConverter : IValueConverter
+    {
+        internal static readonly TreeBandBleedMarginConverter Instance = new();
+
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            var depth = value is int pixels ? Math.Max(0, pixels) : 0;
+            var bleed = depth * TreeChildIndent;
+            return new Thickness(-bleed, 0, 0, 0);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+            Binding.DoNothing;
+    }
+
+    private sealed class TreeBandBleedPaddingConverter : IMultiValueConverter
+    {
+        internal static readonly TreeBandBleedPaddingConverter Instance = new();
+
+        public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            var padding = values is { Length: > 0 } && values[0] is Thickness box
+                ? box
+                : new Thickness(2, 1, 4, 1);
+            var depth = values is { Length: > 1 } && values[1] is int pixels
+                ? Math.Max(0, pixels)
+                : 0;
+            var bleed = depth * TreeChildIndent;
+            return new Thickness(padding.Left + bleed, padding.Top, padding.Right, padding.Bottom);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture) =>
+            [];
+    }
+
     private sealed class TreeNavCornerConverter : IMultiValueConverter
     {
         internal static readonly TreeNavCornerConverter Instance = new();
@@ -6144,6 +6211,32 @@ internal sealed partial class LibraryBrowserView : UserControl
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture) =>
             [];
     }
+
+    internal static int MeasureTreeIndentDepth(TreeViewItem item)
+    {
+        var depth = 0;
+        for (DependencyObject? node = item;
+             ItemsControl.ItemsControlFromItemContainer(node) is TreeViewItem parent;
+             node = parent)
+        {
+            depth++;
+        }
+
+        return depth;
+    }
+
+    internal static Thickness TreeBandBleedMargin(int depth) =>
+        new(-Math.Max(0, depth) * TreeChildIndent, 0, 0, 0);
+
+    internal static Thickness TreeBandBleedPadding(Thickness padding, int depth) =>
+        new(
+            padding.Left + Math.Max(0, depth) * TreeChildIndent,
+            padding.Top,
+            padding.Right,
+            padding.Bottom);
+
+    private static void SyncTreeIndentDepth(TreeViewItem item) =>
+        item.SetValue(TreeIndentDepthProperty, MeasureTreeIndentDepth(item));
 
     private sealed class ListNavCornerConverter : IMultiValueConverter
     {
@@ -6349,6 +6442,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         items.Add(item);
+        SyncTreeIndentDepth(item);
         return item;
     }
 
@@ -7031,6 +7125,7 @@ internal sealed partial class LibraryBrowserView : UserControl
                     continue;
                 }
 
+                SyncTreeIndentDepth(child);
                 var marked = _treeMultiSelected.Contains(child);
                 child.SetValue(TreeMarkedProperty, marked);
                 child.Background = marked ? selected : Brushes.Transparent;
