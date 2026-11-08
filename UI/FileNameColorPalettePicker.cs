@@ -29,10 +29,10 @@ internal sealed class FileNameColorPalettePicker : Border
 
         _chip = new Border
         {
-            Width = 36,
-            Height = 14,
-            // 端を半円に（高さの半分）。設定の GUI 角丸は使わない。
-            CornerRadius = new CornerRadius(7),
+            Width = FileNameColorPaletteBoard.SwatchSize,
+            Height = FileNameColorPaletteBoard.SwatchSize,
+            // 完全な円。パレット見本と同じく、設定の GUI 角丸は使わない。
+            CornerRadius = FileNameColorPaletteBoard.SwatchCorner,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true,
