@@ -2598,6 +2598,12 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>モード名トーストの表示終了予定（UTC）。未表示は null。</summary>
+    private DateTime? _layoutModeToastUntilUtc;
+
+    /// <summary>モード名トーストの世代。Leave 開始時の値より進んだら「この復帰用」とみなす。</summary>
+    private int _layoutModeToastEpoch;
+
     private void ShowLayoutModeToast(WindowLayoutSlot slot)
     {
         if (!IsLoaded)
@@ -2606,6 +2612,11 @@ public partial class MainWindow
         }
 
         var fullscreenMode = AppStorage.Settings.ResolvedLayoutPreset(slot).ResolvedFullscreenMode();
+        // LeaveLibraryMaximize の後追いより先にトーストが出る／終わる時刻を刻む。
+        _layoutModeToastEpoch++;
+        _layoutModeToastUntilUtc = DateTime.UtcNow
+            + LibraryExplorerTypeahead.ToastIdleClear
+            + TimeSpan.FromSeconds(LibraryPlayerMode.ChromeFadeSeconds);
         ShowCenterStatusToast(FormatLayoutModeToast(slot, fullscreenMode, _layoutFullscreenOn));
     }
 

@@ -606,18 +606,38 @@ public partial class MainWindow : Window
             return;
         }
 
+        var launchSlot = AppStorage.Settings.ResolvedLaunchMode();
+        var arglessStartup = launch.Length == 0;
+        var playerLaunch = arglessStartup && WindowLayoutPreset.IsPlayerLayoutSlot(launchSlot);
+        var editorLaunch = arglessStartup && !WindowLayoutPreset.IsPlayerLayoutSlot(launchSlot);
+
+        // プレイヤー起動: 復元中はプラグイン実体を作らない（モード適用は復元のあと）。
+        // ※モードを先に入れるとプレイリスト未同期のまま復元され、タブが欠ける。
+        if (playerLaunch)
+        {
+            _startupPlayerVstBypass = true;
+        }
+
+        // エディタ起動: 復元中の自動 Sync を抑え、表示後にすりガラスで載せる。
+        if (editorLaunch)
+        {
+            _startupDeferVstSync = true;
+        }
+
         await TryRestoreLastDocumentAsync().ConfigureAwait(true);
         EnterLibraryPlayerIfLaunchHasMp3(launch);
+        var enteredStartupMode = false;
         if (launch.Length > 0)
         {
+            _startupPlayerVstBypass = false;
+            _startupDeferVstSync = false;
             await OpenLaunchPathsAsync(launch).ConfigureAwait(true);
         }
         else
         {
-            // 引数なし: クローク中に起動モードを載せてから出す（別モードが一瞬見えないように）。
+            // 引数なし: クローク中に起動モードを載せてから出す。
             // 未保存タブがあるとき F9/F10 へ入れると保存確認が必要。クローク中の
             // ShowDialog は操作不能になるので、プレイヤー起動モードは後回しにする。
-            var launchSlot = AppStorage.Settings.ResolvedLaunchMode();
             var dirtyRestored = false;
             foreach (var session in _sessions)
             {
@@ -628,9 +648,15 @@ public partial class MainWindow : Window
                 }
             }
 
-            if (!(WindowLayoutPreset.IsPlayerLayoutSlot(launchSlot) && dirtyRestored))
+            if (playerLaunch && dirtyRestored)
+            {
+                _startupPlayerVstBypass = false;
+            }
+            else
             {
                 EnterStartupMode();
+                _startupPlayerVstBypass = false;
+                enteredStartupMode = true;
             }
         }
 
@@ -638,6 +664,7 @@ public partial class MainWindow : Window
         UpdateLayout();
         Waveform.Refresh();
         Overview.InvalidateVisual();
+        // すりガラスを見せるため、プラグイン読み込みより先にメイン窓を出す。
         if (WindowPaintReveal.IsPending(this))
         {
             if (IsWaveformMaximized)
@@ -648,6 +675,58 @@ public partial class MainWindow : Window
             WindowPaintReveal.Reveal(this);
             ForegroundActivation.BringToFront(this);
             SyncShellFullscreen();
+        }
+
+        // F9–F12 ショートカットと同じく、起動モード名トーストを出す。
+        if (enteredStartupMode)
+        {
+            _editorEnterToastEpochBaseline = _layoutModeToastEpoch;
+            ShowLayoutModeToast(launchSlot);
+            if (editorLaunch)
+            {
+                await WaitForLayoutModeToastToSettleAsync().ConfigureAwait(true);
+                await LoadStartupVstInsertsWithBusyGlassAsync().ConfigureAwait(true);
+            }
+        }
+    }
+
+    /// <summary>エディタ起動時のプラグイン実体ロード（プレイヤー→エディタと同じすりガラス）。</summary>
+    private async Task LoadStartupVstInsertsWithBusyGlassAsync()
+    {
+        try
+        {
+            var needsLoad = StartupHasVstInsertsToLoad();
+            if (!needsLoad)
+            {
+                _startupDeferVstSync = false;
+                SyncVstInsertEngine();
+                return;
+            }
+
+            // defer 解除より先に busy を立て、隙間の fire-and-forget Sync を防ぐ。
+            _vstEditorEnterBusy = true;
+            _vstSyncQueuedDuringEditorBusy = false;
+            _startupDeferVstSync = false;
+            RefreshTransportCommandsEnabled();
+            ShowBusyGlass(UiStrings.OverlayVstPluginStartupLoading);
+            await Dispatcher.Yield(DispatcherPriority.Render);
+            try
+            {
+                await SyncVstInsertEngineAsync(openEditorSlot: null, preferPlayback: false)
+                    .ConfigureAwait(true);
+            }
+            finally
+            {
+                _vstEditorEnterBusy = false;
+                RefreshTransportCommandsEnabled();
+                _busyGlass.BeginFadeOut();
+                RestoreEditorKeyboardFocusAfterBusy();
+                FlushVstSyncQueuedDuringEditorBusy();
+            }
+        }
+        finally
+        {
+            _startupDeferVstSync = false;
         }
     }
 
