@@ -2409,7 +2409,7 @@ public partial class MainWindow
                 !_playlistVideoChromeVisible,
                 _playlistVideoTimecode,
                 isVideo: true));
-        // タイムコードは AcrylicOverlayKind.Timecode（DWM 影なし）。Effect も付けない。
+        // タイムコードはトーストと同じ Acrylic（DWM Round）。要素 Effect は付けない。
         SyncPlaylistVideoHudLabelColors();
     }
 

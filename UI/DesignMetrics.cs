@@ -619,5 +619,6 @@ internal sealed class CornerChrome : DependencyObject
     {
         ((CornerChrome)d).Corner = new CornerRadius((double)e.NewValue);
         DesignMetrics.RefreshOpenVisuals();
+        AcrylicGlassPopup.RefreshOpenCornerClips();
     }
 }
