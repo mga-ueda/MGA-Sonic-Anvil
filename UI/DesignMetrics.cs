@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -93,6 +94,16 @@ internal static class DesignMetrics
     {
         BindingOperations.SetBinding(rectangle, Rectangle.RadiusXProperty, RadiusBinding());
         BindingOperations.SetBinding(rectangle, Rectangle.RadiusYProperty, RadiusBinding());
+    }
+
+    /// <summary>外形を既定の GUI 角丸で切る（ListBox／DataGrid など CornerRadius を持たないコントロール用）。</summary>
+    public static void BindControlCornerClip(FrameworkElement element)
+    {
+        var binding = new MultiBinding { Converter = ControlCornerClipConverter.Instance };
+        binding.Bindings.Add(new Binding(nameof(FrameworkElement.ActualWidth)) { Source = element });
+        binding.Bindings.Add(new Binding(nameof(FrameworkElement.ActualHeight)) { Source = element });
+        binding.Bindings.Add(RadiusBinding());
+        BindingOperations.SetBinding(element, UIElement.ClipProperty, binding);
     }
 
     public static void RefreshOpenVisuals()
@@ -600,6 +611,32 @@ internal static class DesignMetrics
 
         return Math.Clamp(width, LevelMeterWidth, LevelMeterSurroundLayout.FilledColumnWidth(channels));
     }
+}
+
+/// <summary>ActualWidth／ActualHeight／半径から <see cref="DesignMetrics.ControlCornerClip"/> 相当の Clip を作る。</summary>
+internal sealed class ControlCornerClipConverter : IMultiValueConverter
+{
+    public static ControlCornerClipConverter Instance { get; } = new();
+
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length < 3
+            || values[0] is not double width
+            || values[1] is not double height
+            || values[2] is not double radius
+            || width <= 0
+            || height <= 0)
+        {
+            return Geometry.Empty;
+        }
+
+        var clip = new RectangleGeometry(new Rect(0, 0, width, height), radius, radius);
+        clip.Freeze();
+        return clip;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }
 
 /// <summary>角丸の単一の値。<see cref="DesignMetrics.ControlCornerRadius"/> とバインディングの源。</summary>
