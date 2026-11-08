@@ -529,8 +529,8 @@ internal sealed class TransportIconButton : Button
 /// <item>線は前景色（通常は白）。色は塗りで使うのを基本とし、2色目は意味を補う場合だけ入れる。無理に色を付けない。</item>
 /// <item>色はアプリ内の同じ意味の要素と揃え、テーマキーから描画時に読む（ユーザーが色を変えると追従する）。
 ///   マーカー＝MarkerBrush（オレンジ）、リージョン＝RegionTimelineBrush（緑）、ループ＝SampleLoopTimelineBrush（青）、
-///   再生＝PlayheadBrush（シアン）、録音＝RecordLatchForeBrush（赤）、削除＝ClearButtonBackBrush（赤）、
-///   選択範囲＝WaveSelectionFillBrush。</item>
+///   再生の塗り＝LatchToggleOnBackBrush（ラッチ青）、再生ヘッド線＝PlayheadBrush（シアン）、
+///   録音＝RecordLatchForeBrush（赤）、削除＝ClearButtonBackBrush（赤）、選択範囲＝WaveSelectionFillBrush。</item>
 /// <item>線に色を付けるのは、シークバー（再生ヘッド）のように実物が色線であるものに限る。</item>
 /// <item>アプリ内に実物がある形は合わせる。マーカー旗は <see cref="DrawMarkerFlag"/>（竿は白、旗は塗り）。</item>
 /// <item>削除系は元の図形に <see cref="DrawDeleteBadge"/>（赤い丸に白い ×）を右下に添える。</item>
@@ -584,7 +584,8 @@ internal static class TransportIconDrawing
         var markerPen = pen;
         var regionFill = AccentFill("RegionTimelineBrush", accent, 0xD2);
         var loopFill = AccentFill("SampleLoopTimelineBrush", accent, 0xB4);
-        var playFill = AccentFill("PlayheadBrush", accent, 0xFF);
+        // 再生三角の塗りはラッチオンの青。シークバー本体の線色（シアン）とは分ける。
+        var playFill = AccentFill("LatchToggleOnBackBrush", accent, 0xFF);
         var playheadPen = OutlinePen(pen, WpfControlHelpers.FrozenBrush(AccentColor("PlayheadBrush", fore, accent)));
         var deleteFill = AccentFill("ClearButtonBackBrush", accent, 0xFF);
         var recordFill = accent || latched
