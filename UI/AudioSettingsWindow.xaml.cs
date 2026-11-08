@@ -56,6 +56,9 @@ internal partial class AudioSettingsWindow : Window
 
     public FileNameColorRule[] SelectedFileNameColorRules { get; private set; } = [];
 
+    public SpectrogramColorPalette SelectedSpectrogramColorPalette { get; private set; } =
+        SpectrogramColorPalettes.Default;
+
     /// <summary>色設定パネル（Ctrl+Shift+C）を開く。メインウィンドウ側で接続する。</summary>
     public Action? OpenColorSettings { get; set; }
 
@@ -210,6 +213,7 @@ internal partial class AudioSettingsWindow : Window
     private bool _transportToolbarPreviewReady;
     private readonly string _wallpaperPathOpenedAt;
     private readonly double _wallpaperOpacityOpenedAt;
+    private readonly SpectrogramColorPalette _spectrogramColorPaletteOpenedAt;
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksWave = [];
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksMp3 = [];
     private readonly Dictionary<LibraryFileColumn, CheckBox> _libraryColumnChecksVideo = [];
@@ -274,12 +278,15 @@ internal partial class AudioSettingsWindow : Window
         WindowLayoutPreset? layoutPresetF12 = null,
         IEnumerable<string>? vst3SearchPaths = null,
         bool vst3UseSteinbergHostCache = false,
-        double controlCornerRadius = AppSettings.ControlCornerRadiusDefault)
+        double controlCornerRadius = AppSettings.ControlCornerRadiusDefault,
+        SpectrogramColorPalette spectrogramColorPalette = SpectrogramColorPalette.Blue)
     {
         SelectedSettings = current;
         SelectedLanguage = language;
         SelectedMultiFileArrange = WaveformTileLayout.Parse(multiFileArrange);
         SelectedLaunchMode = launchMode;
+        SelectedSpectrogramColorPalette = spectrogramColorPalette;
+        _spectrogramColorPaletteOpenedAt = SelectedSpectrogramColorPalette;
         SelectedUiScalePercent = UiScale.ClampPercent(uiScalePercent);
         _uiScaleOpenedAt = SelectedUiScalePercent;
         SelectedLoudnessTargetLufs = LoudnessMeterEngine.ClampTargetLufs(loudnessTargetLufs);
@@ -494,6 +501,8 @@ internal partial class AudioSettingsWindow : Window
             FileNameColorMarkerHost,
             FileNameColorMarkerAddButton);
         _fileNameColorMarkers.Load(AppStorage.Settings.FileNameColorRules);
+        FillSpectrogramColorPalette(SelectedSpectrogramColorPalette);
+        SpectrogramColorPaletteCombo.SelectionChanged += SpectrogramColorPaletteCombo_SelectionChanged;
         ActionButtonLooks.ApplyClear(OpenColorSettingsButton);
         ActionButtonLooks.ApplyClear(FileNameColorMarkerAddButton);
         AppDialogKeys.PrepareActionButton(OpenColorSettingsButton);
@@ -1613,6 +1622,10 @@ internal partial class AudioSettingsWindow : Window
         SelectedLaunchMode = LaunchModeCombo.SelectedItem is LaunchModeItem launchItem
             ? launchItem.Slot
             : AppLaunchModes.DefaultSlot;
+        SelectedSpectrogramColorPalette =
+            SpectrogramColorPaletteCombo.SelectedItem is SpectrogramColorPaletteItem paletteItem
+                ? paletteItem.Palette
+                : SpectrogramColorPalettes.Default;
         SelectedWallpaperPath = WallpaperPathBox.Text.Trim().Trim('"');
         SelectedWallpaperOpacity = AppSettings.ClampWallpaperOpacity(
             Math.Round(WallpaperOpacitySlider.Value) / 100d);
@@ -2592,6 +2605,71 @@ internal partial class AudioSettingsWindow : Window
         LaunchModeCombo.SelectedIndex = LaunchModeCombo.Items.Count - 1;
     }
 
+    private void FillSpectrogramColorPalette(SpectrogramColorPalette palette)
+    {
+        SpectrogramColorPaletteCombo.Items.Add(
+            new SpectrogramColorPaletteItem(
+                SpectrogramColorPalette.Blue,
+                UiStrings.LabelSpectrogramColorPaletteBlue));
+        SpectrogramColorPaletteCombo.Items.Add(
+            new SpectrogramColorPaletteItem(
+                SpectrogramColorPalette.Red,
+                UiStrings.LabelSpectrogramColorPaletteRed));
+        foreach (SpectrogramColorPaletteItem item in SpectrogramColorPaletteCombo.Items)
+        {
+            if (item.Palette == palette)
+            {
+                SpectrogramColorPaletteCombo.SelectedItem = item;
+                return;
+            }
+        }
+
+        SpectrogramColorPaletteCombo.SelectedIndex = 0;
+    }
+
+    private void SpectrogramColorPaletteCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded || SpectrogramColorPaletteCombo.SelectedItem is not SpectrogramColorPaletteItem item)
+        {
+            return;
+        }
+
+        PreviewSpectrogramColorPalette(item.Palette);
+        ComboBoxFit.Apply(SpectrogramColorPaletteCombo);
+    }
+
+    private void PreviewSpectrogramColorPalette(SpectrogramColorPalette palette)
+    {
+        SelectedSpectrogramColorPalette = palette;
+        if (Owner is MainWindow window)
+        {
+            window.ApplySpectrogramColorPalettePreview(palette);
+            return;
+        }
+
+        AppStorage.Settings.ApplySpectrogramColorPalette(palette);
+        SpectrogramEngine.SetColorPalette(palette);
+    }
+
+    private void RevertSpectrogramColorPalettePreview()
+    {
+        if (SelectedSpectrogramColorPalette == _spectrogramColorPaletteOpenedAt
+            && AppStorage.Settings.ResolvedSpectrogramColorPalette() == _spectrogramColorPaletteOpenedAt)
+        {
+            return;
+        }
+
+        SelectedSpectrogramColorPalette = _spectrogramColorPaletteOpenedAt;
+        if (Owner is MainWindow window)
+        {
+            window.ApplySpectrogramColorPalettePreview(_spectrogramColorPaletteOpenedAt);
+            return;
+        }
+
+        AppStorage.Settings.ApplySpectrogramColorPalette(_spectrogramColorPaletteOpenedAt);
+        SpectrogramEngine.SetColorPalette(_spectrogramColorPaletteOpenedAt);
+    }
+
     private void FillUiScale(int percent)
     {
         var current = UiScale.ClampPercent(percent);
@@ -2943,6 +3021,7 @@ internal partial class AudioSettingsWindow : Window
         ComboBoxFit.Apply(TransportToolbarIconScaleCombo);
         ComboBoxFit.Apply(MultiFileArrangeCombo);
         ComboBoxFit.Apply(LaunchModeCombo);
+        ComboBoxFit.Apply(SpectrogramColorPaletteCombo);
         ComboBoxFit.Apply(LibraryPlaylistWaveformSizeWaveCombo);
         ComboBoxFit.Apply(LibraryPlaylistWaveformSizeMp3Combo);
         ComboBoxFit.Apply(VideoProxyRetentionCombo);
@@ -3573,6 +3652,7 @@ internal partial class AudioSettingsWindow : Window
             RevertShowMainMenuBarPreview();
             RevertTransportToolbarPreview();
             RevertLayoutPresetPreviews();
+            RevertSpectrogramColorPalettePreview();
         }
 
         WindowPlacement.CaptureSettings(this, AppStorage.Settings);
@@ -3656,6 +3736,11 @@ internal partial class AudioSettingsWindow : Window
         }
 
         return label;
+    }
+
+    private sealed record SpectrogramColorPaletteItem(SpectrogramColorPalette Palette, string Label)
+    {
+        public override string ToString() => Label;
     }
 
     private sealed record LaunchModeItem(WindowLayoutSlot Slot, string Label)

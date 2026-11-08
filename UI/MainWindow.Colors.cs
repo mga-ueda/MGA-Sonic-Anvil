@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 
 namespace MgaSonicAnvil.UI;
@@ -57,6 +58,16 @@ public partial class MainWindow
         // 編集履歴は等倍のまま（ルートの表示倍率を打ち消す）。
         HistoryOverlay.LayoutTransform = UiScaleService.CreateCounterTransform();
         ApplyUiColors();
+    }
+
+    /// <summary>スペクトログラム色調の即時プレビュー／確定。設定値も合わせておく。</summary>
+    internal void ApplySpectrogramColorPalettePreview(SpectrogramColorPalette palette)
+    {
+        AppStorage.Settings.ApplySpectrogramColorPalette(palette);
+        if (SpectrogramEngine.SetColorPalette(palette))
+        {
+            ForEachWaveform(view => view.InvalidateSpectrogramColors());
+        }
     }
 
     internal void ApplyUiColors() => ApplyUiColors(includeColorPanel: true);

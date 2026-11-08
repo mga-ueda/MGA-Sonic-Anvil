@@ -22,6 +22,8 @@ internal sealed class SpectrogramRenderer
     private ushort[] _units = [];
     private readonly int[] _boostMap = new int[SpectrogramEngine.LinearUnitScale + 1];
     private float _mapBoostDb = float.NaN;
+    private SpectrogramColorPalette _mapPalette = (SpectrogramColorPalette)(-1);
+    private SpectrogramColorPalette _drawnPalette = (SpectrogramColorPalette)(-1);
     private bool _hasUnits;
     private double[] _rowHertz = [];
     private int _rowHeight;
@@ -83,6 +85,16 @@ internal sealed class SpectrogramRenderer
         _gainSamples = null;
         _hasUnits = false;
         _mapBoostDb = float.NaN;
+        _mapPalette = (SpectrogramColorPalette)(-1);
+        _drawnPalette = (SpectrogramColorPalette)(-1);
+    }
+
+    /// <summary>色調 LUT だけ差し替える。FFT キャッシュは残す。</summary>
+    public void InvalidateColorMap()
+    {
+        _mapBoostDb = float.NaN;
+        _mapPalette = (SpectrogramColorPalette)(-1);
+        _drawnPalette = (SpectrogramColorPalette)(-1);
     }
 
     public void Dispose() => _cache.Dispose();
@@ -181,7 +193,9 @@ internal sealed class SpectrogramRenderer
             && _sampleRate == document.SampleRate
             && _drewFromCache == fromCache
             && _drewSharp == sharp;
-        if (sameView && Math.Abs(_appliedBoostDb - _displayBoostDb) < 0.01f)
+        if (sameView
+            && Math.Abs(_appliedBoostDb - _displayBoostDb) < 0.01f
+            && _drawnPalette == SpectrogramEngine.ColorPalette)
         {
             return;
         }
@@ -218,11 +232,14 @@ internal sealed class SpectrogramRenderer
             _gainSamples = document.Interleaved;
         }
 
-        var mapDirty = float.IsNaN(_mapBoostDb) || Math.Abs(_mapBoostDb - _displayBoostDb) >= 0.01f;
+        var mapDirty = float.IsNaN(_mapBoostDb)
+            || Math.Abs(_mapBoostDb - _displayBoostDb) >= 0.01f
+            || _mapPalette != SpectrogramEngine.ColorPalette;
         if (mapDirty)
         {
             SpectrogramEngine.FillBoostLinearMap(_boostMap, _displayBoostDb);
             _mapBoostDb = _displayBoostDb;
+            _mapPalette = SpectrogramEngine.ColorPalette;
         }
 
         // シフト再利用できた列はピクセルも一緒にずらしてあるので、ブースト（LUT 適用）は
@@ -261,6 +278,7 @@ internal sealed class SpectrogramRenderer
         _drewFromCache = fromCache;
         _drewSharp = sharp;
         _appliedBoostDb = _displayBoostDb;
+        _drawnPalette = SpectrogramEngine.ColorPalette;
     }
 
     private void RasterizeSpan(

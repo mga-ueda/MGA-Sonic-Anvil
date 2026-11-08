@@ -591,6 +591,19 @@
                                 Margin="0,0,0,20"
                                 Click="OpenColorSettingsButton_Click" />
 
+              <TextBlock x:Name="SpectrogramColorPaletteLabel"
+                         Text="{x:Static domain:UiStrings.LabelSpectrogramColorPalette}"
+                         FontWeight="Bold"
+                         FontSize="11.333"
+                         Margin="0,0,0,6" />
+              <ComboBox x:Name="SpectrogramColorPaletteCombo"
+                        HorizontalAlignment="Left"
+                        Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                        Margin="0,0,0,20"
+                        Padding="6,1"
+                        FontSize="11.333"
+                        VerticalContentAlignment="Center" />
+
               <TextBlock Text="{x:Static domain:UiStrings.LabelFileNameColorMarkers}"
                          FontWeight="Bold"
                          FontSize="11.333"

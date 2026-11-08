@@ -1930,6 +1930,17 @@ internal sealed partial class WaveformView : Grid
         }
     }
 
+    /// <summary>スペクトログラム色調だけ差し替える。FFT キャッシュは残す。</summary>
+    public void InvalidateSpectrogramColors()
+    {
+        _spectrogram.InvalidateColorMap();
+        _boostBar.ApplyTrackBrush();
+        if (SpectrogramVisible)
+        {
+            InvalidateStaticLayerForSpectrogram();
+        }
+    }
+
     public void DisposeSpectrogram()
     {
         _spectrogram.Dispose();
