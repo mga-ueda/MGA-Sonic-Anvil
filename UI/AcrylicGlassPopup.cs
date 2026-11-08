@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -9,19 +10,19 @@ namespace MgaSonicAnvil.UI;
 /// <summary>Acrylic オーバーレイの見た目方針。</summary>
 internal enum AcrylicOverlayKind
 {
-    /// <summary>通常トースト。DWM 角丸＋システム影あり。</summary>
+    /// <summary>通常トースト。DWM Round 角丸＋システム影。</summary>
     Toast,
 
     /// <summary>
-    /// タイムコード専用。DWM 角丸／システム影なし（Border の CornerRadius のみ）。
+    /// タイムコード。角丸はトーストと同じ DWM Round（枠は設定の CornerRadius）。
+    /// TOPMOST だけ外す（常時表示のため他アプリの下に回れるようにする）。
     /// </summary>
     Timecode,
 }
 
 /// <summary>
 /// DWM Acrylic のオーバーレイ（Popup）。
-/// <see cref="AcrylicOverlayKind.Toast"/> は角丸＋システム影あり。
-/// <see cref="AcrylicOverlayKind.Timecode"/> は影なし（タイムコード専用）。
+/// トースト／タイムコードとも DWM Round 角丸。枠の <see cref="Border.CornerRadius"/> は設定へバインド。
 /// </summary>
 internal sealed class AcrylicGlassPopup
 {
@@ -30,7 +31,6 @@ internal sealed class AcrylicGlassPopup
 
     private readonly Popup _popup;
     private readonly Border _plate;
-    private readonly bool _roundCorners;
 
     /// <summary>色のライブ更新時にティントを加工する（フェード中は現在のαを保つ）。</summary>
     public Func<Color, Color>? LiveTint { get; set; }
@@ -42,7 +42,7 @@ internal sealed class AcrylicGlassPopup
 
     public AcrylicGlassPopup(AcrylicOverlayKind kind)
     {
-        _roundCorners = kind != AcrylicOverlayKind.Timecode;
+        _ = kind;
         _plate = new Border
         {
             Background = Brushes.Transparent,
@@ -53,6 +53,7 @@ internal sealed class AcrylicGlassPopup
         };
         DesignMetrics.BindCorner(_plate);
         _plate.SetResourceReference(Border.BorderBrushProperty, "PlayerComboDropBorderBrush");
+        _plate.SizeChanged += (_, _) => ApplyWindowChrome();
 
         _popup = new Popup
         {
@@ -63,11 +64,14 @@ internal sealed class AcrylicGlassPopup
             IsHitTestVisible = false,
             Child = _plate,
         };
+        // トースト／タイムコードとも DWM Round。Acrylic 塗りは OS 固定半径。
         AcrylicPopup.Attach(
             _popup,
             AcrylicBackdrop.ToastTintBrushKey,
-            roundCorners: _roundCorners,
+            roundCorners: true,
             paintChildBackground: false);
+        _popup.Opened += (_, _) =>
+            _popup.Dispatcher.BeginInvoke(ApplyWindowChrome, DispatcherPriority.Loaded);
         Track(this);
     }
 
@@ -92,7 +96,27 @@ internal sealed class AcrylicGlassPopup
         }
     }
 
-    /// <summary>タイムコード専用ホスト（影なし）。</summary>
+    /// <summary>開いているオーバーレイの HWND 状態（TOPMOST 解除など）を載せ直す。</summary>
+    public static void RefreshOpenCornerClips()
+    {
+        AcrylicGlassPopup[] live;
+        lock (TrackGate)
+        {
+            PruneTracked();
+            live = Tracked
+                .Select(weak => weak.TryGetTarget(out var popup) ? popup : null)
+                .Where(popup => popup is not null)
+                .Cast<AcrylicGlassPopup>()
+                .ToArray();
+        }
+
+        foreach (var popup in live)
+        {
+            popup.ApplyWindowChrome();
+        }
+    }
+
+    /// <summary>タイムコード専用ホスト（角丸はトーストと同じ DWM Round）。</summary>
     public static AcrylicGlassPopup CreateTimecode() => new(AcrylicOverlayKind.Timecode);
 
     public UIElement? Content
@@ -155,7 +179,7 @@ internal sealed class AcrylicGlassPopup
 
     /// <summary>開いているときだけティント色を載せ直す（αフェード用）。</summary>
     public bool TryApplyTint(Color tint) =>
-        IsOpen && AcrylicBackdrop.TryApplyTintToVisual(_plate, tint, _roundCorners);
+        IsOpen && AcrylicBackdrop.TryApplyTintToVisual(_plate, tint, AcrylicCornerStyle.Round);
 
     private void ApplyLiveTint(Color tint)
     {
@@ -170,6 +194,21 @@ internal sealed class AcrylicGlassPopup
         }
 
         TryApplyTint(tint);
+    }
+
+    /// <summary>
+    /// Popup 既定の TOPMOST を外す（タイムコードは常時表示なので必須。トーストも揃える）。
+    /// </summary>
+    private void ApplyWindowChrome()
+    {
+        if (!_popup.IsOpen
+            || PresentationSource.FromVisual(_plate) is not HwndSource source
+            || source.Handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        AcrylicBackdrop.ClearPopupTopmost(source.Handle);
     }
 
     private static void Track(AcrylicGlassPopup popup)
@@ -214,6 +253,7 @@ internal sealed class AcrylicGlassPopup
         var offset = _popup.HorizontalOffset;
         _popup.HorizontalOffset = offset + 0.01;
         _popup.HorizontalOffset = offset;
+        ApplyWindowChrome();
     }
 
     public void RefreshPlacementAfterLayout()

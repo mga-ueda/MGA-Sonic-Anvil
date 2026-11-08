@@ -5,6 +5,14 @@ using System.Windows.Media;
 
 namespace MgaSonicAnvil.UI;
 
+/// <summary>DWM Acrylic HWND の角丸。任意半径は取れず、OS の二段階だけ。</summary>
+internal enum AcrylicCornerStyle
+{
+    None,
+    RoundSmall,
+    Round,
+}
+
 /// <summary>
 /// ウィンドウへすりガラスを適用する（MGA After Drive と同じ ACCENT Acrylic。
 /// DWM 呼び出し方針は WinBlur 由来 — THIRD_PARTY_NOTICES.md の WinBlur 項を参照）。
@@ -28,6 +36,7 @@ internal static class AcrylicBackdrop
 
     private const int GwlExStyle = -20;
     private const int WsExLayered = 0x00080000;
+    private const int WsExTopmost = 0x00000008;
     private const int WcaAccentPolicy = 19;
     private const int DwmwaUseImmersiveDarkMode = 20;
     private const int DwmwaWindowCornerPreference = 33;
@@ -35,6 +44,12 @@ internal static class AcrylicBackdrop
     private const int DwmsbtNone = 1;
     private const int DwmwcpDonotround = 1;
     private const int DwmwcpRound = 2;
+    private const int DwmwcpRoundsmall = 3;
+    private static readonly IntPtr HwndNotopmost = new(-2);
+    private const uint SwpNomove = 0x0002;
+    private const uint SwpNosize = 0x0001;
+    private const uint SwpNoactivate = 0x0010;
+    private const uint SwpNoownerzorder = 0x0200;
 
     private enum AccentState
     {
@@ -133,7 +148,13 @@ internal static class AcrylicBackdrop
         TryApplyTintToVisual(visual, ResolveTintColor(tintBrushKey), roundCorners);
 
     /// <summary>任意色ティントで Visual の HWND へ Acrylic を載せる（トーストのαフェード用）。</summary>
-    public static bool TryApplyTintToVisual(Visual? visual, Color tint, bool roundCorners)
+    public static bool TryApplyTintToVisual(Visual? visual, Color tint, bool roundCorners) =>
+        TryApplyTintToVisual(
+            visual,
+            tint,
+            roundCorners ? AcrylicCornerStyle.Round : AcrylicCornerStyle.None);
+
+    public static bool TryApplyTintToVisual(Visual? visual, Color tint, AcrylicCornerStyle corners)
     {
         if (visual is null)
         {
@@ -151,7 +172,7 @@ internal static class AcrylicBackdrop
             source.CompositionTarget.BackgroundColor = Colors.Transparent;
         }
 
-        ApplyTint(source.Handle, tint, roundCorners);
+        ApplyTint(source.Handle, tint, corners);
         return true;
     }
 
@@ -161,10 +182,16 @@ internal static class AcrylicBackdrop
         ApplyTint(hwnd, ResolveTintColor(tintBrushKey), roundCorners: true);
 
     /// <param name="roundCorners">
-    /// false なら DWM 角丸を付けない（タイムコード専用。システム影が下に伸びるのを避ける）。
-    /// Border の CornerRadius は呼び出し側で維持する。
+    /// false なら DWM 角丸なし。true は通常の Round（トースト等）。
+    /// タイムコードは <see cref="ApplyTint(IntPtr, Color, AcrylicCornerStyle)"/> で設定値に近いサイズを選ぶ。
     /// </param>
-    public static void ApplyTint(IntPtr hwnd, Color tint, bool roundCorners)
+    public static void ApplyTint(IntPtr hwnd, Color tint, bool roundCorners) =>
+        ApplyTint(hwnd, tint, roundCorners ? AcrylicCornerStyle.Round : AcrylicCornerStyle.None);
+
+    /// <summary>
+    /// Acrylic の角丸。SetWindowRgn では Acrylic 塗りが切れないので DWM の好みだけを使う。
+    /// </summary>
+    public static void ApplyTint(IntPtr hwnd, Color tint, AcrylicCornerStyle corners)
     {
         if (hwnd == IntPtr.Zero)
         {
@@ -179,7 +206,15 @@ internal static class AcrylicBackdrop
             var backdrop = DwmsbtNone;
             _ = DwmSetWindowAttribute(hwnd, DwmwaSystemBackdropType, ref backdrop, sizeof(int));
 
-            var corner = roundCorners ? DwmwcpRound : DwmwcpDonotround;
+            // 以前のリージョン切り抜きが残ると DWM 角丸が効かないことがある。
+            _ = SetWindowRgn(hwnd, IntPtr.Zero, true);
+
+            var corner = corners switch
+            {
+                AcrylicCornerStyle.Round => DwmwcpRound,
+                AcrylicCornerStyle.RoundSmall => DwmwcpRoundsmall,
+                _ => DwmwcpDonotround,
+            };
             _ = DwmSetWindowAttribute(hwnd, DwmwaWindowCornerPreference, ref corner, sizeof(int));
 
             ClearLayeredStyle(hwnd);
@@ -192,6 +227,32 @@ internal static class AcrylicBackdrop
         {
         }
     }
+
+    /// <summary>
+    /// 設定の角丸（dip）を DWM の二段階に落とす。
+    /// Acrylic の塗りは任意半径にできないため、設定値そのものではなく区分だけ反映する。
+    /// 0＝角なし、〜6＝Small（既定 5）、7以上＝Round。
+    /// </summary>
+    public static AcrylicCornerStyle CornerStyleForControlRadius(double radiusDip)
+    {
+        if (double.IsNaN(radiusDip) || radiusDip <= 0)
+        {
+            return AcrylicCornerStyle.None;
+        }
+
+        return radiusDip <= 6 ? AcrylicCornerStyle.RoundSmall : AcrylicCornerStyle.Round;
+    }
+
+    /// <summary>
+    /// DWM 角に合わせた Border 用の目安半径（dip）。塗りと枠の食い違いを抑える。
+    /// </summary>
+    public static double BorderRadiusForCornerStyle(AcrylicCornerStyle style) =>
+        style switch
+        {
+            AcrylicCornerStyle.RoundSmall => 4,
+            AcrylicCornerStyle.Round => 8,
+            _ => 0,
+        };
 
     internal static Color ResolveTintColor() => ResolveTintColor(TintBrushKey);
 
@@ -275,6 +336,43 @@ internal static class AcrylicBackdrop
         _ = SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(exStyle & ~WsExLayered));
     }
 
+    /// <summary>
+    /// WPF Popup 既定の WS_EX_TOPMOST を外し、他アプリの手前に残らないようにする。
+    /// オーナー窓の上には所有関係で留まる。
+    /// </summary>
+    public static void ClearPopupTopmost(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        try
+        {
+            var exStyle = GetWindowLongPtr(hwnd, GwlExStyle).ToInt64();
+            if ((exStyle & WsExTopmost) != 0)
+            {
+                _ = SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(exStyle & ~WsExTopmost));
+            }
+
+            _ = SetWindowPos(
+                hwnd,
+                HwndNotopmost,
+                0,
+                0,
+                0,
+                0,
+                SwpNomove | SwpNosize | SwpNoactivate | SwpNoownerzorder);
+        }
+        catch (Exception ex) when (
+            ex is ExternalException
+                or InvalidOperationException
+                or NotSupportedException)
+        {
+        }
+    }
+
+
     private static void OnTrackedClosed(object? sender, EventArgs e)
     {
         if (sender is not Window window)
@@ -357,4 +455,17 @@ internal static class AcrylicBackdrop
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        uint uFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
 }
