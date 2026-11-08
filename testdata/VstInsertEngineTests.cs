@@ -764,6 +764,61 @@ public sealed class VstInsertEngineTests
     }
 
     [Fact]
+    public void ForgetParkedOnly_KeepsLive_ApplySamePluginToNewOwner_NoRecreate()
+    {
+        // アクティブタブを閉じても他タブが同じプラグインなら再 create しない。
+        var factory = new CountingFactory();
+        using var engine = new VstInsertEngine(factory);
+        var ownerA = new object();
+        var ownerB = new object();
+        var chainA = new VstInsertChain();
+        chainA.Slots[0].PluginPath = @"C:\A.vst3";
+        chainA.Slots[0].ClassId = "a";
+        engine.Apply(ownerA, chainA, playerBypass: false);
+        Assert.Equal(1, factory.CreateCount);
+        var live = engine.TryGetLive(0);
+        Assert.NotNull(live);
+
+        engine.ForgetParkedOnly(ownerA);
+        Assert.Same(live, engine.TryGetLive(0));
+        Assert.Equal(1, factory.CreateCount);
+
+        var chainB = new VstInsertChain();
+        chainB.Slots[0].PluginPath = @"C:\A.vst3";
+        chainB.Slots[0].ClassId = "a";
+        engine.Apply(ownerB, chainB, playerBypass: false);
+        Assert.Equal(1, factory.CreateCount);
+        Assert.Same(live, engine.TryGetLive(0));
+    }
+
+    [Fact]
+    public void ForgetParkedOnly_ThenApplyDifferentPlugin_DetachesWithoutOrphanPark()
+    {
+        var factory = new CountingFactory();
+        using var engine = new VstInsertEngine(factory);
+        var ownerA = new object();
+        var ownerB = new object();
+        var chainA = new VstInsertChain();
+        chainA.Slots[0].PluginPath = @"C:\A.vst3";
+        chainA.Slots[0].ClassId = "a";
+        engine.Apply(ownerA, chainA, playerBypass: false);
+        Assert.Equal(1, factory.CreateCount);
+
+        engine.ForgetParkedOnly(ownerA);
+
+        var chainB = new VstInsertChain();
+        chainB.Slots[0].PluginPath = @"C:\B.vst3";
+        chainB.Slots[0].ClassId = "b";
+        engine.Apply(ownerB, chainB, playerBypass: false);
+        Assert.Equal(2, factory.CreateCount);
+        Assert.NotNull(engine.TryGetLive(0));
+
+        // 閉じたオーナーへ Park されていないこと（再 Apply しても restore されない）。
+        engine.Apply(ownerA, chainA, playerBypass: false);
+        Assert.Equal(3, factory.CreateCount);
+    }
+
+    [Fact]
     public void Apply_ReplaceDoesNotWaitForSlowDispose_WhenNotExclusive()
     {
         // Exclusive 外は遅延 Dispose。Apply はすぐ返る

@@ -1605,7 +1605,17 @@ public partial class MainWindow
             session.VstInserts.Clear();
         }
 
-        _player.VstInserts.Forget(session);
+        // アクティブを閉じても他タブが残るなら、ライブ実体は次タブの Sync に引き継ぐ。
+        // Forget(owner) すると全スロットを破棄し、同じプラグインでも再読み込みになる。
+        var keepLiveForOtherTabs = ReferenceEquals(_activeSession, session) && _sessions.Count > 1;
+        if (keepLiveForOtherTabs)
+        {
+            _player.VstInserts.ForgetParkedOnly(session);
+        }
+        else
+        {
+            _player.VstInserts.Forget(session);
+        }
     }
 
     private void ForgetVstInserts(IEnumerable<DocumentSession> sessions, bool clearChain = true)
