@@ -20,6 +20,7 @@ internal static class MarkerRolePaint
             return;
         }
 
+        var radius = DesignMetrics.ControlCornerRadius;
         var markers = document.Markers;
         var frames = document.FrameCount;
         for (var i = 0; i < markers.Count; i++)
@@ -47,7 +48,13 @@ internal static class MarkerRolePaint
             x0 = Math.Clamp(x0, wave.X, wave.Right);
             x1 = Math.Clamp(x1, wave.X, wave.Right);
             var width = Math.Max(1, x1 - x0);
-            dc.DrawRectangle(BrushOf(role), null, new Rect(x0, wave.Y, width, wave.Height));
+            // 帯ごとに四隅を既定の GUI 角丸で描く。
+            dc.DrawRoundedRectangle(
+                BrushOf(role),
+                null,
+                new Rect(x0, wave.Y, width, wave.Height),
+                radius,
+                radius);
         }
     }
 
