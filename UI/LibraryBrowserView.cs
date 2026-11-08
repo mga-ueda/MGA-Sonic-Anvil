@@ -8210,6 +8210,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         marker.Name = "NameMarker";
         marker.SetValue(FrameworkElement.WidthProperty, FileNameColorMarkerVisual.Width);
         marker.SetValue(FrameworkElement.HeightProperty, FileNameColorMarkerVisual.Height);
+        marker.SetValue(Border.CornerRadiusProperty, FileNameColorMarkerVisual.Corner);
         marker.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
         marker.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, FileNameColorMarkerVisual.Gap, 0));
         marker.SetValue(UIElement.SnapsToDevicePixelsProperty, true);

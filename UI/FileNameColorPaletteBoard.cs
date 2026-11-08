@@ -25,6 +25,8 @@ internal sealed class FileNameColorPaletteBoard : WrapPanel
             {
                 Width = 16,
                 Height = 14,
+                // 端を半円に（高さの半分）。設定の GUI 角丸は使わない。
+                CornerRadius = new CornerRadius(7),
                 Background = choice.Brush,
                 BorderBrush = Brushes.Transparent,
                 BorderThickness = new Thickness(1),

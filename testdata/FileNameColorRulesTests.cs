@@ -8,6 +8,30 @@ namespace MgaSonicAnvil.Tests;
 
 public sealed class FileNameColorRulesTests
 {
+    [Fact]
+    public void MarkerCorner_IsHalfWidthNotControlCorner()
+    {
+        Assert.Equal(FileNameColorMarkerVisual.Width * 0.5, FileNameColorMarkerVisual.CornerRadius);
+        Assert.NotEqual(FileNameColorMarkerVisual.CornerRadius, DesignMetrics.ControlCornerRadius);
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var marker = FileNameColorMarkerVisual.Create();
+                Assert.Equal(FileNameColorMarkerVisual.Corner, marker.CornerRadius);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        Assert.Null(error?.ToString());
+    }
+
     [Theory]
     [InlineData(1.0, 10.0)]
     [InlineData(1.25, 10.4)]
