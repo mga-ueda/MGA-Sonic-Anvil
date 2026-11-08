@@ -80,7 +80,6 @@ internal static class FormatConvertPicker
         };
 
         var presets = Presets(kind);
-        var cyan = WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush"));
         var matched = Array.IndexOf(presets, currentValue);
         for (var i = 0; i < presets.Length; i++)
         {
@@ -89,7 +88,8 @@ internal static class FormatConvertPicker
             {
                 Header = PickerChrome.Numbered(i + 1, FormatLabel(kind, value)),
                 Tag = value,
-                Icon = AccentMark(value == currentValue, cyan),
+                // DarkMenuItemStyle の CheckedAccent（左端ピル）。塗りつぶし Icon は使わない。
+                IsChecked = value == currentValue,
             };
             item.Click += (_, _) => onCommit(value);
                         menu.Items.Add(item);
@@ -105,7 +105,7 @@ internal static class FormatConvertPicker
                 Header = BuildCustomHeader(presets.Length + 1, box),
                 Tag = "custom",
                 StaysOpenOnClick = true,
-                Icon = AccentMark(matched < 0, cyan),
+                IsChecked = matched < 0,
             };
             custom.PreviewMouseLeftButtonUp += (_, _) =>
             {
@@ -387,16 +387,6 @@ internal static class FormatConvertPicker
         return row;
     }
 
-    private static Border AccentMark(bool selected, Brush cyan) =>
-        new()
-        {
-            Width = 10,
-            Height = 10,
-            BorderThickness = new Thickness(1),
-            BorderBrush = selected ? cyan : Brushes.Transparent,
-            Background = selected ? cyan : Brushes.Transparent,
-        };
-
     private static bool TryReadCustom(TextBox box, out int value)
     {
         value = 0;
@@ -588,17 +578,9 @@ internal static class FormatConvertPicker
 
     private static void SyncMarks(ContextMenu menu, MenuItem selected)
     {
-        var cyan = WpfControlHelpers.FrozenBrush(Theme.Get("AccentCyanBrush"));
         foreach (var item in menu.Items.OfType<MenuItem>())
         {
-            if (item.Icon is not Border mark)
-            {
-                continue;
-            }
-
-            var on = ReferenceEquals(item, selected);
-            mark.BorderBrush = on ? cyan : Brushes.Transparent;
-            mark.Background = on ? cyan : Brushes.Transparent;
+            item.IsChecked = ReferenceEquals(item, selected);
         }
     }
 
