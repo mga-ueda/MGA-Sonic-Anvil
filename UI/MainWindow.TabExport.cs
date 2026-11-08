@@ -319,10 +319,9 @@ public partial class MainWindow
     private void ShowExportBusyGlass(AudioFileKind kind)
     {
         RootChrome.UpdateLayout();
-        RootDock.UpdateLayout();
         _busyGlass.ShowOverlay(
             RootChrome,
-            RootDock,
+            RootChrome,
             GetBusyGlassCoverBounds(),
             kind == AudioFileKind.Mp3 ? UiStrings.OverlayExportMp3 : UiStrings.OverlayExportWave);
     }

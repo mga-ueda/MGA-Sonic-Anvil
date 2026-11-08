@@ -1050,10 +1050,9 @@ public partial class MainWindow
     private void ShowSaveBusyGlass()
     {
         RootChrome.UpdateLayout();
-        RootDock.UpdateLayout();
         _busyGlass.ShowOverlay(
             RootChrome,
-            RootDock,
+            RootChrome,
             GetBusyGlassCoverBounds(),
             UiStrings.OverlaySave);
     }
