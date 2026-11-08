@@ -1892,10 +1892,13 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             return;
         }
 
+        var bounds = new Rect(0, 0, width, height);
         var back = WpfControlHelpers.FrozenBrush(Theme.Get("SilenceDetectWaveformBackBrush"));
         var zero = WpfControlHelpers.FrozenBrush(Theme.Get("WaveZeroLineBrush"));
         var thresholdBrush = WpfControlHelpers.FrozenBrush(Theme.Get("LevelMeterClipOnBrush"));
-        dc.DrawRectangle(back, null, new Rect(0, 0, width, height));
+        // メニュー／コンボと同じ既定の GUI 角丸。
+        dc.PushClip(DesignMetrics.ControlCornerClip(bounds));
+        dc.DrawRectangle(back, null, bounds);
 
         GetWaveAxes(height, out var mid, out var amp);
         var gain = DrawnGain;
@@ -1907,7 +1910,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
             var viewSpan = Math.Max(1.0, _viewSpan);
             if (_bitmap is not null)
             {
-                dc.DrawImage(_bitmap, new Rect(0, 0, width, height));
+                dc.DrawImage(_bitmap, bounds);
             }
 
             if (_hitPointMode && _hitFrames.Count > 0)
@@ -1937,6 +1940,7 @@ internal sealed class SilenceDetectWavePreview : FrameworkElement
 
         DrawHoverBar(dc, width, height);
         DrawSeekBar(dc, width, height);
+        dc.Pop();
     }
 
     private void UpdateHoverBar(double x)
