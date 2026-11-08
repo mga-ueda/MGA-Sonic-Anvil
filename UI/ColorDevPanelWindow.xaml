@@ -68,7 +68,8 @@
               Padding="12"
               Background="Transparent"
               BorderBrush="{DynamicResource ChromeBorderBrush}"
-              BorderThickness="1">
+              BorderThickness="1"
+              CornerRadius="{ui:ControlCorner}">
         <DockPanel>
           <TextBlock x:Name="SelectedName"
                      DockPanel.Dock="Top"
