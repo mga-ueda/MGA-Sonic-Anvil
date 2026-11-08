@@ -457,17 +457,19 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         if (row is null || row.IsCategoryHeader)
         {
             _descriptionText.Text = UiStrings.LabelTransportToolbarDescriptionHint;
-            ShowIconStates([]);
+            ShowIconStates(default, []);
             return;
         }
 
         _descriptionText.Text = row.IsSeparator
             ? UiStrings.LabelTransportToolbarSeparatorDescription
             : row.Description;
-        ShowIconStates(row.Variants);
+        ShowIconStates(row.Command, row.Variants);
     }
 
-    private void ShowIconStates(IReadOnlyList<TransportToolbarCatalog.IconVariant> variants)
+    private void ShowIconStates(
+        TransportCommand command,
+        IReadOnlyList<TransportToolbarCatalog.IconVariant> variants)
     {
         _iconStatesPanel.Children.Clear();
         if (variants.Count == 0)
@@ -492,8 +494,10 @@ internal sealed class TransportToolbarCustomizeWindow : Window
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 0, 14, 0),
             };
-            item.Children.Add(new TransportIconGlyph
+            // トグル面の色は TransportIconButton 側。Glyph だと LatchToggle 背景が出ない。
+            item.Children.Add(new TransportIconButton
             {
+                CommandKind = command,
                 Icon = variant.Icon,
                 IsPlaying = variant.Playing,
                 IsLatched = variant.Latched,
@@ -501,6 +505,8 @@ internal sealed class TransportToolbarCustomizeWindow : Window
                 Height = 22,
                 Margin = new Thickness(0, 0, 4, 0),
                 VerticalAlignment = VerticalAlignment.Center,
+                IsHitTestVisible = false,
+                Focusable = false,
             });
             var state = new TextBlock
             {
@@ -742,7 +748,7 @@ internal sealed class TransportToolbarCustomizeWindow : Window
                 : TransportToolbarCatalog.IconVariants(command);
         }
 
-        /// <summary>状態で絵柄が変わるときの全アイコン。先頭は通常時で、行の主アイコンと同じ。</summary>
+        /// <summary>状態プレビュー用。先頭は通常時で、行の主アイコンと同じ。</summary>
         public IReadOnlyList<TransportToolbarCatalog.IconVariant> Variants { get; }
         public IReadOnlyList<TransportToolbarCatalog.IconVariant> OtherVariants => [.. Variants.Skip(1)];
 

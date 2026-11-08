@@ -315,6 +315,10 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains(TransportCommand.SelectToStart, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.LoopPlay, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.RangeClick, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.SilentSkip, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.AutoLoop, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.AlwaysOnTop, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.CenterLock, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.ExportByMarkers, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.CopyFileName, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.MergeTabs, TransportToolbarCatalog.AllCommands);
@@ -325,6 +329,7 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains(TransportCommand.CopyAllTabTimes, TransportToolbarCatalog.AllCommands);
         Assert.DoesNotContain(TransportCommand.TimeZoomIn, TransportToolbarCatalog.AllCommands);
         Assert.DoesNotContain(TransportCommand.ToggleWaapi, TransportToolbarCatalog.AllCommands);
+        Assert.DoesNotContain(TransportCommand.CenterPlayhead, TransportToolbarCatalog.AllCommands);
         Assert.True(TransportToolbarCatalog.TryGetItem(TransportCommand.Cut, out var cut));
         Assert.Equal(TransportIcon.Cut, cut.Icon);
     }
@@ -386,6 +391,10 @@ public sealed class TransportToolbarSettingsTests
     [InlineData(nameof(TransportCommand.Record))]
     [InlineData(nameof(TransportCommand.SetLoop))]
     [InlineData(nameof(TransportCommand.RangeClick))]
+    [InlineData(nameof(TransportCommand.SilentSkip))]
+    [InlineData(nameof(TransportCommand.AutoLoop))]
+    [InlineData(nameof(TransportCommand.AlwaysOnTop))]
+    [InlineData(nameof(TransportCommand.CenterLock))]
     public void IconVariants_ListEveryStateStartingWithCatalogIcon(string commandName)
     {
         Assert.True(TransportToolbarCatalog.TryGetItem(commandName, out var item));
@@ -716,8 +725,8 @@ public sealed class TransportToolbarSettingsTests
         Assert.False(cut);
         Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.Save, playerMode: true, out var save));
         Assert.False(save);
-        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.CenterPlayhead, playerMode: true, out var center));
-        Assert.False(center);
+        Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.CenterLock, playerMode: true, out var centerLock));
+        Assert.False(centerLock);
         Assert.True(TransportBar.TryMenuEnabled(player, TransportCommand.JumpToTime, playerMode: true, out var jump));
         Assert.False(jump);
 
@@ -830,5 +839,70 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains("Record", applied.Hidden);
         Assert.DoesNotContain("TogglePlayback", applied.Hidden);
         Assert.DoesNotContain("Open", applied.Hidden);
+    }
+
+    [Fact]
+    public void ApplyLayout_AllShownStoresEmptyDefault()
+    {
+        var applied = TransportToolbarCatalog.ApplyLayout(
+            TransportToolbarCatalog.CreateDefaultLayout());
+        Assert.Empty(applied.Layout);
+        Assert.Empty(applied.Hidden);
+        Assert.Empty(TransportToolbarCatalog.ApplyLayout([]).Layout);
+        Assert.Empty(TransportToolbarCatalog.ApplyLayout([]).Hidden);
+        Assert.Empty(TransportToolbarCatalog.ApplyLayout(null).Layout);
+        Assert.Empty(TransportToolbarCatalog.ApplyLayout(null).Hidden);
+    }
+
+    [Fact]
+    public void NormalizeStoredSettings_ClearsLayoutWhenShowingAll()
+    {
+        var settings = new AppSettings
+        {
+            TransportToolbarLayout =
+            [
+                nameof(TransportCommand.TogglePlayback),
+                nameof(TransportCommand.Open),
+            ],
+            HiddenTransportToolbarCommands = [],
+        };
+        TransportToolbarCatalog.NormalizeStoredSettings(settings);
+        Assert.Empty(settings.TransportToolbarLayout);
+        Assert.Empty(settings.HiddenTransportToolbarCommands);
+        foreach (var item in TransportToolbarCatalog.All)
+        {
+            Assert.True(TransportToolbarCatalog.IsCommandVisible(settings, item.Command));
+        }
+    }
+
+    [Fact]
+    public void NormalizeStoredSettings_KeepsPartialSelection()
+    {
+        var settings = new AppSettings
+        {
+            TransportToolbarLayout =
+            [
+                nameof(TransportCommand.TogglePlayback),
+                nameof(TransportCommand.Open),
+            ],
+            HiddenTransportToolbarCommands =
+                TransportToolbarCatalog.HiddenFromLayout(
+                [
+                    nameof(TransportCommand.TogglePlayback),
+                    nameof(TransportCommand.Open),
+                ]),
+        };
+        TransportToolbarCatalog.NormalizeStoredSettings(settings);
+        Assert.Equal(
+            [
+                nameof(TransportCommand.TogglePlayback),
+                TransportToolbarCatalog.SeparatorToken,
+                nameof(TransportCommand.Open),
+            ],
+            settings.TransportToolbarLayout);
+        Assert.Contains(nameof(TransportCommand.Record), settings.HiddenTransportToolbarCommands);
+        Assert.True(
+            TransportToolbarCatalog.IsCommandVisible(settings, TransportCommand.TogglePlayback));
+        Assert.False(TransportToolbarCatalog.IsCommandVisible(settings, TransportCommand.Record));
     }
 }

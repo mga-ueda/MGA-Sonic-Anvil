@@ -40,6 +40,10 @@ public partial class MainWindow
             or TransportCommand.Restart
             or TransportCommand.Preroll
             or TransportCommand.RangeClick
+            or TransportCommand.SilentSkip
+            or TransportCommand.AutoLoop
+            or TransportCommand.AlwaysOnTop
+            or TransportCommand.CenterLock
             or TransportCommand.TimeZoomIn
             or TransportCommand.TimeZoomOut
             or TransportCommand.TimeZoomMax
@@ -48,7 +52,6 @@ public partial class MainWindow
             or TransportCommand.AmpZoomOut
             or TransportCommand.AmpZoomMax
             or TransportCommand.AmpZoomReset
-            or TransportCommand.CenterPlayhead
             or TransportCommand.ToggleLoudnessView
             or TransportCommand.ToggleMinimalChrome
             or TransportCommand.MaximizeWaveform

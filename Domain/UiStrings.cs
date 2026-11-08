@@ -366,6 +366,8 @@ internal static partial class UiStrings
     public static string IconStateHasLoop => Get("ループあり", "Loop set");
     public static string IconStateMarkerClickOff => Get("オフ", "Off");
     public static string IconStateMarkerClickOn => Get("オン", "On");
+    public static string IconStateOptionOff => IconStateMarkerClickOff;
+    public static string IconStateOptionOn => IconStateMarkerClickOn;
     // ツールバー表示名はメニュー文言を正本にし、アクセスキーだけ除く（表記揺れ防止）。
     public static string LabelToolbarPlay => WithoutAccessKey(WaveMenuPlay);
     public static string LabelToolbarRecord => WithoutAccessKey(WaveMenuRecord);
@@ -413,6 +415,10 @@ internal static partial class UiStrings
     public static string LabelToolbarRestart => WithoutAccessKey(WaveMenuRestart);
     public static string LabelToolbarPreroll => WithoutAccessKey(WaveMenuPreroll);
     public static string LabelToolbarMarkerClick => WithoutAccessKey(WaveMenuRangeClick).Trim();
+    public static string LabelToolbarSilentSkip => WithoutAccessKey(WaveMenuSilentSkip).Trim();
+    public static string LabelToolbarAutoLoop => WithoutAccessKey(WaveMenuAutoLoop).Trim();
+    public static string LabelToolbarAlwaysOnTop => WithoutAccessKey(WaveMenuAlwaysOnTop).Trim();
+    public static string LabelToolbarCenterLock => WithoutAccessKey(WaveMenuCenterLock).Trim();
     public static string LabelToolbarWaveformMaximize => LabelLayoutPresetF11;
     public static string LabelToolbarMinimalChrome => LabelLayoutPresetF9;
     public static string LabelToolbarAddMarker => WithoutAccessKey(WaveMenuAddMarker);
@@ -1334,6 +1340,10 @@ internal static partial class UiStrings
     public static string TooltipRestart => Get("やり直し再生 (Alt+Enter)", "Restart playback (Alt+Enter)");
     public static string TooltipPreroll => Get("3秒前から再生 (Ctrl+Space)", "Play from 3s before (Ctrl+Space)");
     public static string TooltipMarkerClick => Get("マーカークリック (Q)", "Marker click (Q)");
+    public static string TooltipSilentSkip => TipOptionSilentSkip;
+    public static string TooltipAutoLoop => TipLibraryAutoLoop;
+    public static string TooltipAlwaysOnTop => TipOptionAlwaysOnTop;
+    public static string TooltipCenterLock => TipOptionCenterLock;
     public static string TooltipWaveformMaximize => LabelLayoutPresetF11;
     public static string TooltipMinimalChrome => LabelLayoutPresetF9;
     public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");
@@ -1358,8 +1368,8 @@ internal static partial class UiStrings
         "ペンで描く (E)  離すと音量になる。描いているあいだ元の曲線は残る。取り消しは Ctrl+Z。曲線の右クリックでも切り替え",
         "Draw with the pen (E)  volume changes when you release. The curve stays while you draw. Undo with Ctrl+Z. Also right-click the curve");
     public static string TooltipCenterPlayhead => Get(
-        "停止中は中央へ寄せる。再生中はセンターロック (Z は停止中も切替)",
-        "Center while stopped. Toggle center-lock while playing (Z toggles even when stopped)");
+        "再生ヘッドを中央へ寄せる",
+        "Center the playhead in view");
     /// <summary>センターロックのトグルトースト。UI 言語に関わらず英語。</summary>
     public static string LabelCenterLock => "Center Lock";
     /// <summary>マーカークリックのトグルトースト。UI 言語に関わらず英語。</summary>
@@ -1550,8 +1560,32 @@ internal static partial class UiStrings
     public static string LabelLibraryAutoLoop => "Single Loop";
     /// <summary>Single Loop の動作説明（エディタ＝サンプルループ／プレイヤー＝全長、選択・A-B 優先）。</summary>
     public static string TipLibraryAutoLoop => Get(
-        "オン時: エディタではサンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。プレイヤーではサンプルループを無視し曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。",
-        "On: in the editor, with a sample loop, play from the head (or playhead) through the intro, then loop S–E forever. In player mode, sample loops are ignored and playback restarts from the start at the end. Selection / A-B take priority.");
+        "オン時: エディタではサンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。プレイヤーではサンプルループを無視し曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。（Alt+Shift+L）",
+        "On: in the editor, with a sample loop, play from the head (or playhead) through the intro, then loop S–E forever. In player mode, sample loops are ignored and playback restarts from the start at the end. Selection / A-B take priority. (Alt+Shift+L)");
+    public static string TipOptionSilentSkip => Get(
+        "Silent Skip（Alt+Shift+S）",
+        "Silent Skip (Alt+Shift+S)");
+    public static string TipOptionAlwaysOnTop => Get(
+        "Always on Top（Alt+Shift+T）",
+        "Always on Top (Alt+Shift+T)");
+    public static string TipOptionCenterLock => Get(
+        "Center Lock（Z）  エディタのみ",
+        "Center Lock (Z)  editor only");
+    public static string TipOptionMarkerClick => Get(
+        "Marker Click（Q）  エディタのみ",
+        "Marker Click (Q)  editor only");
+    public static string TipOptionLibraryShuffle => Get(
+        "Random（Alt+Shift+R）",
+        "Random (Alt+Shift+R)");
+    public static string TipOptionLibraryAutoPlay => Get(
+        "Auto Play（Alt+Shift+P）",
+        "Auto Play (Alt+Shift+P)");
+    public static string TipOptionLibraryAutoPlayNext => Get(
+        "Auto Next（Alt+Shift+N）",
+        "Auto Next (Alt+Shift+N)");
+    public static string TipOptionLibraryCheckSelect => Get(
+        "Check Box（Shift+Space）",
+        "Check Box (Shift+Space)");
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");

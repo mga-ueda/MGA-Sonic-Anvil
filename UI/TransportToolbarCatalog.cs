@@ -61,6 +61,14 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.Preroll, () => UiStrings.LabelToolbarPreroll, () => UiStrings.TooltipPreroll),
         new(TransportCommand.RangeClick, TransportIcon.RangeClick,
             WaveMenuCommand.RangeClick, () => UiStrings.LabelToolbarMarkerClick, () => UiStrings.TooltipMarkerClick),
+        new(TransportCommand.SilentSkip, TransportIcon.SilentSkip,
+            WaveMenuCommand.SilentSkip, () => UiStrings.LabelToolbarSilentSkip, () => UiStrings.TooltipSilentSkip),
+        new(TransportCommand.AutoLoop, TransportIcon.AutoLoop,
+            WaveMenuCommand.AutoLoop, () => UiStrings.LabelToolbarAutoLoop, () => UiStrings.TooltipAutoLoop),
+        new(TransportCommand.AlwaysOnTop, TransportIcon.AlwaysOnTop,
+            WaveMenuCommand.AlwaysOnTop, () => UiStrings.LabelToolbarAlwaysOnTop, () => UiStrings.TooltipAlwaysOnTop),
+        new(TransportCommand.CenterLock, TransportIcon.Lock,
+            WaveMenuCommand.CenterLock, () => UiStrings.LabelToolbarCenterLock, () => UiStrings.TooltipCenterLock),
         new(TransportCommand.PreviousTrack, TransportIcon.PreviousTrack,
             WaveMenuCommand.PreviousTrack, () => UiStrings.LabelToolbarPreviousTrack, () => UiStrings.TooltipPreviousTrack),
         new(TransportCommand.NextTrack, TransportIcon.NextTrack,
@@ -162,7 +170,7 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.DeleteRegions, () => UiStrings.LabelToolbarDeleteRegions, () => UiStrings.TooltipDeleteRegions),
         new(TransportCommand.DeleteAllRegions, TransportIcon.DeleteAllRegions,
             WaveMenuCommand.DeleteAllRegions, () => UiStrings.LabelToolbarDeleteAllRegions, () => UiStrings.TooltipDeleteAllRegions),
-        // 最前面・タイル・WAAPI 等のメニュー Check トグルは非掲載
+        // タイル・WAAPI 等のメニュー Check トグルは非掲載（Silent Skip／Single Loop／Always on Top は掲載）
 
         new(TransportCommand.SampleRate, TransportIcon.SampleRate,
             WaveMenuCommand.SampleRate, () => UiStrings.LabelToolbarSampleRate, () => UiStrings.TooltipSampleRate),
@@ -175,8 +183,7 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.ViewSpectrogram, () => UiStrings.LabelToolbarSpectrogram, () => UiStrings.TooltipSpectrogramView),
         new(TransportCommand.ToggleLoudnessView, TransportIcon.Loudness,
             WaveMenuCommand.ViewLoudness, () => UiStrings.LabelToolbarLoudness, () => UiStrings.TooltipLoudnessView),
-        new(TransportCommand.CenterPlayhead, TransportIcon.Center,
-            WaveMenuCommand.CenterPlayhead, () => UiStrings.LabelToolbarCenter, () => UiStrings.TooltipCenterPlayhead),
+        // 中央へ寄せるはメニューのみ。センターロックは CenterLock トグル。
         new(TransportCommand.History, TransportIcon.History,
             WaveMenuCommand.History, () => UiStrings.LabelToolbarHistory, () => UiStrings.TooltipHistory),
         new(TransportCommand.ToggleMinimalChrome, TransportIcon.MinimalChrome,
@@ -317,8 +324,8 @@ internal static class TransportToolbarCatalog
     }
 
     /// <summary>
-    /// 状態で絵柄が変わるコマンドの全アイコン（1 種類だけなら空）。
-    /// TransportBar で Icon／IsPlaying／IsLatched を切り替えるコマンドを増やしたら、ここにも足す。
+    /// 状態で絵柄または LatchToggle 面が変わるコマンドのプレビュー用（1 種類だけなら空）。
+    /// トグル系は絵柄固定＋ IsLatched。再生／録音／ループ解除だけ絵柄が変わる。
     /// </summary>
     public static IReadOnlyList<IconVariant> IconVariants(TransportCommand command) =>
         command switch
@@ -342,6 +349,26 @@ internal static class TransportToolbarCatalog
             [
                 new(TransportIcon.RangeClick, () => UiStrings.IconStateMarkerClickOff),
                 new(TransportIcon.RangeClick, () => UiStrings.IconStateMarkerClickOn, Latched: true),
+            ],
+            TransportCommand.SilentSkip =>
+            [
+                new(TransportIcon.SilentSkip, () => UiStrings.IconStateOptionOff),
+                new(TransportIcon.SilentSkip, () => UiStrings.IconStateOptionOn, Latched: true),
+            ],
+            TransportCommand.AutoLoop =>
+            [
+                new(TransportIcon.AutoLoop, () => UiStrings.IconStateOptionOff),
+                new(TransportIcon.AutoLoop, () => UiStrings.IconStateOptionOn, Latched: true),
+            ],
+            TransportCommand.AlwaysOnTop =>
+            [
+                new(TransportIcon.AlwaysOnTop, () => UiStrings.IconStateOptionOff),
+                new(TransportIcon.AlwaysOnTop, () => UiStrings.IconStateOptionOn, Latched: true),
+            ],
+            TransportCommand.CenterLock =>
+            [
+                new(TransportIcon.Lock, () => UiStrings.IconStateOptionOff),
+                new(TransportIcon.Lock, () => UiStrings.IconStateOptionOn, Latched: true),
             ],
             _ => [],
         };
@@ -516,11 +543,39 @@ internal static class TransportToolbarCatalog
         return BuildAutoLayout(shown);
     }
 
-    /// <summary>Layout を正本にし Hidden を同期した組を返す（並びはおまかせ配置へ正規化）。</summary>
+    /// <summary>
+    /// Layout を正本にし Hidden を同期した組を返す（並びはおまかせ配置へ正規化）。
+    /// 全コマンド表示（既定）のときは両方とも空配列にする（カタログ追加分が自動で載る）。
+    /// </summary>
     public static (string[] Layout, string[] Hidden) ApplyLayout(IEnumerable<string>? layout)
     {
-        var normalized = BuildAutoLayout(NormalizeLayout(layout));
-        return (normalized, HiddenFromLayout(normalized));
+        var raw = layout?.ToArray() ?? [];
+        if (raw.Length == 0)
+        {
+            return ([], []);
+        }
+
+        var normalized = BuildAutoLayout(NormalizeLayout(raw));
+        var hidden = HiddenFromLayout(normalized);
+        return hidden.Length == 0 ? ([], []) : (normalized, hidden);
+    }
+
+    /// <summary>
+    /// 保存済みツールバー設定を正規化する。Hidden が空なら全表示が既定なので Layout も空にする。
+    /// </summary>
+    public static void NormalizeStoredSettings(AppSettings settings)
+    {
+        settings.HiddenTransportToolbarCommands =
+            NormalizeHidden(settings.HiddenTransportToolbarCommands);
+        if (settings.HiddenTransportToolbarCommands.Length == 0)
+        {
+            settings.TransportToolbarLayout = [];
+            return;
+        }
+
+        settings.TransportToolbarLayout = ResolveLayout(
+            settings.TransportToolbarLayout,
+            settings.HiddenTransportToolbarCommands);
     }
 
     /// <summary>未知名除去・コマンド重複除去・端／連続セパレータ整理。</summary>

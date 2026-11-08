@@ -1,5 +1,6 @@
 using System.IO;
 using MgaSonicAnvil.Domain;
+using MgaSonicAnvil.UI;
 
 namespace MgaSonicAnvil.Config;
 
@@ -101,9 +102,20 @@ internal static class AppStorage
             SessionDocumentPath,
             SessionDirectory,
             out var reset);
+        var layoutBefore = Settings.TransportToolbarLayout ?? [];
+        var hiddenBefore = Settings.HiddenTransportToolbarCommands ?? [];
+        TransportToolbarCatalog.NormalizeStoredSettings(Settings);
         SettingsReset = reset;
         Loaded = true;
         LibraryPlaylistDocuments.ApplyFromSettings(Settings);
+        // 全表示既定への正規化で Layout スナップショットを捨てたときはディスクにも書く。
+        var layoutAfter = Settings.TransportToolbarLayout ?? [];
+        var hiddenAfter = Settings.HiddenTransportToolbarCommands ?? [];
+        if (!layoutBefore.SequenceEqual(layoutAfter, StringComparer.Ordinal)
+            || !hiddenBefore.SequenceEqual(hiddenAfter, StringComparer.Ordinal))
+        {
+            Save();
+        }
     }
 
     public static void Save()
