@@ -1134,6 +1134,8 @@ internal partial class AudioSettingsWindow : Window
         list.SetResourceReference(BackgroundProperty, "DialogInputBackBrush");
         list.SetResourceReference(BorderBrushProperty, "ChromeBorderBrush");
         list.BorderThickness = new Thickness(1);
+        list.Template = CreateRoundedListBoxTemplate();
+        DesignMetrics.BindControlCornerClip(list);
 
         var highlight = ResolveThemeBrush("MenuHighlightBackBrush");
         var fore = ResolveThemeBrush("PrimaryForeBrush");
@@ -1150,6 +1152,41 @@ internal partial class AudioSettingsWindow : Window
         itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
         itemStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
         list.ItemContainerStyle = itemStyle;
+    }
+
+    /// <summary>入力欄と同じく、枠に既定の GUI 角丸を載せる。</summary>
+    private static ControlTemplate CreateRoundedListBoxTemplate()
+    {
+        var border = new FrameworkElementFactory(typeof(Border), "Bd");
+        border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+        border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+        border.SetValue(Border.PaddingProperty, new Thickness(1));
+        border.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        border.SetBinding(Border.CornerRadiusProperty, DesignMetrics.CornerBinding());
+
+        var scroll = new FrameworkElementFactory(typeof(ScrollViewer));
+        scroll.SetValue(UIElement.FocusableProperty, false);
+        scroll.SetValue(
+            ScrollViewer.PaddingProperty,
+            new TemplateBindingExtension(Control.PaddingProperty));
+        scroll.SetValue(
+            ScrollViewer.HorizontalScrollBarVisibilityProperty,
+            new TemplateBindingExtension(ScrollViewer.HorizontalScrollBarVisibilityProperty));
+        scroll.SetValue(
+            ScrollViewer.VerticalScrollBarVisibilityProperty,
+            new TemplateBindingExtension(ScrollViewer.VerticalScrollBarVisibilityProperty));
+        scroll.SetValue(
+            ScrollViewer.CanContentScrollProperty,
+            new TemplateBindingExtension(ScrollViewer.CanContentScrollProperty));
+
+        var items = new FrameworkElementFactory(typeof(ItemsPresenter));
+        items.SetValue(
+            UIElement.SnapsToDevicePixelsProperty,
+            new TemplateBindingExtension(UIElement.SnapsToDevicePixelsProperty));
+        scroll.AppendChild(items);
+        border.AppendChild(scroll);
+        return new ControlTemplate(typeof(ListBox)) { VisualTree = border };
     }
 
     /// <summary>設定のエクスプローラールート一覧へ、欠落パスを赤くする ItemTemplate を載せる。</summary>
