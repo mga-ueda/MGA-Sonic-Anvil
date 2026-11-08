@@ -208,11 +208,8 @@ internal sealed class LoudnessOverlayRenderer
     private static Brush BandBrush(LoudnessTraffic traffic)
     {
         var color = Theme.Get(TrafficKey(traffic));
-        const double shade = 0.28;
-        return WpfControlHelpers.FrozenBrush(Color.FromRgb(
-            (byte)Math.Round(color.R * shade),
-            (byte)Math.Round(color.G * shade),
-            (byte)Math.Round(color.B * shade)));
+        // リージョン波形塗りと同じ半透明（α=0x33）。RGB はテーマの赤・黄・青のまま。
+        return WpfControlHelpers.FrozenBrush(Color.FromArgb(0x33, color.R, color.G, color.B));
     }
 
     private static void DrawGrid(DrawingContext dc, Rect wave, double target)
