@@ -16,7 +16,9 @@ internal sealed class AcrylicToastHost
     private const int FadeSteps = 5;
 
     private readonly AcrylicGlassPopup _glass = new();
+    private readonly StackPanel _body;
     private readonly TextBlock _text;
+    private readonly TextBlock _subText;
     private DispatcherTimer? _holdTimer;
     private DispatcherTimer? _fadeTimer;
     private Color _fadeBase;
@@ -24,30 +26,37 @@ internal sealed class AcrylicToastHost
 
     public AcrylicToastHost()
     {
-        _text = new TextBlock
+        _text = CreateLine();
+        _subText = CreateLine();
+        _subText.Visibility = Visibility.Collapsed;
+        _body = new StackPanel
         {
-            FontFamily = new FontFamily("Consolas"),
-            FontSize = DesignMetrics.PlaylistPdfPageNumberFontSize,
-            FontWeight = FontWeights.Normal,
-            TextAlignment = TextAlignment.Center,
-            TextWrapping = TextWrapping.NoWrap,
+            Orientation = Orientation.Vertical,
+            HorizontalAlignment = HorizontalAlignment.Center,
         };
-        _text.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+        _body.Children.Add(_text);
+        _body.Children.Add(_subText);
         _glass.Padding = DesignMetrics.PlaylistPdfPageNumberPadding;
-        _glass.Content = _text;
+        _glass.Content = _body;
         _glass.LiveTint = AdjustLiveTint;
     }
 
+    public bool IsOpen => _glass.IsOpen;
+
     public string Text
     {
-        get => _text.Text;
-        set => _text.Text = value ?? string.Empty;
+        get => JoinLines(_text.Text, VisibleSubText());
+        set => ApplyLines(value);
     }
 
     public TextAlignment TextAlignment
     {
         get => _text.TextAlignment;
-        set => _text.TextAlignment = value;
+        set
+        {
+            _text.TextAlignment = value;
+            _subText.TextAlignment = value;
+        }
     }
 
     public Thickness Padding
@@ -59,7 +68,11 @@ internal sealed class AcrylicToastHost
     public double FontSize
     {
         get => _text.FontSize;
-        set => _text.FontSize = value;
+        set
+        {
+            _text.FontSize = value;
+            _subText.FontSize = value;
+        }
     }
 
     public UIElement? PlacementTarget
@@ -86,13 +99,16 @@ internal sealed class AcrylicToastHost
     public void Show(string text, TimeSpan hold)
     {
         StopFade();
-        _text.Text = text ?? string.Empty;
-        // いったん閉じて開き直し、拡縮直後の古い Placement を捨てる。
+        ApplyLines(text);
+        // いったん閉じて開き直し、拡縮直後の古い Placement／2 行分の古い寸法を捨てる。
         if (_glass.IsOpen)
         {
             _glass.IsOpen = false;
         }
 
+        // 行数変化後の DesiredSize を確定してから開く（空の 2 行目が残らないように）。
+        _body.InvalidateMeasure();
+        _body.UpdateLayout();
         _glass.IsOpen = true;
         _glass.RefreshPlacementAfterLayout();
         _holdTimer ??= new DispatcherTimer();
@@ -111,7 +127,14 @@ internal sealed class AcrylicToastHost
     {
         StopFade();
         _holdTimer?.Stop();
-        _text.Text = text ?? string.Empty;
+        ApplyLines(text);
+        if (_glass.IsOpen)
+        {
+            _glass.IsOpen = false;
+        }
+
+        _body.InvalidateMeasure();
+        _body.UpdateLayout();
         _glass.IsOpen = true;
     }
 
@@ -187,5 +210,66 @@ internal sealed class AcrylicToastHost
     {
         _fadeTimer?.Stop();
         _fadeStep = 0;
+    }
+
+    private void ApplyLines(string? text)
+    {
+        SplitLines(text, out var primary, out var secondary);
+        _text.Text = primary;
+        if (string.IsNullOrEmpty(secondary))
+        {
+            _subText.Text = string.Empty;
+            _subText.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            _subText.Text = secondary;
+            _subText.Visibility = Visibility.Visible;
+        }
+    }
+
+    private string? VisibleSubText() =>
+        _subText.Visibility == Visibility.Visible ? _subText.Text : null;
+
+    internal static void SplitLines(string? text, out string primary, out string secondary)
+    {
+        primary = string.Empty;
+        secondary = string.Empty;
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        var parts = normalized.Split('\n');
+        primary = parts[0].TrimEnd();
+        for (var i = 1; i < parts.Length; i++)
+        {
+            var line = parts[i].TrimEnd();
+            if (line.Length == 0)
+            {
+                // 空行は捨てる（Player mode の偽 2 行目など）。
+                continue;
+            }
+
+            secondary = string.IsNullOrEmpty(secondary) ? line : secondary + "\n" + line;
+        }
+    }
+
+    private static string JoinLines(string primary, string? secondary) =>
+        string.IsNullOrEmpty(secondary) ? primary ?? string.Empty : primary + "\n" + secondary;
+
+    private static TextBlock CreateLine()
+    {
+        var line = new TextBlock
+        {
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = DesignMetrics.PlaylistPdfPageNumberFontSize,
+            FontWeight = FontWeights.Normal,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.NoWrap,
+        };
+        line.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+        return line;
     }
 }

@@ -2492,6 +2492,21 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void AcrylicToastHost_SplitLines_DropsEmptySecondLine()
+    {
+        AcrylicToastHost.SplitLines("Player mode 1\n", out var primary, out var secondary);
+        Assert.Equal("Player mode 1", primary);
+        Assert.Equal(string.Empty, secondary);
+
+        AcrylicToastHost.SplitLines(
+            "Editor mode 1\nFullscreen: ON",
+            out primary,
+            out secondary);
+        Assert.Equal("Editor mode 1", primary);
+        Assert.Equal("Fullscreen: ON", secondary);
+    }
+
+    [Fact]
     public void CheckSelectModeChanged_RaisesOnToggle_NotOnSilentSet()
     {
         RunSta(() =>
