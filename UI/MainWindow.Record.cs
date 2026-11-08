@@ -89,7 +89,7 @@ public partial class MainWindow
         _recordSettledTakeFrames = 0;
         _recordChromeTick = 0;
         _recordSession = session;
-        _recordUsedSilentSkip = SilentSkipCheck.IsChecked == true;
+        _recordUsedSilentSkip = SilentSkipLatch.IsLatched;
         _recording = true;
         ActivateSession(session);
         document.RefreshPeaks();
@@ -109,7 +109,7 @@ public partial class MainWindow
             this,
             AppStorage.Settings.ResolvedSilentSkipThresholdDb(),
             AppStorage.Settings.ResolvedSilentSkipRecordPadMs(),
-            SilentSkipCheck.IsChecked == true,
+            SilentSkipLatch.IsLatched,
             AppStorage.Settings.SilentSkipRecordAddRegion);
         if (result.Choice == ConfirmRecordSilentSkipChoice.Cancel)
         {
@@ -117,7 +117,7 @@ public partial class MainWindow
         }
 
         AppStorage.Settings.SilentSkipRecordAddRegion = result.AddRegion;
-        SilentSkipCheck.IsChecked = result.UseSilentSkip;
+        SilentSkipLatch.IsLatched = result.UseSilentSkip;
         AppStorage.Settings.SilentSkip = result.UseSilentSkip;
         AppStorage.Save();
         ApplySilentSkipFromSettings();

@@ -1552,13 +1552,13 @@ public partial class MainWindow
         // ステータスバー系は F8／F9 でバーが隠れても、エディタ／プレイヤー共通で効かせる。
         if (key == Key.S && modifiers == LibraryPlayerMode.AltShift)
         {
-            SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
+            ToggleSilentSkipLatch();
             return true;
         }
 
         if (key == Key.T && modifiers == LibraryPlayerMode.AltShift)
         {
-            AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
+            ToggleAlwaysOnTopLatch();
             return true;
         }
 
