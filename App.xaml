@@ -41,6 +41,7 @@
       <Style TargetType="ContextMenu" BasedOn="{StaticResource DarkContextMenuStyle}"/>
       <Style TargetType="Menu" BasedOn="{StaticResource DarkMenuStyle}"/>
       <Style TargetType="MenuItem" BasedOn="{StaticResource DarkMenuItemStyle}"/>
+      <Style TargetType="ResizeGrip" BasedOn="{StaticResource DarkResizeGripStyle}"/>
     </ResourceDictionary>
   </Application.Resources>
 </Application>

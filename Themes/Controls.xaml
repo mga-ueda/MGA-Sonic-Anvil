@@ -1576,4 +1576,31 @@
         </Setter>
     </Style>
 
+    <!-- CanResizeWithGrip の右下つまみ。OS／テーマ依存の斜線を 6ドットに統一。 -->
+    <Style x:Key="DarkResizeGripStyle" TargetType="ResizeGrip">
+        <Setter Property="Width" Value="{x:Static ui:DesignMetrics.WindowResizeGripSize}" />
+        <Setter Property="Height" Value="{x:Static ui:DesignMetrics.WindowResizeGripSize}" />
+        <Setter Property="MinWidth" Value="{x:Static ui:DesignMetrics.WindowResizeGripSize}" />
+        <Setter Property="MinHeight" Value="{x:Static ui:DesignMetrics.WindowResizeGripSize}" />
+        <Setter Property="Margin" Value="0,0,2,2" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ResizeGrip">
+                    <Border Background="Transparent"
+                            Width="{TemplateBinding Width}"
+                            Height="{TemplateBinding Height}"
+                            SnapsToDevicePixels="True">
+                        <ui:WindowResizeGripMark Width="{TemplateBinding Width}"
+                                                 Height="{TemplateBinding Height}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
