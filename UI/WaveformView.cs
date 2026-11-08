@@ -3781,7 +3781,11 @@ internal sealed partial class WaveformView : Grid
         var context = group.Open();
         context.DrawImage(_waveBitmap, dest);
         context.Close();
-        dc.PushClip(new RectangleGeometry(wave));
+        // ラウドネス／スペクトログラムの着色に合わせ、重ね波形も同じ角丸で切る。
+        dc.PushClip(
+            LoudnessVisible || SpectrogramVisible
+                ? DesignMetrics.ControlCornerClip(wave)
+                : new RectangleGeometry(wave));
         dc.DrawDrawing(group);
         dc.Pop();
     }

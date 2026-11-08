@@ -94,7 +94,8 @@ internal sealed class LoudnessOverlayRenderer
         }
 
         target = LoudnessMeterEngine.ClampTargetLufs(target);
-        dc.PushClip(new RectangleGeometry(wave));
+        // 着色帯の外形はメニュー／コンボと同じ既定の GUI 角丸。
+        dc.PushClip(DesignMetrics.ControlCornerClip(wave));
         DrawBands(dc, wave, target);
         DrawGrid(dc, wave, target);
         dc.Pop();
@@ -115,7 +116,7 @@ internal sealed class LoudnessOverlayRenderer
         }
 
         target = LoudnessMeterEngine.ClampTargetLufs(target);
-        dc.PushClip(new RectangleGeometry(wave));
+        dc.PushClip(DesignMetrics.ControlCornerClip(wave));
         DrawLuWidth(dc, wave, profile, target, viewStart, viewSpan, previewGain);
         DrawCurve(dc, wave, profile, target, viewStart, viewSpan, previewGain, danger: false);
         DrawTarget(dc, wave, target);
