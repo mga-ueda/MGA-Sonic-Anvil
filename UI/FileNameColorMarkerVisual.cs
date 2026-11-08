@@ -12,6 +12,13 @@ internal static class FileNameColorMarkerVisual
     public const double Height = 14;
     public const double Gap = 6;
 
+    /// <summary>
+    /// 上下端を半円にする（幅の半分）。設定の GUI 角丸は使わない。
+    /// </summary>
+    public const double CornerRadius = Width * 0.5;
+
+    public static CornerRadius Corner { get; } = new(CornerRadius);
+
     /// <summary>マーカーと、その右の隙間。タブ幅と列幅に足す。</summary>
     public static double SlotWidth => Width + Gap;
 
@@ -52,6 +59,7 @@ internal static class FileNameColorMarkerVisual
         {
             Width = Width,
             Height = Height,
+            CornerRadius = Corner,
             Margin = new Thickness(0, 0, Gap, 0),
             VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true,

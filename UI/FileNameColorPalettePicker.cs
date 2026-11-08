@@ -31,6 +31,8 @@ internal sealed class FileNameColorPalettePicker : Border
         {
             Width = 36,
             Height = 14,
+            // 端を半円に（高さの半分）。設定の GUI 角丸は使わない。
+            CornerRadius = new CornerRadius(7),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true,
