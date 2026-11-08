@@ -960,6 +960,7 @@ public partial class MainWindow : Window
         MarkerClickLatch.LatchLabel = UiStrings.LabelMarkerClick;
         MarkerClickLatch.FitToLabel();
         ApplyStatusOptionLatchToolTips();
+        TransportToolTip.Attach(TabNew, UiStrings.TooltipNew);
         StatusTimes.ApplyLocalizedText();
         TimeScrollStrip.ApplyLocalizedText();
         Transport.ApplyLocalizedText();

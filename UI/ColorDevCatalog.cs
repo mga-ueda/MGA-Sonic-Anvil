@@ -68,6 +68,7 @@ internal static class ColorDevCatalog
             ("WaveFillBrush", ColorDevGroup.Waveform),
             ("WaveFillOverlayBrush", ColorDevGroup.Waveform),
             ("WaveZeroLineBrush", ColorDevGroup.Waveform),
+            ("DocumentTabIdleBackBrush", ColorDevGroup.Waveform),
             ("DocumentTabSelectedBackBrush", ColorDevGroup.Waveform),
             ("DocumentTabSelectedDirtyBackBrush", ColorDevGroup.Waveform),
             ("DocumentTabSelectedForeBrush", ColorDevGroup.Waveform),
@@ -167,6 +168,10 @@ internal static class ColorDevCatalog
             ("PlayerLevelMeterTickBrush", ColorDevGroup.Player),
             ("PlayerVectorScopeGridBrush", ColorDevGroup.Player),
             ("PlayerSurroundHullStrokeBrush", ColorDevGroup.Player),
+            ("PlayerLatchToggleOffBackBrush", ColorDevGroup.Player),
+            ("PlayerLatchToggleOffHoverBackBrush", ColorDevGroup.Player),
+            ("PlayerLatchToggleOnBackBrush", ColorDevGroup.Player),
+            ("PlayerLatchToggleOnHoverBackBrush", ColorDevGroup.Player),
 
             ("TransportBackBrush", ColorDevGroup.Transport),
             ("TransportToolbarGroupVeilBrush", ColorDevGroup.Transport),
