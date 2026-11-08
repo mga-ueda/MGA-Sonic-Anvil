@@ -15,6 +15,8 @@ public partial class MainWindow
     private bool _pitchShiftBusy;
     private bool _timeStretchBusy;
     private bool _vstBakeBusy;
+    private bool _vstAssignBusy;
+    private bool _vstEditorEnterBusy;
     private bool _tabExportBusy;
     private bool _openBusy;
     private bool _openCancelRequested;
@@ -30,6 +32,8 @@ public partial class MainWindow
         || _pitchShiftBusy
         || _timeStretchBusy
         || _vstBakeBusy
+        || _vstAssignBusy
+        || _vstEditorEnterBusy
         || _tabExportBusy
         || _openBusy
         || _exportBusy
@@ -38,6 +42,36 @@ public partial class MainWindow
         || _tabMergeBusy
         || _videoProxyBusy
         || _libraryCatalogWarmupBusy;
+
+    /// <summary>
+    /// すりガラス／プラグイン処理のあと、Space 再生が効くよう波形へフォーカスを戻す。
+    /// </summary>
+    private void RestoreEditorKeyboardFocusAfterBusy()
+    {
+        if (_closing || IsLibraryMaximized)
+        {
+            return;
+        }
+
+        if (!IsActive)
+        {
+            Activate();
+        }
+
+        Waveform.Focus();
+    }
+
+    /// <summary>すりガラス読み込み中に抑止した Sync を1回だけ流す。</summary>
+    private void FlushVstSyncQueuedDuringEditorBusy()
+    {
+        if (!_vstSyncQueuedDuringEditorBusy || _vstEditorEnterBusy)
+        {
+            return;
+        }
+
+        _vstSyncQueuedDuringEditorBusy = false;
+        SyncVstInsertEngine();
+    }
 
     private void PromptFormatConvert(FormatConvertKind kind)
     {

@@ -159,6 +159,27 @@ public partial class MainWindow
         }
 
         ApplyLayoutPreset(AppStorage.Settings.ResolvedLaunchMode(), forceReapply: true);
+        // プレイヤー適用後は通常の IsLibraryMaximized バイパスに任せる。
+        _startupPlayerVstBypass = false;
+    }
+
+    /// <summary>起動時にインサート実体を載せる必要があるか（復元タブ／永続スロット）。</summary>
+    private bool StartupHasVstInsertsToLoad()
+    {
+        if (DocumentSessionStore.SnapshotHasAnyPlugin(AppStorage.Settings.DefaultVstInserts))
+        {
+            return true;
+        }
+
+        foreach (var session in _sessions)
+        {
+            if (DocumentSessionStore.ChainHasAnyPlugin(session.VstInserts))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void RevealStartupMode()

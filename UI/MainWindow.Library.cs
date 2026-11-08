@@ -93,6 +93,11 @@ public partial class MainWindow
     /// エディタ復帰中。波形／再生を先に通すため SyncVstInsertEngine を一時抑止する。
     /// </summary>
     private bool _deferVstInsertSyncForEditorEnter;
+
+    /// <summary>
+    /// Leave 開始時点のモード名トースト世代。これより進んだら「この復帰のトースト」。
+    /// </summary>
+    private int _editorEnterToastEpochBaseline;
     private int _editorEnterBackgroundTicket;
     private CancellationTokenSource _libraryPeakCts = new();
     private int _libraryFolderShowGeneration;
@@ -679,6 +684,7 @@ public partial class MainWindow
         {
             // プレイヤー入りはすぐアンロード。退出時の後追い復元はキャンセル。
             _editorEnterBackgroundTicket++;
+            _layoutModeToastUntilUtc = null;
             SyncVstInsertEngine();
             ProbeLibraryTags();
             if (_libraryPlayFirstPending)
@@ -2883,6 +2889,8 @@ public partial class MainWindow
         }
 
         _deferVstInsertSyncForEditorEnter = true;
+        // ApplyLayoutPreset の ShowLayoutModeToast より前に記録する（後で世代が進んだか見る）。
+        _editorEnterToastEpochBaseline = _layoutModeToastEpoch;
         try
         {
             // レイアウトと波形の初回描画を、フルデコードより先に通す。
@@ -2929,13 +2937,22 @@ public partial class MainWindow
         }
         finally
         {
-            _deferVstInsertSyncForEditorEnter = false;
+            // プレイヤーへ戻った／中断したときだけここで解除。
+            // エディタ復帰は後追い側で、モード名トースト後に解除する。
+            if (IsLibraryMaximized)
+            {
+                _deferVstInsertSyncForEditorEnter = false;
+            }
         }
 
         if (!IsLibraryMaximized)
         {
             // 他タブ PCM とプラグイン実体は再生を妨げないよう後ろへ。
             ScheduleEditorEnterBackgroundWork(active);
+        }
+        else
+        {
+            _deferVstInsertSyncForEditorEnter = false;
         }
     }
 
@@ -2953,25 +2970,186 @@ public partial class MainWindow
 
     private async Task RunEditorEnterBackgroundWorkAsync(int ticket, DocumentSession? activeWhenLeft)
     {
-        if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+        try
         {
+            if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+            {
+                return;
+            }
+
+            // 再生開始のキー入力を先に捌く。
+            await Dispatcher.Yield(DispatcherPriority.Input);
+            if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+            {
+                return;
+            }
+
+            await UpgradeKeptLibrarySessionsForEditorAsync(activeWhenLeft).ConfigureAwait(true);
+            if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+            {
+                return;
+            }
+
+            // モード名トーストが消えてからすりガラス／プラグイン読み込み。
+            // ApplyLayoutPreset はトーストより先に LeaveLibraryMaximize を始めるので、
+            // 「まだ出ていない」うちに待ちを終えないこと。
+            await WaitForLayoutModeToastToSettleAsync().ConfigureAwait(true);
+            if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+            {
+                return;
+            }
+
+            var needsPluginLoad = EditorEnterNeedsVstInsertLoad();
+            if (!needsPluginLoad)
+            {
+                // トースト後に初めて Sync を許可する。
+                _deferVstInsertSyncForEditorEnter = false;
+                await SyncVstInsertEngineAsync(openEditorSlot: null, preferPlayback: true)
+                    .ConfigureAwait(true);
+                return;
+            }
+
+            // defer 解除より先に busy を立て、隙間の fire-and-forget Sync を防ぐ。
+            _vstEditorEnterBusy = true;
+            _vstSyncQueuedDuringEditorBusy = false;
+            _deferVstInsertSyncForEditorEnter = false;
+            RefreshTransportCommandsEnabled();
+            ShowBusyGlass(UiStrings.OverlayVstPluginStartupLoading);
+            await Dispatcher.Yield(DispatcherPriority.Render);
+            try
+            {
+                await SyncVstInsertEngineAsync(openEditorSlot: null, preferPlayback: false)
+                    .ConfigureAwait(true);
+            }
+            finally
+            {
+                _vstEditorEnterBusy = false;
+                RefreshTransportCommandsEnabled();
+                _busyGlass.BeginFadeOut();
+                // ネイティブプラグイン窓がフォーカスを奪ったままになり、Space 再生が効かなくなるのを防ぐ。
+                RestoreEditorKeyboardFocusAfterBusy();
+                FlushVstSyncQueuedDuringEditorBusy();
+            }
+        }
+        finally
+        {
+            _deferVstInsertSyncForEditorEnter = false;
+        }
+    }
+
+    /// <summary>
+    /// F11／F12 のモード名トーストが出て消え終わるまで待つ。
+    /// 世代が進んでから閉じるまで待つ（前回期限残りでの即抜けを防ぐ）。
+    /// </summary>
+    private async Task WaitForLayoutModeToastToSettleAsync()
+    {
+        var needEpoch = _editorEnterToastEpochBaseline + 1;
+        var appearDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(1.5);
+
+        // 1) この復帰用の ShowLayoutModeToast を待つ。来なければトースト無しで進む。
+        while (_layoutModeToastEpoch < needEpoch && DateTime.UtcNow < appearDeadline)
+        {
+            if (IsLibraryMaximized)
+            {
+                return;
+            }
+
+            await Task.Delay(16).ConfigureAwait(true);
+        }
+
+        if (_layoutModeToastEpoch < needEpoch)
+        {
+            _layoutModeToastUntilUtc = null;
+            await Dispatcher.Yield(DispatcherPriority.Render);
+            await Dispatcher.Yield(DispatcherPriority.ContextIdle);
             return;
         }
 
-        // 再生開始のキー入力を先に捌く。
-        await Dispatcher.Yield(DispatcherPriority.Input);
-        if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+        // 2) すでに消えていれば（PCM 昇格が長かった等）そのまま進む。
+        if (!_centerStatusToast.IsOpen
+            && _layoutModeToastUntilUtc is { } done
+            && done <= DateTime.UtcNow)
         {
+            _layoutModeToastUntilUtc = null;
+            await Dispatcher.Yield(DispatcherPriority.Render);
+            await Dispatcher.Yield(DispatcherPriority.ContextIdle);
             return;
         }
 
-        await UpgradeKeptLibrarySessionsForEditorAsync(activeWhenLeft).ConfigureAwait(true);
-        if (ticket != _editorEnterBackgroundTicket || IsLibraryMaximized)
+        _layoutModeToastUntilUtc ??= DateTime.UtcNow
+            + LibraryExplorerTypeahead.ToastIdleClear
+            + TimeSpan.FromSeconds(LibraryPlayerMode.ChromeFadeSeconds);
+
+        var endAt = _layoutModeToastUntilUtc.Value;
+        var hardDeadline = endAt + TimeSpan.FromSeconds(1.0);
+        var sawOpen = _centerStatusToast.IsOpen;
+
+        // 3) 開いているあいだは進まない。再表示で期限が延びたら追従する。
+        while (DateTime.UtcNow < hardDeadline)
         {
-            return;
+            if (IsLibraryMaximized)
+            {
+                return;
+            }
+
+            if (_layoutModeToastUntilUtc is { } latest && latest > endAt)
+            {
+                endAt = latest;
+                hardDeadline = endAt + TimeSpan.FromSeconds(1.0);
+            }
+
+            if (_centerStatusToast.IsOpen)
+            {
+                sawOpen = true;
+            }
+
+            if (sawOpen && !_centerStatusToast.IsOpen && DateTime.UtcNow >= endAt)
+            {
+                break;
+            }
+
+            if (!sawOpen && !_centerStatusToast.IsOpen && DateTime.UtcNow >= endAt)
+            {
+                break;
+            }
+
+            await Task.Delay(16).ConfigureAwait(true);
         }
 
-        await SyncVstInsertEngineAsync(openEditorSlot: null, preferPlayback: true);
+        // 4) まだ開いていれば閉じるまで待つ。
+        var closeDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(1.5);
+        while (_centerStatusToast.IsOpen && DateTime.UtcNow < closeDeadline)
+        {
+            if (IsLibraryMaximized)
+            {
+                return;
+            }
+
+            await Task.Delay(16).ConfigureAwait(true);
+        }
+
+        _layoutModeToastUntilUtc = null;
+        await Dispatcher.Yield(DispatcherPriority.Render);
+        await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+    }
+
+    /// <summary>エディタ復帰時にプラグイン実体を載せる必要があるか。</summary>
+    private bool EditorEnterNeedsVstInsertLoad()
+    {
+        if (!IsVstInsertUiEnabled())
+        {
+            return false;
+        }
+
+        foreach (var session in _sessions)
+        {
+            if (DocumentSessionStore.ChainHasAnyPlugin(session.VstInserts))
+            {
+                return true;
+            }
+        }
+
+        return DocumentSessionStore.SnapshotHasAnyPlugin(AppStorage.Settings.DefaultVstInserts);
     }
 
     /// <summary>

@@ -17,16 +17,34 @@ public partial class MainWindow
     /// <summary>スロットごとの GUI 左上（DIP）。アプリ終了で破棄（永続化しない）。</summary>
     private readonly Dictionary<int, Point> _vstEditorPositions = new();
     private int _vstAssignGate;
+    /// <summary>
+    /// プレイヤー起動モード適用前。復元中の BindWorkspace でプラグイン実体を作らない。
+    /// </summary>
+    private bool _startupPlayerVstBypass;
+    /// <summary>
+    /// エディタ起動のスプラッシュ付きロードまで、復元中の自動 Sync を抑止する。
+    /// </summary>
+    private bool _startupDeferVstSync;
 
     /// <summary>
     /// アクティブ文書のインサートをエンジンへ反映。プレイヤー時はハードバイパス。
     /// VST3 は STA（UI スレッド）で Load／initialize する。
     /// エディタ復帰中（波形優先）は LeaveLibraryMaximizeAsync が後で呼ぶまで抑止する。
     /// </summary>
+    /// <summary>すりガラス読み込み中に来た Sync を、完了後へ持ち越す。</summary>
+    private bool _vstSyncQueuedDuringEditorBusy;
+
     private void SyncVstInsertEngine()
     {
-        if (_deferVstInsertSyncForEditorEnter)
+        if (_deferVstInsertSyncForEditorEnter || _startupDeferVstSync)
         {
+            return;
+        }
+
+        // ガラス待ちの awaited Sync と並走すると epoch が上がり、先に return → ガラスが消える。
+        if (_vstEditorEnterBusy)
+        {
+            _vstSyncQueuedDuringEditorBusy = true;
             return;
         }
 
@@ -41,7 +59,7 @@ public partial class MainWindow
     /// </param>
     private async Task SyncVstInsertEngineAsync(int? openEditorSlot, bool preferPlayback)
     {
-        if (_deferVstInsertSyncForEditorEnter)
+        if (_deferVstInsertSyncForEditorEnter || _startupDeferVstSync)
         {
             return;
         }
@@ -61,7 +79,8 @@ public partial class MainWindow
         }
 
         var session = _activeSession;
-        var player = IsLibraryMaximized;
+        // プレイヤー起動設定なのに復元が先だとエディタ扱いでロードされるのを防ぐ。
+        var player = IsLibraryMaximized || _startupPlayerVstBypass;
 
         // 差し替え中は CaptureState しない（閉じかけの IPlugView 上で GetState すると固まる）。
         // プレイヤー入りでもライブ破棄前にパラメータを書き戻す。
@@ -174,7 +193,7 @@ public partial class MainWindow
         byte[]? initialState = null,
         bool bypassed = false)
     {
-        if ((uint)slotIndex >= VstInsertChain.MaxSlots || _activeSession is null)
+        if ((uint)slotIndex >= VstInsertChain.MaxSlots || _activeSession is null || IsUiBusy)
         {
             return;
         }
@@ -184,6 +203,8 @@ public partial class MainWindow
             return;
         }
 
+        var glassShown = false;
+        var loadFailed = false;
         try
         {
             var session = _activeSession;
@@ -204,6 +225,13 @@ public partial class MainWindow
                     MessageBoxImage.Warning);
                 return;
             }
+
+            // 重い create／差し替えのあいだ、すりガラスで操作を止める。
+            _vstAssignBusy = true;
+            RefreshTransportCommandsEnabled();
+            ShowBusyGlass(UiStrings.OverlayVstInsertLoadingPlugin(entry.Name));
+            glassShown = true;
+            await Dispatcher.Yield(DispatcherPriority.Render);
 
             // Soft Limit（UI STA で create）を MTA で Dispose しながら Altiverb を UI で
             // create するとハングする。Process 停止後、同じ UI STA で破棄を完了させてから作る。
@@ -280,12 +308,18 @@ public partial class MainWindow
             var loaded = _player.VstInserts.TryGetLive(slotIndex);
             if (!IsLibraryMaximized && loaded is not null && !loaded.Faulted)
             {
+                // エディタを開く前にすりガラスを外し、操作を戻す。
+                EndVstAssignBusyGlass(glassShown, failed: false);
+                glassShown = false;
                 await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                 await Task.Delay(150);
                 OpenVstEditorForSlot(slotIndex);
             }
             else if (!IsLibraryMaximized)
             {
+                loadFailed = true;
+                EndVstAssignBusyGlass(glassShown, failed: true);
+                glassShown = false;
                 OwnerCenteredMessageBox.Show(
                     this,
                     UiStrings.ErrorVstInsertLoadFailed,
@@ -296,8 +330,35 @@ public partial class MainWindow
         }
         finally
         {
+            EndVstAssignBusyGlass(glassShown, failed: loadFailed);
             Interlocked.Exchange(ref _vstAssignGate, 0);
         }
+    }
+
+    private void EndVstAssignBusyGlass(bool glassShown, bool failed)
+    {
+        if (!_vstAssignBusy && !glassShown)
+        {
+            return;
+        }
+
+        _vstAssignBusy = false;
+        RefreshTransportCommandsEnabled();
+        if (!glassShown)
+        {
+            return;
+        }
+
+        if (failed)
+        {
+            _busyGlass.HideOverlay();
+        }
+        else
+        {
+            _busyGlass.BeginFadeOut();
+        }
+
+        RestoreEditorKeyboardFocusAfterBusy();
     }
 
     private void CloseEditorsForPendingReload(VstInsertChain? chain)
