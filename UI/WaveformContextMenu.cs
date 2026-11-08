@@ -125,6 +125,7 @@ internal enum WaveMenuCommand
     SoloClear,
     FocusTime,
     SilentSkip,
+    AutoLoop,
     AlwaysOnTop,
     NewDocument,
     Open,
@@ -207,6 +208,7 @@ internal sealed class WaveformContextMenuModel
     public bool HasSolo { get; init; }
     public bool CenterLocked { get; init; }
     public bool SilentSkip { get; init; }
+    public bool AutoLoop { get; init; }
     public bool AlwaysOnTop { get; init; }
     public bool WaapiVisible { get; init; }
     public bool PlayExit { get; init; }
@@ -306,6 +308,7 @@ internal sealed class WaveformContextMenuModel
         HasSolo = true,
         CenterLocked = true,
         SilentSkip = true,
+        AutoLoop = true,
         AlwaysOnTop = true,
         WaapiVisible = true,
         PlayExit = true,
@@ -887,6 +890,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuPreroll, WaveMenuCommand.Preroll, "Ctrl+Space", SingleFileOnly(m) && m.CanNavigate),
         Cmd(UiStrings.WaveMenuRestart, WaveMenuCommand.Restart, "Alt+Enter", SingleFileOnly(m) && m.CanNavigate),
         Check(UiStrings.WaveMenuSilentSkip, WaveMenuCommand.SilentSkip, "Alt+Shift+S", m.SilentSkip, enabled: true),
+        Check(UiStrings.WaveMenuAutoLoop, WaveMenuCommand.AutoLoop, "Alt+Shift+L", m.AutoLoop, enabled: true),
         Check(UiStrings.WaveMenuRangeClick, WaveMenuCommand.RangeClick, "Q", m.RangeClick, SingleFileOnly(m) && m.CanEdit),
     ];
 
@@ -944,16 +948,18 @@ internal static class WaveformContextMenuBuilder
         Sub(UiStrings.WaveMenuCatAnalysis, AnalysisViewItems(m)),
         Sub(UiStrings.WaveMenuCatScreen, ScreenViewItems(m)),
         WaveMenuSeparatorEntry.Instance,
-        Cmd(
-            UiStrings.WaveMenuCenterPlayhead,
-            WaveMenuCommand.CenterPlayhead,
-            enabled: SingleFileOnly(m) && m.CanNavigate && !m.LibraryMaximized),
         Check(
             UiStrings.WaveMenuCenterLock,
             WaveMenuCommand.CenterLock,
-            MenuGestures.CenterPlayhead,
+            MenuGestures.CenterLock,
             m.CenterLocked,
             SingleFileOnly(m) && m.CanNavigate && !m.IsBusy && !m.LibraryMaximized),
+        Check(
+            UiStrings.WaveMenuAlwaysOnTop,
+            WaveMenuCommand.AlwaysOnTop,
+            "Alt+Shift+T",
+            m.AlwaysOnTop,
+            enabled: true),
         WaveMenuSeparatorEntry.Instance,
         Sub(UiStrings.WaveMenuCatSolo, SoloViewItems(m)),
         Sub(UiStrings.WaveMenuCatVideo, VideoChromeItems(m)),
@@ -987,7 +993,6 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuMaximizeLibrary, WaveMenuCommand.MaximizeLibrary, "F10", m.LibraryMaximized, enabled: true),
         Check(UiStrings.WaveMenuMaximizeWaveform, WaveMenuCommand.MaximizeWaveform, "F11", m.WaveformMaximized, enabled: true),
         Check(UiStrings.WaveMenuMaximizeAnalyzers, WaveMenuCommand.MaximizeAnalyzers, "F12", m.AnalyzersMaximized, enabled: true),
-        Check(UiStrings.WaveMenuAlwaysOnTop, WaveMenuCommand.AlwaysOnTop, "Alt+Shift+T", m.AlwaysOnTop, enabled: true),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> VideoChromeItems(WaveformContextMenuModel m) =>
