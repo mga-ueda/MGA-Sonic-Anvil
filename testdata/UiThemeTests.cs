@@ -28,7 +28,7 @@ public sealed class UiThemeTests
         Assert.False(UiThemePalette.IsThemeable("MarkerBrush"));
         Assert.False(UiThemePalette.IsThemeable("DirtyAccentBrush"));
         Assert.False(UiThemePalette.IsThemeable("SeekExitBrush"));
-        Assert.True(UiThemePalette.IsThemeable("WaapiToggleOnBackBrush"));
+        Assert.True(UiThemePalette.IsThemeable("LatchToggleOnBackBrush"));
         Assert.True(UiThemePalette.IsThemeable("ExportButtonBackBrush"));
         Assert.True(UiThemePalette.IsThemeable("ExportButtonFillBrush"));
         Assert.True(UiThemePalette.IsThemeable("LevelMeterTrackBackBrush"));

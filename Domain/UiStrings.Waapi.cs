@@ -25,6 +25,12 @@ internal static partial class UiStrings
     public static string LabelUnnamedProject => Get("(無名)", "(unnamed)");
     public static string LabelAutoActive => Get("Auto Active", "Auto Active");
     public static string LabelPlayMinusE => Get("Play -E", "Play -E");
+    public static string TipOptionAutoActive => Get(
+        "Auto Active（Alt+Shift+A）",
+        "Auto Active (Alt+Shift+A)");
+    public static string TipOptionPlayMinusE => Get(
+        "Play -E（Alt+Shift+E）",
+        "Play -E (Alt+Shift+E)");
     public static string ButtonExport => Get("EXPORT", "EXPORT");
 
     public static string StatusChecking => Get("確認中…", "Checking…");

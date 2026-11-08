@@ -65,24 +65,16 @@
              PreviewMouseLeftButtonUp="OutputPathBox_Click" />
 
     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
-      <CheckBox x:Name="PlayMinusECheckBox"
-                Style="{StaticResource DarkCheckBoxStyle}"
-                Content="{x:Static domain:UiStrings.LabelPlayMinusE}"
-                VerticalAlignment="Center"
-                FontSize="11"
-                Margin="12,0,0,0"
-                Foreground="{DynamicResource StatusBarTitleForeBrush}"
-                Checked="PlayMinusECheckBox_Changed"
-                Unchecked="PlayMinusECheckBox_Changed" />
-      <CheckBox x:Name="AutoActiveCheckBox"
-                Style="{StaticResource DarkCheckBoxStyle}"
-                Content="{x:Static domain:UiStrings.LabelAutoActive}"
-                VerticalAlignment="Center"
-                FontSize="11"
-                Margin="12,0,12,0"
-                Foreground="{DynamicResource StatusBarTitleForeBrush}"
-                Checked="AutoActiveCheckBox_Changed"
-                Unchecked="AutoActiveCheckBox_Changed" />
+      <ui:MonitorLatchButton x:Name="PlayMinusELatch"
+                             LatchLabel="{x:Static domain:UiStrings.LabelPlayMinusE}"
+                             VerticalAlignment="Center"
+                             Margin="8,0,0,0"
+                             Click="PlayMinusELatch_Click" />
+      <ui:MonitorLatchButton x:Name="AutoActiveLatch"
+                             LatchLabel="{x:Static domain:UiStrings.LabelAutoActive}"
+                             VerticalAlignment="Center"
+                             Margin="6,0,8,0"
+                             Click="AutoActiveLatch_Click" />
       <ui:RoundedButton x:Name="ExportButton"
                         Width="{x:Static ui:DesignMetrics.StatusExportButtonWidth}"
                         Height="{x:Static ui:DesignMetrics.StatusExportButtonHeight}"

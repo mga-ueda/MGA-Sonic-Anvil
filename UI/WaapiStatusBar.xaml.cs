@@ -63,17 +63,46 @@ internal sealed partial class WaapiStatusBar : UserControl
         _outputFolderButton.Click += (_, _) => OutputFolderBrowse?.Invoke(this, EventArgs.Empty);
         OutputFolderButtonHost.Content = _outputFolderButton;
 
-        AutoActiveCheckBox.IsChecked = true;
+        InitOptionLatches();
+        AutoActiveLatch.IsLatched = true;
         ActionButtonLooks.ApplyStatusExport(ExportButton);
         SetPending();
         BadgeCanvas.Loaded += (_, _) => DrawBadge();
     }
 
+    private void InitOptionLatches()
+    {
+        foreach (var latch in new[] { PlayMinusELatch, AutoActiveLatch })
+        {
+            latch.UseLatchToggleTheme = true;
+            latch.FitToLabel();
+        }
+
+        ApplyOptionLatchToolTips();
+    }
+
+    internal void SetOptionLatchWashThrough(bool wash)
+    {
+        PlayMinusELatch.WashThrough = wash;
+        AutoActiveLatch.WashThrough = wash;
+        PlayMinusELatch.RefreshAppearance();
+        AutoActiveLatch.RefreshAppearance();
+    }
+
+    private void ApplyOptionLatchToolTips()
+    {
+        TransportToolTip.Attach(PlayMinusELatch, UiStrings.TipOptionPlayMinusE);
+        TransportToolTip.Attach(AutoActiveLatch, UiStrings.TipOptionAutoActive);
+    }
+
     public void ApplyLocalizedText()
     {
         TitleLabel.Text = UiStrings.WaapiTitle;
-        PlayMinusECheckBox.Content = UiStrings.LabelPlayMinusE;
-        AutoActiveCheckBox.Content = UiStrings.LabelAutoActive;
+        PlayMinusELatch.LatchLabel = UiStrings.LabelPlayMinusE;
+        PlayMinusELatch.FitToLabel();
+        AutoActiveLatch.LatchLabel = UiStrings.LabelAutoActive;
+        AutoActiveLatch.FitToLabel();
+        ApplyOptionLatchToolTips();
         ExportButton.Content = UiStrings.ButtonExport;
         ActionButtonLooks.ApplyStatusExport(ExportButton);
         UpdateKeepLockAppearance();
@@ -89,6 +118,8 @@ internal sealed partial class WaapiStatusBar : UserControl
         ApplyKeepLockColors();
         ActionButtonLooks.ApplyStatusExport(ExportButton);
         _outputFolderButton.InvalidateVisual();
+        PlayMinusELatch.RefreshAppearance();
+        AutoActiveLatch.RefreshAppearance();
         DrawBadge();
     }
 
@@ -167,10 +198,10 @@ internal sealed partial class WaapiStatusBar : UserControl
 
     public bool AutoActiveChecked
     {
-        get => AutoActiveCheckBox.IsChecked == true;
+        get => AutoActiveLatch.IsLatched;
         set
         {
-            if (AutoActiveCheckBox.IsChecked == value)
+            if (AutoActiveLatch.IsLatched == value)
             {
                 return;
             }
@@ -178,7 +209,7 @@ internal sealed partial class WaapiStatusBar : UserControl
             _suppressAutoActiveEvent = true;
             try
             {
-                AutoActiveCheckBox.IsChecked = value;
+                AutoActiveLatch.IsLatched = value;
             }
             finally
             {
@@ -190,10 +221,10 @@ internal sealed partial class WaapiStatusBar : UserControl
     /// <summary>Play -E（Wwise Play post-exit）。既定オフ。</summary>
     public bool PlayPostExitChecked
     {
-        get => PlayMinusECheckBox.IsChecked == true;
+        get => PlayMinusELatch.IsLatched;
         set
         {
-            if (PlayMinusECheckBox.IsChecked == value)
+            if (PlayMinusELatch.IsLatched == value)
             {
                 return;
             }
@@ -201,7 +232,7 @@ internal sealed partial class WaapiStatusBar : UserControl
             _suppressPlayPostExitEvent = true;
             try
             {
-                PlayMinusECheckBox.IsChecked = value;
+                PlayMinusELatch.IsLatched = value;
             }
             finally
             {
@@ -426,7 +457,7 @@ internal sealed partial class WaapiStatusBar : UserControl
     {
         _badgeText = UiStrings.WaapiBadgeConnect;
         _badgeBack = Theme.Get("StatusBarConnectedBadgeBackBrush");
-        _badgeFore = Theme.Get("WaapiToggleOnForeBrush");
+        _badgeFore = Theme.Get("LatchToggleOnForeBrush");
         _badgeFilled = true;
     }
 
@@ -434,7 +465,7 @@ internal sealed partial class WaapiStatusBar : UserControl
     {
         _badgeText = UiStrings.WaapiBadgeDisconnect;
         _badgeBack = Theme.Get("StatusBarDisconnectedBadgeBackBrush");
-        _badgeFore = Theme.Get("WaapiToggleOnForeBrush");
+        _badgeFore = Theme.Get("LatchToggleOnForeBrush");
         _badgeFilled = true;
     }
 
@@ -524,23 +555,25 @@ internal sealed partial class WaapiStatusBar : UserControl
             : $"{wwise} v{text}";
     }
 
-    private void AutoActiveCheckBox_Changed(object sender, RoutedEventArgs e)
+    private void AutoActiveLatch_Click(object sender, RoutedEventArgs e)
     {
         if (_suppressAutoActiveEvent)
         {
             return;
         }
 
+        AutoActiveLatch.IsLatched = !AutoActiveLatch.IsLatched;
         AutoActiveChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void PlayMinusECheckBox_Changed(object sender, RoutedEventArgs e)
+    private void PlayMinusELatch_Click(object sender, RoutedEventArgs e)
     {
         if (_suppressPlayPostExitEvent)
         {
             return;
         }
 
+        PlayMinusELatch.IsLatched = !PlayMinusELatch.IsLatched;
         PlayPostExitChanged?.Invoke(this, EventArgs.Empty);
     }
 

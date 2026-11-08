@@ -8,6 +8,28 @@ namespace MgaSonicAnvil.Tests;
 public sealed class PlayerMeterChromeTests
 {
     [Fact]
+    public void WashLatchToggleFace_AppliesWashAlphaKeepingRgb()
+    {
+        var face = System.Windows.Media.Color.FromRgb(0x00, 0x6B, 0xD7);
+        var washed = PlayerChrome.WashLatchToggleFace(face);
+        Assert.Equal(PlayerChrome.LatchToggleWashAlpha, washed.A);
+        Assert.Equal(face.R, washed.R);
+        Assert.Equal(face.G, washed.G);
+        Assert.Equal(face.B, washed.B);
+    }
+
+    [Fact]
+    public void WashLatchToggleFace_KeepsCustomAlphaFromLatchToggleOn()
+    {
+        var face = System.Windows.Media.Color.FromArgb(0x40, 0x00, 0x6B, 0xD7);
+        var washed = PlayerChrome.WashLatchToggleFace(face);
+        Assert.Equal(0x40, washed.A);
+        Assert.Equal(face.R, washed.R);
+        Assert.Equal(face.G, washed.G);
+        Assert.Equal(face.B, washed.B);
+    }
+
+    [Fact]
     public void Grid_LeavesEditorColorUnchanged()
     {
         var dark = Color.FromRgb(0x3A, 0x3A, 0x3E);

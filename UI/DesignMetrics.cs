@@ -216,6 +216,18 @@ internal static class DesignMetrics
     /// <summary>モニター列ボタンのラベル字サイズ。</summary>
     public static double MonitorButtonFontSize => From96(9);
 
+    /// <summary>オプションラッチ（旧チェックボックス）のラベル字サイズ。</summary>
+    public static double OptionLatchFontSize => From96(11);
+
+    /// <summary>オプションラッチの高さ（字 11 に合わせた余白込み）。</summary>
+    public static double OptionLatchButtonHeight => From96(22);
+
+    /// <summary>オプションラッチ幅の最小値。</summary>
+    public static double OptionLatchMinWidth => From96(48);
+
+    /// <summary>オプションラッチのラベル左右余白合計（面パッド込み）。</summary>
+    public static double OptionLatchLabelWidthPad => From96(20);
+
     /// <summary>BPM テンポ数値（ボタン上）の字サイズ。</summary>
     public static double MonitorBpmValueFontSize => From96(12);
 
