@@ -69,7 +69,8 @@ internal sealed class BrandLicenseLabel : TextBlock
     {
         var spacing = FontFamily?.LineSpacing > 0 ? FontFamily.LineSpacing : 1.2;
         LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
-        LineHeight = Math.Max(1, FontSize * spacing);
+        var lineSize = Math.Max(FontSize, DesignMetrics.BrandLicenseCompanyFontSize);
+        LineHeight = Math.Max(1, lineSize * spacing);
     }
 
     private void RebuildContent()
@@ -95,17 +96,20 @@ internal sealed class BrandLicenseLabel : TextBlock
                 Inlines.Add(new LineBreak());
             }
 
-            AppendLineWithLinks(lines[i], bodyBrush);
+            var lineFontSize = i == 0
+                ? DesignMetrics.BrandLicenseCompanyFontSize
+                : FontSize;
+            AppendLineWithLinks(lines[i], bodyBrush, lineFontSize);
         }
 
         UpdateLinkBrushes();
     }
 
-    private void AppendLineWithLinks(string line, Brush bodyBrush)
+    private void AppendLineWithLinks(string line, Brush bodyBrush, double fontSize)
     {
         if (string.IsNullOrEmpty(line))
         {
-            Inlines.Add(new Run(" ") { Foreground = bodyBrush });
+            Inlines.Add(new Run(" ") { Foreground = bodyBrush, FontSize = fontSize });
             return;
         }
 
@@ -114,22 +118,23 @@ internal sealed class BrandLicenseLabel : TextBlock
         {
             if (!TryNextLink(remaining, out var at, out var id, out var length))
             {
-                Inlines.Add(new Run(remaining) { Foreground = bodyBrush });
+                Inlines.Add(new Run(remaining) { Foreground = bodyBrush, FontSize = fontSize });
                 break;
             }
 
             if (at > 0)
             {
-                Inlines.Add(new Run(remaining[..at]) { Foreground = bodyBrush });
+                Inlines.Add(new Run(remaining[..at]) { Foreground = bodyBrush, FontSize = fontSize });
             }
 
-            var link = new Hyperlink(new Run(remaining.Substring(at, length)))
+            var link = new Hyperlink(new Run(remaining.Substring(at, length)) { FontSize = fontSize })
             {
                 Style = LinkStyle(),
                 TextDecorations = null,
                 Cursor = Cursors.Hand,
                 Focusable = false,
                 Tag = id,
+                FontSize = fontSize,
             };
             var capturedId = id;
             link.Click += (_, _) =>

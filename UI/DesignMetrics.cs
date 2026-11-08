@@ -217,6 +217,9 @@ internal static class DesignMetrics
     /// <summary>バージョン情報ダイアログなどの権利表記フォント。</summary>
     public static double BrandLicenseFontSize => From96(8);
 
+    /// <summary>権利表記の会社名行（© MIYABI …）フォント。本文より少し大きめ。</summary>
+    public static double BrandLicenseCompanyFontSize => From96(10);
+
     /// <summary>モニター列ボタンの高さ（一回り大きめ）。</summary>
     public static double MonitorButtonHeight => Dip(26);
 
