@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -26,5 +27,58 @@ public sealed class SelectionBandCornersTests
         Assert.Equal(default, SelectionBandCorners.Of(SelectionBandEdge.Middle, radius));
         Assert.Equal(new CornerRadius(0, 0, radius, radius), SelectionBandCorners.Of(SelectionBandEdge.Last, radius));
         Assert.Equal(default, SelectionBandCorners.Of(SelectionBandEdge.Middle, 0));
+    }
+
+    [Fact]
+    public void TreeBandBleed_ExtendsLeftByIndentDepth()
+    {
+        Assert.Equal(new Thickness(0), LibraryBrowserView.TreeBandBleedMargin(0));
+        Assert.Equal(
+            new Thickness(-LibraryBrowserView.TreeChildIndent, 0, 0, 0),
+            LibraryBrowserView.TreeBandBleedMargin(1));
+        Assert.Equal(
+            new Thickness(-2 * LibraryBrowserView.TreeChildIndent, 0, 0, 0),
+            LibraryBrowserView.TreeBandBleedMargin(2));
+
+        var padding = new Thickness(2, 1, 4, 1);
+        Assert.Equal(padding, LibraryBrowserView.TreeBandBleedPadding(padding, 0));
+        Assert.Equal(
+            new Thickness(2 + LibraryBrowserView.TreeChildIndent, 1, 4, 1),
+            LibraryBrowserView.TreeBandBleedPadding(padding, 1));
+    }
+
+    [Fact]
+    public void MeasureTreeIndentDepth_CountsAncestors()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (Application.Current is null)
+                {
+                    _ = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                }
+
+                var tree = new TreeView();
+                var root = new TreeViewItem();
+                var child = new TreeViewItem();
+                var grand = new TreeViewItem();
+                tree.Items.Add(root);
+                root.Items.Add(child);
+                child.Items.Add(grand);
+                Assert.Equal(0, LibraryBrowserView.MeasureTreeIndentDepth(root));
+                Assert.Equal(1, LibraryBrowserView.MeasureTreeIndentDepth(child));
+                Assert.Equal(2, LibraryBrowserView.MeasureTreeIndentDepth(grand));
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        Assert.Null(error?.ToString());
     }
 }
