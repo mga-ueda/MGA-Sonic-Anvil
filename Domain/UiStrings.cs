@@ -289,6 +289,51 @@ internal static partial class UiStrings
     public static string TooltipVstInsertPersistClear => Get(
         "このスロットとプラグインの組の記憶を消します。以降に開く波形には入りません",
         "Forget this slot and plug-in pair. Later waveforms won’t get it");
+    public static string TooltipVstInsertPreset => Get(
+        "スロット 1–8 の組をプリセットとして呼び出します。同じプリセットを再度適用するときは、いったん Effect Preset を選んでから選び直します",
+        "Recall a saved setup for insert slots 1–8. To apply the same preset again, choose Effect Preset first, then pick it again");
+    /// <summary>プリセットコンボ先頭の空欄（再適用のための選択解除用）。表示名のみ。</summary>
+    public static string LabelVstInsertPresetBlank => Get("Effect Preset", "Effect Preset");
+    public static string TooltipVstInsertPresetSave => Get(
+        "今のスロット 1–8 をプリセットとして保存します",
+        "Save the current slots 1–8 as a preset");
+    public static string TooltipVstInsertPresetDelete => Get(
+        "選んでいるプリセットを削除します",
+        "Delete the selected preset");
+    public static string LabelVstInsertPresetSave => Get("Save", "Save");
+    public static string LabelVstInsertPresetDelete => Get("Delete", "Delete");
+    public static string LabelVstInsertPresetRename => Get("名前を変更(_R)", "_Rename");
+    public static string TitleVstInsertPresetSave => Get("プリセットを保存", "Save Preset");
+    public static string TitleVstInsertPresetRename => Get("プリセット名を変更", "Rename Preset");
+    public static string TitleVstInsertPresetApply => Get("プリセットの適用", "Apply Preset");
+    public static string TitleVstInsertPresetDelete => Get("プリセットの削除", "Delete Preset");
+    public static string TitleVstInsertPresetReplace => Get("プリセットの上書き", "Overwrite Preset");
+    public static string AskVstInsertPresetApplyScope => Get(
+        "このプリセットをどこへ適用しますか？\n\n今のタブ: アクティブなタブだけ\n全てのタブ: 開いているすべてのタブ",
+        "Where should this preset be applied?\n\nThis tab: the active tab only\nAll tabs: every open tab");
+    public static string ButtonVstInsertPresetThisTab => Get("今のタブ", "This Tab");
+    public static string ButtonVstInsertPresetAllTabs => Get("全てのタブ", "All Tabs");
+    public static string WarnVstInsertPresetOverwrite(string list) => Format(
+        "既にインサートされているスロットの内容が消えます。置き換えて適用しますか？\n\n対象:\n{0}\n\nOK: 置き換える\nCancel: 中止",
+        "This will erase plug-ins already inserted in the target slots. Replace and apply?\n\nAffected:\n{0}\n\nOK: replace\nCancel: cancel",
+        list);
+    public static string WarnVstInsertPresetDelete(string name) => Format(
+        "プリセット「{0}」を削除しますか？\n\nOK: 削除する\nCancel: 中止",
+        "Delete preset “{0}”?\n\nOK: delete\nCancel: cancel",
+        name);
+    public static string WarnVstInsertPresetReplaceName(string name) => Format(
+        "同名のプリセット「{0}」があります。上書きしますか？\n\nOK: 上書きする\nCancel: 中止",
+        "A preset named “{0}” already exists. Overwrite it?\n\nOK: overwrite\nCancel: cancel",
+        name);
+    public static string VstInsertPresetOverwriteLine(string tab, int slotNumber, string plugin) => Format(
+        "{0} / スロット {1}（{2}）",
+        "{0} / slot {1} ({2})",
+        tab,
+        slotNumber,
+        plugin);
+    public static string ErrorVstInsertPresetNameEmpty => Get(
+        "プリセット名を入力してください。",
+        "Enter a preset name.");
     public static string LabelVstInsertPickerTitle => Get("インサート", "Insert");
     public static string LabelVstInsertPickerGroupVendor => Get("メーカー名(_M)", "Vendor(_M)");
     public static string LabelVstInsertPickerGroupCategory => Get("種別(_T)", "Category(_T)");

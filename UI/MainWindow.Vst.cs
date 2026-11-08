@@ -42,7 +42,7 @@ public partial class MainWindow
         }
 
         // ガラス待ちの awaited Sync と並走すると epoch が上がり、先に return → ガラスが消える。
-        if (_vstEditorEnterBusy)
+        if (_vstEditorEnterBusy || _vstAssignBusy)
         {
             _vstSyncQueuedDuringEditorBusy = true;
             return;
@@ -433,7 +433,9 @@ public partial class MainWindow
             ClearMatchingVstInsertSlotAcrossTabs,
             ConfirmPersistReplacingOtherTabs,
             PasteVstInsertSettingsToAllTabs,
-            ConfirmPasteReplacingSlot);
+            ConfirmPasteReplacingSlot,
+            ConfirmVstInsertPresetOverwrite,
+            ApplyVstInsertPresetChain);
         if (show)
         {
             VstInsertRack.ApplyTheme();
@@ -446,6 +448,108 @@ public partial class MainWindow
     {
         SyncVstInsertEngine();
         RefreshTransportCommandsEnabled();
+    }
+
+    /// <summary>
+    /// プリセット適用で使用中スロットの内容が消えるとき、置き換えるか中止するかを問う。
+    /// 対象が空きだけなら OK。中止は Cancel。
+    /// </summary>
+    private MessageBoxResult ConfirmVstInsertPresetOverwrite(
+        VstInsertSlotSnapshot[] slots,
+        bool allTabs)
+    {
+        var lines = new List<string>();
+        IEnumerable<DocumentSession> targets = allTabs
+            ? _sessions
+            : _activeSession is null ? [] : [_activeSession];
+        foreach (var session in targets)
+        {
+            foreach (var hit in DocumentSessionStore.CollectPresetOverwriteSlots(session.VstInserts, slots))
+            {
+                lines.Add(UiStrings.VstInsertPresetOverwriteLine(
+                    session.DisplayName,
+                    hit.Index + 1,
+                    hit.PluginLabel));
+            }
+        }
+
+        if (lines.Count == 0)
+        {
+            return MessageBoxResult.OK;
+        }
+
+        return OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.WarnVstInsertPresetOverwrite(string.Join("\n", lines)),
+            UiStrings.TitleVstInsertPresetApply,
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel);
+    }
+
+    /// <summary>プリセットのスロット組を今のタブ、または全タブへ載せる。</summary>
+    private void ApplyVstInsertPresetChain(VstInsertSlotSnapshot[] slots, bool allTabs) =>
+        _ = ApplyVstInsertPresetChainAsync(slots, allTabs);
+
+    /// <summary>
+    /// プリセット適用。プラグイン create／差し替えが重いので、起動時と同じすりガラスで待つ。
+    /// </summary>
+    private async Task ApplyVstInsertPresetChainAsync(VstInsertSlotSnapshot[] slots, bool allTabs)
+    {
+        if (_activeSession is null || IsUiBusy)
+        {
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _vstAssignGate, 1, 0) != 0)
+        {
+            return;
+        }
+
+        var glassShown = false;
+        try
+        {
+            _player.VstInserts.CaptureAppliedStates();
+            IEnumerable<DocumentSession> targets = allTabs
+                ? _sessions
+                : [_activeSession];
+            var changed = false;
+            foreach (var session in targets)
+            {
+                if (DocumentSessionStore.ApplyChainSnapshot(session.VstInserts, slots))
+                {
+                    changed = true;
+                }
+            }
+
+            if (!changed)
+            {
+                VstInsertRack.Refresh();
+                return;
+            }
+
+            VstInsertRack.Refresh();
+
+            // 単発インサート／起動時ロードと同じく、読み込み中は操作を止める。
+            _vstAssignBusy = true;
+            _vstSyncQueuedDuringEditorBusy = false;
+            RefreshTransportCommandsEnabled();
+            ShowBusyGlass(UiStrings.OverlayVstPluginStartupLoading);
+            glassShown = true;
+            await Dispatcher.Yield(DispatcherPriority.Render);
+
+            await SyncVstInsertEngineAsync(openEditorSlot: null, preferPlayback: false)
+                .ConfigureAwait(true);
+
+            VstInsertRack.Refresh();
+            RefreshTransportCommandsEnabled();
+        }
+        finally
+        {
+            EndVstAssignBusyGlass(glassShown, failed: false);
+            FlushVstSyncQueuedDuringEditorBusy();
+            Interlocked.Exchange(ref _vstAssignGate, 0);
+        }
     }
 
     /// <summary>
