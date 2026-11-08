@@ -282,6 +282,7 @@ public partial class MainWindow
         }
 
         _tileArrange = arrange;
+        SyncDocumentTabHostVisibility();
         // F12 中はタイル突入で dB 列を畳み、仕切りを出す。
         ApplyWaveformScaleLanes();
         var generation = ++_tileBuildGeneration;
@@ -635,6 +636,7 @@ public partial class MainWindow
         CaptureAllTileViews();
         TearDownWaveformTiles();
         _tileArrange = WaveformTileArrange.Off;
+        SyncDocumentTabHostVisibility();
         _tileNeedsInitialBind = false;
         _tileGrid = null;
         _tileActiveView = null;

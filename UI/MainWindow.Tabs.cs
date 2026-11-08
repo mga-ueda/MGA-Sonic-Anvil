@@ -845,6 +845,20 @@ public partial class MainWindow
         RefreshLibraryBrowser();
     }
 
+    /// <summary>
+    /// 上部タブバーの出し分け。プレイヤー最大化・動画ミニ・タイル表示中は隠す
+    /// （タイルは各ペインのファイル名帯で足りる）。
+    /// </summary>
+    private void SyncDocumentTabHostVisibility()
+    {
+        var hide = IsLibraryMaximized || _videoLaunchPlacement || _tileMode;
+        var next = hide ? Visibility.Collapsed : Visibility.Visible;
+        if (DocumentTabHost.Visibility != next)
+        {
+            DocumentTabHost.Visibility = next;
+        }
+    }
+
     private TabNewButton CreateTabNewButton()
     {
         var button = new TabNewButton();
@@ -1236,9 +1250,7 @@ public partial class MainWindow
     }
 
     private FileNameEditSurface DefaultFileNameEditSurface() =>
-        _tileMode && !DocumentTabHost.IsMouseOver
-            ? FileNameEditSurface.Tile
-            : FileNameEditSurface.Tab;
+        _tileMode ? FileNameEditSurface.Tile : FileNameEditSurface.Tab;
 
     private FileNameEditSurface SurfaceFromAnchor(FrameworkElement anchor)
     {

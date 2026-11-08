@@ -3823,7 +3823,7 @@ public partial class MainWindow
         TransportChromeHost.Visibility = Visibility.Visible;
         MeterColumn.Visibility = Visibility.Visible;
         MeterColumnSplitter.Visibility = Visibility.Collapsed;
-        DocumentTabHost.Visibility = Visibility.Collapsed;
+        SyncDocumentTabHostVisibility();
         SyncHistoryStripVisibility();
         TransportToolbarHost.Visibility = Visibility.Collapsed;
         MeterColumn.ClipToBounds = false;
@@ -3858,14 +3858,10 @@ public partial class MainWindow
 
     private void RestoreMinimalChromeMeterHosts()
     {
-        // プレイヤー中はタブ／履歴ストリップを出さない（ApplyLibraryChrome の Collapsed を上書きしない）。
+        // プレイヤー／動画ミニ／タイル中はタブを出さない（SyncDocumentTabHostVisibility）。
+        SyncDocumentTabHostVisibility();
         if (!IsLibraryMaximized)
         {
-            if (DocumentTabHost.Visibility != Visibility.Visible)
-            {
-                DocumentTabHost.Visibility = Visibility.Visible;
-            }
-
             SyncHistoryStripVisibility();
         }
 

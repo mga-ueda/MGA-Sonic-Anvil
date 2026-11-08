@@ -10,7 +10,7 @@ Hear, cut, mark, and loop game audio — then hand a Wave-only structure to Wwis
 
 Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, and a spectrogram — decide by ear and commit. You can prep game one-shots and loops here without bouncing between a DAW and a dedicated editor.
 
-**Several files can be tiled for comparison, not just tabbed.** Shift+T cycles side by side → stacked → grid → off (skips layouts that will not fit; Ctrl+T is Trim). The right-click menu picks one directly. A setting chooses the default arrangement applied after opening multiple files. While tiled, Ctrl+F searches tab names (space = AND, `|` = OR) and dims non-matching tiles under frosted glass. Alt+Enter closes tiles that did not match (keeps unsaved; no prompt; clears the filter).
+**Several files can be tiled for comparison, not just tabbed.** Shift+T cycles side by side → stacked → grid → off (skips layouts that will not fit; Ctrl+T is Trim). The right-click menu picks one directly. While tiled, the top tab bar is hidden and each tile’s file-name strip is used to switch. A setting chooses the default arrangement applied after opening multiple files. While tiled, Ctrl+F searches tab names (space = AND, `|` = OR) and dims non-matching tiles under frosted glass. Alt+Enter closes tiles that did not match (keeps unsaved; no prompt; clears the filter).
 
 **The editor hosts VST3 inserts** (Ctrl+Shift+1–8, Bounce = Ctrl+Shift+B; asks whether to keep tails; Cancel aborts). Mixdown is Ctrl+Shift+X (warns when inserts are active). See the manual for details.
 

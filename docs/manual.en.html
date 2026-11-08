@@ -146,7 +146,7 @@
         <p><strong>Edit waveforms and send them to Wwise in one window.</strong></p>
         <p>Fade, match loudness, delete unused parts, copy / paste, markers, regions, loops, a spectrogram, and VST3 inserts. Listen, decide, and apply.</p>
         <p><strong>Wwise gets a single Wave file.</strong> The original wave is written to Originals and imported as Interactive Music. Markers ending in <code>-A</code> / <code>-L</code> / <code>-E</code> and the sample loop are used (not Custom Cues). See <a href="#export">WAAPI EXPORT</a>.</p>
-        <p>You can save an open file as Wave or MP3. Right-click a tab to write the current edits to another file.</p>
+        <p>You can save an open file as Wave or MP3. Right-click the top tab bar or a tile file-name strip to write the current edits to another file (while tiled, the top tab bar is hidden).</p>
         <p>New file: <kbd>Ctrl</kbd>+<kbd>N</kbd>. After opening, record with <kbd>Ctrl</kbd>+<kbd>R</kbd>. Before recording, you are always asked whether to use Silent Skip (skip silence). Recording uses the current file format and overwrites from the playhead (Undo restores it). It does not start if no file is open.</p>
         <p>Recording stays as raw audio. MP3 is only when you save or export. Unsaved work in tabs that were still open comes back on the next launch. A closed tab can be reopened with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> until you quit the app.</p>
         <p>Speaker layouts (mono through Atmos) and which channels play are switched in Settings and the speaker list at the bottom of the window.</p>
@@ -346,8 +346,8 @@
         </ul>
         <h4>Fullscreen</h4>
         <ul>
-          <li><kbd>F11</kbd> — waveform area fullscreen, like a browser. Hides WAAPI, channel names, the dB scale, the window frame, and the taskbar. Keeps tabs, the toolbar, and the overview. Analyzers, level meter, and status bar follow the Layout tab preset (by default analyzers are off and fullscreen Toggle starts on; the level meter is 1.5× only while layout fullscreen is on, same scale as F12). Works while tiled. <kbd>F11</kbd> again toggles. Stays in front only while this window is active (switching away restores the taskbar and does not keep covering other apps; see <a href="#layout-top">Always on Top</a>). Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
-          <li><kbd>F12</kbd> — fullscreen with only the title bar hidden. Tabs, toolbar, meters, WAAPI, channel names, and the dB scale stay. Spectrum, loudness, level meter, and vector scope are 1.5× only while layout fullscreen is on (on top of Windows display scaling and UI scale). Works while tiled. <kbd>F12</kbd> again toggles. Frontmost only while active, same as <kbd>F11</kbd>. Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
+          <li><kbd>F11</kbd> — waveform area fullscreen, like a browser. Hides WAAPI, channel names, the dB scale, the window frame, and the taskbar. Keeps tabs, the toolbar, and the overview (while tiled the top tab bar is already hidden). Analyzers, level meter, and status bar follow the Layout tab preset (by default analyzers are off and fullscreen Toggle starts on; the level meter is 1.5× only while layout fullscreen is on, same scale as F12). Works while tiled. <kbd>F11</kbd> again toggles. Stays in front only while this window is active (switching away restores the taskbar and does not keep covering other apps; see <a href="#layout-top">Always on Top</a>). Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
+          <li><kbd>F12</kbd> — fullscreen with only the title bar hidden. Tabs, toolbar, meters, WAAPI, channel names, and the dB scale stay (while tiled the top tab bar is already hidden). Spectrum, loudness, level meter, and vector scope are 1.5× only while layout fullscreen is on (on top of Windows display scaling and UI scale). Works while tiled. <kbd>F12</kbd> again toggles. Frontmost only while active, same as <kbd>F11</kbd>. Leaving the player keeps only selected audio files; video / PDF are not taken at all, including as audio-only.</li>
         </ul>
       </article>
 
@@ -612,6 +612,7 @@
           <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> also closes all tabs. Closing several tabs with two or more unsaved ones also offers “Save all and close” and “Close without saving any”.</li>
         </ul>
         <h4>Right-click</h4>
+        <p>Usually from the top tab bar. While tiled, the top tab bar is hidden — open the same menu from each tile’s file-name strip.</p>
         <ul>
           <li>“Close This Tab (S)”, “Close Other Tabs (O)”, “Close This and Tabs to the Right (R)”, “Close This and Tabs to the Left (L)”, “Close All Tabs (X)”</li>
           <li>“Rename File (N)” (<kbd>F2</kbd>, or double-click the file name on a tab / tile strip)</li>
@@ -656,16 +657,16 @@
           <li><kbd>Ctrl</kbd>+<kbd>V</kbd> applies the copied edit history to every selected tab at once. A dim overlay blocks the UI and shows an overall bar plus a bar per tab.</li>
         </ul>
         <h4>When the bar is full</h4>
-        <p>When tabs no longer fit, inactive tabs shrink first. Scroll arrows appear only if a title would fall below 6 characters.</p>
+        <p>When tabs no longer fit, inactive tabs shrink first. Scroll arrows appear only if a title would fall below 6 characters. (While tiled, the top tab bar is hidden — this section applies only in normal tab view.)</p>
       </article>
 
       <article class="part" id="layout-tile">
         <h3>Tiling</h3>
-        <p>Shows several tabs on one screen for comparison.</p>
+        <p>Shows several tabs on one screen for comparison. While tiled, the top tab bar is hidden; use each tile’s file-name strip to switch, open the tab menu, and multi-select.</p>
         <h4>Arrangement</h4>
         <ul>
           <li><kbd>Shift</kbd>+<kbd>T</kbd> cycles side by side → stacked → grid → off (editor only; ignored while the player is maximized; <kbd>Ctrl</kbd>+<kbd>T</kbd> is Trim). Arrangements that would look identical for the current file count, or would not fit the waveform area, are skipped. If side-by-side or stacked would not fit, grid is tried. If grid would not fit either, the shortcut does nothing.</li>
-          <li>You can also pick one directly from waveform right-click → Tabs, or from the tab right-click menu: “Keep Tabs (B)” / “Side by Side (1)” / “Stacked (2)” / “Grid (3)”. Two or more tabs. Arrangements that would not fit stay disabled. The check marks the current arrangement.</li>
+          <li>You can also pick one from waveform right-click → Tabs, or from the tab menu on the top tab bar (while tiled, each tile’s file-name strip): “Keep Tabs (B)” / “Side by Side (1)” / “Stacked (2)” / “Grid (3)”. Two or more tabs. Arrangements that would not fit stay disabled. The check marks the current arrangement.</li>
           <li>Tiling switches every tab to the analysis view of the current tab (waveform / spectrogram / overlay / loudness).</li>
           <li>Switching arrangements does not stop playback. Closing a tab while tiled removes its pane. When one tab remains, the view returns to normal.</li>
           <li>Shrinking the window until side-by-side or stacked no longer fits tries grid, then returns to tabs if grid would not fit either.</li>
@@ -679,7 +680,7 @@
           <li>Right-click the file-name strip for the same menu as a tab.</li>
         </ul>
         <h4>Search</h4>
-        <p>While tiled, <kbd>Ctrl</kbd>+<kbd>F</kbd> opens a tab-name search (also tab right-click, or waveform right-click → Tabs → Find Tabs). A search box appears in the center of the waveform area (it shows how to match all words or any word). The list updates as you type. Tiles that do not match are darkened and covered with a dim overlay.</p>
+        <p>While tiled, <kbd>Ctrl</kbd>+<kbd>F</kbd> opens a tab-name search (also right-click a tile’s file-name strip, or waveform right-click → Tabs → Find Tabs). A search box appears in the center of the waveform area (it shows how to match all words or any word). The list updates as you type. Tiles that do not match are darkened and covered with a dim overlay.</p>
         <ul>
           <li>Words separated by spaces must all match, and <code>|</code> means any group may match (for example <code>bgm loop|se</code> = contains both bgm and loop, or contains se; capital letters do not matter).</li>
           <li><kbd>Enter</kbd> confirms the condition and closes the box. The filter stays. <kbd>Ctrl</kbd>+<kbd>F</kbd> again reopens it with the same condition.</li>
@@ -1245,7 +1246,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd></td><td>Settings</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save (Wave or MP3; with several tabs selected, every selected file; files with a path are overwritten, untitled or AIFF files ask for a folder and write Wave)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save as (with several tabs selected, pick a folder, write each as Wave, and point the tabs at those files)</td></tr>
-          <tr><td><kbd>F2</kbd></td><td>Rename the file (double-clicking the file name on a tab / tile strip, tab right-click → Rename File (N), or waveform right-click → File → Rename File (F) does the same)</td></tr>
+          <tr><td><kbd>F2</kbd></td><td>Rename the file (double-clicking the file name on a tab / tile strip, tab bar or tile strip right-click → Rename File (N), or waveform right-click → File → Rename File (F) does the same)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate the file (opens in the next tab)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>Mixdown two or more selected tabs — choose where to save first, then the mixed Wave opens to the right of the selection (default name <code>Bounce.wav</code>; length is the longest tab; only when formats match; warns if any VST insert is active; if the sum exceeds ±1, cancel or lower the mix before writing; same key and menu gesture in the player; per-tab VST inserts are not applied)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Bounce Selected (bake inserts into the waveform and bypass those slots; asks Keep / Cut tails; Keep by default; Cancel aborts; if it cannot bounce, a dialog states why and stops; <strong>editor only</strong>; selected tabs, or the active tab; see <a href="#layout-vst">VST inserts</a>)</td></tr>
@@ -1258,7 +1259,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>PageUp</kbd> / numpad <kbd>4</kbd></td><td>Previous tab (same; numpad <kbd>4</kbd> is editor-only — previous track in the player)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all. A triple-click on the waveform does the same. Over the tab bar or a tile file-name strip, selects every tab. On the player list, selects every row (disabled during real video playback / bright PDF view and other chrome-hidden states)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Select every tab (regardless of the pointer position or tiling; while the tile search filter is active, only the tabs the search matched; also via waveform right-click → Tabs → “Select All Tabs (A)”. In player mode, selects every list row)</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Tab-name search (tile view; also from tab right-click, or waveform right-click → Tabs → Search Tabs; updates as you type; non-matching tiles are darkened under a dim overlay; narrowing makes the first matching waveform active; space-separated words = all must match, <code>|</code> = any may match; <kbd>Enter</kbd> confirms, <kbd>Alt</kbd>+<kbd>Enter</kbd> closes tiles that did not match (keeps unsaved; no prompt; clears the filter), <kbd>Esc</kbd> cancels, clear the text to remove the filter). In player mode, activates search in the focused library or playlist</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Tab-name search (tile view; also from a tile file-name strip right-click, or waveform right-click → Tabs → Find Tabs; updates as you type; non-matching tiles are darkened under a dim overlay; narrowing makes the first matching waveform active; space-separated words = all must match, <code>|</code> = any may match; <kbd>Enter</kbd> confirms, <kbd>Alt</kbd>+<kbd>Enter</kbd> closes tiles that did not match (keeps unsaved; no prompt; clears the filter), <kbd>Esc</kbd> cancels, clear the text to remove the filter). In player mode, activates search in the focused library or playlist</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td><td>Empty the search word and confirm = remove the search filter (only while a search word is set; runs silently without showing the box)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Cancel edit, menu, tile search (while its box has focus), scrub, tab selection, the waveform selection, then spectrogram / loudness view, in that order</td></tr>
         </tbody>
@@ -1311,8 +1312,8 @@
           <tr><td><kbd>F8</kbd></td><td>Video / PDF mini player (toggle; no playlist / toolbar chrome; <kbd>Escape</kbd> / <kbd>Q</kbd> return to the playlist; details under Per screen)</td></tr>
           <tr><td><kbd>F9</kbd></td><td>Shows only the playlist and waveform (from any mode; pressing <kbd>F9</kbd> again does not leave to the editor; Alt+Shift S / T / L / monitor still work while chrome is hidden, and Alt+Shift R / N / P while in the player; details under Per screen / <a href="#layout-player">Player mode</a>)</td></tr>
           <tr><td><kbd>F10</kbd></td><td>Player mode. Not fullscreen. Pressing <kbd>F10</kbd> again does not leave the player (re-applies chrome only). Return to the editor with <kbd>F11</kbd> / <kbd>F12</kbd>. Entering from the editor with unsaved files shows a dialog; you cannot switch until nothing remains unsaved (Save / Don’t Save / Cancel; see <a href="#layout-player">Player mode</a>). During video / PDF real playback or video frame pause, stays in the player, drops to the dim background preview, and restores front chrome = the playlist. Screen, playback, library, and jacket are under the same section.</td></tr>
-          <tr><td><kbd>F11</kbd></td><td>Fullscreen / toggle the waveform area (hides the taskbar, like a browser; also hides WAAPI, channel names, and the dB scale; keeps tabs, the toolbar, and the overview; meters and status bar follow the preset; 1.5× only while layout fullscreen is on; works while tiled; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
-          <tr><td><kbd>F12</kbd></td><td>Fullscreen / toggle with only the title bar hidden (tabs, toolbar, meters, WAAPI, channel names, and the dB scale stay; spectrum, loudness, level meter, and vector scope are 1.5× only while layout fullscreen is on, on top of Windows display scaling and UI scale; works while tiled; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
+          <tr><td><kbd>F11</kbd></td><td>Fullscreen / toggle the waveform area (hides the taskbar, like a browser; also hides WAAPI, channel names, and the dB scale; keeps tabs, the toolbar, and the overview — while tiled the top tab bar is already hidden; meters and status bar follow the preset; 1.5× only while layout fullscreen is on; works while tiled; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
+          <tr><td><kbd>F12</kbd></td><td>Fullscreen / toggle with only the title bar hidden (tabs, toolbar, meters, WAAPI, channel names, and the dB scale stay — while tiled the top tab bar is already hidden; spectrum, loudness, level meter, and vector scope are 1.5× only while layout fullscreen is on, on top of Windows display scaling and UI scale; works while tiled; frontmost only while active; leaving the player keeps only the selected audio files — video / PDF are not taken along)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>T</kbd></td><td>Cycle the tile arrangement (side by side → stacked → grid → off; identical-looking or too-cramped arrangements are skipped; if side-by-side or stacked would not fit, grid is tried; if grid would not fit either, it does nothing; two or more tabs; <strong>editor only</strong>; ignored while the player is maximized; not the same as <kbd>Ctrl</kbd>+<kbd>T</kbd> Trim)</td></tr>
           <tr><td><kbd>A</kbd></td><td>Switch spectrogram / overlay (from loudness, goes to spectrogram; not a three-way cycle)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>Return to the waveform (from any view)</td></tr>
@@ -1467,7 +1468,7 @@
           <tr><td>Menu key / <kbd>Shift</kbd>+<kbd>F10</kbd></td><td>Same menu as right-click (pointer position on the waveform, or the playhead; in the player, destructive edits are available from the playlist; destructive edit keys stay off; Mixdown <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> are the exceptions)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+click a tab / tile strip</td><td>Toggle that tab in the selection</td></tr>
           <tr><td><kbd>Shift</kbd>+click a tab / tile strip</td><td>Range-select tabs</td></tr>
-          <tr><td>Right-click a tab</td><td>
+          <tr><td>Right-click the tab bar / a tile file-name strip (while tiled, only the strip)</td><td>
             <ul>
               <li>Close this / others / right / left / all. Rename, copy file name / full path, duplicate, delete the file. Select all. Reopen. <span class="ui">Color</span> (a manual filename color; see <a href="#layout-filename-color">Filename colors</a>).</li>
               <li>Show all file times (table: copy / range copy / CSV / PDF; with multiple tabs selected, only the selected files). Copy selection time (also with full path).</li>

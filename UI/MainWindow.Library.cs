@@ -646,7 +646,7 @@ public partial class MainWindow
             ApplyLibraryWashChrome(true);
         }
         LibrarySplitter.Visibility = Visibility.Collapsed;
-        DocumentTabHost.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        SyncDocumentTabHostVisibility();
         LibraryRowDef.MinHeight = show ? DesignMetrics.LibraryPaneMinHeight : 0;
         LibraryRowDef.Height = show
             ? new GridLength(1, GridUnitType.Star)
