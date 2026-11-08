@@ -149,6 +149,13 @@ internal static class AcrylicPopup
         item.IsSubmenuOpen = true;
     }
 
+    /// <summary>
+    /// コンボのリスト面はメニュー用のほぼ透明（MenuPopupBackBrush）だと、
+    /// すりガラスが効かない／黒ティントだけが目立ち真っ黒に見える。
+    /// 閉じた枠と同系の PlayerComboDropFillBrush を塗り、角丸 Acrylic だけ載せる。
+    /// </summary>
+    private const string ComboDropBackBrushKey = "PlayerComboDropFillBrush";
+
     private static void OnComboDropDownOpened(object? sender, EventArgs e)
     {
         if (sender is not ComboBox combo)
@@ -162,7 +169,11 @@ internal static class AcrylicPopup
             return;
         }
 
-        FrostPopupSurface(popup, AcrylicBackdrop.TintBrushKey, roundCorners: true);
+        FrostPopupSurface(
+            popup,
+            AcrylicBackdrop.TintBrushKey,
+            roundCorners: true,
+            ComboDropBackBrushKey);
     }
 
     private static readonly ConditionalWeakTable<Popup, AttachOptions> AttachedOptions = new();

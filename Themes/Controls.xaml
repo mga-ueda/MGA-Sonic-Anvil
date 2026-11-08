@@ -292,13 +292,14 @@
                                AllowsTransparency="False"
                                Focusable="False"
                                PopupAnimation="Slide">
-                            <Border Background="{DynamicResource MenuPopupBackBrush}"
+                            <!-- コンボ一覧は MenuPopupBackBrush（ほぼ透明）だと真っ黒に見える。閉じた枠と同系の塗りを使う。 -->
+                            <Border Background="{DynamicResource PlayerComboDropFillBrush}"
                                     BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="{ui:ControlCorner}"
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <ScrollViewer Margin="0" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="0" Background="{DynamicResource PlayerComboDropFillBrush}" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -600,14 +601,14 @@
                                PopupAnimation="Slide">
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <Border Background="{DynamicResource MenuPopupBackBrush}"
+                                <Border Background="{DynamicResource PlayerComboDropFillBrush}"
                                         CornerRadius="{ui:ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="{ui:ControlCorner}"
                                         IsHitTestVisible="False" />
-                                <ScrollViewer Margin="1" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="1" Background="{DynamicResource PlayerComboDropFillBrush}" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -754,14 +755,14 @@
                                PopupAnimation="Slide">
                             <Grid MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <Border Background="{DynamicResource MenuPopupBackBrush}"
+                                <Border Background="{DynamicResource PlayerComboDropFillBrush}"
                                         CornerRadius="{ui:ControlCorner}"
                                         IsHitTestVisible="False" />
                                 <Border BorderBrush="{DynamicResource PlayerComboDropBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="{ui:ControlCorner}"
                                         IsHitTestVisible="False" />
-                                <ScrollViewer Margin="1" Background="{DynamicResource MenuPopupBackBrush}" SnapsToDevicePixels="True"
+                                <ScrollViewer Margin="1" Background="{DynamicResource PlayerComboDropFillBrush}" SnapsToDevicePixels="True"
                                               HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                               VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
