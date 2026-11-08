@@ -8544,7 +8544,8 @@ internal sealed partial class WaveformView : Grid
             DrawSeekPlaybackTrailReverse(dc, bounds, playX, start, span, _reverseTrailSamples, Theme.Get("PlayheadBrush"));
             DrawCrossfadeFadePlaybackProgress(dc, bounds, start, span);
             EnsurePlayheadPens();
-            var y0 = wave.Y;
+            // タイムレーン上端から波形下端へ（wave.Y 始まりは動画上で下寄りに見える）。
+            var y0 = 0;
             var y1 = wave.Y + wave.Height;
             if (_exitPlayheadFrame >= 0)
             {
@@ -8864,8 +8865,8 @@ internal sealed partial class WaveformView : Grid
 
     private void SyncMouseGuideHeight()
     {
-        var top = Math.Min(ChromeTopHeight, Math.Max(0, ActualHeight));
-        var margin = new Thickness(0, top, 0, 0);
+        // 再生ヘッドと同じく上端から（ChromeTop 余白だと動画上で下寄り）。
+        var margin = new Thickness(0);
         if (_mouseGuideBar.Margin != margin)
         {
             _mouseGuideBar.Margin = margin;
