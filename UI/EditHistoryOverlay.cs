@@ -159,15 +159,16 @@ internal sealed class EditHistoryOverlay : Border
             var selected = item.Index == selectedIndex;
             var future = item.Index > selectedIndex;
             var copying = copySelected is not null && copySelected.Contains(item.Index);
-            var row = new Border
+            // ハイライト帯の角丸はメニュー／コンボと同じ ControlCorner。
+            // 左 BorderThickness は背景を内側へずらすので使わず、コピー印は重ねる。
+            var row = DesignMetrics.BindCorner(new Border
             {
                 Tag = item.Index,
-                Padding = new Thickness(8, 4, 10, 4),
+                Padding = new Thickness(8, 4, 8, 4),
+                Margin = new Thickness(4, 0, 4, 0),
                 Background = selected ? selectedBack : Brushes.Transparent,
-                BorderThickness = new Thickness(2, 0, 0, 0),
-                BorderBrush = copying ? copyMark : Brushes.Transparent,
                 Cursor = Cursors.Hand,
-            };
+            });
             var label = new TextBlock
             {
                 Text = item.Title,
@@ -179,7 +180,25 @@ internal sealed class EditHistoryOverlay : Border
                     ? copyMark
                     : selected ? selectedFore : future ? futureFore : idleFore,
             };
-            row.Child = label;
+            if (copying)
+            {
+                var body = new Grid();
+                body.Children.Add(new Border
+                {
+                    Width = 2,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(0, 2, 0, 2),
+                    CornerRadius = new CornerRadius(1),
+                    Background = copyMark,
+                    IsHitTestVisible = false,
+                });
+                body.Children.Add(label);
+                row.Child = body;
+            }
+            else
+            {
+                row.Child = label;
+            }
             row.MouseLeftButtonUp += (_, e) =>
             {
                 e.Handled = true;
