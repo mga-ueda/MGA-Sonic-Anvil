@@ -1590,21 +1590,29 @@ public partial class MainWindow
         }
     }
 
-    private void ForgetVstInserts(DocumentSession session)
+    /// <param name="clearChain">
+    /// true: チェーンを空にする（完全に捨てるとき）。
+    /// false: メタ／state はセッションに残す（閉じたタブの復元用）。
+    /// </param>
+    private void ForgetVstInserts(DocumentSession session, bool clearChain = true)
     {
         // アンロード前にパラメータを永続スロットへ保存（次に別波形を開いたとき再現する）。
         _player.VstInserts.CaptureStatesInto(session.VstInserts);
         FlushPersistedInsertParameters(session.VstInserts);
         CloseAllVstEditors(resumeAudioOnClose: false);
-        session.VstInserts.Clear();
+        if (clearChain)
+        {
+            session.VstInserts.Clear();
+        }
+
         _player.VstInserts.Forget(session);
     }
 
-    private void ForgetVstInserts(IEnumerable<DocumentSession> sessions)
+    private void ForgetVstInserts(IEnumerable<DocumentSession> sessions, bool clearChain = true)
     {
         foreach (var session in sessions)
         {
-            ForgetVstInserts(session);
+            ForgetVstInserts(session, clearChain);
         }
     }
 
