@@ -23,9 +23,6 @@ internal static class MenuGestures
     public const string SelectSameColor = "Shift+C";
     /// <summary>センターロック（再生ヘッド中央寄せではない）。</summary>
     public const string CenterLock = "Z / Num.";
-
-    /// <summary>旧名。表示は <see cref="CenterLock"/> と同じ。</summary>
-    public const string CenterPlayhead = CenterLock;
     public const string VideoZoomIn = "+ / Num+";
     public const string VideoZoomOut = "- / Num-";
     public const string ExitRealPlayback = "Q / Esc";

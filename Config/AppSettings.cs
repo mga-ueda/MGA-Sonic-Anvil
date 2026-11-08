@@ -977,30 +977,6 @@ internal sealed class AppSettings
     public static double ClampWallpaperOpacity(double opacity) =>
         double.IsFinite(opacity) ? Math.Clamp(opacity, 0, 1) : WallpaperOpacityDefault;
 
-    public static bool TryParseWallpaperOpacityPercent(string? text, out double opacity)
-    {
-        opacity = WallpaperOpacityDefault;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return false;
-        }
-
-        var trimmed = text.Trim().TrimEnd('%').Trim();
-        if (!double.TryParse(trimmed, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent)
-            && !double.TryParse(trimmed, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.CurrentCulture, out percent))
-        {
-            return false;
-        }
-
-        if (!double.IsFinite(percent) || percent is < 0 or > 100)
-        {
-            return false;
-        }
-
-        opacity = percent / 100d;
-        return true;
-    }
-
     public static string FormatWallpaperOpacityPercent(double opacity) =>
         Math.Round(ClampWallpaperOpacity(opacity) * 100d).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
 

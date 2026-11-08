@@ -62,9 +62,6 @@ public sealed class AppSettingsFileTests
         Assert.Equal(string.Empty, settings.ResolvedWallpaperPath());
         Assert.Equal(0.20, settings.ResolvedWallpaperOpacity());
         Assert.Equal("20", AppSettings.FormatWallpaperOpacityPercent(settings.WallpaperOpacity));
-        Assert.True(AppSettings.TryParseWallpaperOpacityPercent("20", out var opacity));
-        Assert.Equal(0.20, opacity);
-        Assert.False(AppSettings.TryParseWallpaperOpacityPercent("101", out _));
         Assert.Equal(1, AppSettings.ClampWallpaperOpacity(2));
         Assert.Equal(21, AppSettings.NudgeWallpaperOpacityPercent(20, 1));
         Assert.Equal(19, AppSettings.NudgeWallpaperOpacityPercent(20, -1));
