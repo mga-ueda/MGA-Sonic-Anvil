@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
@@ -15,6 +16,14 @@ public partial class MainWindow
     private readonly List<HistoryRecipeClipboardItem> _historyRecipeClipboard = [];
     private readonly HashSet<int> _historyCopySelection = [];
 
+    /// <summary>ビッグタイムコード／編集履歴／VST ラックの論理表示。初回 Sync までは null。</summary>
+    private bool? _editorChromeShown;
+
+    /// <summary>直前 Sync 時にプレイヤーだったか。復帰時はメーター同様即出し。</summary>
+    private bool _editorChromeWasPlayer;
+
+    /// <summary>フェードアウト後の Collapse を世代で無効化する。</summary>
+    private int _editorChromeFadeTicket;
     /// <summary>
     /// 直近のコピーが履歴レシピかどうか。true の間はメインウィンドウの
     /// Ctrl+V が（履歴ウィンドウを開かなくても）レシピ適用になる。
@@ -234,9 +243,15 @@ public partial class MainWindow
 
     private void RefreshHistoryStrip()
     {
+        RefreshHistoryStripItems();
+        SyncEditorChromeFade();
+    }
+
+    private void RefreshHistoryStripItems()
+    {
         if (_document is null)
         {
-            HistoryStrip.SetItems([], 0);
+            // フェードアウト中は題を残し、Collapse 完了時に空にする。
             return;
         }
 
@@ -244,6 +259,190 @@ public partial class MainWindow
         var current = HistoryOpen ? _historySelectedIndex : _history.CurrentIndex;
         HistoryStrip.SetItems(items, current);
     }
+
+    /// <summary>
+    /// ビッグタイムコード／編集履歴／VST ラック。
+    /// エディタで波形があるときだけ。出し入れはメーターと同じ 1 秒フェード
+    /// （再生中のインとプレイヤー復帰は即）。アウト後に Collapse して列幅を返す。
+    /// </summary>
+    private void SyncHistoryStripVisibility() => SyncEditorChromeFade();
+
+    private void SyncEditorChromeFade()
+    {
+        var player = IsLibraryMaximized;
+        var show = !player
+            && !_videoLaunchPlacement
+            && _document is not null
+            && TransportChromeHost.Visibility == Visibility.Visible;
+        var showTimecode = show && PlayerWaveformSlot.Visibility != Visibility.Visible;
+        var showVst = show && IsVstInsertUiEnabled();
+
+        if (!show)
+        {
+            CloseEditHistory(commit: true);
+        }
+
+        var leavingPlayer = !player && _editorChromeWasPlayer;
+        _editorChromeWasPlayer = player;
+
+        var first = _editorChromeShown is null;
+        var instantReveal = LibraryPlayerMode.InstantPlayerMeterReveal(show, IsPlaybackActive());
+        var wantInstant = first
+            || leavingPlayer
+            || LibraryPlayerMode.InstantPlayerMeterFade(show, instantReveal);
+
+        if (_editorChromeShown == show)
+        {
+            // フェードアウト中／非表示中に SyncVstInsertEngine などから再入すると、
+            // VST を instant Collapse してメーター系だけ残る。触らない。
+            if (!show)
+            {
+                return;
+            }
+
+            RefreshHistoryStripItems();
+            BindVstInsertRackSession(showVst);
+
+            if (wantInstant && EditorChromeNeedsOpaqueSnap(show, showTimecode, showVst))
+            {
+                ApplyEditorChromeFade(show, showTimecode, showVst, instant: true);
+                return;
+            }
+
+            // ドック切替や VST 有効化など、論理表示は同じで子だけ変わる場合。
+            ApplyEditorChromeTarget(HistoryStrip, show, instant: false);
+            ApplyEditorChromeTarget(EditorPositionTimecodeHost, showTimecode, instant: false);
+            ApplyEditorChromeTarget(VstInsertRack, showVst, instant: false);
+            return;
+        }
+
+        ApplyEditorChromeFade(show, showTimecode, showVst, wantInstant);
+        _editorChromeShown = show;
+    }
+
+    private bool EditorChromeNeedsOpaqueSnap(bool show, bool showTimecode, bool showVst)
+    {
+        if (!show)
+        {
+            return false;
+        }
+
+        if (LibraryPlayerMode.NeedsInstantOpaqueSnap(HistoryStrip))
+        {
+            return true;
+        }
+
+        if (showTimecode && LibraryPlayerMode.NeedsInstantOpaqueSnap(EditorPositionTimecodeHost))
+        {
+            return true;
+        }
+
+        return showVst && LibraryPlayerMode.NeedsInstantOpaqueSnap(VstInsertRack);
+    }
+
+    private void ApplyEditorChromeFade(bool show, bool showTimecode, bool showVst, bool instant)
+    {
+        var ticket = ++_editorChromeFadeTicket;
+        if (show)
+        {
+            RefreshHistoryStripItems();
+        }
+
+        ApplyEditorChromeTarget(HistoryStrip, show, instant);
+        ApplyEditorChromeTarget(EditorPositionTimecodeHost, showTimecode, instant);
+
+        if (IsVstInsertUiEnabled())
+        {
+            if (showVst)
+            {
+                BindVstInsertRackSession(true);
+            }
+
+            ApplyEditorChromeTarget(VstInsertRack, showVst, instant);
+            if (!showVst && instant)
+            {
+                BindVstInsertRackSession(false);
+            }
+        }
+        else
+        {
+            ApplyEditorChromeTarget(VstInsertRack, visible: false, instant: true);
+            BindVstInsertRackSession(false);
+        }
+
+        if (!show)
+        {
+            if (instant)
+            {
+                FinishEditorChromeCollapse(ticket);
+            }
+            else
+            {
+                ScheduleEditorChromeCollapse(ticket);
+            }
+        }
+    }
+
+    private static void ApplyEditorChromeTarget(UIElement target, bool visible, bool instant)
+    {
+        if (visible)
+        {
+            if (target.Visibility != Visibility.Visible)
+            {
+                target.BeginAnimation(UIElement.OpacityProperty, null);
+                target.Opacity = 0;
+                target.Visibility = Visibility.Visible;
+            }
+
+            LibraryPlayerMode.FadeElementOpacity(target, 1, instant, hitTestVisible: true);
+            return;
+        }
+
+        LibraryPlayerMode.FadeElementOpacity(target, 0, instant, hitTestVisible: false);
+        if (instant)
+        {
+            target.BeginAnimation(UIElement.OpacityProperty, null);
+            target.Opacity = 0;
+            target.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void ScheduleEditorChromeCollapse(int ticket)
+    {
+        var timer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(LibraryPlayerMode.MeterFadeSeconds + 0.05),
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            FinishEditorChromeCollapse(ticket);
+        };
+        timer.Start();
+    }
+
+    private void FinishEditorChromeCollapse(int ticket)
+    {
+        if (ticket != _editorChromeFadeTicket || _editorChromeShown == true)
+        {
+            return;
+        }
+
+        foreach (var target in EditorChromeFadeTargets())
+        {
+            target.BeginAnimation(UIElement.OpacityProperty, null);
+            target.Opacity = 0;
+            target.Visibility = Visibility.Collapsed;
+            target.IsHitTestVisible = false;
+        }
+
+        HistoryStrip.SetItems([], 0);
+        EditorPositionTimecode.Clear();
+        BindVstInsertRackSession(false);
+    }
+
+    private UIElement[] EditorChromeFadeTargets() =>
+        [HistoryStrip, EditorPositionTimecodeHost, VstInsertRack];
 
     private void HistoryStrip_OpenRequested(object sender, EventArgs e)
     {

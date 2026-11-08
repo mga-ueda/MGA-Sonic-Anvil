@@ -197,7 +197,9 @@ internal sealed class AcrylicGlassPopup
     }
 
     /// <summary>
-    /// Popup 既定の TOPMOST を外す（タイムコードは常時表示なので必須。トーストも揃える）。
+    /// Popup の Z 順をホストに合わせる。
+    /// 通常は TOPMOST を外して他アプリの手前に残さない。
+    /// ホストが全画面 Topmost のときは同じ帯に残し、背面へ回らないようにする。
     /// </summary>
     private void ApplyWindowChrome()
     {
@@ -208,7 +210,17 @@ internal sealed class AcrylicGlassPopup
             return;
         }
 
-        AcrylicBackdrop.ClearPopupTopmost(source.Handle);
+        var ownerTopmost = _popup.PlacementTarget is DependencyObject target
+            && Window.GetWindow(target) is { Topmost: true };
+
+        if (ownerTopmost)
+        {
+            AcrylicBackdrop.EnsurePopupTopmost(source.Handle);
+        }
+        else
+        {
+            AcrylicBackdrop.ClearPopupTopmost(source.Handle);
+        }
     }
 
     private static void Track(AcrylicGlassPopup popup)

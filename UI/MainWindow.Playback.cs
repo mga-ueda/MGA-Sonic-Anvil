@@ -2491,8 +2491,13 @@ public partial class MainWindow
             && !forceReapply
             && preset.ResolvedFullscreenMode() != LayoutFullscreenMode.Toggle)
         {
-            // 固定 On/Off の再押下は見た目を変えず再適用のみ。
+            // 固定 On/Off の再押下は見た目を変えず再適用のみ。モード名トーストは出す。
             ApplyWaveformMaximizeChrome();
+            if (fromUserShortcut)
+            {
+                ShowLayoutModeToast(slot);
+            }
+
             return;
         }
 
@@ -2528,6 +2533,7 @@ public partial class MainWindow
                 userShortcut: fromUserShortcut);
         }
 
+        var wasLibrary = IsLibraryMaximized;
         var wasFullscreen = IsWaveformMaximized;
         // 全画面オン同士は枠を一度も外さず、中身だけ差し替える。
         var stayFullscreen = wasFullscreen && nextFullscreen;
@@ -2596,7 +2602,18 @@ public partial class MainWindow
 
             if (fromUserShortcut)
             {
-                ShowLayoutModeToast(slot);
+                // プレイヤー→エディタは Leave の初回 Loaded 後に出す（F11 窓復元と競合しない）。
+                if (wasLibrary
+                    && !IsLibraryMaximized
+                    && !WindowLayoutPreset.IsPlayerLayoutSlot(slot))
+                {
+                    _pendingLayoutModeToastSlot = slot;
+                }
+                else if (!(wasLibrary && IsLibraryMaximized))
+                {
+                    _pendingLayoutModeToastSlot = null;
+                    ShowLayoutModeToast(slot);
+                }
             }
         }
         finally
@@ -2611,6 +2628,17 @@ public partial class MainWindow
     /// <summary>モード名トーストの世代。Leave 開始時の値より進んだら「この復帰用」とみなす。</summary>
     private int _layoutModeToastEpoch;
 
+    private void FlushPendingLayoutModeToast()
+    {
+        if (_pendingLayoutModeToastSlot is not { } slot)
+        {
+            return;
+        }
+
+        _pendingLayoutModeToastSlot = null;
+        ShowLayoutModeToast(slot);
+    }
+
     private void ShowLayoutModeToast(WindowLayoutSlot slot)
     {
         if (!IsLoaded)
@@ -2624,7 +2652,9 @@ public partial class MainWindow
         _layoutModeToastUntilUtc = DateTime.UtcNow
             + LibraryExplorerTypeahead.ToastIdleClear
             + TimeSpan.FromSeconds(LibraryPlayerMode.ChromeFadeSeconds);
+        PlaybackScene.UpdateLayout();
         ShowCenterStatusToast(FormatLayoutModeToast(slot, fullscreenMode, _layoutFullscreenOn));
+        _centerStatusToast.RefreshPlacementAfterLayout();
     }
 
     /// <summary>
@@ -2952,6 +2982,9 @@ public partial class MainWindow
         {
             Topmost = want;
         }
+
+        // ホストが Topmost 帯に入ったあと、開いている Acrylic トーストも直上へ戻す。
+        AcrylicGlassPopup.RefreshOpenCornerClips();
 
         // フルスクリーン／常に最前面でホストが Topmost 帯に入ったあと、
         // Owner 無しの VST エディタが同じ帯の背後へ回らないよう押し上げる。
@@ -3791,8 +3824,7 @@ public partial class MainWindow
         MeterColumn.Visibility = Visibility.Visible;
         MeterColumnSplitter.Visibility = Visibility.Collapsed;
         DocumentTabHost.Visibility = Visibility.Collapsed;
-        HistoryStrip.Visibility = Visibility.Collapsed;
-        SyncEditorPositionTimecodeVisibility();
+        SyncHistoryStripVisibility();
         TransportToolbarHost.Visibility = Visibility.Collapsed;
         MeterColumn.ClipToBounds = false;
         TransportChromeHost.ClipToBounds = false;
@@ -3834,12 +3866,7 @@ public partial class MainWindow
                 DocumentTabHost.Visibility = Visibility.Visible;
             }
 
-            if (HistoryStrip.Visibility != Visibility.Visible)
-            {
-                HistoryStrip.Visibility = Visibility.Visible;
-            }
-
-            SyncEditorPositionTimecodeVisibility();
+            SyncHistoryStripVisibility();
         }
 
         ApplyTransportToolbarVisibility();

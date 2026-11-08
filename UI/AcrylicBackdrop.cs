@@ -45,6 +45,7 @@ internal static class AcrylicBackdrop
     private const int DwmwcpDonotround = 1;
     private const int DwmwcpRound = 2;
     private const int DwmwcpRoundsmall = 3;
+    private static readonly IntPtr HwndTopmost = new(-1);
     private static readonly IntPtr HwndNotopmost = new(-2);
     private const uint SwpNomove = 0x0002;
     private const uint SwpNosize = 0x0001;
@@ -338,7 +339,8 @@ internal static class AcrylicBackdrop
 
     /// <summary>
     /// WPF Popup 既定の WS_EX_TOPMOST を外し、他アプリの手前に残らないようにする。
-    /// オーナー窓の上には所有関係で留まる。
+    /// オーナーが Topmost（全画面シェル等）のときは
+    /// <see cref="RaisePopupAboveOwner"/> でホスト直上へ戻すこと。
     /// </summary>
     public static void ClearPopupTopmost(IntPtr hwnd)
     {
@@ -358,6 +360,42 @@ internal static class AcrylicBackdrop
             _ = SetWindowPos(
                 hwnd,
                 HwndNotopmost,
+                0,
+                0,
+                0,
+                0,
+                SwpNomove | SwpNosize | SwpNoactivate | SwpNoownerzorder);
+        }
+        catch (Exception ex) when (
+            ex is ExternalException
+                or InvalidOperationException
+                or NotSupportedException)
+        {
+        }
+    }
+
+    /// <summary>
+    /// ホストが Topmost 帯にいるとき、Popup も同じ帯へ戻す。
+    /// 非 TOPMOST のままでは Topmost ホストの手前に出せない。
+    /// </summary>
+    public static void EnsurePopupTopmost(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        try
+        {
+            var exStyle = GetWindowLongPtr(hwnd, GwlExStyle).ToInt64();
+            if ((exStyle & WsExTopmost) == 0)
+            {
+                _ = SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(exStyle | WsExTopmost));
+            }
+
+            _ = SetWindowPos(
+                hwnd,
+                HwndTopmost,
                 0,
                 0,
                 0,

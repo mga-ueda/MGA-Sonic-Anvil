@@ -407,20 +407,34 @@ public partial class MainWindow
         }
     }
 
-    private void SyncVstInsertRackUi()
+    private void SyncVstInsertRackUi() => SyncEditorChromeFade();
+
+    /// <summary>
+    /// VST ラックのセッション紐づけ。表示フェードは <see cref="SyncEditorChromeFade"/> 側。
+    /// フェードアウト中は見た目を残すため、Collapse 完了まで null にしない。
+    /// </summary>
+    private void BindVstInsertRackSession(bool show)
     {
         if (!IsVstInsertUiEnabled())
         {
-            VstInsertRack.Visibility = Visibility.Collapsed;
+            VstInsertRack.SetSession(
+                null,
+                OnVstInsertChainChanged,
+                OnVstInsertOpenEditorRequested,
+                OnVstInsertAssignRequested,
+                OnVstInsertMoveRequested,
+                () => _player.VstInserts.CaptureAppliedStates(),
+                () => _sessions.Count > 1,
+                SyncPersistedVstInsertsAcrossTabs,
+                ClearMatchingVstInsertSlotAcrossTabs,
+                ConfirmPersistReplacingOtherTabs,
+                PasteVstInsertSettingsToAllTabs,
+                ConfirmPasteReplacingSlot,
+                ConfirmVstInsertPresetOverwrite,
+                ApplyVstInsertPresetChain);
             return;
         }
 
-        var show = !IsLibraryMaximized
-            && TransportChromeHost.Visibility == Visibility.Visible
-            && _activeSession is not null;
-        VstInsertRack.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        VstInsertRack.IsHitTestVisible = show;
-        VstInsertRack.Opacity = show ? 1 : 0;
         VstInsertRack.SetSession(
             show ? _activeSession : null,
             OnVstInsertChainChanged,

@@ -98,6 +98,12 @@ public partial class MainWindow
     /// Leave 開始時点のモード名トースト世代。これより進んだら「この復帰のトースト」。
     /// </summary>
     private int _editorEnterToastEpochBaseline;
+
+    /// <summary>
+    /// プレイヤー離脱後に出すモード名トースト。ApplyLayoutPreset が予約し、Leave の初回レイアウト後に出す。
+    /// </summary>
+    private WindowLayoutSlot? _pendingLayoutModeToastSlot;
+
     private int _editorEnterBackgroundTicket;
     private CancellationTokenSource _libraryPeakCts = new();
     private int _libraryFolderShowGeneration;
@@ -666,12 +672,7 @@ public partial class MainWindow
         SyncPlayerScratchEnabled();
         SyncPlaylistVideoChromeFade();
         TimeScrollStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
-        HistoryStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
-        SyncEditorPositionTimecodeVisibility();
-        if (show)
-        {
-            CloseEditHistory(commit: true);
-        }
+        SyncHistoryStripVisibility();
 
         RefreshTransportCommandsEnabled();
         ApplyLibraryWaapi(show);
@@ -2897,11 +2898,15 @@ public partial class MainWindow
         try
         {
             // レイアウトと波形の初回描画を、フルデコードより先に通す。
+            // この Loaded より前に ApplyLayoutPreset が窓位置まで終え、pending トーストを予約する。
             await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Loaded);
             if (IsLibraryMaximized)
             {
                 return;
             }
+
+            // F11 非全画面など、窓復元後の寸法が効いてからモード名を出す。
+            FlushPendingLayoutModeToast();
 
             // 音が出るために必要なアクティブだけ先にフル PCM へ。
             if (active is not null
@@ -2944,6 +2949,7 @@ public partial class MainWindow
             // エディタ復帰は後追い側で、モード名トースト後に解除する。
             if (IsLibraryMaximized)
             {
+                _pendingLayoutModeToastSlot = null;
                 _deferVstInsertSyncForEditorEnter = false;
             }
         }
@@ -3047,10 +3053,11 @@ public partial class MainWindow
     private async Task WaitForLayoutModeToastToSettleAsync()
     {
         var needEpoch = _editorEnterToastEpochBaseline + 1;
-        var appearDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(1.5);
+        var appearDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(2.5);
 
-        // 1) この復帰用の ShowLayoutModeToast を待つ。来なければトースト無しで進む。
-        while (_layoutModeToastEpoch < needEpoch && DateTime.UtcNow < appearDeadline)
+        // 1) pending 予約またはこの復帰用 ShowLayoutModeToast を待つ。来なければトースト無しで進む。
+        while (DateTime.UtcNow < appearDeadline
+            && (_pendingLayoutModeToastSlot is not null || _layoutModeToastEpoch < needEpoch))
         {
             if (IsLibraryMaximized)
             {
@@ -3086,8 +3093,10 @@ public partial class MainWindow
         var endAt = _layoutModeToastUntilUtc.Value;
         var hardDeadline = endAt + TimeSpan.FromSeconds(1.0);
         var sawOpen = _centerStatusToast.IsOpen;
+        var openDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(1.0);
 
         // 3) 開いているあいだは進まない。再表示で期限が延びたら追従する。
+        // 世代が進んでから IsOpen になるまで短く待ち、未表示のまま期限切れですりガラスへ進まない。
         while (DateTime.UtcNow < hardDeadline)
         {
             if (IsLibraryMaximized)
@@ -3111,9 +3120,18 @@ public partial class MainWindow
                 break;
             }
 
-            if (!sawOpen && !_centerStatusToast.IsOpen && DateTime.UtcNow >= endAt)
+            if (!sawOpen && !_centerStatusToast.IsOpen)
             {
-                break;
+                if (DateTime.UtcNow < openDeadline)
+                {
+                    await Task.Delay(16).ConfigureAwait(true);
+                    continue;
+                }
+
+                if (DateTime.UtcNow >= endAt)
+                {
+                    break;
+                }
             }
 
             await Task.Delay(16).ConfigureAwait(true);

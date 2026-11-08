@@ -95,6 +95,9 @@ internal sealed class AcrylicToastHost
 
     public void SetOverlayScale(double scale) => _glass.SetOverlayScale(scale);
 
+    /// <summary>開いているとき、PlacementTarget のレイアウト後に位置をやり直す。</summary>
+    public void RefreshPlacementAfterLayout() => _glass.RefreshPlacementAfterLayout();
+
     /// <summary>表示して <paramref name="hold"/> 後に疑似フェードして閉じる。</summary>
     public void Show(string text, TimeSpan hold)
     {

@@ -1153,7 +1153,12 @@ public partial class MainWindow : Window
         {
             // 遅延 ViewChanged が古い PlayheadFrame を sampleRate=0 で載せないよう、常に空表示へ戻す。
             StatusTimes.SetState(0, WaveSelection.Empty, 0, 0, hasDocument: false);
-            EditorPositionTimecode.Clear();
+            // ビッグタイムコードはフェードアウト中も数字を残し、Collapse 完了時に消す。
+            if (EditorPositionTimecodeHost.Visibility != Visibility.Visible)
+            {
+                EditorPositionTimecode.Clear();
+            }
+
             PlaylistVideoNowEndText.Text = "00:00.00 / 00:00.00";
             PlaylistVideoSelText.Visibility = Visibility.Collapsed;
             return;
@@ -1205,18 +1210,7 @@ public partial class MainWindow : Window
         EditorPositionTimecode.SetDisplay("00:00.000");
     }
 
-    private void SyncEditorPositionTimecodeVisibility()
-    {
-        var show = !IsLibraryMaximized
-            && HistoryStrip.Visibility == Visibility.Visible
-            && PlayerWaveformSlot.Visibility != Visibility.Visible
-            && TransportChromeHost.Visibility == Visibility.Visible;
-        var next = show ? Visibility.Visible : Visibility.Collapsed;
-        if (EditorPositionTimecodeHost.Visibility != next)
-        {
-            EditorPositionTimecodeHost.Visibility = next;
-        }
-    }
+    private void SyncEditorPositionTimecodeVisibility() => SyncEditorChromeFade();
 
     private void RefreshPlaylistVideoTimecode(
         long nowFrame,
