@@ -3724,9 +3724,13 @@ public partial class MainWindow
             if (!session.Document.IsDeferredLoad)
             {
                 RememberClosedTab(session, i);
+                ForgetVstInserts(session, clearChain: false);
+            }
+            else
+            {
+                ForgetVstInserts(session);
             }
 
-            ForgetVstInserts(session);
             _sessions.RemoveAt(i);
         }
     }

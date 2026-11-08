@@ -184,9 +184,14 @@ public partial class MainWindow
         if (rememberClosed)
         {
             RememberClosedTab(session, index);
+            // 復元用にチェーンは残し、エンジン実体だけ外す。
+            ForgetVstInserts(session, clearChain: false);
+        }
+        else
+        {
+            ForgetVstInserts(session);
         }
 
-        ForgetVstInserts(session);
         _sessions.RemoveAt(index);
         if (_sessions.Count == 0)
         {
@@ -235,8 +240,12 @@ public partial class MainWindow
         }
 
         var index = Math.Clamp(closed.Index, 0, _sessions.Count);
-        // 閉じるときに ForgetVstInserts で空になっているので、永続インサートを載せ直す。
-        ApplyDefaultVstInserts(session);
+        // 閉じたときのチェーンが空なら（古い経路）、永続インサートだけ載せ直す。
+        if (!DocumentSessionStore.ChainHasAnyPlugin(session.VstInserts))
+        {
+            ApplyDefaultVstInserts(session);
+        }
+
         _sessions.Insert(index, session);
         ActivateSession(session);
         // ファイルが 1 つに減ってタイルが解除されていても、複数に戻ったら
