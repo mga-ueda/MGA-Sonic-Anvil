@@ -277,6 +277,12 @@ internal static class DesignMetrics
 
     public static double StatusTimecodeFontSize => From96(13);
 
+    /// <summary>エディタ下段左の現在位置タイムコード。Viewbox が帯の高さへ縮尺する基準サイズ。</summary>
+    public static double EditorPositionTimecodeFontSize => From96(72);
+
+    /// <summary>左空き領域のうちタイムコードが使う幅の割合（残りは余白）。</summary>
+    public const double EditorPositionTimecodeWidthRatio = 0.75;
+
     /// <summary>動画再生中、上中央に出す時刻。2 行分の枠を先に確保し、選択行は下へ伸ばす。</summary>
     public static double PlaylistVideoTimecodeFontSize => From96(32);
 

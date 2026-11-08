@@ -317,6 +317,9 @@ public partial class MainWindow : Window
             return (SelectionClipboardText.CanCopy(items), HasTabSelection);
         };
         StatusTimes.CopySelectionTimeRequested += (_, pathKind) => CopySelectionTimes(pathKind);
+        StatusTimes.ShowSamplesChanged += (_, _) => SyncTransportPosition();
+        ApplyEditorPositionTimecodeWidth();
+        BindEditorPositionTimecodeMenu();
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
         HookWaveformEvents(PrimaryWaveform);
         HookCrossfadePanel();
@@ -1150,22 +1153,73 @@ public partial class MainWindow : Window
         {
             // 遅延 ViewChanged が古い PlayheadFrame を sampleRate=0 で載せないよう、常に空表示へ戻す。
             StatusTimes.SetState(0, WaveSelection.Empty, 0, 0, hasDocument: false);
+            EditorPositionTimecode.Clear();
             PlaylistVideoNowEndText.Text = "00:00.00 / 00:00.00";
             PlaylistVideoSelText.Visibility = Visibility.Collapsed;
             return;
         }
 
+        var now = frame ?? Waveform.PlayheadFrame;
         StatusTimes.SetState(
-            frame ?? Waveform.PlayheadFrame,
+            now,
             _document.Selection,
             _document.FrameCount,
             _document.SampleRate,
             hasDocument: true);
+        WriteEditorPositionTimecode(
+            UiStrings.FormatStatusTime(now, _document.SampleRate, StatusTimes.ShowSamples));
         RefreshPlaylistVideoTimecode(
-            frame ?? Waveform.PlayheadFrame,
+            now,
             _document.Selection,
             _document.FrameCount,
             _document.SampleRate);
+    }
+
+    private void WriteEditorPositionTimecode(string text) =>
+        EditorPositionTimecode.SetDisplay(text);
+
+
+    private void ApplyEditorPositionTimecodeWidth()
+    {
+        var ratio = DesignMetrics.EditorPositionTimecodeWidthRatio;
+        var side = Math.Max(0, (1d - ratio) * 0.5);
+        EditorPositionSlot.ColumnDefinitions[0].Width = new GridLength(side, GridUnitType.Star);
+        EditorPositionSlot.ColumnDefinitions[1].Width = new GridLength(ratio, GridUnitType.Star);
+        EditorPositionSlot.ColumnDefinitions[2].Width = new GridLength(side, GridUnitType.Star);
+    }
+
+    private void BindEditorPositionTimecodeMenu()
+    {
+        var menu = new ContextMenu();
+        var timeItem = new MenuItem { IsCheckable = true };
+        var sampleItem = new MenuItem { IsCheckable = true };
+        timeItem.Click += (_, _) => StatusTimes.SetShowSamples(false);
+        sampleItem.Click += (_, _) => StatusTimes.SetShowSamples(true);
+        menu.Items.Add(timeItem);
+        menu.Items.Add(sampleItem);
+        menu.Opened += (_, _) =>
+        {
+            timeItem.Header = UiStrings.MenuShowTime;
+            sampleItem.Header = UiStrings.MenuShowSamples;
+            timeItem.IsChecked = !StatusTimes.ShowSamples;
+            sampleItem.IsChecked = StatusTimes.ShowSamples;
+        };
+        EditorPositionTimecodeHost.ContextMenu = menu;
+        EditorPositionTimecode.ContextMenu = menu;
+        EditorPositionTimecode.SetDisplay("00:00.000");
+    }
+
+    private void SyncEditorPositionTimecodeVisibility()
+    {
+        var show = !IsLibraryMaximized
+            && HistoryStrip.Visibility == Visibility.Visible
+            && PlayerWaveformSlot.Visibility != Visibility.Visible
+            && TransportChromeHost.Visibility == Visibility.Visible;
+        var next = show ? Visibility.Visible : Visibility.Collapsed;
+        if (EditorPositionTimecodeHost.Visibility != next)
+        {
+            EditorPositionTimecodeHost.Visibility = next;
+        }
     }
 
     private void RefreshPlaylistVideoTimecode(

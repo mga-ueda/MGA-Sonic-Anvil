@@ -35,6 +35,14 @@ public sealed class TransportLayoutTests
     }
 
     [Fact]
+    public void EditorPositionTimecodeFontSize_IsLargerThanStatusStrip()
+    {
+        Assert.True(DesignMetrics.EditorPositionTimecodeFontSize > DesignMetrics.StatusTimecodeFontSize);
+        Assert.True(DesignMetrics.EditorPositionTimecodeFontSize >= DesignMetrics.PlaylistVideoTimecodeFontSize);
+        Assert.Equal(0.75, DesignMetrics.EditorPositionTimecodeWidthRatio);
+    }
+
+    [Fact]
     public void LoudnessMeterWidth_FitsLongestCaptionValueUnit()
     {
         var regular = new Typeface("Consolas");

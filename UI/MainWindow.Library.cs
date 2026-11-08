@@ -667,6 +667,7 @@ public partial class MainWindow
         SyncPlaylistVideoChromeFade();
         TimeScrollStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         HistoryStrip.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        SyncEditorPositionTimecodeVisibility();
         if (show)
         {
             CloseEditHistory(commit: true);
@@ -2794,6 +2795,7 @@ public partial class MainWindow
         }
 
         PlayerWaveformSlot.Visibility = Visibility.Visible;
+        SyncEditorPositionTimecodeVisibility();
         WaveformTileHost.HorizontalAlignment = HorizontalAlignment.Stretch;
         WaveformTileHost.VerticalAlignment = VerticalAlignment.Stretch;
         CollapseLibraryWaveformRowForDock();
@@ -2816,6 +2818,7 @@ public partial class MainWindow
         }
 
         PlayerWaveformSlot.Visibility = Visibility.Collapsed;
+        SyncEditorPositionTimecodeVisibility();
         WaveformTileHost.ClearValue(FrameworkElement.HorizontalAlignmentProperty);
         WaveformTileHost.ClearValue(FrameworkElement.VerticalAlignmentProperty);
 

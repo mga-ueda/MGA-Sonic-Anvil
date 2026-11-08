@@ -36,12 +36,17 @@ internal partial class StatusTimeStrip : UserControl
 
     public event EventHandler<SelectionClipboardPathKind>? CopySelectionTimeRequested;
 
+    /// <summary>時間／サンプル数の表示切替。</summary>
+    public event EventHandler? ShowSamplesChanged;
+
     /// <summary>選択範囲の時間コピーの有効性と、複数タブ選択時の見出し切り替え。</summary>
     public Func<(bool CanCopy, bool HasSelectedTabs)>? SelectionCopyState { get; set; }
 
     public bool IsTimeFocused => _fields.Keys.Any(box => box.IsKeyboardFocusWithin);
 
     public bool IsEditing => _fields.Values.Any(state => state.Editing) || IsTimeFocused;
+
+    public bool ShowSamples => _showSamples;
 
     public StatusTimeStrip()
     {
@@ -248,7 +253,7 @@ internal partial class StatusTimeStrip : UserControl
         return menu;
     }
 
-    private void SetShowSamples(bool showSamples)
+    public void SetShowSamples(bool showSamples)
     {
         if (_showSamples == showSamples)
         {
@@ -260,6 +265,7 @@ internal partial class StatusTimeStrip : UserControl
         AppStorage.Settings.StatusShowSamples = showSamples;
         AppStorage.Save();
         RefreshTexts();
+        ShowSamplesChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void RefreshTexts()

@@ -3621,6 +3621,7 @@ public partial class MainWindow
         ApplyAnalyzerMaximizeScale();
         ApplyWaapiPanelVisible();
         ApplyLibraryChrome();
+        SyncEditorPositionTimecodeVisibility();
         SyncVstInsertRackUi();
         ApplyLayoutWaveformVisibility(preset);
         Transport.SetMaximizeMode(_waveformMaximizeMode, _activeLayoutSlot);
@@ -3791,6 +3792,7 @@ public partial class MainWindow
         MeterColumnSplitter.Visibility = Visibility.Collapsed;
         DocumentTabHost.Visibility = Visibility.Collapsed;
         HistoryStrip.Visibility = Visibility.Collapsed;
+        SyncEditorPositionTimecodeVisibility();
         TransportToolbarHost.Visibility = Visibility.Collapsed;
         MeterColumn.ClipToBounds = false;
         TransportChromeHost.ClipToBounds = false;
@@ -3836,6 +3838,8 @@ public partial class MainWindow
             {
                 HistoryStrip.Visibility = Visibility.Visible;
             }
+
+            SyncEditorPositionTimecodeVisibility();
         }
 
         ApplyTransportToolbarVisibility();

@@ -312,13 +312,31 @@
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <!-- プレイヤーでラウドネス表示中: 波形帯をここ（ラウドネス左）へドックする。 -->
-        <Border x:Name="PlayerWaveformSlot"
-                Grid.Column="0"
-                Margin="0,0,6,0"
-                Background="Transparent"
-                Visibility="Collapsed"
-                ClipToBounds="True" />
+        <!-- エディタ: 左空き幅の 75% を中央に現在位置タイムコード。プレイヤーでラウドネス表示中は波形をここにドック。 -->
+        <Grid x:Name="EditorPositionSlot"
+              Grid.Column="0"
+              Margin="0,0,6,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="6*" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Border x:Name="PlayerWaveformSlot"
+                  Grid.ColumnSpan="3"
+                  Background="Transparent"
+                  Visibility="Collapsed"
+                  ClipToBounds="True" />
+          <Viewbox x:Name="EditorPositionTimecodeHost"
+                   Grid.Column="1"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch"
+                   Margin="0,4"
+                   ClipToBounds="False"
+                   IsHitTestVisible="True">
+            <ui:EditorPositionTimecodeView x:Name="EditorPositionTimecode" />
+          </Viewbox>
+        </Grid>
         <ui:HistoryStripView x:Name="HistoryStrip"
                              Grid.Column="1"
                              Margin="0,0,6,0"
