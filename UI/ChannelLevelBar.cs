@@ -81,13 +81,18 @@ internal sealed class ChannelLevelBar : FrameworkElement
     protected override void OnRender(DrawingContext dc)
     {
         var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
-        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush")), null, bounds);
-        dc.DrawRectangle(
-            null,
+        // メニュー／コンボと同じ既定の GUI 角丸。
+        var radius = DesignMetrics.ControlCornerRadius;
+        dc.DrawRoundedRectangle(
+            WpfControlHelpers.FrozenBrush(Theme.Get("WaveformBackBrush")),
             new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("ChromeBorderBrush")), 1),
-            bounds);
+            bounds,
+            radius,
+            radius);
 
         var track = new Rect(1, 1, Math.Max(1, bounds.Width - 2), Math.Max(1, bounds.Height - 2));
+        var trackRadius = Math.Max(0, radius - 1);
+        dc.PushClip(new RectangleGeometry(track, trackRadius, trackRadius));
         var db = LevelMeterEngine.ToDb(_display);
         var fillWidth = Math.Max(0, track.Width * LevelMeterEngine.DbToNorm(db));
         if (fillWidth >= 0.5)
@@ -100,17 +105,17 @@ internal sealed class ChannelLevelBar : FrameworkElement
             dc.Pop();
         }
 
-        if (!_showFloor)
+        if (_showFloor)
         {
-            return;
+            var floorNorm = LevelMeterEngine.DbToNorm(DisplayFloorDb);
+            var x = track.X + (track.Width * floorNorm) - (FloorLineWidth * 0.5);
+            x = Math.Clamp(x, track.X, track.Right - FloorLineWidth);
+            dc.DrawRectangle(
+                WpfControlHelpers.FrozenBrush(FloorLine),
+                null,
+                new Rect(x, track.Y, FloorLineWidth, track.Height));
         }
 
-        var floorNorm = LevelMeterEngine.DbToNorm(DisplayFloorDb);
-        var x = track.X + (track.Width * floorNorm) - (FloorLineWidth * 0.5);
-        x = Math.Clamp(x, track.X, track.Right - FloorLineWidth);
-        dc.DrawRectangle(
-            WpfControlHelpers.FrozenBrush(FloorLine),
-            null,
-            new Rect(x, track.Y, FloorLineWidth, track.Height));
+        dc.Pop();
     }
 }
