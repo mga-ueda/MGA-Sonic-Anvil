@@ -5796,6 +5796,16 @@ internal sealed partial class LibraryBrowserView : UserControl
         });
         band.SetBinding(Border.BackgroundProperty, chrome);
 
+        var corners = new MultiBinding { Converter = PlaylistRowCornerConverter.Instance };
+        corners.Bindings.Add(new Binding(nameof(LibraryFileRow.SelectionBandEdge)));
+        corners.Bindings.Add(new Binding(nameof(LibraryFileRow.IsPlaylistSelected)));
+        corners.Bindings.Add(new Binding(nameof(UIElement.IsMouseOver))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        corners.Bindings.Add(DesignMetrics.RadiusBinding());
+        band.SetBinding(Border.CornerRadiusProperty, corners);
+
         var host = new FrameworkElementFactory(typeof(Grid));
         host.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
         host.AppendChild(band);
@@ -5843,6 +5853,36 @@ internal sealed partial class LibraryBrowserView : UserControl
             [];
     }
 
+    private sealed class PlaylistRowCornerConverter : IMultiValueConverter
+    {
+        internal static readonly PlaylistRowCornerConverter Instance = new();
+
+        public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            var radius = values is { Length: > 3 } && values[3] is double pixels
+                ? pixels
+                : DesignMetrics.ControlCornerRadius;
+            var selected = values is { Length: > 1 } && values[1] is true;
+            if (selected)
+            {
+                var edge = values[0] is SelectionBandEdge bandEdge && bandEdge != SelectionBandEdge.None
+                    ? bandEdge
+                    : SelectionBandEdge.Solo;
+                return SelectionBandCorners.Of(edge, radius);
+            }
+
+            if (values is { Length: > 2 } && values[2] is true)
+            {
+                return SelectionBandCorners.Of(SelectionBandEdge.Solo, radius);
+            }
+
+            return default(CornerRadius);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture) =>
+            [];
+    }
+
     private sealed class FileNameMarkerBrushConverter : IValueConverter
     {
         internal static readonly FileNameMarkerBrushConverter Instance = new();
@@ -5883,6 +5923,12 @@ internal sealed partial class LibraryBrowserView : UserControl
         typeof(bool),
         typeof(LibraryBrowserView),
         new PropertyMetadata(false));
+
+    internal static readonly DependencyProperty SelectionBandEdgeProperty = DependencyProperty.RegisterAttached(
+        "SelectionBandEdge",
+        typeof(SelectionBandEdge),
+        typeof(LibraryBrowserView),
+        new FrameworkPropertyMetadata(SelectionBandEdge.None));
 
     internal static readonly DependencyProperty PlaylistBandLeftProperty = DependencyProperty.RegisterAttached(
         "PlaylistBandLeft",
@@ -5933,6 +5979,27 @@ internal sealed partial class LibraryBrowserView : UserControl
         bd.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
         bd.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
         bd.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        var treeCorners = new MultiBinding { Converter = TreeNavCornerConverter.Instance };
+        treeCorners.Bindings.Add(new Binding
+        {
+            Path = new PropertyPath(SelectionBandEdgeProperty),
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        treeCorners.Bindings.Add(new Binding(nameof(TreeViewItem.IsSelected))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        treeCorners.Bindings.Add(new Binding
+        {
+            Path = new PropertyPath(TreeMarkedProperty),
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        treeCorners.Bindings.Add(new Binding(nameof(UIElement.IsMouseOver))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        treeCorners.Bindings.Add(DesignMetrics.RadiusBinding());
+        bd.SetBinding(Border.CornerRadiusProperty, treeCorners);
         bd.AppendChild(row);
 
         var items = new FrameworkElementFactory(typeof(ItemsPresenter));
@@ -6011,6 +6078,22 @@ internal sealed partial class LibraryBrowserView : UserControl
         bd.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
         bd.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
         bd.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        var listCorners = new MultiBinding { Converter = ListNavCornerConverter.Instance };
+        listCorners.Bindings.Add(new Binding
+        {
+            Path = new PropertyPath(SelectionBandEdgeProperty),
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        listCorners.Bindings.Add(new Binding(nameof(ListBoxItem.IsSelected))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        listCorners.Bindings.Add(new Binding(nameof(UIElement.IsMouseOver))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        listCorners.Bindings.Add(DesignMetrics.RadiusBinding());
+        bd.SetBinding(Border.CornerRadiusProperty, listCorners);
         bd.AppendChild(presenter);
 
         var template = new ControlTemplate(typeof(ListBoxItem)) { VisualTree = bd };
@@ -6029,6 +6112,66 @@ internal sealed partial class LibraryBrowserView : UserControl
             Setters = { new Setter(Border.BackgroundProperty, selected, "Bd") },
         });
         return template;
+    }
+
+    private sealed class TreeNavCornerConverter : IMultiValueConverter
+    {
+        internal static readonly TreeNavCornerConverter Instance = new();
+
+        public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            var radius = values is { Length: > 4 } && values[4] is double pixels
+                ? pixels
+                : DesignMetrics.ControlCornerRadius;
+            var selected = (values is { Length: > 1 } && values[1] is true)
+                || (values is { Length: > 2 } && values[2] is true);
+            if (selected)
+            {
+                var edge = values[0] is SelectionBandEdge bandEdge && bandEdge != SelectionBandEdge.None
+                    ? bandEdge
+                    : SelectionBandEdge.Solo;
+                return SelectionBandCorners.Of(edge, radius);
+            }
+
+            if (values is { Length: > 3 } && values[3] is true)
+            {
+                return SelectionBandCorners.Of(SelectionBandEdge.Solo, radius);
+            }
+
+            return default(CornerRadius);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture) =>
+            [];
+    }
+
+    private sealed class ListNavCornerConverter : IMultiValueConverter
+    {
+        internal static readonly ListNavCornerConverter Instance = new();
+
+        public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            var radius = values is { Length: > 3 } && values[3] is double pixels
+                ? pixels
+                : DesignMetrics.ControlCornerRadius;
+            if (values is { Length: > 1 } && values[1] is true)
+            {
+                var edge = values[0] is SelectionBandEdge bandEdge && bandEdge != SelectionBandEdge.None
+                    ? bandEdge
+                    : SelectionBandEdge.Solo;
+                return SelectionBandCorners.Of(edge, radius);
+            }
+
+            if (values is { Length: > 2 } && values[2] is true)
+            {
+                return SelectionBandCorners.Of(SelectionBandEdge.Solo, radius);
+            }
+
+            return default(CornerRadius);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture) =>
+            [];
     }
 
     private void BuildExplorerRoots()
@@ -6228,6 +6371,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        ApplyTreeMultiSelectChrome();
         // 子のレイアウト後に、展開した行がビューポート先頭へ来るよう寄せる。
         Dispatcher.BeginInvoke(
             () => ScrollExplorerItemToTop(item),
@@ -6267,6 +6411,10 @@ internal sealed partial class LibraryBrowserView : UserControl
         if (sender is TreeViewItem item)
         {
             RememberExplorerExpanded(item, expanded: false);
+            if (!_treeExpansionBusy)
+            {
+                ApplyTreeMultiSelectChrome();
+            }
         }
     }
 
@@ -6863,6 +7011,17 @@ internal sealed partial class LibraryBrowserView : UserControl
     private void ApplyTreeMultiSelectChrome()
     {
         var selected = CyanSelectionBrush();
+        var run = new List<TreeViewItem>();
+        void Flush()
+        {
+            for (var i = 0; i < run.Count; i++)
+            {
+                run[i].SetValue(SelectionBandEdgeProperty, SelectionBandCorners.EdgeAt(i, run.Count));
+            }
+
+            run.Clear();
+        }
+
         void Walk(ItemCollection items)
         {
             foreach (var raw in items)
@@ -6875,7 +7034,17 @@ internal sealed partial class LibraryBrowserView : UserControl
                 var marked = _treeMultiSelected.Contains(child);
                 child.SetValue(TreeMarkedProperty, marked);
                 child.Background = marked ? selected : Brushes.Transparent;
-                if (child.Items.Count > 0)
+                if (marked || child.IsSelected)
+                {
+                    run.Add(child);
+                }
+                else
+                {
+                    Flush();
+                    child.SetValue(SelectionBandEdgeProperty, SelectionBandEdge.None);
+                }
+
+                if (child.IsExpanded && child.Items.Count > 0)
                 {
                     Walk(child.Items);
                 }
@@ -6883,6 +7052,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         Walk(_folderTree.Items);
+        Flush();
     }
 
     private void FolderTree_DragOver(object sender, DragEventArgs e)
@@ -9052,11 +9222,19 @@ internal sealed partial class LibraryBrowserView : UserControl
             _playlistSelectionNotifyDepth--;
         }
 
-        if (_playlistSelectionNotifyDepth == 0 && _playlistSelectionNotifyPending)
+        if (_playlistSelectionNotifyDepth != 0)
         {
-            _playlistSelectionNotifyPending = false;
-            PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
+            return;
         }
+
+        RefreshPlaylistSelectionBandEdges();
+        if (!_playlistSelectionNotifyPending)
+        {
+            return;
+        }
+
+        _playlistSelectionNotifyPending = false;
+        PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void NotePlaylistSelectionChanged()
@@ -9067,7 +9245,58 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        RefreshPlaylistSelectionBandEdges();
         PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 連続選択の先頭／末尾だけ角丸。グループ見出しなど非ファイル行は帯を切る。
+    /// </summary>
+    private void RefreshPlaylistSelectionBandEdges()
+    {
+        var seen = new HashSet<LibraryFileRow>();
+        var run = new List<LibraryFileRow>();
+        void Flush()
+        {
+            for (var i = 0; i < run.Count; i++)
+            {
+                var row = run[i];
+                row.SelectionBandEdge = SelectionBandCorners.EdgeAt(i, run.Count);
+                seen.Add(row);
+            }
+
+            run.Clear();
+        }
+
+        foreach (var item in _grid.Items)
+        {
+            if (item is not LibraryFileRow row)
+            {
+                Flush();
+                continue;
+            }
+
+            if (row.IsPlaylistSelected)
+            {
+                run.Add(row);
+                continue;
+            }
+
+            Flush();
+            if (row.SelectionBandEdge != SelectionBandEdge.None)
+            {
+                row.SelectionBandEdge = SelectionBandEdge.None;
+            }
+        }
+
+        Flush();
+        foreach (var row in _playlistSelectedRows)
+        {
+            if (!seen.Contains(row))
+            {
+                row.SelectionBandEdge = SelectionBandEdge.Solo;
+            }
+        }
     }
 
     private static LibraryFileRow? FindPlaylistRow(DependencyObject origin)
@@ -10764,11 +10993,68 @@ internal sealed partial class LibraryBrowserView : UserControl
     {
         if (_favoritesRangeBusy || (Keyboard.Modifiers & ModifierKeys.Shift) != 0)
         {
+            RefreshFavoritesSelectionBandEdges();
             return;
         }
 
         _favoritesAnchorIndex = _favoritesList.SelectedIndex;
         _favoritesCaretIndex = _favoritesAnchorIndex;
+        RefreshFavoritesSelectionBandEdges();
+    }
+
+    private void RefreshFavoritesSelectionBandEdges()
+    {
+        var count = _favorites.Count;
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var selected = new bool[count];
+        foreach (var raw in _favoritesList.SelectedItems)
+        {
+            if (raw is LibraryFavoriteRow row)
+            {
+                var index = _favorites.IndexOf(row);
+                if (index >= 0)
+                {
+                    selected[index] = true;
+                }
+            }
+        }
+
+        var i = 0;
+        while (i < count)
+        {
+            if (_favoritesList.ItemContainerGenerator.ContainerFromIndex(i) is ListBoxItem idle
+                && !selected[i])
+            {
+                idle.SetValue(SelectionBandEdgeProperty, SelectionBandEdge.None);
+            }
+
+            if (!selected[i])
+            {
+                i++;
+                continue;
+            }
+
+            var start = i;
+            while (i < count && selected[i])
+            {
+                i++;
+            }
+
+            var runLength = i - start;
+            for (var offset = 0; offset < runLength; offset++)
+            {
+                if (_favoritesList.ItemContainerGenerator.ContainerFromIndex(start + offset) is ListBoxItem item)
+                {
+                    item.SetValue(
+                        SelectionBandEdgeProperty,
+                        SelectionBandCorners.EdgeAt(offset, runLength));
+                }
+            }
+        }
     }
 
     internal void MoveFavoritesSelection(int delta, bool extend = false)
@@ -10848,6 +11134,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         finally
         {
             _favoritesRangeBusy = false;
+            RefreshFavoritesSelectionBandEdges();
         }
     }
 
