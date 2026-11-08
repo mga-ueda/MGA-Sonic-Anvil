@@ -1266,21 +1266,13 @@
                                 ClipToBounds="False">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MenuCheck"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto" SharedSizeGroup="MenuGesture"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="CheckMark"
-                                           Grid.Column="0"
-                                           Width="16"
-                                           Text=""
-                                           Visibility="Collapsed"
-                                           TextAlignment="Center"
-                                           VerticalAlignment="Center"/>
                                 <ContentPresenter x:Name="IconPresenter"
-                                                  Grid.Column="1"
+                                                  Grid.Column="0"
                                                   ContentSource="Icon"
                                                   Width="22"
                                                   Height="22"
@@ -1288,7 +1280,7 @@
                                                   VerticalAlignment="Center"
                                                   HorizontalAlignment="Center"
                                                   ClipToBounds="False"/>
-                                <ContentPresenter Grid.Column="2"
+                                <ContentPresenter Grid.Column="1"
                                                   ContentSource="Header"
                                                   RecognizesAccessKey="True"
                                                   VerticalAlignment="Center"
@@ -1312,13 +1304,13 @@
                                     </ContentPresenter.Resources>
                                 </ContentPresenter>
                                 <TextBlock x:Name="Gesture"
-                                           Grid.Column="3"
+                                           Grid.Column="2"
                                            Margin="16,0,4,0"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource MutedForeBrush}"
                                            Text="{TemplateBinding InputGestureText}"/>
                                 <Path x:Name="Arrow"
-                                      Grid.Column="4"
+                                      Grid.Column="3"
                                       Margin="8,0,0,0"
                                       VerticalAlignment="Center"
                                       Visibility="Collapsed"
@@ -1326,6 +1318,18 @@
                                       Fill="{TemplateBinding Foreground}"/>
                             </Grid>
                         </Border>
+                        <!-- ON 時の左端アクセント。✓列の代わりにアイコンと干渉しない。
+                             太さは 4px、角は幅半分のピル丸み（既定 ControlCorner は使わない）。 -->
+                        <Border x:Name="CheckedAccent"
+                                Width="4"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Margin="3,4,0,4"
+                                CornerRadius="2"
+                                Background="{DynamicResource AccentCyanBrush}"
+                                Visibility="Collapsed"
+                                IsHitTestVisible="False"
+                                SnapsToDevicePixels="True"/>
                         <Popup x:Name="PART_Popup"
                                AllowsTransparency="False"
                                Focusable="False"
@@ -1360,12 +1364,8 @@
                             <Setter TargetName="Gesture" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="Gesture" Property="Margin" Value="0"/>
                         </Trigger>
-                        <Trigger Property="IsCheckable" Value="True">
-                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
-                        </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
-                            <Setter TargetName="CheckMark" Property="Text" Value="✓"/>
+                            <Setter TargetName="CheckedAccent" Property="Visibility" Value="Visible"/>
                         </Trigger>
                         <Trigger Property="Role" Value="SubmenuHeader">
                             <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
@@ -1380,6 +1380,7 @@
                             <Setter TargetName="IconPresenter" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="IconPresenter" Property="Width" Value="0"/>
                             <Setter TargetName="IconPresenter" Property="Margin" Value="0"/>
+                            <Setter TargetName="CheckedAccent" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
                         <Trigger Property="Role" Value="TopLevelItem">
                             <Setter Property="Padding" Value="10,2"/>
@@ -1387,6 +1388,7 @@
                             <Setter TargetName="IconPresenter" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="IconPresenter" Property="Width" Value="0"/>
                             <Setter TargetName="IconPresenter" Property="Margin" Value="0"/>
+                            <Setter TargetName="CheckedAccent" Property="Visibility" Value="Collapsed"/>
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
@@ -1406,7 +1408,7 @@
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource MenuDisabledForeBrush}" />
                             <Setter TargetName="Gesture" Property="Foreground" Value="{DynamicResource MenuDisabledForeBrush}" />
-                            <Setter TargetName="CheckMark" Property="Foreground" Value="{DynamicResource MenuDisabledForeBrush}" />
+                            <Setter TargetName="CheckedAccent" Property="Background" Value="{DynamicResource MenuDisabledForeBrush}" />
                             <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource MenuDisabledForeBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
