@@ -17,6 +17,11 @@ namespace MgaSonicAnvil.UI;
 /// </summary>
 internal partial class ColorDevPanelWindow : Window
 {
+    /// <summary>一覧左の色見本の直径。設定の GUI 角丸には連動しない。</summary>
+    public const double SwatchSize = 22;
+
+    public static CornerRadius SwatchCorner { get; } = new(SwatchSize * 0.5);
+
     private readonly Dictionary<string, ColorRow> _rows = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ColorGroup> _groups = [];
     private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
@@ -190,13 +195,15 @@ internal partial class ColorDevPanelWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Hidden,
         });
-        var swatch = DesignMetrics.BindCorner(new Border
+        // 完全な円。設定の GUI 角丸は使わない。
+        var swatch = new Border
         {
-            Width = 22,
-            Height = 22,
+            Width = SwatchSize,
+            Height = SwatchSize,
+            CornerRadius = SwatchCorner,
             BorderThickness = new Thickness(1),
             VerticalAlignment = VerticalAlignment.Center,
-        });
+        };
         var name = new TextBlock
         {
             Text = entry.Label,

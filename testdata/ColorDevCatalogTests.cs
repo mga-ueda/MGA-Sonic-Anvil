@@ -242,6 +242,16 @@ public sealed class ColorDevCatalogTests
     }
 
     [Fact]
+    public void ListSwatch_IsCircleNotControlCorner()
+    {
+        Assert.Equal(ColorDevPanelWindow.SwatchSize, ColorDevPanelWindow.SwatchCorner.TopLeft * 2);
+        Assert.Equal(
+            ColorDevPanelWindow.SwatchCorner.TopLeft,
+            ColorDevPanelWindow.SwatchCorner.BottomRight);
+        Assert.NotEqual(ColorDevPanelWindow.SwatchCorner.TopLeft, DesignMetrics.ControlCornerRadius);
+    }
+
+    [Fact]
     public void Title_UsesPlainColorSettingsLabel()
     {
         var dark = UiStrings.ColorDevTitleFor();
