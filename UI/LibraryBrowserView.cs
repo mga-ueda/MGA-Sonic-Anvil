@@ -67,6 +67,10 @@ internal sealed partial class LibraryBrowserView : UserControl
     internal const double PaneFocusLineHeight = 36;
     internal static byte PaneFocusLineAlpha =>
         PlayerChrome.Get("PlayerPaneFocusLineBrush", UiTheme.Dark).A;
+
+    /// <summary>ペインフォーカスの白いグラデ帯。左上・右上だけ既定の GUI 角丸。</summary>
+    internal static CornerRadius PaneFocusTopCorners(double? radius = null) =>
+        SelectionBandCorners.Of(SelectionBandEdge.First, radius ?? DesignMetrics.ControlCornerRadius);
     internal const string PlaylistRowBandName = "PlaylistRowBand";
 
     /// <summary>ツリー子のインデント。選択帯をルート左端へ揃える基準。</summary>
@@ -9887,16 +9891,49 @@ internal sealed partial class LibraryBrowserView : UserControl
         waveTo.Opacity = to.Opacity;
     }
 
-    private static Border CreatePaneFocusLine() => new()
+    private static Border CreatePaneFocusLine()
     {
-        Height = PaneFocusLineHeight,
-        HorizontalAlignment = HorizontalAlignment.Stretch,
-        VerticalAlignment = VerticalAlignment.Top,
-        Background = CreatePaneFocusLineBrush(),
-        IsHitTestVisible = false,
-        SnapsToDevicePixels = true,
-        Visibility = Visibility.Collapsed,
-    };
+        var line = new Border
+        {
+            Height = PaneFocusLineHeight,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Top,
+            Background = CreatePaneFocusLineBrush(),
+            IsHitTestVisible = false,
+            SnapsToDevicePixels = true,
+            Visibility = Visibility.Collapsed,
+        };
+        // 上辺のグラデだけなので左上・右上に既定の GUI 角丸を付ける。
+        BindingOperations.SetBinding(
+            line,
+            Border.CornerRadiusProperty,
+            new Binding(nameof(CornerChrome.Radius))
+            {
+                Source = DesignMetrics.Chrome,
+                Mode = BindingMode.OneWay,
+                Converter = PaneFocusTopCornerConverter.Instance,
+            });
+        return line;
+    }
+
+    private sealed class PaneFocusTopCornerConverter : IValueConverter
+    {
+        internal static readonly PaneFocusTopCornerConverter Instance = new();
+
+        public object Convert(
+            object value,
+            Type targetType,
+            object parameter,
+            System.Globalization.CultureInfo culture) =>
+            PaneFocusTopCorners(value is double pixels ? pixels : null);
+
+        public object ConvertBack(
+            object value,
+            Type targetType,
+            object parameter,
+            System.Globalization.CultureInfo culture) =>
+            Binding.DoNothing;
+    }
 
     private void ApplyPaneFocusLineBrush()
     {

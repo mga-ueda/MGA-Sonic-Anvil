@@ -142,6 +142,10 @@ public sealed class LibraryArtworkGlowTests
                 Assert.Equal(255, brush.GradientStops[0].Color.R);
                 Assert.Equal(0, brush.GradientStops[^1].Color.A);
                 Assert.Equal(36, LibraryBrowserView.PaneFocusLineHeight);
+                // ペインフォーカス帯は上辺だけ丸める（左上・右上＝ SelectionBandEdge.First）。
+                Assert.Equal(
+                    new CornerRadius(DesignMetrics.ControlCornerRadius, DesignMetrics.ControlCornerRadius, 0, 0),
+                    LibraryBrowserView.PaneFocusTopCorners());
             });
         });
     }
