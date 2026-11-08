@@ -478,7 +478,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- ツリー／お気に入り／リストの区切り。普段は出さず、近いとき／ドラッグ時だけ 1px。 -->
+    <!-- ツリー／お気に入り／リストの区切り。普段は出さず、近いとき／ドラッグ時だけ 1px。中央から外側へ描きつつフェード。 -->
     <Style x:Key="LibrarySplitterStyle" TargetType="GridSplitter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Focusable" Value="False" />
@@ -492,7 +492,12 @@
                                    VerticalAlignment="Stretch"
                                    Fill="{DynamicResource PrimaryForeBrush}"
                                    Opacity="0"
-                                   SnapsToDevicePixels="True" />
+                                   RenderTransformOrigin="0.5,0.5"
+                                   SnapsToDevicePixels="True">
+                            <Rectangle.RenderTransform>
+                                <ScaleTransform ScaleX="0" ScaleY="0" />
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="ResizeDirection" Value="Rows">
@@ -510,8 +515,31 @@
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="Line"
                                                          Storyboard.TargetProperty="Opacity"
+                                                         From="0"
                                                          To="0.20"
-                                                         Duration="0:0:0.12" />
+                                                         Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Line"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         From="0"
+                                                         To="1"
+                                                         Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Line"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         From="0"
+                                                         To="1"
+                                                         Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </Trigger.EnterActions>
@@ -521,7 +549,27 @@
                                         <DoubleAnimation Storyboard.TargetName="Line"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="0"
-                                                         Duration="0:0:0.35" />
+                                                         Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseIn" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Line"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="0"
+                                                         Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseIn" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Line"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="0"
+                                                         Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseIn" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </Trigger.ExitActions>
