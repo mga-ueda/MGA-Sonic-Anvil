@@ -119,6 +119,24 @@ internal sealed class LibraryFileRow : INotifyPropertyChanged
         }
     }
 
+    private SelectionBandEdge _selectionBandEdge;
+
+    /// <summary>連続選択での帯の位置。角丸の上下を決める。</summary>
+    public SelectionBandEdge SelectionBandEdge
+    {
+        get => _selectionBandEdge;
+        set
+        {
+            if (_selectionBandEdge == value)
+            {
+                return;
+            }
+
+            _selectionBandEdge = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectionBandEdge)));
+        }
+    }
+
     public object? Tag { get; init; }
 
     public string Name { get; init; } = string.Empty;
