@@ -96,7 +96,7 @@ internal sealed class AcrylicGlassPopup
         }
     }
 
-    /// <summary>開いているオーバーレイの HWND 状態（TOPMOST 解除など）を載せ直す。</summary>
+    /// <summary>開いているオーバーレイの HWND 状態（ホストに合わせた TOPMOST の付け外し）を載せ直す。</summary>
     public static void RefreshOpenCornerClips()
     {
         AcrylicGlassPopup[] live;

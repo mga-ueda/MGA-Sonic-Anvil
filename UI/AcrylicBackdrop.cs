@@ -340,7 +340,7 @@ internal static class AcrylicBackdrop
     /// <summary>
     /// WPF Popup 既定の WS_EX_TOPMOST を外し、他アプリの手前に残らないようにする。
     /// オーナーが Topmost（全画面シェル等）のときは
-    /// <see cref="RaisePopupAboveOwner"/> でホスト直上へ戻すこと。
+    /// <see cref="EnsurePopupTopmost"/> で同じ帯へ戻すこと。
     /// </summary>
     public static void ClearPopupTopmost(IntPtr hwnd)
     {

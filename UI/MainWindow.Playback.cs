@@ -3654,8 +3654,8 @@ public partial class MainWindow
         ApplyAnalyzerMaximizeScale();
         ApplyWaapiPanelVisible();
         ApplyLibraryChrome();
+        // ビッグタイムコード／履歴／VST は同一の SyncEditorChromeFade へ集約済み。
         SyncEditorPositionTimecodeVisibility();
-        SyncVstInsertRackUi();
         ApplyLayoutWaveformVisibility(preset);
         Transport.SetMaximizeMode(_waveformMaximizeMode, _activeLayoutSlot);
         ApplyWaveformScaleLanes();
