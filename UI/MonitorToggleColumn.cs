@@ -122,10 +122,6 @@ internal sealed class MonitorToggleColumn : StackPanel
             _mono.WashThrough = value;
             _dim.WashThrough = value;
             _lowCut.WashThrough = value;
-            _bpm.InvalidateVisual();
-            _mono.InvalidateVisual();
-            _dim.InvalidateVisual();
-            _lowCut.InvalidateVisual();
         }
     }
 
@@ -159,10 +155,17 @@ internal sealed class MonitorToggleColumn : StackPanel
             UiStrings.TooltipMonitorLowCut(AppStorage.Settings.ResolvedMonitorLowCutHz()));
         ApplyUniformButtonWidth();
         ApplyBpmChrome();
-        _bpm.InvalidateVisual();
-        _mono.InvalidateVisual();
-        _dim.InvalidateVisual();
-        _lowCut.InvalidateVisual();
+        RefreshAppearance();
+    }
+
+    /// <summary>配色変更時の再描画（オフ面の LatchToggle 色など）。</summary>
+    public void RefreshAppearance()
+    {
+        ApplyBpmChrome();
+        _bpm.RefreshAppearance();
+        _mono.RefreshAppearance();
+        _dim.RefreshAppearance();
+        _lowCut.RefreshAppearance();
     }
 
     public void StopTicks()
@@ -348,7 +351,7 @@ internal sealed class MonitorToggleColumn : StackPanel
         _bpm.LatchLabel = "BPM";
         _bpm.IsLatched = on;
         _bpm.LatchColor = BpmOn;
-        _bpm.InvalidateVisual();
+        _bpm.RefreshAppearance();
 
         Color valueColor;
         if (_videoOverlayLabels)

@@ -43,7 +43,7 @@ public sealed class ColorDevCatalogTests
     [InlineData("ProjectBarBackBrush", "Transport")]
     [InlineData("HistoryStripBackBrush", "Transport")]
     [InlineData("ActionCopyrightForeBrush", "Transport")]
-    [InlineData("WaapiToggleOnBackBrush", "Transport")]
+    [InlineData("LatchToggleOnBackBrush", "Transport")]
     [InlineData("StatusBarBackBrush", "StatusBar")]
     [InlineData("WaapiBarBackBrush", "StatusBar")]
     [InlineData("WindowBackBrush", "Dialog")]

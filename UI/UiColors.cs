@@ -19,6 +19,74 @@ internal static class UiColors
         CaptureDefaults();
         MigrateLegacyColors(AppStorage.Settings);
         MigrateLightColors(AppStorage.Settings);
+        MigrateLatchToggleColorKeys(AppStorage.Settings);
+    }
+
+    /// <summary>LatchToggle 面色を変えたあとにプレイヤー用半透明ブラシを焼き直す。</summary>
+    private static bool IsLatchToggleFaceKey(string key) =>
+        key is "LatchToggleOffBackBrush"
+            or "LatchToggleOffHoverBackBrush"
+            or "LatchToggleOnBackBrush"
+            or "LatchToggleOnHoverBackBrush";
+
+    /// <summary>
+    /// 旧 WaapiToggle*／OptionLatchOn* を LatchToggle* へ寄せる。
+    /// </summary>
+    internal static void MigrateLatchToggleColorKeys(AppSettings settings)
+    {
+        RenameColorOverrideKeys(settings.ColorsDark, LatchToggleKeyRenames);
+        RenameColorOverrideKeys(settings.ColorsLight, LatchToggleKeyRenames);
+    }
+
+    private static readonly (string From, string To)[] LatchToggleKeyRenames =
+    [
+        ("WaapiToggleOffBackBrush", "LatchToggleOffBackBrush"),
+        ("WaapiToggleOffHoverBackBrush", "LatchToggleOffHoverBackBrush"),
+        ("WaapiToggleOffForeBrush", "LatchToggleOffForeBrush"),
+        ("WaapiToggleOnBackBrush", "LatchToggleOnBackBrush"),
+        ("WaapiToggleOnHoverBackBrush", "LatchToggleOnHoverBackBrush"),
+        ("WaapiToggleOnForeBrush", "LatchToggleOnForeBrush"),
+        ("PlayerWaapiToggleOffBackBrush", "LatchToggleOffBackBrush"),
+        ("PlayerWaapiToggleOffHoverBackBrush", "LatchToggleOffHoverBackBrush"),
+        ("PlayerWaapiToggleOnBackBrush", "LatchToggleOnBackBrush"),
+        ("PlayerWaapiToggleOnHoverBackBrush", "LatchToggleOnHoverBackBrush"),
+        ("OptionLatchOnBackBrush", "LatchToggleOnBackBrush"),
+        ("OptionLatchOnHoverBackBrush", "LatchToggleOnHoverBackBrush"),
+        ("OptionLatchOnPressedBackBrush", "LatchToggleOnBackBrush"),
+        ("OptionLatchOnForeBrush", "LatchToggleOnForeBrush"),
+    ];
+
+    private static void RenameColorOverrideKeys(
+        Dictionary<string, string>? map,
+        (string From, string To)[] renames)
+    {
+        if (map is null || map.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var (from, to) in renames)
+        {
+            if (!map.Remove(from, out var value))
+            {
+                continue;
+            }
+
+            if (map.ContainsKey(to))
+            {
+                continue;
+            }
+
+            // Player* 半透明上書きは RGB だけ残して不透明の LatchToggle へ。
+            if (from.StartsWith("Player", StringComparison.OrdinalIgnoreCase)
+                && TryParseColor(value, out var parsed))
+            {
+                map[to] = $"#{parsed.R:X2}{parsed.G:X2}{parsed.B:X2}";
+                continue;
+            }
+
+            map[to] = value;
+        }
     }
 
     public static void ApplySaved(UiTheme theme)
@@ -32,6 +100,7 @@ internal static class UiColors
         }
 
         ApplyMap(OverridesOf(AppStorage.Settings, theme), theme);
+        PlayerChrome.SyncLatchToggleWashBrushes();
     }
 
     public static void Save()
@@ -179,12 +248,15 @@ internal static class UiColors
             return;
         }
 
-        if (TryWrite(app.Resources, key, color))
+        if (!TryWrite(app.Resources, key, color))
         {
-            return;
+            app.Resources[key] = new SolidColorBrush(color);
         }
 
-        app.Resources[key] = new SolidColorBrush(color);
+        if (IsLatchToggleFaceKey(key))
+        {
+            PlayerChrome.SyncLatchToggleWashBrushes();
+        }
     }
 
     /// <summary>

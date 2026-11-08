@@ -65,6 +65,7 @@ public partial class MainWindow
     {
         ApplyStatusFieldChrome();
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        PlayerChrome.SyncLatchToggleWashBrushes();
         ForEachWaveform(view => view.RefreshAppearance());
         RefreshTileChrome();
         Overview.RefreshAppearance();
@@ -82,6 +83,12 @@ public partial class MainWindow
         TabScrollLeft.InvalidateVisual();
         TabScrollRight.InvalidateVisual();
         _waapiToggle?.InvalidateVisual();
+        CenterLockLatch.RefreshAppearance();
+        MarkerClickLatch.RefreshAppearance();
+        SilentSkipLatch.RefreshAppearance();
+        AutoLoopLatch.RefreshAppearance();
+        AlwaysOnTopLatch.RefreshAppearance();
+        MonitorToggles.RefreshAppearance();
         WaapiBar.RefreshAppearance();
         RefreshTabHeaders();
         RefreshStatus();

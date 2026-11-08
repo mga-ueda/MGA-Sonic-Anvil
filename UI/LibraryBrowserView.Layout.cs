@@ -172,60 +172,35 @@ internal sealed partial class LibraryBrowserView
         DockPanel.SetDock(playlistSearch, Dock.Right);
         bar.Children.Add(playlistSearch);
 
-        _shuffleCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
-        _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
-        _shuffleCheck.IsChecked = false;
-        _shuffleCheck.Focusable = false;
-        _shuffleCheck.VerticalAlignment = VerticalAlignment.Center;
-        _shuffleCheck.FontSize = 11;
-        _shuffleCheck.Margin = new Thickness(8, 0, 0, 0);
-        _shuffleCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
-        _shuffleCheck.Checked += ShuffleCheck_Changed;
-        _shuffleCheck.Unchecked += ShuffleCheck_Changed;
-        DockPanel.SetDock(_shuffleCheck, Dock.Right);
-        bar.Children.Add(_shuffleCheck);
-
         // Dock.Right は先に足したものが右。Shuffle → AutoNext → AutoPlay → CheckBox で
         // 見た目は Check Box | Auto Play | Auto Next | Random。Single Loop はステータスバーへ。
-        _autoPlayNextCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
-        _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
-        _autoPlayNextCheck.IsChecked = false;
-        _autoPlayNextCheck.Focusable = false;
-        _autoPlayNextCheck.VerticalAlignment = VerticalAlignment.Center;
-        _autoPlayNextCheck.FontSize = 11;
-        _autoPlayNextCheck.Margin = new Thickness(8, 0, 0, 0);
-        _autoPlayNextCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
-        _autoPlayNextCheck.Checked += AutoPlayNextCheck_Changed;
-        _autoPlayNextCheck.Unchecked += AutoPlayNextCheck_Changed;
-        DockPanel.SetDock(_autoPlayNextCheck, Dock.Right);
-        bar.Children.Add(_autoPlayNextCheck);
+        _shuffleLatch.IsLatched = false;
+        _shuffleLatch.Margin = new Thickness(6, 0, 0, 0);
+        TransportToolTip.Attach(_shuffleLatch, UiStrings.TipOptionLibraryShuffle);
+        _shuffleLatch.Click += ShuffleLatch_Click;
+        DockPanel.SetDock(_shuffleLatch, Dock.Right);
+        bar.Children.Add(_shuffleLatch);
 
-        _autoPlayCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
-        _autoPlayCheck.Content = UiStrings.LabelLibraryAutoPlay;
-        _autoPlayCheck.IsChecked = true;
-        _autoPlayCheck.Focusable = false;
-        _autoPlayCheck.VerticalAlignment = VerticalAlignment.Center;
-        _autoPlayCheck.FontSize = 11;
-        _autoPlayCheck.Margin = new Thickness(8, 0, 0, 0);
-        _autoPlayCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
-        _autoPlayCheck.Checked += AutoPlayCheck_Changed;
-        _autoPlayCheck.Unchecked += AutoPlayCheck_Changed;
-        DockPanel.SetDock(_autoPlayCheck, Dock.Right);
-        bar.Children.Add(_autoPlayCheck);
+        _autoPlayNextLatch.IsLatched = false;
+        _autoPlayNextLatch.Margin = new Thickness(6, 0, 0, 0);
+        TransportToolTip.Attach(_autoPlayNextLatch, UiStrings.TipOptionLibraryAutoPlayNext);
+        _autoPlayNextLatch.Click += AutoPlayNextLatch_Click;
+        DockPanel.SetDock(_autoPlayNextLatch, Dock.Right);
+        bar.Children.Add(_autoPlayNextLatch);
 
-        _checkSelectCheck.Style = TryFindResource("DarkCheckBoxStyle") as Style;
-        _checkSelectCheck.Content = UiStrings.LabelLibraryCheckSelect;
-        _checkSelectCheck.IsChecked = false;
-        _checkSelectCheck.Focusable = false;
-        _checkSelectCheck.VerticalAlignment = VerticalAlignment.Center;
-        _checkSelectCheck.FontSize = 11;
-        _checkSelectCheck.Margin = new Thickness(8, 0, 0, 0);
-        _checkSelectCheck.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
-        _checkSelectCheck.ToolTip = "Shift+Space";
-        _checkSelectCheck.Checked += CheckSelectCheck_Changed;
-        _checkSelectCheck.Unchecked += CheckSelectCheck_Changed;
-        DockPanel.SetDock(_checkSelectCheck, Dock.Right);
-        bar.Children.Add(_checkSelectCheck);
+        _autoPlayLatch.IsLatched = true;
+        _autoPlayLatch.Margin = new Thickness(6, 0, 0, 0);
+        TransportToolTip.Attach(_autoPlayLatch, UiStrings.TipOptionLibraryAutoPlay);
+        _autoPlayLatch.Click += AutoPlayLatch_Click;
+        DockPanel.SetDock(_autoPlayLatch, Dock.Right);
+        bar.Children.Add(_autoPlayLatch);
+
+        _checkSelectLatch.IsLatched = false;
+        _checkSelectLatch.Margin = new Thickness(6, 0, 0, 0);
+        TransportToolTip.Attach(_checkSelectLatch, UiStrings.TipOptionLibraryCheckSelect);
+        _checkSelectLatch.Click += CheckSelectLatch_Click;
+        DockPanel.SetDock(_checkSelectLatch, Dock.Right);
+        bar.Children.Add(_checkSelectLatch);
 
         _playlistLabel.VerticalAlignment = VerticalAlignment.Center;
         _playlistLabel.TextTrimming = TextTrimming.CharacterEllipsis;

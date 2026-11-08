@@ -6,6 +6,17 @@ namespace MgaSonicAnvil.UI;
 
 internal static class PlayerChrome
 {
+    /// <summary>ジャケットウォッシュ越しに載せるラッチ面の既定アルファ。</summary>
+    internal const byte LatchToggleWashAlpha = 0x8C;
+
+    private static readonly (string Source, string Player)[] LatchToggleWashPairs =
+    [
+        ("LatchToggleOffBackBrush", "PlayerLatchToggleOffBackBrush"),
+        ("LatchToggleOffHoverBackBrush", "PlayerLatchToggleOffHoverBackBrush"),
+        ("LatchToggleOnBackBrush", "PlayerLatchToggleOnBackBrush"),
+        ("LatchToggleOnHoverBackBrush", "PlayerLatchToggleOnHoverBackBrush"),
+    ];
+
     internal static Color Get(string key) => Get(key, UiThemeService.Painted);
 
     internal static Color Get(string key, UiTheme theme)
@@ -20,6 +31,35 @@ internal static class PlayerChrome
     }
 
     internal static Brush Brush(string key) => WpfControlHelpers.FrozenBrush(Get(key));
+
+    /// <summary>
+    /// ラッチ面色にウォッシュ用アルファを掛ける（RGB はそのまま）。
+    /// 色設定でαを下げているときはその値を使い、不透明（255）のときだけ既定ウォッシュαにする。
+    /// </summary>
+    internal static Color WashLatchToggleFace(Color face) =>
+        Color.FromArgb(
+            face.A < 255 ? face.A : LatchToggleWashAlpha,
+            face.R,
+            face.G,
+            face.B);
+
+    /// <summary><c>LatchToggle*</c> から <c>PlayerLatchToggle*</c> を半透明に焼成する。</summary>
+    internal static void SyncLatchToggleWashBrushes()
+    {
+        foreach (var (source, player) in LatchToggleWashPairs)
+        {
+            UiColors.Set(player, WashLatchToggleFace(Get(source)));
+        }
+    }
+
+    internal static string LatchTogglePlayerKey(string latchToggleKey) => latchToggleKey switch
+    {
+        "LatchToggleOffBackBrush" => "PlayerLatchToggleOffBackBrush",
+        "LatchToggleOffHoverBackBrush" => "PlayerLatchToggleOffHoverBackBrush",
+        "LatchToggleOnBackBrush" => "PlayerLatchToggleOnBackBrush",
+        "LatchToggleOnHoverBackBrush" => "PlayerLatchToggleOnHoverBackBrush",
+        _ => latchToggleKey,
+    };
 }
 
 /// <summary>プレイヤーのメーター罫線。色設定の Player* ブラシを使い、既定はエディタ色からの焼成。</summary>

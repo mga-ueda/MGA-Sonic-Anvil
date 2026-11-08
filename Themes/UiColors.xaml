@@ -98,10 +98,11 @@
     <SolidColorBrush x:Key="PlayerLevelMeterTickBrush" Color="#60FFFFFF" />
     <SolidColorBrush x:Key="PlayerVectorScopeGridBrush" Color="#FF717174" />
     <SolidColorBrush x:Key="PlayerSurroundHullStrokeBrush" Color="#FF88888C" />
-    <SolidColorBrush x:Key="PlayerWaapiToggleOffBackBrush" Color="#8C2A2A2E" />
-    <SolidColorBrush x:Key="PlayerWaapiToggleOffHoverBackBrush" Color="#8C3A3A40" />
-    <SolidColorBrush x:Key="PlayerWaapiToggleOnBackBrush" Color="#8C006BD7" />
-    <SolidColorBrush x:Key="PlayerWaapiToggleOnHoverBackBrush" Color="#8C1A82EA" />
+    <!-- 色設定には出さない。LatchToggle* からアルファを焼いて同期する（ウォッシュ用）。 -->
+    <SolidColorBrush x:Key="PlayerLatchToggleOffBackBrush" Color="#8C2A2A2E" />
+    <SolidColorBrush x:Key="PlayerLatchToggleOffHoverBackBrush" Color="#8C3A3A40" />
+    <SolidColorBrush x:Key="PlayerLatchToggleOnBackBrush" Color="#8C007DFF" />
+    <SolidColorBrush x:Key="PlayerLatchToggleOnHoverBackBrush" Color="#8C00BDFF" />
     <SolidColorBrush x:Key="PlayerJacketReflectionBrush" Color="#4EFFFFFF" />
     <SolidColorBrush x:Key="DbScaleForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="SpectrogramScaleForeBrush" Color="#FFEBEBEB" />
@@ -177,12 +178,12 @@
     <SolidColorBrush x:Key="VstInsertSlotPersistHoverBackBrush" Color="#FFFF9A2E" />
     <SolidColorBrush x:Key="VstInsertSlotPersistPressedBackBrush" Color="#FFC46E12" />
     <SolidColorBrush x:Key="VstInsertSlotPersistForeBrush" Color="#FFEBEBEB" />
-    <SolidColorBrush x:Key="WaapiToggleOffBackBrush" Color="#FF2A2A2E" />
-    <SolidColorBrush x:Key="WaapiToggleOffHoverBackBrush" Color="#FF3A3A40" />
-    <SolidColorBrush x:Key="WaapiToggleOffForeBrush" Color="#FF9A9A9A" />
-    <SolidColorBrush x:Key="WaapiToggleOnBackBrush" Color="#FF006BD7" />
-    <SolidColorBrush x:Key="WaapiToggleOnHoverBackBrush" Color="#FF1A82EA" />
-    <SolidColorBrush x:Key="WaapiToggleOnForeBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="LatchToggleOffBackBrush" Color="#FF2A2A2E" />
+    <SolidColorBrush x:Key="LatchToggleOffHoverBackBrush" Color="#FF3A3A40" />
+    <SolidColorBrush x:Key="LatchToggleOffForeBrush" Color="#FF9A9A9A" />
+    <SolidColorBrush x:Key="LatchToggleOnBackBrush" Color="#8C007DFF" />
+    <SolidColorBrush x:Key="LatchToggleOnHoverBackBrush" Color="#8C00BDFF" />
+    <SolidColorBrush x:Key="LatchToggleOnForeBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="ActionCopyrightForeBrush" Color="#FF969696" />
     <SolidColorBrush x:Key="ActionLinkForeBrush" Color="#FF6EB4FF" />
     <SolidColorBrush x:Key="ActionLinkHoverForeBrush" Color="#FF00F5FF" />

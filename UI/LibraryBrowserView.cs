@@ -160,10 +160,10 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly TextBlock _explorerSearchHint = new();
     private readonly TextBox _playlistSearchBox = new();
     private readonly TextBlock _playlistSearchHint = new();
-    private readonly CheckBox _shuffleCheck = new();
-    private readonly CheckBox _autoPlayCheck = new();
-    private readonly CheckBox _autoPlayNextCheck = new();
-    private readonly CheckBox _checkSelectCheck = new();
+    private readonly MonitorLatchButton _shuffleLatch = MonitorLatchButton.CreateOption(UiStrings.LabelLibraryShuffle);
+    private readonly MonitorLatchButton _autoPlayLatch = MonitorLatchButton.CreateOption(UiStrings.LabelLibraryAutoPlay);
+    private readonly MonitorLatchButton _autoPlayNextLatch = MonitorLatchButton.CreateOption(UiStrings.LabelLibraryAutoPlayNext);
+    private readonly MonitorLatchButton _checkSelectLatch = MonitorLatchButton.CreateOption(UiStrings.LabelLibraryCheckSelect);
     private readonly LibraryPlaylistShuffle _shuffle = new();
     private bool _shuffleEnabled;
     private bool _shuffleBusy;
@@ -931,7 +931,7 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     private void SyncCheckSelectCheck()
     {
-        if (_checkSelectCheck.IsChecked == _checkSelectMode)
+        if (_checkSelectLatch.IsLatched == _checkSelectMode)
         {
             return;
         }
@@ -939,7 +939,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         _checkSelectBusy = true;
         try
         {
-            _checkSelectCheck.IsChecked = _checkSelectMode;
+            _checkSelectLatch.IsLatched = _checkSelectMode;
         }
         finally
         {
@@ -1301,7 +1301,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     private void SetShuffleEnabled(bool enabled)
     {
         var changed = _shuffleEnabled != enabled;
-        if (!changed && _shuffleCheck.IsChecked == enabled)
+        if (!changed && _shuffleLatch.IsLatched == enabled)
         {
             return;
         }
@@ -1312,12 +1312,12 @@ internal sealed partial class LibraryBrowserView : UserControl
             _shuffle.Clear();
         }
 
-        if (_shuffleCheck.IsChecked != enabled)
+        if (_shuffleLatch.IsLatched != enabled)
         {
             _shuffleBusy = true;
             try
             {
-                _shuffleCheck.IsChecked = enabled;
+                _shuffleLatch.IsLatched = enabled;
             }
             finally
             {
@@ -1334,19 +1334,19 @@ internal sealed partial class LibraryBrowserView : UserControl
     private void SetAutoPlayEnabled(bool enabled, bool raise)
     {
         var changed = _autoPlayEnabled != enabled;
-        if (!changed && _autoPlayCheck.IsChecked == enabled)
+        if (!changed && _autoPlayLatch.IsLatched == enabled)
         {
             return;
         }
 
         _autoPlayEnabled = enabled;
 
-        if (_autoPlayCheck.IsChecked != enabled)
+        if (_autoPlayLatch.IsLatched != enabled)
         {
             _autoPlayBusy = true;
             try
             {
-                _autoPlayCheck.IsChecked = enabled;
+                _autoPlayLatch.IsLatched = enabled;
             }
             finally
             {
@@ -1363,19 +1363,19 @@ internal sealed partial class LibraryBrowserView : UserControl
     private void SetAutoPlayNextEnabled(bool enabled)
     {
         var changed = _autoPlayNextEnabled != enabled;
-        if (!changed && _autoPlayNextCheck.IsChecked == enabled)
+        if (!changed && _autoPlayNextLatch.IsLatched == enabled)
         {
             return;
         }
 
         _autoPlayNextEnabled = enabled;
 
-        if (_autoPlayNextCheck.IsChecked != enabled)
+        if (_autoPlayNextLatch.IsLatched != enabled)
         {
             _autoPlayNextBusy = true;
             try
             {
-                _autoPlayNextCheck.IsChecked = enabled;
+                _autoPlayNextLatch.IsLatched = enabled;
             }
             finally
             {
@@ -3631,10 +3631,18 @@ internal sealed partial class LibraryBrowserView : UserControl
                                                                                                         _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
-        _shuffleCheck.Content = UiStrings.LabelLibraryShuffle;
-        _autoPlayCheck.Content = UiStrings.LabelLibraryAutoPlay;
-        _checkSelectCheck.Content = UiStrings.LabelLibraryCheckSelect;
-        _autoPlayNextCheck.Content = UiStrings.LabelLibraryAutoPlayNext;
+        _shuffleLatch.LatchLabel = UiStrings.LabelLibraryShuffle;
+        _shuffleLatch.FitToLabel();
+        TransportToolTip.Attach(_shuffleLatch, UiStrings.TipOptionLibraryShuffle);
+        _autoPlayLatch.LatchLabel = UiStrings.LabelLibraryAutoPlay;
+        _autoPlayLatch.FitToLabel();
+        TransportToolTip.Attach(_autoPlayLatch, UiStrings.TipOptionLibraryAutoPlay);
+        _checkSelectLatch.LatchLabel = UiStrings.LabelLibraryCheckSelect;
+        _checkSelectLatch.FitToLabel();
+        TransportToolTip.Attach(_checkSelectLatch, UiStrings.TipOptionLibraryCheckSelect);
+        _autoPlayNextLatch.LatchLabel = UiStrings.LabelLibraryAutoPlayNext;
+        _autoPlayNextLatch.FitToLabel();
+        TransportToolTip.Attach(_autoPlayNextLatch, UiStrings.TipOptionLibraryAutoPlayNext);
         _explorerSearchHint.Text = UiStrings.LibrarySearchHint;
         _playlistSearchHint.Text = UiStrings.LibrarySearchHint;
         RebuildExplorerContextMenu();
@@ -3660,6 +3668,19 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         InvalidateGroupJackets();
+        _shuffleLatch.RefreshAppearance();
+        _autoPlayLatch.RefreshAppearance();
+        _autoPlayNextLatch.RefreshAppearance();
+        _checkSelectLatch.RefreshAppearance();
+    }
+
+    internal void SetOptionLatchWashThrough(bool wash)
+    {
+        foreach (var latch in new[] { _shuffleLatch, _autoPlayLatch, _autoPlayNextLatch, _checkSelectLatch })
+        {
+            latch.WashThrough = wash;
+            latch.RefreshAppearance();
+        }
     }
 
     internal static double GlowVeilOpacityFor(UiTheme theme) =>
@@ -9143,44 +9164,44 @@ internal sealed partial class LibraryBrowserView : UserControl
         BindRows(active, selected);
     }
 
-    private void ShuffleCheck_Changed(object sender, RoutedEventArgs e)
+    private void ShuffleLatch_Click(object sender, RoutedEventArgs e)
     {
         if (_shuffleBusy)
         {
             return;
         }
 
-        SetShuffleEnabled(_shuffleCheck.IsChecked == true);
+        SetShuffleEnabled(!_shuffleEnabled);
     }
 
-    private void AutoPlayCheck_Changed(object sender, RoutedEventArgs e)
+    private void AutoPlayLatch_Click(object sender, RoutedEventArgs e)
     {
         if (_autoPlayBusy)
         {
             return;
         }
 
-        SetAutoPlayEnabled(_autoPlayCheck.IsChecked == true, raise: true);
+        SetAutoPlayEnabled(!_autoPlayEnabled, raise: true);
     }
 
-    private void CheckSelectCheck_Changed(object sender, RoutedEventArgs e)
+    private void CheckSelectLatch_Click(object sender, RoutedEventArgs e)
     {
         if (_checkSelectBusy)
         {
             return;
         }
 
-        SetCheckSelectMode(_checkSelectCheck.IsChecked == true);
+        SetCheckSelectMode(!_checkSelectMode);
     }
 
-    private void AutoPlayNextCheck_Changed(object sender, RoutedEventArgs e)
+    private void AutoPlayNextLatch_Click(object sender, RoutedEventArgs e)
     {
         if (_autoPlayNextBusy)
         {
             return;
         }
 
-        SetAutoPlayNextEnabled(_autoPlayNextCheck.IsChecked == true);
+        SetAutoPlayNextEnabled(!_autoPlayNextEnabled);
     }
 
     private bool TryPatchBoundRows(IReadOnlyList<LibraryFileRow> rows)
