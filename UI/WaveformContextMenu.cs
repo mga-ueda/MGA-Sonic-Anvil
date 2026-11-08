@@ -80,6 +80,7 @@ internal enum WaveMenuCommand
     CheckSelectMode,
     SelectByGroupUp,
     SelectByGroupDown,
+    SelectSameColor,
     PreviousTrack,
     NextTrack,
     RestartTrack,
@@ -219,6 +220,9 @@ internal sealed class WaveformContextMenuModel
     public bool CheckSelectMode { get; init; }
     public bool CanStepPlaylist { get; init; }
     public bool CanRestartTrack { get; init; }
+
+    /// <summary>プレイリストに色付きファイルがあり、同色全選択できるか。</summary>
+    public bool CanSelectSameColor { get; init; }
     public bool VideoMini { get; init; }
     public bool MinimalChrome { get; init; }
     public bool CanToggleVideoMini { get; init; }
@@ -317,6 +321,7 @@ internal sealed class WaveformContextMenuModel
         AutoPlayNext = true,
         AutoPlay = true,
         CheckSelectMode = true,
+        CanSelectSameColor = true,
         KeepTarget = true,
         AutoActive = true,
         CanKeepTarget = true,
@@ -932,6 +937,11 @@ internal static class WaveformContextMenuBuilder
             WaveMenuCommand.SelectByGroupDown,
             MenuGestures.SelectByGroupDown,
             m.LibraryMaximized && m.CanStepPlaylist && !m.IsBusy),
+        Cmd(
+            UiStrings.WaveMenuSelectSameColor,
+            WaveMenuCommand.SelectSameColor,
+            MenuGestures.SelectSameColor,
+            m.LibraryMaximized && m.CanSelectSameColor && !m.IsBusy),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> SeekPlaybackItems(WaveformContextMenuModel m) =>

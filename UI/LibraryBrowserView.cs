@@ -3622,6 +3622,81 @@ internal sealed partial class LibraryBrowserView : UserControl
         FocusList();
     }
 
+    /// <summary>
+    /// キャレット行と同じファイル名色（色なし含む）の行だけを選ぶ。
+    /// </summary>
+    public void SelectSameColorRows()
+    {
+        if (!CanSelectSameColorRows())
+        {
+            return;
+        }
+
+        var files = SnapshotPlaylistFiles();
+        var caret = ResolvePlaylistCaretRow() ?? files[0];
+        var colorIndex = caret.FileNameMarkerIndex;
+        LibraryFileRow? last = null;
+        var firstIndex = -1;
+        _syncing = true;
+        SuspendPlaylistSelectionNotify();
+        try
+        {
+            ClearPlaylistRowSelectionFlags();
+            for (var i = 0; i < files.Count; i++)
+            {
+                var row = files[i];
+                if (row.FileNameMarkerIndex != colorIndex)
+                {
+                    continue;
+                }
+
+                SetPlaylistRowSelected(row, true);
+                last = row;
+                if (firstIndex < 0)
+                {
+                    firstIndex = i;
+                }
+            }
+
+            if (last is null || firstIndex < 0)
+            {
+                return;
+            }
+
+            _playlistRangeCaretIndex = -1;
+            SyncPlaylistCaretToGrid(last);
+            _anchorIndex = firstIndex;
+            PinSelectionCurrent();
+        }
+        finally
+        {
+            _syncing = false;
+            ResumePlaylistSelectionNotify();
+        }
+
+        FocusList();
+    }
+
+    /// <summary>プレイリストに行があり、かつ色マーカー付きの行があるときだけ同色選択できる。</summary>
+    public bool CanSelectSameColorRows()
+    {
+        var files = SnapshotPlaylistFiles();
+        if (files.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var row in files)
+        {
+            if (row.HasFileNameMarker)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void ApplyLocalizedText()
     {
         _groupLabel.Text = UiStrings.LibraryGroupLabel;

@@ -176,6 +176,13 @@ public partial class MainWindow
             case TransportCommand.SelectAll:
                 Waveform.SelectAll();
                 break;
+            case TransportCommand.SelectSameColor:
+                if (IsLibraryMaximized)
+                {
+                    LibraryBrowser.SelectSameColorRows();
+                }
+
+                break;
             case TransportCommand.ClearSelection:
                 Waveform.ClearSelection();
                 break;

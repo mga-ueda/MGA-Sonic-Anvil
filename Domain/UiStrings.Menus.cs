@@ -131,6 +131,8 @@ internal static partial class UiStrings
     /// <summary>プレイリストサブメニュー。グループ単位の範囲選択。ショートカットは Ctrl+Shift+↑↓（エディタの振幅ズームとは別）。頭出し(D) と重ならないよう下は W。</summary>
     public static string WaveMenuSelectByGroupUp => Get("グループごとに選択（上）(_G)", "Select by _Group Up");
     public static string WaveMenuSelectByGroupDown => Get("グループごとに選択（下）(_W)", "Select by Group Do_wn");
+    /// <summary>プレイリストサブメニュー。キャレットと同じ色の行を全選択。チェックボックス(C) と重ならないよう S。ショートカットは Shift+C。</summary>
+    public static string WaveMenuSelectSameColor => Get("同じ色のファイルをすべて選択(_S)", "Select All _Same Color");
     /// <summary>再生カテゴリ内。P／N／R はプレイリストの前後曲と頭出し。アクセスキーは再生(P) などと重ならない。</summary>
     public static string WaveMenuPreviousTrack => Get("前の曲(_K)", "Previous Track (_K)");
     public static string WaveMenuNextTrack => Get("次の曲(_J)", "Next Track (_J)");

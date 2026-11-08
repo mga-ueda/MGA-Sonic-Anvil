@@ -167,6 +167,7 @@ public sealed class TransportIconThemeTests
                 TransportIcon.InsertSilence,
                 TransportIcon.DetectSilence,
                 TransportIcon.SelectAll,
+                TransportIcon.SelectSameColor,
                 TransportIcon.ClearSelection,
                 TransportIcon.CrossfadeEdit,
                 TransportIcon.NormalizePerRegion,

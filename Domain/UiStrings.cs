@@ -500,6 +500,7 @@ internal static partial class UiStrings
     public static string LabelToolbarInsertSilence => WithoutAccessKey(WaveMenuInsertSilence);
     public static string LabelToolbarDetectSilence => WithoutAccessKey(WaveMenuDetectSilence);
     public static string LabelToolbarSelectAll => WithoutAccessKey(WaveMenuSelectAll);
+    public static string LabelToolbarSelectSameColor => WithoutAccessKey(WaveMenuSelectSameColor);
     public static string LabelToolbarClearSelection => WithoutAccessKey(WaveMenuClearSelection);
     public static string LabelToolbarCrossfadeEdit => WithoutAccessKey(WaveMenuCrossfadeEdit);
     public static string LabelToolbarNormalizePerRegion => WithoutAccessKey(WaveMenuNormalizePerRegion);
@@ -1367,6 +1368,9 @@ internal static partial class UiStrings
     public static string TooltipInsertSilence => Get("無音を挿入 (Ctrl+Ins)", "Insert silence (Ctrl+Ins)");
     public static string TooltipDetectSilence => Get("無音・ヒット検出 (Ctrl+D)", "Silence & hit detection (Ctrl+D)");
     public static string TooltipSelectAll => Get("すべて選択 (Ctrl+A)", "Select all (Ctrl+A)");
+    public static string TooltipSelectSameColor => Get(
+        "同じ色のファイルをすべて選択 (Shift+C)",
+        "Select all same color (Shift+C)");
     public static string TooltipClearSelection => Get("選択を解除 (Esc)", "Clear selection (Esc)");
     public static string TooltipCrossfadeEdit => Get("フェード調整ツール (Shift+X)", "Fade adjust tool (Shift+X)");
     public static string TooltipNormalizePerRegion => Get("リージョン毎にノーマライズ", "Normalize per region");

@@ -98,6 +98,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoPlay));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectByGroupUp));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectByGroupDown));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectSameColor));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.VideoMini));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ForceVideoProxy));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Undo));
@@ -584,6 +585,9 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Delete, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsSelectSameColor(Key.C, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsSelectSameColor(Key.C, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.Control | ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Y, ModifierKeys.Control));

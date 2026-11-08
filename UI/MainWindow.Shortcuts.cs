@@ -2211,6 +2211,18 @@ public partial class MainWindow
                 return true;
             }
 
+            if (LibraryPlayerMode.IsSelectSameColor(key, modifiers))
+            {
+                if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
+                        _playlistVideoChromeVisible))
+                {
+                    return true;
+                }
+
+                LibraryBrowser.SelectSameColorRows();
+                return true;
+            }
+
             if (key == Key.C && modifiers == ModifierKeys.Control)
             {
                 LibraryBrowser.CopySelected();

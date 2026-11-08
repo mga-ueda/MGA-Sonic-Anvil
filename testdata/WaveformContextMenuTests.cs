@@ -290,6 +290,8 @@ public sealed class WaveformContextMenuTests
             Assert.Equal(MenuGestures.SelectByGroupUp, Find(tree, WaveMenuCommand.SelectByGroupUp)?.Gesture);
             Assert.Contains(WaveMenuCommand.SelectByGroupDown, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal(MenuGestures.SelectByGroupDown, Find(tree, WaveMenuCommand.SelectByGroupDown)?.Gesture);
+            Assert.Contains(WaveMenuCommand.SelectSameColor, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
+            Assert.Equal(MenuGestures.SelectSameColor, Find(tree, WaveMenuCommand.SelectSameColor)?.Gesture);
             var view = Category(tree, UiStrings.WaveMenuCatView).Children!;
             Assert.Contains(UiStrings.WaveMenuCatAnalysis, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(UiStrings.WaveMenuCatScreen, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
