@@ -598,12 +598,13 @@ internal sealed class LoudnessMeterView : Grid
             VerticalAlignment = VerticalAlignment.Center,
             TextAlignment = TextAlignment.Right,
         };
+        // 縦 Padding を Margin に移し、行高（行間）はそのままで塗り同士だけ隙間を空ける。
         var box = DesignMetrics.BindCorner(new Border
         {
             Child = value,
-            Padding = new Thickness(3, 1, 3, 1),
+            Padding = new Thickness(3, 0, 3, 0),
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(6, 0, 4, 0),
+            Margin = new Thickness(6, 1, 4, 1),
             Background = Brushes.Transparent,
         });
         return (box, value);
