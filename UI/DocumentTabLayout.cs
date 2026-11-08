@@ -18,13 +18,22 @@ internal static class DocumentTabLayout
     public const double GridPadLeft = 10;
     public const double GridPadRight = 4;
     public const double TitleMarginRight = 6;
-    public const double BorderRight = 1;
+    /// <summary>上下のわずかな余白。</summary>
+    public const double GapVertical = 1;
+    /// <summary>タブ間のすき間。</summary>
+    public const double GapRight = 2;
 
     private static readonly Typeface TitleTypeface =
         new(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
 
+    /// <summary>タブ角の丸み（設定の GUI 角丸に追随）。</summary>
+    public static double CornerRadius =>
+        Math.Clamp(DesignMetrics.ControlCornerRadius, 0, 10);
+
     public static double ChromeWidth =>
-        BorderRight + GridPadLeft + GridPadRight + TitleMarginRight + CloseWidth;
+        GridPadLeft + GridPadRight + TitleMarginRight + CloseWidth;
+
+    public static Thickness ItemMargin => new(0, GapVertical, GapRight, GapVertical);
 
     public static string MinVisibleText(string? title)
     {

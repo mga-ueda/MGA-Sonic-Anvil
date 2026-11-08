@@ -134,6 +134,9 @@ internal static class DesignMetrics
 
     public static double DocumentTabScrollButtonWidth => From96(20);
 
+    /// <summary>タブ隣の新規（＋）ボタン一辺。タブ本体より小さく。</summary>
+    public static double DocumentTabNewButtonWidth => From96(14);
+
     public static double RulerHeight => From96(16);
 
     public static double MarkerLaneRowHeight => From96(16);

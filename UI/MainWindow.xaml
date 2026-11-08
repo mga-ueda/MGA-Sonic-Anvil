@@ -157,12 +157,9 @@
                             PanningMode="HorizontalOnly"
                             ScrollChanged="DocumentTabScroll_ScrollChanged"
                             PreviewMouseWheel="DocumentTabScroll_PreviewMouseWheel">
-                <Grid>
-                  <StackPanel x:Name="DocumentTabs"
-                              Orientation="Horizontal" />
-                  <Canvas x:Name="DocumentTabAccentHost"
-                          IsHitTestVisible="False" />
-                </Grid>
+                <StackPanel x:Name="DocumentTabs"
+                            Orientation="Horizontal"
+                            ClipToBounds="False" />
               </ScrollViewer>
             </DockPanel>
           </Grid>

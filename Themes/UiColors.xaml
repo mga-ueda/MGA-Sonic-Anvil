@@ -39,6 +39,7 @@
     <SolidColorBrush x:Key="WaveZeroLineBrush" Color="#5ACCCCCC" />
     <SolidColorBrush x:Key="TimelineWellBackBrush" Color="#FF17171A" />
     <!-- タブ／タイル帯の選択・アクティブ。背景は半透明。 -->
+    <SolidColorBrush x:Key="DocumentTabIdleBackBrush" Color="#18FFFFFF" />
     <SolidColorBrush x:Key="DocumentTabSelectedBackBrush" Color="#30FFFFFF" />
     <SolidColorBrush x:Key="DocumentTabSelectedDirtyBackBrush" Color="#40FF002B" />
     <SolidColorBrush x:Key="DocumentTabSelectedForeBrush" Color="#FFFFFFFF" />
