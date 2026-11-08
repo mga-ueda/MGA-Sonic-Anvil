@@ -24,6 +24,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.HidesWaveformContextMenu(playerMode: false));
         Assert.False(LibraryPlayerMode.ShowsCueOverlays(playerMode: true));
         Assert.True(LibraryPlayerMode.ShowsCueOverlays(playerMode: false));
+        Assert.False(LibraryPlayerMode.ShowsEditorOnlyStatusLatches(playerMode: true));
+        Assert.True(LibraryPlayerMode.ShowsEditorOnlyStatusLatches(playerMode: false));
         Assert.True(LibraryPlayerMode.ShowsPlayerScratchOverlays(
             playerMode: true,
             videoMiniPlayer: true,
@@ -87,6 +89,8 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CenterLock));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.MaximizeLibrary));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SilentSkip));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoLoop));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AlwaysOnTop));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Manual));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewWaveform));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Shuffle));
@@ -295,6 +299,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.PreviousTrack));
         Assert.False(LibraryPlayerMode.BlocksTransport(TransportCommand.NextTrack));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CenterPlayhead));
+        Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.CenterLock));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleSpectrogram));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleLoudnessView));
         Assert.True(LibraryPlayerMode.BlocksTransport(TransportCommand.ToggleAnalysis));

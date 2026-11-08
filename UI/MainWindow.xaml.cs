@@ -176,6 +176,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        InitStatusOptionLatches();
         BindAcrylicToasts();
         ApplyRememberedVideoChrome();
         EditHistory.CommandApplying += ResetPlaybackPitchForEdit;
@@ -280,10 +281,10 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(ApplyUiColors);
         };
         UiScaleService.Changed += (_, _) => Dispatcher.BeginInvoke(OnUiScaleChanged);
-        AlwaysOnTopCheck.IsChecked = AppStorage.Settings.AlwaysOnTop;
+        AlwaysOnTopLatch.IsLatched = AppStorage.Settings.AlwaysOnTop;
         Topmost = AppStorage.Settings.AlwaysOnTop;
-        SilentSkipCheck.IsChecked = AppStorage.Settings.SilentSkip;
-        AutoLoopCheck.IsChecked = AppStorage.Settings.LibraryAutoLoop;
+        SilentSkipLatch.IsLatched = AppStorage.Settings.SilentSkip;
+        AutoLoopLatch.IsLatched = AppStorage.Settings.LibraryAutoLoop;
         Mp3Gapless.Enabled = AppStorage.Settings.GaplessPlayback;
         ApplyMonitorMixFromSettings();
         ApplySilentSkipFromSettings();
@@ -869,8 +870,17 @@ public partial class MainWindow : Window
 
     private void RefreshLocalizedText()
     {
-        AlwaysOnTopCheck.Content = UiStrings.LabelAlwaysOnTop;
-        SilentSkipCheck.Content = UiStrings.LabelSilentSkip;
+        AlwaysOnTopLatch.LatchLabel = UiStrings.LabelAlwaysOnTop;
+        AlwaysOnTopLatch.FitToLabel();
+        SilentSkipLatch.LatchLabel = UiStrings.LabelSilentSkip;
+        SilentSkipLatch.FitToLabel();
+        AutoLoopLatch.LatchLabel = UiStrings.LabelLibraryAutoLoop;
+        AutoLoopLatch.FitToLabel();
+        CenterLockLatch.LatchLabel = UiStrings.LabelCenterLock;
+        CenterLockLatch.FitToLabel();
+        MarkerClickLatch.LatchLabel = UiStrings.LabelMarkerClick;
+        MarkerClickLatch.FitToLabel();
+        ApplyStatusOptionLatchToolTips();
         StatusTimes.ApplyLocalizedText();
         TimeScrollStrip.ApplyLocalizedText();
         Transport.ApplyLocalizedText();
@@ -1816,11 +1826,123 @@ public partial class MainWindow : Window
         ];
     }
 
-    private void AlwaysOnTopCheck_Changed(object sender, RoutedEventArgs e)
+    private void InitStatusOptionLatches()
     {
-        var enabled = AlwaysOnTopCheck.IsChecked == true;
-        ApplyWindowTopmost();
+        foreach (var latch in new[]
+                 {
+                     CenterLockLatch,
+                     MarkerClickLatch,
+                     SilentSkipLatch,
+                     AutoLoopLatch,
+                     AlwaysOnTopLatch,
+                 })
+        {
+            latch.UseLatchToggleTheme = true;
+            latch.FitToLabel();
+        }
+
+        ApplyStatusOptionLatchToolTips();
+        SyncEditorOnlyStatusLatches();
+    }
+
+    private void SetOptionLatchWashThrough(bool wash)
+    {
+        foreach (var latch in new[]
+                 {
+                     CenterLockLatch,
+                     MarkerClickLatch,
+                     SilentSkipLatch,
+                     AutoLoopLatch,
+                     AlwaysOnTopLatch,
+                 })
+        {
+            latch.WashThrough = wash;
+            latch.RefreshAppearance();
+        }
+
+        WaapiBar.SetOptionLatchWashThrough(wash);
+        LibraryBrowser.SetOptionLatchWashThrough(wash);
+    }
+
+    private void ApplyStatusOptionLatchToolTips()
+    {
+        TransportToolTip.Attach(CenterLockLatch, UiStrings.TipOptionCenterLock);
+        TransportToolTip.Attach(MarkerClickLatch, UiStrings.TipOptionMarkerClick);
+        TransportToolTip.Attach(SilentSkipLatch, UiStrings.TipOptionSilentSkip);
+        TransportToolTip.Attach(AutoLoopLatch, UiStrings.TipLibraryAutoLoop);
+        TransportToolTip.Attach(AlwaysOnTopLatch, UiStrings.TipOptionAlwaysOnTop);
+    }
+
+    /// <summary>センターロック／マーカークリックはエディタ専用。プレイヤーではステータスから隠す。</summary>
+    private void SyncEditorOnlyStatusLatches()
+    {
+        var editor = LibraryPlayerMode.ShowsEditorOnlyStatusLatches(IsLibraryMaximized);
+        var visibility = editor ? Visibility.Visible : Visibility.Collapsed;
+        CenterLockLatch.Visibility = visibility;
+        MarkerClickLatch.Visibility = visibility;
+        CenterLockLatch.IsEnabled = editor;
+        MarkerClickLatch.IsEnabled = editor;
+        CenterLockLatch.IsLatched = Waveform.CenterLocked;
+        MarkerClickLatch.IsLatched = _rangeClickEnabled;
+        CenterLockLatch.RefreshAppearance();
+        MarkerClickLatch.RefreshAppearance();
+        Transport.SetCenterLock(editor && Waveform.CenterLocked);
+    }
+
+    private void CenterLockLatch_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsLibraryMaximized)
+        {
+            SyncEditorOnlyStatusLatches();
+            return;
+        }
+
+        ToggleCenterLock();
+    }
+
+    private void MarkerClickLatch_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsLibraryMaximized)
+        {
+            SyncEditorOnlyStatusLatches();
+            return;
+        }
+
+        ToggleRangeClick();
+    }
+
+    private void AlwaysOnTopLatch_Click(object sender, RoutedEventArgs e)
+    {
+        AlwaysOnTopLatch.IsLatched = !AlwaysOnTopLatch.IsLatched;
+        ApplyAlwaysOnTopFromLatch(showToast: IsLoaded);
+    }
+
+    private void SilentSkipLatch_Click(object sender, RoutedEventArgs e)
+    {
+        SilentSkipLatch.IsLatched = !SilentSkipLatch.IsLatched;
+        ApplySilentSkipFromLatch(showToast: IsLoaded);
+    }
+
+    private void AutoLoopLatch_Click(object sender, RoutedEventArgs e)
+    {
+        AutoLoopLatch.IsLatched = !AutoLoopLatch.IsLatched;
         if (!IsLoaded)
+        {
+            return;
+        }
+
+        if (LibraryBrowser.AutoLoopEnabled != AutoLoopLatch.IsLatched)
+        {
+            LibraryBrowser.AutoLoopEnabled = AutoLoopLatch.IsLatched;
+        }
+    }
+
+    private void ApplyAlwaysOnTopFromLatch(bool showToast)
+    {
+        var enabled = AlwaysOnTopLatch.IsLatched;
+        ApplyWindowTopmost();
+        Transport.SetAlwaysOnTop(enabled);
+        if (!showToast)
         {
             return;
         }
@@ -1830,32 +1952,33 @@ public partial class MainWindow : Window
         ShowOptionToggleToast(UiStrings.LabelAlwaysOnTop, enabled);
     }
 
-    private void SilentSkipCheck_Changed(object sender, RoutedEventArgs e)
+    private void ApplySilentSkipFromLatch(bool showToast)
     {
         ApplySilentSkipFromSettings();
-        if (!IsLoaded)
+        Transport.SetSilentSkip(SilentSkipLatch.IsLatched);
+        if (!showToast)
         {
             return;
         }
 
-        var enabled = SilentSkipCheck.IsChecked == true;
+        var enabled = SilentSkipLatch.IsLatched;
         AppStorage.Settings.SilentSkip = enabled;
         AppStorage.Save();
         ShowOptionToggleToast(UiStrings.LabelSilentSkip, enabled);
     }
 
-    private void AutoLoopCheck_Changed(object sender, RoutedEventArgs e)
+    /// <summary>ショートカット／メニューから Always on Top を反転する。</summary>
+    private void ToggleAlwaysOnTopLatch()
     {
-        if (!IsLoaded)
-        {
-            return;
-        }
+        AlwaysOnTopLatch.IsLatched = !AlwaysOnTopLatch.IsLatched;
+        ApplyAlwaysOnTopFromLatch(showToast: IsLoaded);
+    }
 
-        var enabled = AutoLoopCheck.IsChecked == true;
-        if (LibraryBrowser.AutoLoopEnabled != enabled)
-        {
-            LibraryBrowser.AutoLoopEnabled = enabled;
-        }
+    /// <summary>ショートカット／メニューから Silent Skip を反転する。</summary>
+    private void ToggleSilentSkipLatch()
+    {
+        SilentSkipLatch.IsLatched = !SilentSkipLatch.IsLatched;
+        ApplySilentSkipFromLatch(showToast: IsLoaded);
     }
 
     private void ApplyMonitorMixFromSettings()
@@ -1868,7 +1991,7 @@ public partial class MainWindow : Window
 
     private void ApplySilentSkipFromSettings()
     {
-        var enabled = SilentSkipCheck.IsChecked == true
+        var enabled = SilentSkipLatch.IsLatched
             && !LibraryPlayerMode.IgnoresSilentSkipForVideo(
                 IsLibraryMaximized,
                 LibraryBrowser.PlaylistVisualIsVideo);

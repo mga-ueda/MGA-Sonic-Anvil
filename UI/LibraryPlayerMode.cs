@@ -24,6 +24,9 @@ internal static class LibraryPlayerMode
     /// <summary>プレイヤーではドキュメントのマーカー／リージョン／ループを波形に出さない。</summary>
     public static bool ShowsCueOverlays(bool playerMode) => !playerMode;
 
+    /// <summary>センターロック／マーカークリックはエディタ専用（ステータスバーにも出さない）。</summary>
+    public static bool ShowsEditorOnlyStatusLatches(bool playerMode) => !playerMode;
+
     /// <summary>
     /// 捨て A-B／マーカーを波形に出すか。
     /// 音声のプレイリスト波形、動画本再生／F8 ミニ／イマーシブ一時停止。
@@ -91,6 +94,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.ForceVideoProxy
             or WaveMenuCommand.ViewWaveform
             or WaveMenuCommand.SilentSkip
+            or WaveMenuCommand.AutoLoop
             or WaveMenuCommand.AlwaysOnTop
             or WaveMenuCommand.Open
             or WaveMenuCommand.Settings

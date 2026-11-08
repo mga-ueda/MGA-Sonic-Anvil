@@ -620,6 +620,7 @@ public partial class MainWindow
     {
         var show = IsLibraryMaximized;
         ApplyStatusFieldChrome();
+        SyncEditorOnlyStatusLatches();
         LibraryBrowser.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         LibraryBrowser.IsEnabled = show;
         if (show)
@@ -2707,6 +2708,7 @@ public partial class MainWindow
         }
 
         MonitorToggles.WashThrough = show;
+        SetOptionLatchWashThrough(show);
 
         LevelMeter.InvalidateVisual();
         VectorScope.InvalidateVisual();
@@ -3170,6 +3172,10 @@ public partial class MainWindow
                 CanMergeTabs: CanMergeSelectedTabs()));
         Transport.SetSampleLoopPresent(hasSampleLoop);
         Transport.SetRangeClick(_rangeClickEnabled);
+        Transport.SetSilentSkip(SilentSkipLatch.IsLatched);
+        Transport.SetAutoLoop(LibraryBrowser.AutoLoopEnabled);
+        Transport.SetAlwaysOnTop(AlwaysOnTopLatch.IsLatched);
+        Transport.SetCenterLock(!IsLibraryMaximized && Waveform.CenterLocked);
         Transport.ApplyMenuEnabled(
             WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(CaptureMenuBarHit())),
             playerMode: IsLibraryMaximized);
@@ -6502,9 +6508,11 @@ public partial class MainWindow
         AppStorage.Settings.LibraryAutoLoop = LibraryBrowser.AutoLoopEnabled;
         AppStorage.Save();
         ShowOptionToggleToast(UiStrings.LabelLibraryAutoLoop, LibraryBrowser.AutoLoopEnabled);
-        if (AutoLoopCheck.IsChecked != LibraryBrowser.AutoLoopEnabled)
+        Transport.SetAutoLoop(LibraryBrowser.AutoLoopEnabled);
+        if (AutoLoopLatch.IsLatched != LibraryBrowser.AutoLoopEnabled)
         {
-            AutoLoopCheck.IsChecked = LibraryBrowser.AutoLoopEnabled;
+            AutoLoopLatch.IsLatched = LibraryBrowser.AutoLoopEnabled;
+            AutoLoopLatch.RefreshAppearance();
         }
 
         _crossfadeWindow?.SetSingleLoopChecked(LibraryBrowser.AutoLoopEnabled);
