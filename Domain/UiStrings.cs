@@ -237,6 +237,14 @@ internal static partial class UiStrings
         "バウンス中: {0}",
         "Bouncing: {0}",
         name);
+    public static string OverlayVstInsertLoading => Get("プラグインをインサート中", "Inserting plug-in");
+    public static string OverlayVstInsertLoadingPlugin(string name) => Format(
+        "インサート中: {0}",
+        "Inserting: {0}",
+        name);
+    public static string OverlayVstPluginStartupLoading => Get(
+        "プラグイン読み込み中",
+        "Loading plug-ins");
     public static string LabelToolbarBounce => WithoutAccessKey(WaveMenuBounce);
     public static string TooltipBounce => TooltipVstInsertBake;
     public static string LabelVstInsert => Get("インサート(_I)", "_Insert");
@@ -248,6 +256,11 @@ internal static partial class UiStrings
     public static string LabelVstInsertRemoveAllTabs => Get("全てのタブから削除(_T)", "Remove from All _Tabs");
     public static string LabelVstInsertRemoveAll => Get("すべて削除(_A)", "Remove _All");
     public static string LabelVstInsertOpenEditor => Get("エディタを開く(_O)", "_Open editor");
+    public static string LabelVstInsertCopySettings => Get("設定をコピー(_Y)", "Copy _Settings");
+    public static string LabelVstInsertPasteSettings => Get("設定をペースト(_V)", "Paste _Settings");
+    public static string LabelVstInsertPasteSettingsAllTabs => Get(
+        "全てのタブへペースト(_S)",
+        "Paste Settings to All Tabs (_S)");
     public static string TooltipVstInsertPersist => Get(
         "このスロットと、今刺さっているプラグインとパラメータを記憶します。タブを閉じても、別の波形を開くと同じスロットに同じ設定で有効になります。他のタブのプラグイン設定が消えるときは、置き換えるか中止するかを確認します",
         "Remember this slot, plug-in, and its parameters. After you close the tab, opening any other waveform restores the same slot with the same settings. If that would erase plug-in settings on other tabs, you are asked whether to replace them or cancel");
@@ -256,6 +269,17 @@ internal static partial class UiStrings
     public static string WarnVstPersistReplacesOtherTabs(string list) => Format(
         "このスロットを永続化すると、他のタブで使っているプラグインの設定が消えます。\n\n対象:\n{0}\n\nOK: 他のタブもこの設定に置き換えて永続化する\nCancel: 永続化しない",
         "Persisting this slot would erase plug-in settings used on other tabs.\n\nAffected:\n{0}\n\nOK: replace the other tabs with this setup and persist it\nCancel: do not persist",
+        list);
+    public static string TitleVstPasteReplace => Get("設定のペースト", "Paste Settings");
+    /// <summary>使用中スロットへペーストするときの確認（OK＝置き換え／Cancel＝中止）。</summary>
+    public static string WarnVstPasteReplacesSlot(string plugin) => Format(
+        "このスロットには既に「{0}」がインサートされています。置き換えてペーストしますか？\n\nOK: 置き換える\nCancel: 中止",
+        "This slot already has “{0}” inserted. Replace it and paste?\n\nOK: replace\nCancel: cancel",
+        plugin);
+    /// <summary>全タブペーストで使用中スロットがあるときの確認。</summary>
+    public static string WarnVstPasteReplacesSlots(string list) => Format(
+        "既にインサートされているスロットの内容が消えます。置き換えてペーストしますか？\n\n対象:\n{0}\n\nOK: 置き換える\nCancel: 中止",
+        "This will erase plug-ins already inserted in the target slots. Replace and paste?\n\nAffected:\n{0}\n\nOK: replace\nCancel: cancel",
         list);
     public static string VstPersistLossLine(string tab, string plugin) => Format(
         "{0}（{1}）",

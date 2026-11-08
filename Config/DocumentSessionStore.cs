@@ -649,6 +649,89 @@ internal static class DocumentSessionStore
         };
     }
 
+    /// <summary>スロットとスナップショットが同じプラグインか（パス／ClassId）。</summary>
+    public static bool SlotMatchesPlugin(VstInsertSlot slot, VstInsertSlotSnapshot? snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        if (snapshot is null
+            || slot.IsEmpty
+            || string.IsNullOrWhiteSpace(snapshot.PluginPath))
+        {
+            return false;
+        }
+
+        return string.Equals(slot.PluginPath, snapshot.PluginPath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(slot.ClassId ?? string.Empty, snapshot.ClassId ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// クリップボードの設定を貼り付ける。
+    /// 空きスロットならプラグインごと載せ、同一プラグインなら StateBlob だけ上書き（バイパスは触らない）。
+    /// <paramref name="replaceDifferentPlugin"/> が true なら別プラグインも置き換える（全タブペースト用）。
+    /// </summary>
+    /// <returns>貼り付けたら true。拒否／不正 Base64 は false。</returns>
+    public static bool TryPasteSlotSettings(
+        VstInsertSlot target,
+        VstInsertSlotSnapshot? clipboard,
+        bool replaceDifferentPlugin = false)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (clipboard is null || string.IsNullOrWhiteSpace(clipboard.PluginPath))
+        {
+            return false;
+        }
+
+        if (!TryDecodeStateBlob(clipboard, out var state))
+        {
+            return false;
+        }
+
+        if (target.IsEmpty || (replaceDifferentPlugin && !SlotMatchesPlugin(target, clipboard)))
+        {
+            target.PluginPath = clipboard.PluginPath;
+            target.ClassId = clipboard.ClassId;
+            target.DisplayName = clipboard.DisplayName;
+            target.Bypassed = clipboard.Bypassed;
+            target.StateBlob = state is null ? null : (byte[])state.Clone();
+            target.Faulted = false;
+            return true;
+        }
+
+        if (!SlotMatchesPlugin(target, clipboard))
+        {
+            return false;
+        }
+
+        if (StateBlobEquals(target.StateBlob, state))
+        {
+            return false;
+        }
+
+        target.StateBlob = state is null ? null : (byte[])state.Clone();
+        target.Faulted = false;
+        return true;
+    }
+
+    /// <summary>スナップショットの StateBase64 をデコードする。空は成功・null。</summary>
+    public static bool TryDecodeStateBlob(VstInsertSlotSnapshot? snapshot, out byte[]? state)
+    {
+        state = null;
+        if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.StateBase64))
+        {
+            return true;
+        }
+
+        try
+        {
+            state = Convert.FromBase64String(snapshot.StateBase64);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>スロット内容が永続スナップショットと一致するか（パス／ClassId／バイパス）。</summary>
     public static bool SlotMatchesPersisted(VstInsertSlotSnapshot[]? defaults, int index, VstInsertSlot slot)
     {
