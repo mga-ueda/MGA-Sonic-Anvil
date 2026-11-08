@@ -595,10 +595,10 @@ public partial class MainWindow
     private void ShowBusyGlass(string message)
     {
         RootChrome.UpdateLayout();
-        RootDock.UpdateLayout();
+        // 覆いと同じ RootChrome を DPI 対応 Render で撮る（VisualBrush は高 DPI で左に縮む）。
         _busyGlass.ShowOverlay(
             RootChrome,
-            RootDock,
+            RootChrome,
             GetBusyGlassCoverBounds(),
             message);
     }

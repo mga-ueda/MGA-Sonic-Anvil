@@ -36,6 +36,8 @@ internal sealed class BusyGlassOverlay : FrameworkElement
     private float _fadeStartOpacity = 1f;
     private float _paintOpacity = 1f;
     private Panel? _host;
+    private FrameworkElement? _captureSource;
+    private Rect _coverBounds;
 
     public BusyGlassOverlay()
     {
@@ -59,14 +61,26 @@ internal sealed class BusyGlassOverlay : FrameworkElement
     {
         CancelFade();
         EnsureParent(host, coverBounds);
+        _captureSource = captureSource;
+        _coverBounds = coverBounds;
 
-        _frostedBrush = CaptureFrostedBrush(captureSource, coverBounds);
+        // host 自身を撮るときだけ、自分を畳んでからキャプチャする。
+        if (ReferenceEquals(host, captureSource))
+        {
+            Visibility = Visibility.Collapsed;
+            host.UpdateLayout();
+        }
+
+        captureSource.UpdateLayout();
+        _frostedBrush = CaptureFrostedBrush(captureSource);
+
         _baseText = NormalizeMessage(baseText);
         _statusText = string.Empty;
         _jobs = [];
         _jobFitNames = [];
         _dotCount = 1;
-        _percent = 0;
+        // 進捗未報告は不定。0% のまま固定しない（プラグイン読み込みなど）。
+        _percent = -1;
         _paintOpacity = 1f;
 
         Visibility = Visibility.Visible;
@@ -84,6 +98,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         }
 
         ApplyBounds(coverBounds);
+        _coverBounds = coverBounds;
         InvalidateVisual();
     }
 
@@ -175,6 +190,8 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         _frostedBrush = null;
         _jobs = [];
         _jobFitNames = [];
+        _captureSource = null;
+        _coverBounds = default;
         if (_host?.Children.Contains(this) == true)
         {
             _host.Children.Remove(this);
@@ -312,7 +329,8 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             dpi);
 
         var statusText = _statusText;
-        var percentText = _percent >= 0
+        var showProgress = _percent >= 0;
+        var percentText = showProgress
             ? (string.IsNullOrEmpty(statusText) ? $"{_percent}%" : $"{statusText}  {_percent}%")
             : statusText;
         var percentFormatted = new FormattedText(
@@ -326,7 +344,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
 
         var headerHeight = baseFormatted.Height
             + (percentText.Length > 0 ? 8 + percentFormatted.Height : 0)
-            + 16 + ProgressBarHeight;
+            + (showProgress ? 16 + ProgressBarHeight : 0);
         var jobsGap = _jobs.Length > 0 ? 14d : 0d;
         var availableJobsHeight = Math.Max(
             BusyGlassJobLayout.MinRowHeight,
@@ -353,12 +371,21 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             dc.DrawText(percentFormatted, new Point(percentX, percentY));
             barY = percentY + percentFormatted.Height + 12;
         }
-        else
+        else if (showProgress)
         {
             barY += 16;
         }
 
-        DrawBar(dc, (ActualWidth - ProgressBarWidth) / 2, barY, ProgressBarWidth, Math.Clamp(_percent, 0, 100) / 100d, opacity);
+        if (showProgress)
+        {
+            DrawBar(
+                dc,
+                (ActualWidth - ProgressBarWidth) / 2,
+                barY,
+                ProgressBarWidth,
+                Math.Clamp(_percent, 0, 100) / 100d,
+                opacity);
+        }
 
         if (_jobs.Length > 0)
         {
@@ -367,7 +394,7 @@ internal sealed class BusyGlassOverlay : FrameworkElement
             var gridWidth = layout.Columns * layout.RowWidth
                 + Math.Max(0, layout.Columns - 1) * BusyGlassJobLayout.ColumnGap;
             var gridX = (ActualWidth - gridWidth) / 2;
-            var rowY = barY + ProgressBarHeight + 14;
+            var rowY = barY + (showProgress ? ProgressBarHeight + 14 : 14);
             for (var i = 0; i < _jobs.Length; i++)
             {
                 var col = i / layout.Rows;
@@ -500,52 +527,42 @@ internal sealed class BusyGlassOverlay : FrameworkElement
         return best;
     }
 
-    private static ImageBrush? CaptureFrostedBrush(FrameworkElement captureSource, Rect coverBounds)
+    /// <summary>
+    /// 要素を OS DPI どおりに Render してから縮小する。
+    /// VisualBrush→96DPI の経路は高 DPI で内容が左に縮む。
+    /// </summary>
+    private static ImageBrush? CaptureFrostedBrush(FrameworkElement captureSource)
     {
-        if (coverBounds.Width <= 0 || coverBounds.Height <= 0)
-        {
-            return null;
-        }
-
         try
         {
             captureSource.UpdateLayout();
-            var fullW = Math.Max(1, (int)Math.Ceiling(captureSource.ActualWidth));
-            var fullH = Math.Max(1, (int)Math.Ceiling(captureSource.ActualHeight));
-            if (fullW <= 1 || fullH <= 1)
+            var dipW = captureSource.ActualWidth;
+            var dipH = captureSource.ActualHeight;
+            if (dipW <= 1 || dipH <= 1)
             {
                 return null;
             }
 
-            var cropX = Math.Clamp((int)Math.Floor(coverBounds.X), 0, fullW - 1);
-            var cropY = Math.Clamp((int)Math.Floor(coverBounds.Y), 0, fullH - 1);
-            var cropW = Math.Clamp((int)Math.Ceiling(coverBounds.Width), 1, fullW - cropX);
-            var cropH = Math.Clamp((int)Math.Ceiling(coverBounds.Height), 1, fullH - cropY);
-            var (midW, midH) = FrostPixelSize(cropW, cropH, FrostRenderDivisor);
-            var (tinyW, tinyH) = FrostPixelSize(cropW, cropH, FrostBrushDivisor);
+            var dpi = VisualTreeHelper.GetDpi(captureSource);
+            var pixelW = Math.Max(1, (int)Math.Ceiling(dipW * dpi.DpiScaleX));
+            var pixelH = Math.Max(1, (int)Math.Ceiling(dipH * dpi.DpiScaleY));
+            var full = new RenderTargetBitmap(
+                pixelW,
+                pixelH,
+                96 * dpi.DpiScaleX,
+                96 * dpi.DpiScaleY,
+                PixelFormats.Pbgra32);
+            full.Render(captureSource);
+            full.Freeze();
 
-            var visual = new DrawingVisual();
-            using (var dc = visual.RenderOpen())
-            {
-                var brush = new VisualBrush(captureSource)
-                {
-                    Stretch = Stretch.Fill,
-                    ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
-                    Viewbox = new Rect(
-                        cropX / (double)fullW,
-                        cropY / (double)fullH,
-                        cropW / (double)fullW,
-                        cropH / (double)fullH),
-                };
-                dc.DrawRectangle(brush, null, new Rect(0, 0, midW, midH));
-            }
-
-            var rtb = new RenderTargetBitmap(midW, midH, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(visual);
-            rtb.Freeze();
-            var tiny = midW == tinyW && midH == tinyH
-                ? rtb
-                : ScaleBitmap(rtb, tinyW, tinyH);
+            var (midW, midH) = FrostPixelSize(pixelW, pixelH, FrostRenderDivisor);
+            var (tinyW, tinyH) = FrostPixelSize(pixelW, pixelH, FrostBrushDivisor);
+            BitmapSource mid = midW == pixelW && midH == pixelH
+                ? full
+                : ScaleBitmap(full, midW, midH);
+            var tiny = tinyW == mid.PixelWidth && tinyH == mid.PixelHeight
+                ? mid
+                : ScaleBitmap(mid, tinyW, tinyH);
             var image = new ImageBrush(tiny)
             {
                 Stretch = Stretch.Fill,
