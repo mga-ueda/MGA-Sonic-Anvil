@@ -561,7 +561,7 @@
         </div>
         <h4>Waveform</h4>
         <ul>
-          <li>The waveform only seeks and selects. Document markers / regions / loops stay hidden.</li>
+          <li>The waveform only seeks and selects. Document markers / regions / loops stay hidden. The playhead and mouse guide match the trail’s wave-band height (they do not extend from the time-lane top as in the editor).</li>
           <li>On the audio playlist waveform and during real video playback / F8, <kbd>I</kbd> / <kbd>O</kbd> set a disposable A-B loop and <kbd>M</kbd> / <kbd>Ins</kbd> place temporary markers (forgotten when another file plays; for audio, markers merge with existing ones and a complete A-B becomes the sample loop as an unsaved edit on return to the editor; video / PDF are not taken into the editor so those cues are discarded).</li>
           <li>Not used on the dim video / PDF preview. Selection is inverted and translucent. No zoom.</li>
           <li>Display-resolution peaks only. Short files stay dense. Spectrogram / loudness-curve views stay off. On the waveform, the right-click menu focuses seek, selection, and playback (destructive file edits are done from the playlist menu; see below).</li>
@@ -771,7 +771,7 @@
           <li>While playing, values are live from the output and the numbers are colored.</li>
           <li>While stopped in the editor, all five readings are an offline measure of the whole file. Short Term is the file maximum. The color is the value fill and the text stays the default color. Edits such as volume re-measure.</li>
           <li>While stopped in the player, one selected file does not show these five readings. Two or more selected files show the average of each file’s five readings (Short Term is that file’s maximum; the unit says Avg).</li>
-          <li>In the editor, the edit-history list sits left of loudness. As many rows as fit; older rows clip. Click opens edit history with <kbd>U</kbd>. The strip itself does not select. The player does not show this list.</li>
+          <li>In the editor, the edit-history list sits left of loudness (bordered in the same color as an empty VST slot). As many rows as fit; older rows clip. Click opens edit history with <kbd>U</kbd>. The strip itself does not select. Further left, the open space shows a large current-position timecode (about 75% of that width, centered). It stays in sync with the status bar’s time / samples mode (same switch from its right-click menu). It is hidden in the player, while the library is maximized, or while the waveform is docked left of loudness — and the edit-history list is hidden then too.</li>
         </ul>
         <h4>Spectrum and channel color</h4>
         <ul>
@@ -824,7 +824,7 @@
           <li><strong>Format</strong> — name is on the tab. Sample rate / bit depth / channels turn red after conversion until you save. MP3 / M4A also show bit rate. Size is MB (MiB / B), and turns red as an estimate after conversion or a range delete that changes length.</li>
           <li><strong>Center Lock / Marker Click / Silent Skip / Single Loop / Always on Top</strong> — latch buttons (not checkboxes) left of the speaker icon, in that order. Center Lock is <kbd>Z</kbd> (or numpad <kbd>.</kbd>), Marker Click is <kbd>Q</kbd>, Silent Skip is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, <span class="ui">Single Loop</span> is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>, Always on Top is <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>. In the player, Center Lock and Marker Click are hidden and only the other three show. Silent Skip skips silence on playback and records only above the threshold (threshold in Settings). See <a href="#layout-single-loop">Single Loop</a> for that toggle.</li>
           <li><strong>Speaker</strong> — the list right of the speaker icon switches the speaker layout. Same list as Shown. The definition in use stays listed until you switch away. Auto speaker selection, off by default, switches to a matching enabled definition.</li>
-          <li><strong>Times</strong> — current / selection start / selection length / selection end / total. All but total are editable. Wheel / ↑↓ nudge: time by 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min, samples by 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Right-click switches time and samples (kept across launches).</li>
+          <li><strong>Times</strong> — current / selection start / selection length / selection end / total. All but total are editable. Wheel / ↑↓ nudge: time by 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min, samples by 1 / Shift 10 / Ctrl 100 / Ctrl+Shift 1000. Right-click switches time and samples (kept across launches; the large current-position timecode left of the edit-history strip follows the same mode, and its right-click menu switches it too).</li>
         </ul>
       </article>
 
@@ -845,7 +845,7 @@
         <li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> — Silent Skip. Skip silent stretches during playback, and while recording write only audio above the threshold (off by default; threshold is in Settings, default −60 dB). Hold ← / → during playback to shuttle without skipping. Recording always asks whether to turn Silent Skip on (the checkbox starts from the status-bar switch; OK updates it). The prompt shows the current threshold and silence insert duration (changeable in Settings). The region checkbox is enabled only when Silent Skip is on (off by default; remembered).</li>
         <li>With Auto Next on, player continuous playback prepares the next track. Tiny silences at the start and end of MP3 / M4A are reduced by <a href="#layout-gapless">gapless playback</a> (Player tab in Settings; on by default). A slight gap can still remain when it is on.</li>
         <li><kbd>Ctrl</kbd>+drag — scrub. Every channel is mixed to left and right (the level meter moves on L/R only).</li>
-        <li><kbd>G</kbd> — type NOW POS in the status bar. Enter jumps. Copy / paste allowed. Right-click switches time / samples.</li>
+        <li><kbd>G</kbd> — type NOW POS in the status bar. Enter jumps. Copy / paste allowed. Right-click switches time / samples (the large current-position timecode left of the edit-history strip follows the same mode; its right-click menu switches it too).</li>
         <li><kbd>J</kbd> — skip 5 s back, <kbd>K</kbd> — skip 5 s forward (0.75 s crossfade; hold repeats after a short wait)</li>
         <li><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> — playback pitch up / down by one semitone (main keyboard or numpad; Shift may be held on the main <kbd>+</kbd> key). <kbd>Ctrl</kbd>+<kbd>0</kbd> (main keyboard or numpad) returns it to zero. A toast in the center shows the semitones. Heard on the audio that is playing, in the editor and the player. Length and the playhead stay put. Range is ±2 octaves. Starting another track forgets the shift.</li>
         <li><kbd>,</kbd> — rewind, <kbd>.</kbd> — fast-forward (±3× at original pitch; −4 dB while held; works while stopped and leaves you stopped at the new position)</li>
@@ -1040,7 +1040,7 @@
         <li><kbd>Shift</kbd>+<kbd>R</kbd> — set the selection as a region. If both ends already have a region, the first press divides it in two; the same range again divides it in three, and so on (clear with right-click / <kbd>Delete</kbd>; hold uses the same repeat timing, one history entry until you release).</li>
         <li><kbd>Shift</kbd>+top-row digits — jump to the start of that region number (regions count from 1, separate from marker numbers; two digits OK; editor only — the player does not jump to regions. Unmodified numpad stays transport).</li>
         <li>Click a flag to select an edge. Shift+click for a range, Ctrl+click to add. Drag or ←/→ to move (Shift ×3).</li>
-        <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red (only when you write it; the span after a loop or sample loop is not painted red automatically). <code>-R</code> is gray. See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
+        <li>Double-click a comment / region name. <code>-A</code> lime, <code>-L</code> blue, <code>-E</code> red (only when you write it; the span after a loop or sample loop is not painted red automatically). <code>-R</code> is gray. Role underlays on the wave use the same colors as translucent fills (corners follow the Settings GUI corner radius). See <a href="#export-suffix">9-3</a> for what EXPORT does with them.</li>
         <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> — rename.</li>
         <li><kbd>Ctrl</kbd>+← / → — Previous Point / Next Point. In the editor, moves to the nearest marker, region edge, sample-loop edge, selection start or end, or file edge in that direction. The selection stays while an edge remains ahead, and clears once both edges are passed. File edges work with no markers. In the player this jump runs only while temporary markers exist; markers wrap to the other end and do not stop on a file edge (selection edges still count). The same commands are on Timeline in the right-click menu and menu bar, and on the toolbar buttons of the same name. The icon is timeline ticks and a chevron.</li>
         <li>Right-click, or <kbd>Ctrl</kbd>+<kbd>Del</kbd>, deletes markers. Delete all markers and delete all regions are on Timeline. Go to Start / End / View Left / View Right sit directly under Timeline (not in a Seek submenu, and not under Playback).</li>
@@ -1183,7 +1183,7 @@
         <li>A Short Term LKFS curve. The faint white band is ±1 LU around the curve (1 LU = a 1 LKFS difference).</li>
         <li>The waveform is the Mid-summed peak dBFS joined by a line, on the same vertical scale as LKFS (0 dBFS = 0 on the scale). When zoomed in far enough to see samples, each sample is joined as in the normal waveform.</li>
         <li>dBFS and LKFS are different measures, but you can compare peak and loudness at the same height.</li>
-        <li>Background bands match the meter: blue up to the target, orange for the next 3 LU, red above that. The curve uses cyan / orange / red, with red drawn slightly thicker.</li>
+        <li>Background bands match the meter colors as translucent fills: blue up to the target, orange for the next 3 LU, red above that. The curve uses cyan / orange / red, with red drawn slightly thicker.</li>
         <li>The left scale is LKFS (dB on the normal waveform). The white line is the target in Settings.</li>
         <li>The pen button at the top right of the curve, <kbd>E</kbd>, or a right-click on the curve switches to the pen (again to leave it). While the pen is on, dragging on the curve does not make a time selection, and the original curve stays visible. Releasing the mouse applies the intent read from your stroke to the volume. Drawing back in time replaces what you drew there, so each moment has one level. Both ends of a stroke fade briefly back to the previous level. If it would go above 0 dBFS, you can lower the whole range or discard that stroke and draw again. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the stroke in progress and each finished stroke. The curve stays after you cancel the volume popup, so you can draw from there. A right-click on a marker, region, or loop still opens the menu.</li>
       </ul>
@@ -1319,7 +1319,7 @@
           <tr><td><kbd>V</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>Show loudness analysis and open volume input (both in the editor; player: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> only)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>Return to the waveform (from any view)</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Solo a channel (next / previous; past the last clears it; or click a name on the left; Ctrl+click adds; Shift+click mutes / unmutes; the time selection does not change; edits stay on those lanes; muted lanes go gray)</td></tr>
-          <tr><td><kbd>G</kbd></td><td>Edit NOW POS in the status bar</td></tr>
+          <tr><td><kbd>G</kbd></td><td>Edit NOW POS in the status bar (time / samples: right-click a status field or the large current-position timecode left of the edit-history strip; both stay in sync)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Always on Top (pin / unpin the window; works in every mode, including F8 / F9)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>Color settings (dark UI)</td></tr>
         </tbody>
@@ -1710,7 +1710,7 @@
           <tr><td>Type / <kbd>Enter</kbd></td><td>Jump to the current time, or apply selection start / length / end</td></tr>
           <tr><td>↑↓ / wheel</td><td>Time: 1 s (<kbd>Shift</kbd> 10 s / <kbd>Ctrl</kbd> 1 min / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> 10 min). Samples: 1 / 10 / 100 / 1000</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd></td><td>Copy / paste that field</td></tr>
-          <tr><td>Right-click</td><td>Switch time and samples</td></tr>
+          <tr><td>Right-click</td><td>Switch time and samples (same from the large current-position timecode left of the edit-history strip; both stay in sync)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Cancel the edit</td></tr>
         </tbody>
       </table>
