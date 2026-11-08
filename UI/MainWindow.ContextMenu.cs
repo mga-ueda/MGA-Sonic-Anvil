@@ -1141,6 +1141,7 @@ public partial class MainWindow
             CheckSelectMode = LibraryBrowser.CheckSelectMode,
             CanStepPlaylist = _sessions.Count > 0,
             CanRestartTrack = _sessions.Count > 0,
+            CanSelectSameColor = IsLibraryMaximized && LibraryBrowser.CanSelectSameColorRows(),
             VideoMini = IsVideoMiniPlayerActive(),
             MinimalChrome = _activeLayoutSlot == WindowLayoutSlot.F9,
             CanToggleVideoMini = LibraryPlayerMode.CanToggleVideoMiniPlayer(

@@ -70,6 +70,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.CheckSelectMode
             or WaveMenuCommand.SelectByGroupUp
             or WaveMenuCommand.SelectByGroupDown
+            or WaveMenuCommand.SelectSameColor
             or WaveMenuCommand.PreviousTrack
             or WaveMenuCommand.NextTrack
             or WaveMenuCommand.RestartTrack
@@ -273,6 +274,8 @@ internal static class LibraryPlayerMode
             (Key.Delete, ModifierKeys.Control) => true,
             (Key.R, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.A, ModifierKeys.Control) => true,
+            // 同じ色のファイルをすべて選択（プレイリスト）。
+            (Key.C, ModifierKeys.Shift) => true,
             (Key.F, ModifierKeys.Control) => true,
             (Key.S, ModifierKeys.Alt | ModifierKeys.Shift) => true,
             (Key.T, ModifierKeys.Alt | ModifierKeys.Shift) => true,
@@ -660,6 +663,10 @@ internal static class LibraryPlayerMode
     /// <summary>Shift+Space。プレイリストのチェック選択モードをトグル（ツリーは折りたたみのまま）。</summary>
     public static bool IsCheckSelectModeToggle(Key key, ModifierKeys modifiers) =>
         key == Key.Space && modifiers == ModifierKeys.Shift;
+
+    /// <summary>Shift+C。プレイリストでキャレットと同じ色の行を全選択。</summary>
+    public static bool IsSelectSameColor(Key key, ModifierKeys modifiers) =>
+        key == Key.C && modifiers == ModifierKeys.Shift;
 
     /// <summary>Ctrl+Space のプリロールは波形フォーカス時だけ。</summary>
     public static bool PrefersPrerollOnCtrlSpace(bool waveformFocused) => waveformFocused;

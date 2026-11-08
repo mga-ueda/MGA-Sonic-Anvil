@@ -1081,10 +1081,12 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal(MenuGestures.NextTrack, ((MenuItem)listPlaylist.Items[1]).InputGestureText);
             Assert.Equal(MenuGestures.RestartTrack, ((MenuItem)listPlaylist.Items[2]).InputGestureText);
             Assert.Equal("Alt+Shift+P", ((MenuItem)listPlaylist.Items[4]).InputGestureText);
-            Assert.Equal(MenuGestures.SelectByGroupUp, ((MenuItem)listPlaylist.Items[^2]).InputGestureText);
-            Assert.Equal(MenuGestures.SelectByGroupDown, ((MenuItem)listPlaylist.Items[^1]).InputGestureText);
-            Assert.Equal(UiStrings.WaveMenuSelectByGroupUp, (string)((MenuItem)listPlaylist.Items[^2]).Header);
-            Assert.Equal(UiStrings.WaveMenuSelectByGroupDown, (string)((MenuItem)listPlaylist.Items[^1]).Header);
+            Assert.Equal(MenuGestures.SelectByGroupUp, ((MenuItem)listPlaylist.Items[^3]).InputGestureText);
+            Assert.Equal(MenuGestures.SelectByGroupDown, ((MenuItem)listPlaylist.Items[^2]).InputGestureText);
+            Assert.Equal(MenuGestures.SelectSameColor, ((MenuItem)listPlaylist.Items[^1]).InputGestureText);
+            Assert.Equal(UiStrings.WaveMenuSelectByGroupUp, (string)((MenuItem)listPlaylist.Items[^3]).Header);
+            Assert.Equal(UiStrings.WaveMenuSelectByGroupDown, (string)((MenuItem)listPlaylist.Items[^2]).Header);
+            Assert.Equal(UiStrings.WaveMenuSelectSameColor, (string)((MenuItem)listPlaylist.Items[^1]).Header);
             Assert.Equal(MenuGestures.PitchUp, listPlayback.Items.OfType<MenuItem>()
                 .First(item => item.InputGestureText == MenuGestures.PitchUp).InputGestureText);
             // 編集末尾はシェル操作＋プレイリストからクリア。
@@ -2083,6 +2085,68 @@ public sealed class LibraryBrowserSelectionTests
             Flush();
             Assert.Equal(3, view.SelectedSessions.Length);
             window.Close();
+        });
+    }
+
+    [Fact]
+    public void Playlist_SelectSameColorRows_SelectsMatchingMarkerOnly()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var previous = AppStorage.Settings.FileNameColorAssignments;
+            var redA = Session("red-a.mp3");
+            var redB = Session("red-b.mp3");
+            var blue = Session("blue.mp3");
+            var plain = Session("plain.mp3");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            try
+            {
+                view.SetGroup(LibraryFileGroup.None);
+                view.SetSessions([redA, redB, blue, plain], redA, [redA]);
+                Flush();
+                view.UpdateLayout();
+                Flush();
+
+                Assert.False(view.CanSelectSameColorRows());
+
+                view.SetManualFileNameColor(
+                    [redA.Document.SourcePath!, redB.Document.SourcePath!],
+                    colorIndex: 3);
+                view.SetManualFileNameColor([blue.Document.SourcePath!], colorIndex: 10);
+                Flush();
+
+                Assert.True(view.CanSelectSameColorRows());
+                view.SelectSameColorRows();
+                Flush();
+                Assert.Equal(2, view.SelectedSessions.Length);
+                Assert.Contains(redA, view.SelectedSessions);
+                Assert.Contains(redB, view.SelectedSessions);
+                Assert.DoesNotContain(blue, view.SelectedSessions);
+                Assert.DoesNotContain(plain, view.SelectedSessions);
+
+                view.SelectSessionQuiet(blue);
+                Flush();
+                view.SelectSameColorRows();
+                Flush();
+                Assert.Single(view.SelectedSessions);
+                Assert.Same(blue, view.SelectedSessions[0]);
+            }
+            finally
+            {
+                AppStorage.Settings.FileNameColorAssignments = previous;
+                AppStorage.Save();
+                window.Close();
+            }
         });
     }
 
@@ -4514,6 +4578,12 @@ public sealed class LibraryBrowserSelectionTests
         Application.Current.Resources["MenuHighlightBackBrush"] = new SolidColorBrush(Color.FromRgb(0x37, 0x37, 0x3A));
         Application.Current.Resources["ColorPanelBackBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x2A));
         Application.Current.Resources["ChromeBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x4A, 0x4A, 0x4E));
+        // MonitorLatchButton のフィールド初期化（CreateOption のコンストラクタ）で参照される。
+        Application.Current.Resources["TransportBackBrush"] = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E));
+        Application.Current.Resources["LatchToggleOnForeBrush"] = new SolidColorBrush(Colors.White);
+        Application.Current.Resources["LatchToggleOffForeBrush"] = new SolidColorBrush(Color.FromRgb(0xC8, 0xC8, 0xC8));
+        Application.Current.Resources["LatchToggleOnBackBrush"] = new SolidColorBrush(Color.FromRgb(0x2F, 0x6F, 0xED));
+        Application.Current.Resources["LatchToggleOffBackBrush"] = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x40));
     }
 
     private static void Flush() =>

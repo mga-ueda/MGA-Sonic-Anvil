@@ -20,6 +20,7 @@ internal static class MenuGestures
     public const string RestartTrack = "R / Num5";
     public const string SelectByGroupUp = "Ctrl+Shift+Up";
     public const string SelectByGroupDown = "Ctrl+Shift+Down";
+    public const string SelectSameColor = "Shift+C";
     /// <summary>センターロック（再生ヘッド中央寄せではない）。</summary>
     public const string CenterLock = "Z / Num.";
 

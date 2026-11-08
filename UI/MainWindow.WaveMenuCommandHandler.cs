@@ -267,6 +267,13 @@ public partial class MainWindow
                 }
 
                 break;
+            case WaveMenuCommand.SelectSameColor:
+                if (IsLibraryMaximized)
+                {
+                    LibraryBrowser.SelectSameColorRows();
+                }
+
+                break;
             case WaveMenuCommand.AutoPlay:
                 LibraryBrowser.ToggleAutoPlay();
                 break;

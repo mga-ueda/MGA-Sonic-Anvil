@@ -326,6 +326,7 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains(TransportCommand.DeleteAllMarkers, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.PreviousTrack, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.NextTrack, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.SelectSameColor, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.CopyAllTabTimes, TransportToolbarCatalog.AllCommands);
         Assert.DoesNotContain(TransportCommand.TimeZoomIn, TransportToolbarCatalog.AllCommands);
         Assert.DoesNotContain(TransportCommand.ToggleWaapi, TransportToolbarCatalog.AllCommands);

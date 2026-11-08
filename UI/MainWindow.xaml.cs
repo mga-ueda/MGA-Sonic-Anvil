@@ -200,6 +200,7 @@ public partial class MainWindow : Window
         {
             RefreshTabHeaders();
             RefreshPlaylistVideoFileName();
+            RefreshTransportCommandsEnabled();
         };
         LibraryBrowser.SortChanged += LibraryBrowser_SortChanged;
         LibraryBrowser.ExplorerFolderChanged += LibraryBrowser_ExplorerFolderChanged;

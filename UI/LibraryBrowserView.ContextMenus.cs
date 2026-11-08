@@ -401,6 +401,7 @@ internal sealed partial class LibraryBrowserView
             SelectedTabsHaveSampleLoop = hasLoop,
             CanStepPlaylist = hasRows,
             CanRestartTrack = hasRows,
+            CanSelectSameColor = CanSelectSameColorRows(),
             AutoPlay = AutoPlayEnabled,
             AutoPlayNext = AutoPlayNextEnabled,
             Shuffle = ShuffleEnabled,

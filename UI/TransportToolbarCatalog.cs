@@ -96,6 +96,8 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.DetectSilence, () => UiStrings.LabelToolbarDetectSilence, () => UiStrings.TooltipDetectSilence),
         new(TransportCommand.SelectAll, TransportIcon.SelectAll,
             WaveMenuCommand.SelectAll, () => UiStrings.LabelToolbarSelectAll, () => UiStrings.TooltipSelectAll),
+        new(TransportCommand.SelectSameColor, TransportIcon.SelectSameColor,
+            WaveMenuCommand.SelectSameColor, () => UiStrings.LabelToolbarSelectSameColor, () => UiStrings.TooltipSelectSameColor),
         new(TransportCommand.ClearSelection, TransportIcon.ClearSelection,
             WaveMenuCommand.ClearSelection, () => UiStrings.LabelToolbarClearSelection, () => UiStrings.TooltipClearSelection),
         new(TransportCommand.SelectToStart, TransportIcon.SelectToStart,
@@ -377,7 +379,8 @@ internal static class TransportToolbarCatalog
         command switch
         {
             TransportCommand.PreviousTrack
-                or TransportCommand.NextTrack =>
+                or TransportCommand.NextTrack
+                or TransportCommand.SelectSameColor =>
                 UiStrings.NoteToolbarPlayerMode,
             TransportCommand.ToggleMinimalChrome
                 or TransportCommand.ToggleLibraryMaximize

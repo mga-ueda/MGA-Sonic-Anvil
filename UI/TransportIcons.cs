@@ -43,6 +43,7 @@ internal enum TransportIcon
     InsertSilence,
     DetectSilence,
     SelectAll,
+    SelectSameColor,
     ClearSelection,
     AddMarker,
     SetLoop,
@@ -147,6 +148,7 @@ internal enum TransportCommand
     InsertSilence,
     DetectSilence,
     SelectAll,
+    SelectSameColor,
     ClearSelection,
     AddMarker,
     SetLoop,
@@ -666,6 +668,9 @@ internal static class TransportIconDrawing
             case TransportIcon.SelectAll:
                 dc.DrawRectangle(selectionFill, DashedPen(pen), new Rect(cx - 10, cy - 8, 20, 16));
                 DrawMiniWave(dc, pen, cx, cy, 6);
+                break;
+            case TransportIcon.SelectSameColor:
+                DrawSelectSameColor(dc, pen, selectionFill, accent, cx, cy);
                 break;
             case TransportIcon.ClearSelection:
                 dc.DrawRectangle(null, DashedPen(pen), new Rect(cx - 10, cy - 8, 20, 16));
@@ -1262,6 +1267,39 @@ internal static class TransportIconDrawing
 
         geo.Freeze();
         dc.DrawGeometry(null, pen, geo);
+    }
+
+    /// <summary>
+    /// RGB 3 色の帯。赤だけ選択枠＝「その色のファイルを選ぶ」。
+    /// 色ありは色設定パレットと同じ原色。無効時は単色線画。
+    /// </summary>
+    private static void DrawSelectSameColor(
+        DrawingContext dc,
+        Pen pen,
+        Brush? selectionFill,
+        bool accent,
+        double cx,
+        double cy)
+    {
+        var colors = new[] { PaletteRed, PaletteGreen, PaletteBlue };
+        for (var i = 0; i < 3; i++)
+        {
+            var y = cy + (i - 1) * 6.2;
+            var row = new Rect(cx - 9, y - 2.3, 18, 4.6);
+            var selected = i == 0;
+            if (accent)
+            {
+                // 帯全体を色で塗る（細いマーカーより一目で RGB と分かる）。
+                var fill = Color.FromArgb(selected ? (byte)0xE6 : (byte)0xB4, colors[i].R, colors[i].G, colors[i].B);
+                dc.DrawRectangle(WpfControlHelpers.FrozenBrush(fill), null, row);
+            }
+            else if (selected && selectionFill is not null)
+            {
+                dc.DrawRectangle(selectionFill, null, row);
+            }
+
+            dc.DrawRectangle(null, selected ? OutlinePen(pen, 1.35) : pen, row);
+        }
     }
 
     /// <summary>反時計回りの矢印で囲んだ時計。編集履歴。</summary>
