@@ -12,6 +12,11 @@ internal sealed class FileNameColorPaletteBoard : WrapPanel
     public const double CellWidth = 24;
     public const double CellHeight = 22;
 
+    /// <summary>色見本の直径。設定の GUI 角丸には連動しない。</summary>
+    public const double SwatchSize = 14;
+
+    public static CornerRadius SwatchCorner { get; } = new(SwatchSize * 0.5);
+
     private readonly List<(int Index, Border Swatch)> _swatches = [];
 
     public event EventHandler<int>? ColorSelected;
@@ -23,10 +28,10 @@ internal sealed class FileNameColorPaletteBoard : WrapPanel
         {
             var swatch = new Border
             {
-                Width = 16,
-                Height = 14,
-                // 端を半円に（高さの半分）。設定の GUI 角丸は使わない。
-                CornerRadius = new CornerRadius(7),
+                Width = SwatchSize,
+                Height = SwatchSize,
+                // 完全な円。設定の GUI 角丸は使わない。
+                CornerRadius = SwatchCorner,
                 Background = choice.Brush,
                 BorderBrush = Brushes.Transparent,
                 BorderThickness = new Thickness(1),

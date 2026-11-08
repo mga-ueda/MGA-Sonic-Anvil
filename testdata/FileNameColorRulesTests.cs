@@ -32,6 +32,22 @@ public sealed class FileNameColorRulesTests
         Assert.Null(error?.ToString());
     }
 
+    [Fact]
+    public void PaletteSwatch_IsCircleNotControlCorner()
+    {
+        Assert.Equal(FileNameColorPaletteBoard.SwatchSize, FileNameColorPaletteBoard.SwatchCorner.TopLeft * 2);
+        Assert.Equal(
+            FileNameColorPaletteBoard.SwatchCorner.TopLeft,
+            FileNameColorPaletteBoard.SwatchCorner.TopRight);
+        Assert.Equal(
+            FileNameColorPaletteBoard.SwatchCorner.TopLeft,
+            FileNameColorPaletteBoard.SwatchCorner.BottomLeft);
+        Assert.Equal(
+            FileNameColorPaletteBoard.SwatchCorner.TopLeft,
+            FileNameColorPaletteBoard.SwatchCorner.BottomRight);
+        Assert.NotEqual(FileNameColorPaletteBoard.SwatchCorner.TopLeft, DesignMetrics.ControlCornerRadius);
+    }
+
     [Theory]
     [InlineData(1.0, 10.0)]
     [InlineData(1.25, 10.4)]
