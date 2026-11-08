@@ -499,6 +499,64 @@ public sealed class DocumentSessionStoreTests
     }
 
     [Fact]
+    public void SlotSettingsClipboard_PastesStateOnlyToMatchingPlugin()
+    {
+        var source = new VstInsertSlot
+        {
+            PluginPath = @"C:\Plugins\EQ.vst3",
+            ClassId = "cid",
+            DisplayName = "EQ",
+            Bypassed = true,
+            StateBlob = [1, 2, 3],
+        };
+        var clipboard = DocumentSessionStore.CaptureSlot(source);
+
+        var same = new VstInsertSlot
+        {
+            PluginPath = @"C:\Plugins\EQ.vst3",
+            ClassId = "cid",
+            DisplayName = "EQ",
+            Bypassed = false,
+            StateBlob = [9],
+        };
+        Assert.True(DocumentSessionStore.SlotMatchesPlugin(same, clipboard));
+        Assert.True(DocumentSessionStore.TryPasteSlotSettings(same, clipboard));
+        Assert.Equal(new byte[] { 1, 2, 3 }, same.StateBlob);
+        // バイパスは設定コピーの対象外。
+        Assert.False(same.Bypassed);
+        Assert.False(DocumentSessionStore.TryPasteSlotSettings(same, clipboard));
+
+        var other = new VstInsertSlot
+        {
+            PluginPath = @"C:\Plugins\Comp.vst3",
+            ClassId = "cid",
+            DisplayName = "Comp",
+            StateBlob = [9],
+        };
+        Assert.False(DocumentSessionStore.SlotMatchesPlugin(other, clipboard));
+        Assert.False(DocumentSessionStore.TryPasteSlotSettings(other, clipboard));
+        Assert.Equal(new byte[] { 9 }, other.StateBlob);
+
+        // 空きスロットにはプラグインごと貼れる（バイパスも含む）。
+        var empty = new VstInsertSlot();
+        Assert.True(DocumentSessionStore.TryPasteSlotSettings(empty, clipboard));
+        Assert.Equal(source.PluginPath, empty.PluginPath);
+        Assert.Equal(source.ClassId, empty.ClassId);
+        Assert.Equal(source.DisplayName, empty.DisplayName);
+        Assert.Equal(source.StateBlob, empty.StateBlob);
+        Assert.True(empty.Bypassed);
+
+        // 全タブペースト用: 別プラグインも置き換えられる。
+        Assert.True(DocumentSessionStore.TryPasteSlotSettings(other, clipboard, replaceDifferentPlugin: true));
+        Assert.Equal(source.PluginPath, other.PluginPath);
+        Assert.Equal(source.StateBlob, other.StateBlob);
+        Assert.True(other.Bypassed);
+
+        Assert.False(DocumentSessionStore.TryPasteSlotSettings(same, null));
+        Assert.False(DocumentSessionStore.SlotMatchesPlugin(new VstInsertSlot(), clipboard));
+    }
+
+    [Fact]
     public void DefaultInserts_PersistBypassAndClearPerSlot()
     {
         var settings = new AppSettings();

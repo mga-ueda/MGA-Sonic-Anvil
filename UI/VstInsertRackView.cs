@@ -16,11 +16,18 @@ namespace MgaSonicAnvil.UI;
 /// </summary>
 internal sealed class VstInsertRackView : Grid
 {
+    /// <summary>設定コピー用クリップボード。タブ横断で使うためラックに静的保持。</summary>
+    private static VstInsertSlotSnapshot? _settingsClipboard;
+
     private readonly RoundedButton[] _slots = new RoundedButton[VstInsertChain.MaxSlots];
     private DocumentSession? _session;
     private Action? _onChanged;
     private Action<int>? _openEditor;
-    private Action<int, VstPickerEntry, bool>? _assignPlugin;
+    /// <summary>
+    /// 割り当てコールバック。第 4 引数は初期 StateBlob、第 5 引数は初期バイパス
+    /// （設定ペースト用。通常のインサートは null / false）。
+    /// </summary>
+    private Action<int, VstPickerEntry, bool, byte[]?, bool>? _assignPlugin;
     private Action<int, int>? _moveSlot;
     private Func<bool>? _canInsertAllTabs;
     /// <summary>永続化前にライブ state をスロットへ書き戻す（MainWindow）。</summary>
@@ -33,10 +40,21 @@ internal sealed class VstInsertRackView : Grid
     /// </summary>
     private Func<int, MessageBoxResult>? _confirmPersistReplace;
     /// <summary>
+    /// 使用中スロットへペーストするとき、置き換えるか中止するかを問う（MainWindow）。
+    /// 第 2 引数は全タブペーストか。Cancel なら貼らない。
+    /// </summary>
+    private Func<int, bool, MessageBoxResult>? _confirmPasteReplace;
+    /// <summary>
     /// 全タブの同じ番号を空ける（MainWindow）。
     /// 引数はスロット番号と、消す対象の表示名／パス／ClassId（名前一致が必須）。
     /// </summary>
     private Action<int, string?, string?, string?>? _clearMatchingSlotOnAllTabs;
+    /// <summary>
+    /// 設定クリップボードを全タブの同じスロット番号へだけ貼る（MainWindow）。
+    /// 第 3 引数が false のときはアクティブ以外のみ（ロードは呼び出し側の Assign に任せる）。
+    /// 他スロットは触らない。
+    /// </summary>
+    private Action<int, VstInsertSlotSnapshot, bool>? _pasteSettingsToAllTabs;
     private Point _dragStart;
     /// <summary>掴んだ位置（元ボタン内座標）。ゴーストを指の下に貼り付ける。</summary>
     private Point _dragGrabOffset;
@@ -142,13 +160,15 @@ internal sealed class VstInsertRackView : Grid
         DocumentSession? session,
         Action? onChanged = null,
         Action<int>? openEditor = null,
-        Action<int, VstPickerEntry, bool>? assignPlugin = null,
+        Action<int, VstPickerEntry, bool, byte[]?, bool>? assignPlugin = null,
         Action<int, int>? moveSlot = null,
         Action? captureStates = null,
         Func<bool>? canInsertAllTabs = null,
         Action? syncPersistedToAllTabs = null,
         Action<int, string?, string?, string?>? clearMatchingSlotOnAllTabs = null,
-        Func<int, MessageBoxResult>? confirmPersistReplace = null)
+        Func<int, MessageBoxResult>? confirmPersistReplace = null,
+        Action<int, VstInsertSlotSnapshot, bool>? pasteSettingsToAllTabs = null,
+        Func<int, bool, MessageBoxResult>? confirmPasteReplace = null)
     {
         _session = session;
         _onChanged = onChanged;
@@ -160,6 +180,8 @@ internal sealed class VstInsertRackView : Grid
         _syncPersistedToAllTabs = syncPersistedToAllTabs;
         _clearMatchingSlotOnAllTabs = clearMatchingSlotOnAllTabs;
         _confirmPersistReplace = confirmPersistReplace;
+        _pasteSettingsToAllTabs = pasteSettingsToAllTabs;
+        _confirmPasteReplace = confirmPasteReplace;
         Refresh();
     }
 
@@ -621,7 +643,7 @@ internal sealed class VstInsertRackView : Grid
         var slot = _session.VstInserts.Slots[index];
         if (slot.IsEmpty)
         {
-            // 空きは左クリックで「インサート／全てのタブにインサート」。右クリックは使わない。
+            // 空きは左／右クリックともインサート／設定ペーストメニュー。
             ShowEmptyInsertMenu(index, _slots[index]);
         }
         else
@@ -640,6 +662,7 @@ internal sealed class VstInsertRackView : Grid
         e.Handled = true;
         if (_session.VstInserts.Slots[index].IsEmpty)
         {
+            ShowEmptyInsertMenu(index, sender as UIElement);
             return;
         }
 
@@ -693,6 +716,10 @@ internal sealed class VstInsertRackView : Grid
         open.Click += (_, _) => _openEditor?.Invoke(index);
         menu.Items.Add(open);
 
+        menu.Items.Add(new Separator());
+        AddSettingsClipboardMenuItems(menu, index);
+
+        menu.Items.Add(new Separator());
         AddInsertMenuItems(menu, index);
 
         menu.Items.Add(new Separator());
@@ -732,6 +759,9 @@ internal sealed class VstInsertRackView : Grid
         var menu = new ContextMenu { MaxHeight = VstInsertPluginMenu.ResolveMaxHeight() };
         AddInsertMenuItems(menu, index);
 
+        menu.Items.Add(new Separator());
+        AddSettingsClipboardMenuItems(menu, index, includeCopy: false);
+
         // 空きでも永続中なら「永続化を解除」を出す（グレーの永続化は出さない）。
         if (SlotIsPersisted(index))
         {
@@ -740,6 +770,166 @@ internal sealed class VstInsertRackView : Grid
         }
 
         OpenContextMenu(menu, placement);
+    }
+
+    private void AddSettingsClipboardMenuItems(ContextMenu menu, int index, bool includeCopy = true)
+    {
+        if (includeCopy)
+        {
+            var copy = new MenuItem { Header = UiStrings.LabelVstInsertCopySettings };
+            copy.Click += (_, _) => CopySlotSettings(index);
+            menu.Items.Add(copy);
+        }
+
+        var canPaste = CanPasteSlotSettings(index);
+        var paste = new MenuItem
+        {
+            Header = UiStrings.LabelVstInsertPasteSettings,
+            IsEnabled = canPaste,
+        };
+        paste.Click += (_, _) => PasteSlotSettings(index, allTabs: false);
+        menu.Items.Add(paste);
+
+        // 永続化は既に全タブ共通なので、そのときはグレー（削除の全タブ項目と同じ）。
+        var pasteAll = new MenuItem
+        {
+            Header = UiStrings.LabelVstInsertPasteSettingsAllTabs,
+            IsEnabled = canPaste
+                && !SlotIsPersisted(index)
+                && (_canInsertAllTabs?.Invoke() ?? false),
+        };
+        pasteAll.Click += (_, _) =>
+        {
+            if (!CanPasteSlotSettings(index)
+                || SlotIsPersisted(index)
+                || _canInsertAllTabs?.Invoke() != true)
+            {
+                return;
+            }
+
+            PasteSlotSettings(index, allTabs: true);
+        };
+        menu.Items.Add(pasteAll);
+    }
+
+    /// <summary>このスロットの設定だけをクリップボードへ入れる（他スロットは含めない）。</summary>
+    private void CopySlotSettings(int index)
+    {
+        if (_session is null || (uint)index >= VstInsertChain.MaxSlots)
+        {
+            return;
+        }
+
+        var slot = _session.VstInserts.Slots[index];
+        if (slot.IsEmpty)
+        {
+            return;
+        }
+
+        // ライブで刺さっているパラメータをスロットへ戻してからコピーする。
+        _captureStates?.Invoke();
+        _settingsClipboard = DocumentSessionStore.CaptureSlot(slot);
+    }
+
+    private bool CanPasteSlotSettings(int index)
+    {
+        // 使用中でも可（実行時に置き換え確認）。クリップボードがあれば有効。
+        return _session is not null
+            && (uint)index < VstInsertChain.MaxSlots
+            && _settingsClipboard is not null
+            && !string.IsNullOrWhiteSpace(_settingsClipboard.PluginPath);
+    }
+
+    /// <summary>
+    /// 設定をこのスロットへだけ貼る。
+    /// <paramref name="allTabs"/> なら全タブの同じ番号へ。チェーン全体はコピーしない。
+    /// 使用中スロットへ貼るときは確認ダイアログを出す。
+    /// </summary>
+    private void PasteSlotSettings(int index, bool allTabs)
+    {
+        if (_session is null || (uint)index >= VstInsertChain.MaxSlots || _settingsClipboard is null)
+        {
+            return;
+        }
+
+        if (_confirmPasteReplace?.Invoke(index, allTabs) == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
+        // 全タブ・非永続: 当該スロット番号だけ。チェーン全体はコピーしない。
+        if (allTabs && !SlotIsPersisted(index) && _pasteSettingsToAllTabs is not null)
+        {
+            var wasEmpty = _session.VstInserts.Slots[index].IsEmpty;
+            var samePlugin = DocumentSessionStore.SlotMatchesPlugin(
+                _session.VstInserts.Slots[index],
+                _settingsClipboard);
+            if (wasEmpty || !samePlugin)
+            {
+                // 空き／別プラグイン: 他タブへデータ、アクティブは Assign でロード／差し替え。
+                _pasteSettingsToAllTabs(index, _settingsClipboard, false);
+                PasteInsertFromClipboard(index);
+            }
+            else
+            {
+                _pasteSettingsToAllTabs(index, _settingsClipboard, true);
+            }
+
+            return;
+        }
+
+        var slot = _session.VstInserts.Slots[index];
+        if (slot.IsEmpty
+            || !DocumentSessionStore.SlotMatchesPlugin(slot, _settingsClipboard))
+        {
+            // 空きまたは別プラグインは通常の Assign（差し替え）経路。
+            PasteInsertFromClipboard(index);
+            return;
+        }
+
+        if (!DocumentSessionStore.TryPasteSlotSettings(slot, _settingsClipboard))
+        {
+            return;
+        }
+
+        // 永続化中なら記憶も更新し、全タブの同じスロットへ載せる。
+        if (SlotIsPersisted(index)
+            && DocumentSessionStore.TrySyncDefaultInsertFromSlot(AppStorage.Settings, index, slot))
+        {
+            AppStorage.Save();
+            _syncPersistedToAllTabs?.Invoke();
+        }
+
+        Refresh();
+        _onChanged?.Invoke();
+    }
+
+    /// <summary>空きスロットへ、コピー済みプラグインを設定付きでインサートする（このタブ・このスロットだけ）。</summary>
+    private void PasteInsertFromClipboard(int index)
+    {
+        if (_settingsClipboard is null || string.IsNullOrWhiteSpace(_settingsClipboard.PluginPath))
+        {
+            return;
+        }
+
+        if (!DocumentSessionStore.TryDecodeStateBlob(_settingsClipboard, out var state))
+        {
+            return;
+        }
+
+        var path = _settingsClipboard.PluginPath!;
+        var name = string.IsNullOrWhiteSpace(_settingsClipboard.DisplayName)
+            ? System.IO.Path.GetFileNameWithoutExtension(path)
+            : _settingsClipboard.DisplayName!;
+        var entry = new VstPickerEntry(
+            name,
+            path,
+            string.Empty,
+            string.Empty,
+            _settingsClipboard.ClassId);
+
+        // 単タブのロード経路。全タブ展開は呼び出し側でスロット単位に行う。
+        AssignPlugin(index, entry, allTabs: false, state, _settingsClipboard.Bypassed);
     }
 
     private void AddInsertMenuItems(ContextMenu menu, int index)
@@ -978,7 +1168,12 @@ internal sealed class VstInsertRackView : Grid
             ? UiStrings.LabelVstInsertVendorUnknown
             : vendor.Trim();
 
-    private void AssignPlugin(int index, VstPickerEntry entry, bool allTabs)
+    private void AssignPlugin(
+        int index,
+        VstPickerEntry entry,
+        bool allTabs,
+        byte[]? initialState = null,
+        bool bypassed = false)
     {
         if (_session is null)
         {
@@ -988,7 +1183,7 @@ internal sealed class VstInsertRackView : Grid
         // 差し替えは MainWindow 側でアンロード→ロードの二段階にする
         if (_assignPlugin is not null)
         {
-            _assignPlugin(index, entry, allTabs);
+            _assignPlugin(index, entry, allTabs, initialState, bypassed);
             return;
         }
 
@@ -996,8 +1191,8 @@ internal sealed class VstInsertRackView : Grid
         slot.PluginPath = entry.Path;
         slot.DisplayName = entry.Name;
         slot.ClassId = entry.ClassId;
-        slot.StateBlob = null;
-        slot.Bypassed = false;
+        slot.StateBlob = initialState is null ? null : (byte[])initialState.Clone();
+        slot.Bypassed = bypassed;
         slot.Faulted = false;
         Refresh();
         _openEditor?.Invoke(index);

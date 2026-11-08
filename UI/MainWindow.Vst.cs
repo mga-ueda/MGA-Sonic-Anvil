@@ -159,10 +159,20 @@ public partial class MainWindow
     /// プラグイン割り当て。既に別プラグインがある差し替えは
     /// 「アンロード → 待機 → ロード → エディタ」の二段階にし、同一 Apply 内の破棄＋生成を避ける。
     /// </summary>
-    private void OnVstInsertAssignRequested(int slotIndex, VstPickerEntry entry, bool allTabs) =>
-        _ = AssignVstPluginAsync(slotIndex, entry, allTabs);
+    private void OnVstInsertAssignRequested(
+        int slotIndex,
+        VstPickerEntry entry,
+        bool allTabs,
+        byte[]? initialState,
+        bool bypassed) =>
+        _ = AssignVstPluginAsync(slotIndex, entry, allTabs, initialState, bypassed);
 
-    private async Task AssignVstPluginAsync(int slotIndex, VstPickerEntry entry, bool allTabs)
+    private async Task AssignVstPluginAsync(
+        int slotIndex,
+        VstPickerEntry entry,
+        bool allTabs,
+        byte[]? initialState = null,
+        bool bypassed = false)
     {
         if ((uint)slotIndex >= VstInsertChain.MaxSlots || _activeSession is null)
         {
@@ -225,8 +235,8 @@ public partial class MainWindow
                 slot.PluginPath = entry.Path;
                 slot.DisplayName = entry.Name;
                 slot.ClassId = entry.ClassId;
-                slot.StateBlob = null;
-                slot.Bypassed = false;
+                slot.StateBlob = initialState is null ? null : (byte[])initialState.Clone();
+                slot.Bypassed = bypassed;
                 slot.Faulted = false;
                 VstInsertRack.Refresh();
 
@@ -360,7 +370,9 @@ public partial class MainWindow
             () => _sessions.Count > 1,
             SyncPersistedVstInsertsAcrossTabs,
             ClearMatchingVstInsertSlotAcrossTabs,
-            ConfirmPersistReplacingOtherTabs);
+            ConfirmPersistReplacingOtherTabs,
+            PasteVstInsertSettingsToAllTabs,
+            ConfirmPasteReplacingSlot);
         if (show)
         {
             VstInsertRack.ApplyTheme();
@@ -373,6 +385,60 @@ public partial class MainWindow
     {
         SyncVstInsertEngine();
         RefreshTransportCommandsEnabled();
+    }
+
+    /// <summary>
+    /// 使用中スロットへ設定をペーストするとき、置き換えるか中止するかを問う。
+    /// 対象が空きだけなら OK。中止は Cancel。
+    /// </summary>
+    private MessageBoxResult ConfirmPasteReplacingSlot(int index, bool allTabs)
+    {
+        if ((uint)index >= VstInsertChain.MaxSlots)
+        {
+            return MessageBoxResult.Cancel;
+        }
+
+        if (!allTabs)
+        {
+            if (_activeSession is null || _activeSession.VstInserts.Slots[index].IsEmpty)
+            {
+                return MessageBoxResult.OK;
+            }
+
+            return OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.WarnVstPasteReplacesSlot(
+                    VstInsertPluginLabel(_activeSession.VstInserts.Slots[index])),
+                UiStrings.TitleVstPasteReplace,
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning,
+                MessageBoxResult.Cancel);
+        }
+
+        var lines = new List<string>();
+        foreach (var session in _sessions)
+        {
+            var slot = session.VstInserts.Slots[index];
+            if (slot.IsEmpty)
+            {
+                continue;
+            }
+
+            lines.Add(UiStrings.VstPersistLossLine(session.DisplayName, VstInsertPluginLabel(slot)));
+        }
+
+        if (lines.Count == 0)
+        {
+            return MessageBoxResult.OK;
+        }
+
+        return OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.WarnVstPasteReplacesSlots(string.Join("\n", lines)),
+            UiStrings.TitleVstPasteReplace,
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel);
     }
 
     /// <summary>
@@ -501,6 +567,44 @@ public partial class MainWindow
 
             session.VstInserts.CopyFrom(source);
         }
+    }
+
+    /// <summary>
+    /// 設定クリップボードを全タブの同じスロット番号へだけ貼る（他スロットは触らない）。
+    /// 空き／同一プラグインは設定反映、別プラグインは置き換え。
+    /// <paramref name="includeActive"/> が false のときは他タブのデータ更新のみ（エンジンは触らない）。
+    /// </summary>
+    private void PasteVstInsertSettingsToAllTabs(
+        int index,
+        VstInsertSlotSnapshot clipboard,
+        bool includeActive)
+    {
+        if ((uint)index >= VstInsertChain.MaxSlots)
+        {
+            return;
+        }
+
+        foreach (var session in _sessions)
+        {
+            if (!includeActive && ReferenceEquals(session, _activeSession))
+            {
+                continue;
+            }
+
+            DocumentSessionStore.TryPasteSlotSettings(
+                session.VstInserts.Slots[index],
+                clipboard,
+                replaceDifferentPlugin: true);
+        }
+
+        if (!includeActive)
+        {
+            return;
+        }
+
+        SyncVstInsertEngine();
+        VstInsertRack.Refresh();
+        RefreshTransportCommandsEnabled();
     }
 
     /// <summary>
