@@ -463,8 +463,11 @@ internal static class DesignMetrics
     /// <summary>編集履歴オーバーレイの最小高さ。</summary>
     public static double EditHistoryOverlayMinHeight => From96(200);
 
+    /// <summary>ウィンドウ／パネル右下のリサイズつまみ（6ドット）。</summary>
+    public static double WindowResizeGripSize => From96(14);
+
     /// <summary>編集履歴オーバーレイ右下のリサイズつまみ。</summary>
-    public static double EditHistoryOverlayResizeGrip => From96(14);
+    public static double EditHistoryOverlayResizeGrip => WindowResizeGripSize;
 
     /// <summary>ラウドネスの Consolas 12 で約1文字。左右余白に使う。</summary>
     public static double LoudnessMeterCharWidth => From96(7);
