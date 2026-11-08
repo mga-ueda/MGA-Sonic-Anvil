@@ -62,15 +62,41 @@ internal sealed class HistoryStripView : FrameworkElement
 
     protected override void OnRender(DrawingContext dc)
     {
+        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
+        var radius = DesignMetrics.ControlCornerRadius;
         if (_hover)
         {
-            var radius = DesignMetrics.ControlCornerRadius;
             dc.DrawRoundedRectangle(
                 ThemeBrush("HistoryStripHoverBackBrush"),
                 null,
-                new Rect(0, 0, ActualWidth, ActualHeight),
+                bounds,
                 radius,
                 radius);
+        }
+
+        // ClipToBounds 内に収めるため、枠は外形から内側へ半線分ずらす。
+        const double thickness = 1;
+        var half = thickness * 0.5;
+        var strokeBounds = new Rect(
+            bounds.X + half,
+            bounds.Y + half,
+            Math.Max(0, bounds.Width - thickness),
+            Math.Max(0, bounds.Height - thickness));
+        if (strokeBounds.Width > 0 && strokeBounds.Height > 0)
+        {
+            // 枠色は VST 空きスロットと同じ。
+            var pen = new Pen(ThemeBrush("VstInsertSlotEmptyBackBrush"), thickness);
+            if (pen.CanFreeze)
+            {
+                pen.Freeze();
+            }
+
+            dc.DrawRoundedRectangle(
+                null,
+                pen,
+                strokeBounds,
+                Math.Max(0, radius - half),
+                Math.Max(0, radius - half));
         }
 
         var rowHeight = DesignMetrics.HistoryStripRowHeight;
