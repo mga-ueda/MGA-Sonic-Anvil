@@ -467,6 +467,37 @@ internal sealed class VstInsertEngine : IDisposable
         }
     }
 
+    /// <summary>
+    /// 退避分だけ破棄し、ライブ実体は残す。
+    /// アクティブタブを閉じても他タブが残るとき、同じプラグインの再 create を避ける。
+    /// オーナー参照だけ外す（_structuralKey / _live は維持）ので、次の Apply で
+    /// 同一プラグインなら再利用、別プラグインなら Park せず Detach できる。
+    /// </summary>
+    public void ForgetParkedOnly(object owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        List<IVstSlotProcessor>? toDispose = null;
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            toDispose = [];
+            CollectParkedOwnerNoLock(owner, toDispose);
+            if (ReferenceEquals(_owner, owner))
+            {
+                _owner = null;
+            }
+        }
+
+        if (toDispose is { Count: > 0 })
+        {
+            ScheduleDispose(toDispose);
+        }
+    }
+
     /// <summary>差し替え中など、Process を完全に止める（待ちはしない）。</summary>
     public void BeginExclusiveLoad()
     {
