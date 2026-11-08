@@ -310,6 +310,77 @@ public partial class MainWindow
         RefreshTransportCommandsEnabled();
     }
 
+    /// <summary>
+    /// アクティブタブと同じファイル名色のタブだけを選ぶ。色が無いときは何もしない。
+    /// タイル表示でも同じ選択モデルを使う。タイル検索フィルター中はヒットしたタブだけ対象。
+    /// </summary>
+    private void SelectSameColorTabs()
+    {
+        if (!CanSelectSameColorTabs())
+        {
+            return;
+        }
+
+        var caret = _activeSession ?? _sessions[0];
+        var colorIndex = ResolveFileNameColorIndex(caret);
+        if (colorIndex < 0)
+        {
+            return;
+        }
+
+        DocumentSession? first = null;
+        _selectedTabs.Clear();
+        foreach (var session in _sessions)
+        {
+            if (TileSearchFilterActive && !TileSearchMatches(session))
+            {
+                continue;
+            }
+
+            if (ResolveFileNameColorIndex(session) != colorIndex)
+            {
+                continue;
+            }
+
+            _selectedTabs.Add(session);
+            first ??= session;
+        }
+
+        if (first is not null)
+        {
+            _tabSelectionAnchor = first;
+        }
+
+        RebuildTabBar();
+        RefreshTileChrome();
+        SyncPlaylistSelectionLoudness();
+        RefreshTransportCommandsEnabled();
+    }
+
+    /// <summary>開いているタブに色マーカー付きが1つでもあるときだけ同色選択できる。</summary>
+    private bool CanSelectSameColorTabs()
+    {
+        foreach (var session in _sessions)
+        {
+            if (TileSearchFilterActive && !TileSearchMatches(session))
+            {
+                continue;
+            }
+
+            if (ResolveFileNameColorIndex(session) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int ResolveFileNameColorIndex(DocumentSession session) =>
+        FileNameColorResolve.TryResolve(session.DisplayName, session.Document.SourcePath, out var index, out _)
+            ? index
+            : -1;
+
     /// <summary>タブまたはタイルの帯。Ctrl で個別、Shift で範囲、通常クリックで前面。</summary>
     private void HandleTabOrTileChromeClick(DocumentSession session, MouseButtonEventArgs e)
     {
@@ -466,6 +537,11 @@ public partial class MainWindow
                 "Ctrl+V",
                 enabled: canMutate && _historyRecipeClipboard.Count > 0));
             menu.Items.Add(CreateTabMenuItem(
+                UiStrings.WaveMenuSelectSameColor,
+                SelectSameColorTabs,
+                MenuGestures.SelectSameColor,
+                enabled: CanSelectSameColorTabs()));
+            menu.Items.Add(CreateTabMenuItem(
                 UiStrings.WaveMenuReopenTab,
                 ReopenLastClosedTab,
                 "Ctrl+Shift+T",
@@ -515,6 +591,11 @@ public partial class MainWindow
                 UiStrings.TabMenuSelectAll,
                 SelectAllTabs,
                 enabled: _sessions.Count > 1 && !AllTabsSelected));
+            menu.Items.Add(CreateTabMenuItem(
+                UiStrings.WaveMenuSelectSameColor,
+                SelectSameColorTabs,
+                MenuGestures.SelectSameColor,
+                enabled: CanSelectSameColorTabs()));
             menu.Items.Add(CreateTabMenuItem(
                 UiStrings.WaveMenuReopenTab,
                 ReopenLastClosedTab,

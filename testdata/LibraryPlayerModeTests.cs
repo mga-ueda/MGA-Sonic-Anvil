@@ -478,8 +478,10 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.R, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.BypassesSearchFocus(Key.A, ModifierKeys.None));
         // Shift＋文字は大文字入力と同じ。テキスト入力中はショートカットへ回さない。
+        // リネームで大文字の C を打つときも IsSelectSameColor（Shift+C）へ進まない。
         Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.X, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.A, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.C, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.L, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.R, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsShiftLetterChord(Key.V, ModifierKeys.Shift));
@@ -495,6 +497,8 @@ public sealed class LibraryPlayerModeTests
             editingFileName: false, editingMarkerComment: false, focusedEditableText: true));
         Assert.False(LibraryPlayerMode.DefersShortcutToTextInput(
             editingFileName: false, editingMarkerComment: false, focusedEditableText: false));
+        // Caps Lock の C は Shift 無しなので同色選択にはならない。
+        Assert.False(LibraryPlayerMode.IsSelectSameColor(Key.C, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsMonitorMonoToggle(Key.M, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsMonitorBpmCycle(Key.B, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsPlaylistFolderAddKey(Key.Enter, ModifierKeys.None));

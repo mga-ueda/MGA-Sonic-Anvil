@@ -3627,7 +3627,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     }
 
     /// <summary>
-    /// キャレット行と同じファイル名色（色なし含む）の行だけを選ぶ。
+    /// キャレット行と同じファイル名色の行だけを選ぶ。色が無い行では何もしない。
     /// </summary>
     public void SelectSameColorRows()
     {
@@ -3639,6 +3639,11 @@ internal sealed partial class LibraryBrowserView : UserControl
         var files = SnapshotPlaylistFiles();
         var caret = ResolvePlaylistCaretRow() ?? files[0];
         var colorIndex = caret.FileNameMarkerIndex;
+        if (colorIndex < 0)
+        {
+            return;
+        }
+
         LibraryFileRow? last = null;
         var firstIndex = -1;
         _syncing = true;

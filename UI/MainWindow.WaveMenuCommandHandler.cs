@@ -272,6 +272,10 @@ public partial class MainWindow
                 {
                     LibraryBrowser.SelectSameColorRows();
                 }
+                else
+                {
+                    SelectSameColorTabs();
+                }
 
                 break;
             case WaveMenuCommand.AutoPlay:

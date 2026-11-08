@@ -221,7 +221,7 @@ internal sealed class WaveformContextMenuModel
     public bool CanStepPlaylist { get; init; }
     public bool CanRestartTrack { get; init; }
 
-    /// <summary>プレイリストに色付きファイルがあり、同色全選択できるか。</summary>
+    /// <summary>プレイヤーのプレイリスト、またはエディタのタブ／タイルに色付きファイルがあり、同色全選択できるか。</summary>
     public bool CanSelectSameColor { get; init; }
     public bool VideoMini { get; init; }
     public bool MinimalChrome { get; init; }
@@ -937,12 +937,33 @@ internal static class WaveformContextMenuBuilder
             WaveMenuCommand.SelectByGroupDown,
             MenuGestures.SelectByGroupDown,
             m.LibraryMaximized && m.CanStepPlaylist && !m.IsBusy),
-        Cmd(
-            UiStrings.WaveMenuSelectSameColor,
-            WaveMenuCommand.SelectSameColor,
-            MenuGestures.SelectSameColor,
-            m.LibraryMaximized && m.CanSelectSameColor && !m.IsBusy),
+        ..SelectSameColorPlaylistItems(m),
     ];
+
+    /// <summary>同色選択はプレイヤーではプレイリスト配下。エディタはタブ配下へ出す。</summary>
+    private static IReadOnlyList<WaveMenuEntry> SelectSameColorPlaylistItems(WaveformContextMenuModel m) =>
+        m.LibraryMaximized
+            ?
+            [
+                Cmd(
+                    UiStrings.WaveMenuSelectSameColor,
+                    WaveMenuCommand.SelectSameColor,
+                    MenuGestures.SelectSameColor,
+                    m.CanSelectSameColor && !m.IsBusy),
+            ]
+            : [];
+
+    private static IReadOnlyList<WaveMenuEntry> SelectSameColorTabItems(WaveformContextMenuModel m) =>
+        m.LibraryMaximized
+            ? []
+            :
+            [
+                Cmd(
+                    UiStrings.WaveMenuSelectSameColor,
+                    WaveMenuCommand.SelectSameColor,
+                    MenuGestures.SelectSameColor,
+                    m.CanSelectSameColor && !m.IsBusy),
+            ];
 
     private static IReadOnlyList<WaveMenuEntry> SeekPlaybackItems(WaveformContextMenuModel m) =>
     [
@@ -1100,6 +1121,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.TabMenuCloseAllNormal, WaveMenuCommand.CloseAll, "Ctrl+Shift+W", m.HasDocument && !m.IsBusy && !m.IsRecording && !m.LibraryMaximized),
         WaveMenuSeparatorEntry.Instance,
         Cmd(UiStrings.TabMenuSelectAll, WaveMenuCommand.SelectAllTabs, "Ctrl+Shift+A", m.HasMultipleTabs && !m.AllTabsSelected && !m.IsBusy && !m.LibraryMaximized),
+        ..SelectSameColorTabItems(m),
         Cmd(UiStrings.WaveMenuReopenTab, WaveMenuCommand.ReopenTab, "Ctrl+Shift+T", m.CanReopenTab && !m.IsBusy && !m.LibraryMaximized),
         Cmd(m.HasMultipleSelectedTabs ? UiStrings.WaveMenuCopySelectedTabTimes : UiStrings.WaveMenuCopyAllTabTimes, WaveMenuCommand.CopyAllTabTimes, enabled: m.HasDocument),
         WaveMenuSeparatorEntry.Instance,

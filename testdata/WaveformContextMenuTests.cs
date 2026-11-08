@@ -262,6 +262,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.CloseTab, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Contains(WaveMenuCommand.CloseOthers, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Contains(WaveMenuCommand.SelectAllTabs, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Contains(WaveMenuCommand.SelectSameColor, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
+            Assert.Equal(MenuGestures.SelectSameColor, Find(tree, WaveMenuCommand.SelectSameColor)?.Gesture);
             Assert.Contains(WaveMenuCommand.CopyAllTabTimes, CommandsIn(tree, UiStrings.WaveMenuCatTabs));
             Assert.Contains(WaveMenuCommand.Settings, CommandsIn(tree, UiStrings.WaveMenuCatOther));
             Assert.Contains(WaveMenuCommand.ColorPanel, CommandsIn(tree, UiStrings.WaveMenuCatOther));
@@ -290,8 +292,7 @@ public sealed class WaveformContextMenuTests
             Assert.Equal(MenuGestures.SelectByGroupUp, Find(tree, WaveMenuCommand.SelectByGroupUp)?.Gesture);
             Assert.Contains(WaveMenuCommand.SelectByGroupDown, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal(MenuGestures.SelectByGroupDown, Find(tree, WaveMenuCommand.SelectByGroupDown)?.Gesture);
-            Assert.Contains(WaveMenuCommand.SelectSameColor, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
-            Assert.Equal(MenuGestures.SelectSameColor, Find(tree, WaveMenuCommand.SelectSameColor)?.Gesture);
+            Assert.DoesNotContain(WaveMenuCommand.SelectSameColor, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             var view = Category(tree, UiStrings.WaveMenuCatView).Children!;
             Assert.Contains(UiStrings.WaveMenuCatAnalysis, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(UiStrings.WaveMenuCatScreen, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
@@ -378,6 +379,30 @@ public sealed class WaveformContextMenuTests
         Assert.Contains(WaveMenuCommand.ClearLoopItem, CommandsIn(tree, UiStrings.WaveMenuCatTimeline));
         Assert.True(Category(tree, UiStrings.WaveMenuCatTimeline).Enabled);
         Assert.True(Category(tree, UiStrings.WaveMenuCatHere).Enabled);
+    }
+
+    [Fact]
+    public void Build_SelectSameColor_LivesUnderPlaylistInPlayerAndTabsInEditor()
+    {
+        var editor = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            CanSelectSameColor = true,
+            HasMultipleTabs = true,
+        });
+        Assert.Contains(WaveMenuCommand.SelectSameColor, CommandsIn(editor, UiStrings.WaveMenuCatTabs));
+        Assert.DoesNotContain(WaveMenuCommand.SelectSameColor, CommandsIn(editor, UiStrings.WaveMenuCatPlayback));
+        Assert.True(Find(editor, WaveMenuCommand.SelectSameColor)?.Enabled);
+        Assert.Equal(MenuGestures.SelectSameColor, Find(editor, WaveMenuCommand.SelectSameColor)?.Gesture);
+
+        var player = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+        {
+            LibraryMaximized = true,
+            CanSelectSameColor = true,
+            CanStepPlaylist = true,
+        });
+        Assert.Contains(WaveMenuCommand.SelectSameColor, CommandsIn(player, UiStrings.WaveMenuCatPlayback));
+        Assert.DoesNotContain(WaveMenuCommand.SelectSameColor, CommandsIn(player, UiStrings.WaveMenuCatTabs));
+        Assert.True(Find(player, WaveMenuCommand.SelectSameColor)?.Enabled);
     }
 
     [Fact]

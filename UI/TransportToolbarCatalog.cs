@@ -379,8 +379,7 @@ internal static class TransportToolbarCatalog
         command switch
         {
             TransportCommand.PreviousTrack
-                or TransportCommand.NextTrack
-                or TransportCommand.SelectSameColor =>
+                or TransportCommand.NextTrack =>
                 UiStrings.NoteToolbarPlayerMode,
             TransportCommand.ToggleMinimalChrome
                 or TransportCommand.ToggleLibraryMaximize

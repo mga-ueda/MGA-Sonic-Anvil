@@ -520,7 +520,7 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// Shift＋A–Z。大文字入力と同じ修飾なので、テキスト入力中はアプリショートカットへ回さない。
-    /// （Shift+X＝フェード調整、Shift+A／V＝解析解除、Shift+L／R＝ループ／リージョン、Shift+T＝タイル巡回 など）
+    /// （Shift+C＝同色選択、Shift+X＝フェード調整、Shift+A／V＝解析解除、Shift+L／R＝ループ／リージョン、Shift+T＝タイル巡回 など）
     /// </summary>
     public static bool IsShiftLetterChord(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Shift && key is >= Key.A and <= Key.Z;
@@ -664,7 +664,7 @@ internal static class LibraryPlayerMode
     public static bool IsCheckSelectModeToggle(Key key, ModifierKeys modifiers) =>
         key == Key.Space && modifiers == ModifierKeys.Shift;
 
-    /// <summary>Shift+C。プレイリストでキャレットと同じ色の行を全選択。</summary>
+    /// <summary>Shift+C。プレイリスト／タブ／タイルでキャレットと同じ色のファイルを全選択。</summary>
     public static bool IsSelectSameColor(Key key, ModifierKeys modifiers) =>
         key == Key.C && modifiers == ModifierKeys.Shift;
 

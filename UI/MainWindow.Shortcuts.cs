@@ -803,7 +803,7 @@ public partial class MainWindow
             return searchHandled.Value;
         }
 
-        // リネーム等の文字入力中は Shift+X（フェード調整）など文字キーショートカットを握らない。
+        // リネーム等の文字入力中は Shift+C（同色選択）／Shift+X（フェード調整）など文字キーショートカットを握らない。
         // Escape だけキャンセル用に通す。検索欄は上で Bypass 付きトグルを通している。
         if (ShouldDeferShortcutToTextInput())
         {
@@ -952,6 +952,13 @@ public partial class MainWindow
             }
 
             Waveform.SelectAll();
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsSelectSameColor(key, modifiers))
+        {
+            // エディタ／タイルでもアクティブと同じ色のタブをまとめて選ぶ。
+            SelectSameColorTabs();
             return true;
         }
 
