@@ -40,14 +40,8 @@ internal sealed class TabNewButton : Button
             return;
         }
 
-        // ホバーはボタン全面より少し内側の小さな角丸。
-        var pad = Math.Max(1, bounds.Width * 0.08);
-        var hover = new Rect(
-            pad,
-            pad,
-            Math.Max(1, bounds.Width - pad * 2),
-            Math.Max(1, bounds.Height - pad * 2));
-        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed, hover);
+        // ホバーはアイコン（ボタン）全面。＋グリフの大きさは変えず、既定の pad=3 も使わない。
+        TransportChrome.Paint(dc, bounds, IsEnabled, IsMouseOver, IsPressed, bounds);
         DrawPlus(dc, bounds, TransportChrome.Fore(IsEnabled));
     }
 
