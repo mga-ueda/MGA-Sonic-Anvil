@@ -98,6 +98,12 @@ internal enum TransportIcon
     CopyAllTabTimes,
     /// <summary>マーカー旗と八分音符。オンは旗をマーカー色にする。</summary>
     RangeClick,
+    /// <summary>無音区間を飛ばす（ギャップ＋跳ね矢印）。</summary>
+    SilentSkip,
+    /// <summary>1 周ループ（Single Loop）。LoopPlay のカセットとは別。</summary>
+    AutoLoop,
+    /// <summary>常に最前面（ピン）。</summary>
+    AlwaysOnTop,
 }
 
 internal enum TransportCommand
@@ -191,6 +197,10 @@ internal enum TransportCommand
     NextTrack,
     CopyAllTabTimes,
     RangeClick,
+    SilentSkip,
+    AutoLoop,
+    AlwaysOnTop,
+    CenterLock,
 }
 
 /// <summary>メニュー／リスト用のトランスポートアイコン。ツールバーと同じ <see cref="TransportIconDrawing"/> を描く。</summary>
@@ -320,11 +330,14 @@ internal sealed class TransportIconButton : Button
         Focusable = false;
         FocusVisualStyle = null;
         Cursor = Cursors.Hand;
-        Background = Brushes.Transparent;
+        Background = null;
         BorderThickness = new Thickness(0);
         OverridesDefaultStyle = true;
         Template = new ControlTemplate(typeof(Button));
         SnapsToDevicePixels = true;
+        // WAAPI チップの FormattedText が ClearType だと半透明面が潰れる。
+        TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
+        TextOptions.SetTextRenderingMode(this, TextRenderingMode.Grayscale);
         TransportHover.Attach(this);
     }
 
@@ -332,6 +345,23 @@ internal sealed class TransportIconButton : Button
         new Rect(RenderSize).Contains(hitTestParameters.HitPoint)
             ? new PointHitTestResult(this, hitTestParameters.HitPoint)
             : null;
+
+    /// <summary>
+    /// オン／オフを LatchToggle 面の色で示すトグル（絵柄差し替えはしない）。
+    /// 録音・ループ解除・再生／停止は別表現のまま。
+    /// </summary>
+    private bool UsesLatchToggleFace =>
+        CommandKind is TransportCommand.RangeClick
+            or TransportCommand.SilentSkip
+            or TransportCommand.AutoLoop
+            or TransportCommand.AlwaysOnTop
+            or TransportCommand.CenterLock
+            or TransportCommand.ToggleSpectrogram
+            or TransportCommand.ToggleLoudnessView
+            or TransportCommand.ToggleMinimalChrome
+            or TransportCommand.ToggleLibraryMaximize
+            or TransportCommand.MaximizeWaveform
+            or TransportCommand.ToggleAnalyzerMaximize;
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -344,6 +374,12 @@ internal sealed class TransportIconButton : Button
         if (Icon == TransportIcon.Waapi)
         {
             DrawWaapiToggle(dc, bounds);
+            return;
+        }
+
+        if (UsesLatchToggleFace)
+        {
+            DrawLatchToggleIcon(dc, bounds);
             return;
         }
 
@@ -363,15 +399,6 @@ internal sealed class TransportIconButton : Button
             fore = Theme.Get("RecordLatchForeBrush");
         }
 
-        // 解析など「今オフ」のトグルは弱い色。F9–F12 のモード切替は
-        // 未選択でも押せるので、無効色にはしない（選択は IsLatched／アイコン差し替えで示す）。
-        if (Icon is TransportIcon.Analysis
-            or TransportIcon.Overlay
-            or TransportIcon.Loudness)
-        {
-            fore = IsLatched ? fore : TransportChrome.Fore(false);
-        }
-
         TransportIconDrawing.Draw(
             dc,
             Icon,
@@ -383,28 +410,36 @@ internal sealed class TransportIconButton : Button
             latched: IsLatched);
     }
 
+    /// <summary>
+    /// WAAPI と同じ LatchToggle 面でオン／オフを示す。
+    /// アイコン自体の色・絵柄は変えず、通常のツールバー前景のまま描く。
+    /// </summary>
+    private void DrawLatchToggleIcon(DrawingContext dc, Rect bounds)
+    {
+        var on = IsLatched;
+        var hover = IsEnabled && IsMouseOver && !IsPressed;
+        PaintLatchToggleFace(dc, bounds, on, hover, chipInset: false);
+        var fore = IconForeOverride ?? TransportChrome.Fore(IsEnabled);
+
+        TransportIconDrawing.Draw(
+            dc,
+            Icon,
+            bounds,
+            fore,
+            IsPlaying,
+            UiThemeService.Current,
+            accent: IsEnabled,
+            latched: false);
+    }
+
     private void DrawWaapiToggle(DrawingContext dc, Rect bounds)
     {
         var on = IsLatched;
         var hover = IsEnabled && IsMouseOver && !IsPressed;
-        var back = WaapiChipBack(on, hover);
+        PaintLatchToggleFace(dc, bounds, on, hover, chipInset: true);
         var fore = on
-            ? Theme.Get("WaapiToggleOnForeBrush")
-            : Theme.Get("WaapiToggleOffForeBrush");
-
-        var slotKey = QuietChrome ? "ProjectBarBackBrush" : "TransportBackBrush";
-        if (!WashThrough)
-        {
-            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(slotKey)), null, bounds);
-        }
-
-        var chip = new Rect(2, 6, Math.Max(1, bounds.Width - 4), Math.Max(1, bounds.Height - 12));
-        dc.DrawRoundedRectangle(
-            WpfControlHelpers.FrozenBrush(back),
-            null,
-            chip,
-            DesignMetrics.ControlCornerRadius,
-            DesignMetrics.ControlCornerRadius);
+            ? Theme.Get("LatchToggleOnForeBrush")
+            : Theme.Get("LatchToggleOffForeBrush");
 
         var formatted = new FormattedText(
             UiStrings.WaapiTitle,
@@ -421,18 +456,53 @@ internal sealed class TransportIconButton : Button
                 (bounds.Height - formatted.Height) * 0.5));
     }
 
-    private Color WaapiChipBack(bool on, bool hover)
+    private void PaintLatchToggleFace(
+        DrawingContext dc,
+        Rect bounds,
+        bool on,
+        bool hover,
+        bool chipInset)
     {
-        if (WashThrough)
+        var back = LatchToggleFaceBack(on, hover);
+        // WAAPI チップはバー地を敷く。ツールバーアイコンはグループベールを透かす。
+        if (chipInset && !WashThrough)
         {
-            return PlayerChrome.Get(on
-                ? hover ? "PlayerWaapiToggleOnHoverBackBrush" : "PlayerWaapiToggleOnBackBrush"
-                : hover ? "PlayerWaapiToggleOffHoverBackBrush" : "PlayerWaapiToggleOffBackBrush");
+            var slotKey = QuietChrome ? "ProjectBarBackBrush" : "TransportBackBrush";
+            dc.DrawRectangle(WpfControlHelpers.FrozenBrush(Theme.Get(slotKey)), null, bounds);
         }
 
-        return on
-            ? Theme.Get(hover ? "WaapiToggleOnHoverBackBrush" : "WaapiToggleOnBackBrush")
-            : Theme.Get(hover ? "WaapiToggleOffHoverBackBrush" : "WaapiToggleOffBackBrush");
+        var chip = chipInset
+            ? new Rect(2, 6, Math.Max(1, bounds.Width - 4), Math.Max(1, bounds.Height - 12))
+            : new Rect(
+                3,
+                3,
+                Math.Max(1, bounds.Width - 6),
+                Math.Max(1, bounds.Height - 6));
+        // Color.A ではなく Brush.Opacity。OnRender の FromArgb は中間面で潰れることがある。
+        var chipBrush = new SolidColorBrush(Color.FromRgb(back.R, back.G, back.B))
+        {
+            Opacity = back.A / 255d,
+        };
+        if (chipBrush.CanFreeze)
+        {
+            chipBrush.Freeze();
+        }
+
+        dc.DrawRoundedRectangle(
+            chipBrush,
+            null,
+            chip,
+            DesignMetrics.ControlCornerRadius,
+            DesignMetrics.ControlCornerRadius);
+    }
+
+    private Color LatchToggleFaceBack(bool on, bool hover)
+    {
+        var key = on
+            ? (hover ? "LatchToggleOnHoverBackBrush" : "LatchToggleOnBackBrush")
+            : (hover ? "LatchToggleOffHoverBackBrush" : "LatchToggleOffBackBrush");
+        var face = Theme.Get(key);
+        return WashThrough ? PlayerChrome.WashLatchToggleFace(face) : face;
     }
 
     private Color ChromeHole(string backKey)
@@ -716,16 +786,25 @@ internal static class TransportIconDrawing
                 dc.DrawLine(pen, new Point(cx + 1.5, cy + 5), new Point(cx + 9.5, cy + 5));
                 break;
             case TransportIcon.RangeClick:
-                // 左にマーカー旗、右に八分音符。オンのときだけ旗をマーカー色にする。
+                // 左にマーカー旗（常にマーカー色）、右に八分音符。オン／オフは背景色のみ。
                 DrawMarkerFlag(
                     dc,
-                    latched ? markerBrush : brush,
+                    accent ? markerBrush : brush,
                     pen,
                     cx - 10,
                     cy - 8,
                     cy + 8,
                     7);
                 DrawEighthNote(dc, pen, cx + 3.2, cy + 5);
+                break;
+            case TransportIcon.SilentSkip:
+                DrawSilentSkip(dc, pen, cx, cy);
+                break;
+            case TransportIcon.AutoLoop:
+                DrawSingleLoop(dc, pen, latched ? loopFill : null, cx, cy);
+                break;
+            case TransportIcon.AlwaysOnTop:
+                DrawAlwaysOnTop(dc, pen, brush, cx, cy);
                 break;
             case TransportIcon.SetLoop:
                 DrawCassetteAutoReverse(dc, pen, loopFill);
@@ -1790,6 +1869,51 @@ internal static class TransportIconDrawing
         dc.DrawLine(pen, new Point(cx + 2, cy + 5), new Point(cx + 5, cy - 6));
         dc.DrawLine(pen, new Point(cx + 5, cy - 6), new Point(cx + 9, cy + 2));
         dc.DrawLine(pen, new Point(cx - 8, cy + 7), new Point(cx + 8, cy + 7));
+    }
+
+    /// <summary>波形の谷を弧で飛び越える。</summary>
+    private static void DrawSilentSkip(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawLine(pen, new Point(cx - 9, cy + 3), new Point(cx - 5, cy - 5));
+        dc.DrawLine(pen, new Point(cx - 5, cy - 5), new Point(cx - 2, cy + 2));
+        dc.DrawLine(pen, new Point(cx + 2, cy + 2), new Point(cx + 5, cy - 5));
+        dc.DrawLine(pen, new Point(cx + 5, cy - 5), new Point(cx + 9, cy + 3));
+        var arc = new StreamGeometry();
+        using (var ctx = arc.Open())
+        {
+            ctx.BeginFigure(new Point(cx - 2, cy + 2), false, false);
+            ctx.ArcTo(
+                new Point(cx + 2, cy + 2),
+                new Size(5, 7),
+                0,
+                false,
+                SweepDirection.Clockwise,
+                true,
+                false);
+        }
+
+        arc.Freeze();
+        dc.DrawGeometry(null, pen, arc);
+        dc.DrawLine(pen, new Point(cx + 0.5, cy - 4), new Point(cx + 2, cy + 2));
+        dc.DrawLine(pen, new Point(cx + 3.5, cy - 1), new Point(cx + 2, cy + 2));
+    }
+
+    /// <summary>1 周だけ回る矢印。LoopPlay（カセット）と区別する。</summary>
+    private static void DrawSingleLoop(DrawingContext dc, Pen pen, Brush? fill, double cx, double cy)
+    {
+        dc.DrawEllipse(fill, pen, new Point(cx - 1, cy), 7, 7);
+        dc.DrawLine(pen, new Point(cx + 5, cy - 4), new Point(cx + 9, cy - 1));
+        dc.DrawLine(pen, new Point(cx + 5, cy + 1), new Point(cx + 9, cy - 1));
+        dc.DrawLine(pen, new Point(cx + 5, cy - 4), new Point(cx + 5, cy + 1));
+    }
+
+    /// <summary>窓の上辺にピン。</summary>
+    private static void DrawAlwaysOnTop(DrawingContext dc, Pen pen, Brush brush, double cx, double cy)
+    {
+        dc.DrawRoundedRectangle(null, pen, new Rect(cx - 8, cy - 3, 16, 11), 2, 2);
+        dc.DrawLine(pen, new Point(cx - 8, cy), new Point(cx + 8, cy));
+        dc.DrawEllipse(brush, pen, new Point(cx, cy - 7), 2.2, 2.2);
+        dc.DrawLine(pen, new Point(cx, cy - 5), new Point(cx, cy - 1));
     }
 
     private static void DrawFormatGlyph(

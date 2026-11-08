@@ -157,14 +157,14 @@ internal sealed class AppSettings
         };
 
     /// <summary>
-    /// ツールバーで隠すコマンド名（<c>TransportCommand</c> の名前）。空は全表示。
+    /// ツールバーで隠すコマンド名（<c>TransportCommand</c> の名前）。空は全表示（既定）。
     /// <see cref="TransportToolbarLayout"/> があるときはそこから同期する互換フィールド。
     /// </summary>
     public string[] HiddenTransportToolbarCommands { get; set; } = [];
 
     /// <summary>
-    /// ツールバーに出すコマンド名と <c>|</c>（セパレータ）。空は既定。
-    /// 並びは常にカタログのカテゴリ順（おまかせ配置）。ここに無いコマンドは非表示。
+    /// ツールバーに出すコマンド名と <c>|</c>（セパレータ）。空は全表示（既定）。
+    /// 並びは常にカタログのカテゴリ順（おまかせ配置）。Hidden が空のときは Layout も空で覚える。
     /// </summary>
     public string[] TransportToolbarLayout { get; set; } = [];
 

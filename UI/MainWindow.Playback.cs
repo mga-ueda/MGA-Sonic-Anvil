@@ -200,6 +200,18 @@ public partial class MainWindow
             case TransportCommand.RangeClick:
                 ToggleRangeClick();
                 break;
+            case TransportCommand.SilentSkip:
+                ToggleSilentSkipLatch();
+                break;
+            case TransportCommand.AutoLoop:
+                LibraryBrowser.ToggleAutoLoop();
+                break;
+            case TransportCommand.AlwaysOnTop:
+                ToggleAlwaysOnTopLatch();
+                break;
+            case TransportCommand.CenterLock:
+                ToggleCenterLock();
+                break;
             case TransportCommand.SeekViewLeft:
                 Waveform.SeekToViewEdge(-1);
                 break;
@@ -333,9 +345,6 @@ public partial class MainWindow
                 break;
             case TransportCommand.ToggleLoudnessView:
                 Waveform.ToggleLoudnessView();
-                break;
-            case TransportCommand.CenterPlayhead:
-                CenterPlayheadOrToggleLock();
                 break;
             case TransportCommand.History:
                 OpenEditHistory();
@@ -1298,6 +1307,8 @@ public partial class MainWindow
         _rangeClickEnabled = !_rangeClickEnabled;
         SyncRangeClicks();
         Transport.SetRangeClick(_rangeClickEnabled);
+        MarkerClickLatch.IsLatched = _rangeClickEnabled;
+        MarkerClickLatch.RefreshAppearance();
         ShowOptionToggleToast(UiStrings.LabelMarkerClick, _rangeClickEnabled);
         Waveform.Focus();
     }
@@ -2378,23 +2389,12 @@ public partial class MainWindow
         AfterMarkerEdit();
     }
 
-    private void CenterPlayheadOrToggleLock()
-    {
-        if (IsPlaybackActive())
-        {
-            DetachOverviewScrubKeepPlayback();
-            ToggleCenterLock();
-            return;
-        }
-
-        Waveform.CenterViewOnPlayhead();
-    }
-
     /// <summary>センターロックを反転し、中央に ON／OFF を出す。停止中でも有効。スクロールや停止では外さない。プレイヤーでは切替しない。</summary>
     private void ToggleCenterLock()
     {
         if (IsLibraryMaximized)
         {
+            SyncEditorOnlyStatusLatches();
             return;
         }
 
@@ -2408,6 +2408,9 @@ public partial class MainWindow
             Waveform.UnlockCenter();
         }
 
+        CenterLockLatch.IsLatched = enabled;
+        CenterLockLatch.RefreshAppearance();
+        Transport.SetCenterLock(enabled);
         ShowOptionToggleToast(UiStrings.LabelCenterLock, enabled);
     }
 
@@ -2926,7 +2929,7 @@ public partial class MainWindow
     private void ApplyWindowTopmost()
     {
         var fullscreenFront = (IsWaveformMaximized || _playlistVideoFullscreen) && IsActive;
-        var want = AlwaysOnTopCheck.IsChecked == true || fullscreenFront;
+        var want = AlwaysOnTopLatch.IsLatched || fullscreenFront;
         if (Topmost != want)
         {
             Topmost = want;

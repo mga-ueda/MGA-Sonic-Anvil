@@ -58,6 +58,23 @@ internal partial class TransportBar : UserControl
         }
     }
 
+    public void SetSilentSkip(bool enabled) => SetLatched(TransportCommand.SilentSkip, enabled);
+
+    public void SetAutoLoop(bool enabled) => SetLatched(TransportCommand.AutoLoop, enabled);
+
+    public void SetAlwaysOnTop(bool enabled) => SetLatched(TransportCommand.AlwaysOnTop, enabled);
+
+    public void SetCenterLock(bool enabled) => SetLatched(TransportCommand.CenterLock, enabled);
+
+    private void SetLatched(TransportCommand command, bool enabled)
+    {
+        if (_buttons.TryGetValue(command, out var button))
+        {
+            button.IsLatched = enabled;
+            button.InvalidateVisual();
+        }
+    }
+
     public void SetRecording(bool recording)
     {
         if (_buttons.TryGetValue(TransportCommand.Record, out var button))
@@ -93,15 +110,16 @@ internal partial class TransportBar : UserControl
     {
         if (_buttons.TryGetValue(TransportCommand.ToggleSpectrogram, out var spectrogram))
         {
+            // オン／オフは LatchToggle 面。Overlay 時も絵柄は差し替えない。
             spectrogram.IsLatched = view is WaveformAnalysisView.Spectrogram or WaveformAnalysisView.Overlay;
-            spectrogram.Icon = view == WaveformAnalysisView.Overlay
-                ? TransportIcon.Overlay
-                : TransportIcon.Analysis;
+            spectrogram.Icon = TransportIcon.Analysis;
+            spectrogram.InvalidateVisual();
         }
 
         if (_buttons.TryGetValue(TransportCommand.ToggleLoudnessView, out var loudness))
         {
             loudness.IsLatched = view == WaveformAnalysisView.Loudness;
+            loudness.InvalidateVisual();
         }
     }
 
@@ -127,7 +145,8 @@ internal partial class TransportBar : UserControl
 
         if (_buttons.TryGetValue(TransportCommand.ToggleLibraryMaximize, out var library))
         {
-            library.Icon = f10 ? TransportIcon.EditorMode : TransportIcon.PlayerMode;
+            // プレイヤー／エディタの絵柄差し替えはせず、LatchToggle 面でオンを示す。
+            library.Icon = TransportIcon.PlayerMode;
             library.IsLatched = f10;
             TransportToolTip.Attach(library, UiStrings.TooltipLibraryMaximize);
             library.InvalidateVisual();
@@ -135,7 +154,7 @@ internal partial class TransportBar : UserControl
 
         if (_buttons.TryGetValue(TransportCommand.MaximizeWaveform, out var waveform))
         {
-            waveform.Icon = f11 ? TransportIcon.WaveformRestore : TransportIcon.WaveformMaximize;
+            waveform.Icon = TransportIcon.WaveformMaximize;
             waveform.IsLatched = f11;
             TransportToolTip.Attach(waveform, UiStrings.TooltipWaveformMaximize);
             waveform.InvalidateVisual();
@@ -143,7 +162,7 @@ internal partial class TransportBar : UserControl
 
         if (_buttons.TryGetValue(TransportCommand.ToggleAnalyzerMaximize, out var analyzers))
         {
-            analyzers.Icon = f12 ? TransportIcon.AnalyzerRestore : TransportIcon.AnalyzerMaximize;
+            analyzers.Icon = TransportIcon.AnalyzerMaximize;
             analyzers.IsLatched = f12;
             TransportToolTip.Attach(analyzers, UiStrings.TooltipAnalyzerMaximize);
             analyzers.InvalidateVisual();
