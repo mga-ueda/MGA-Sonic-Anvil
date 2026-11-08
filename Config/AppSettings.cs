@@ -506,6 +506,9 @@ internal sealed class AppSettings
     /// <summary>配色。auto / dark / light。既定は OS に従う。</summary>
     public string UiTheme { get; set; } = "auto";
 
+    /// <summary>スペクトログラムの色調。blue（既定）/ red。空・不明も青系。</summary>
+    public string SpectrogramColorPalette { get; set; } = "blue";
+
     /// <summary>アプリ表示の追加拡大（％）。100 未満は 100。上限 200。</summary>
     public int UiScalePercent { get; set; } = UiScale.DefaultPercent;
 
@@ -1022,6 +1025,12 @@ internal sealed class AppSettings
 
     public double ResolvedTransportToolbarIconScale() =>
         TransportToolbarIconScale.FactorFrom(TransportToolbarIconScalePercent);
+
+    public SpectrogramColorPalette ResolvedSpectrogramColorPalette() =>
+        SpectrogramColorPalettes.Parse(SpectrogramColorPalette);
+
+    public void ApplySpectrogramColorPalette(SpectrogramColorPalette palette) =>
+        SpectrogramColorPalette = SpectrogramColorPalettes.Format(palette);
 
     public FadeShape ResolvedFadeInCurve() => FadeCurves.ParseStored(DefaultFadeInCurve);
 

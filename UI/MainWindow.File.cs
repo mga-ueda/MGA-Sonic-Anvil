@@ -2273,7 +2273,8 @@ public partial class MainWindow
             settings.ResolvedLayoutPreset(WindowLayoutSlot.F12),
             settings.ResolvedVst3SearchPaths(),
             settings.Vst3UseSteinbergHostCache,
-            settings.ResolvedControlCornerRadius())
+            settings.ResolvedControlCornerRadius(),
+            settings.ResolvedSpectrogramColorPalette())
         {
             Owner = this,
             OpenColorSettings = ShowColorDevPanel,
@@ -2383,6 +2384,7 @@ public partial class MainWindow
         LibraryBrowser.RefreshFileNameMarkers();
         RefreshTabHeaders();
         RefreshPlaylistVideoFileName();
+        ApplySpectrogramColorPalettePreview(dialog.SelectedSpectrogramColorPalette);
         settings.Mp3BitRate = dialog.SelectedMp3BitRate;
         settings.LameExePath = dialog.SelectedLameExePath;
         settings.LameOptions = dialog.SelectedLameOptions;

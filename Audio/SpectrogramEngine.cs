@@ -17,7 +17,26 @@ internal static class SpectrogramEngine
     public const double FrequencyWarp = 1.35;
     public const byte OverlayAlpha = 255;
     private const int ColorLutSize = 256;
-    private static readonly int[] ColorLut = CreateColorLut();
+    private static readonly int[] BlueColorLut = CreateColorLut(SpectrogramColorPalette.Blue);
+    private static readonly int[] RedColorLut = CreateColorLut(SpectrogramColorPalette.Red);
+    private static int[] ColorLut = BlueColorLut;
+    private static SpectrogramColorPalette _colorPalette = SpectrogramColorPalette.Blue;
+
+    /// <summary>現在のスペクトログラム色調。既定は青系。</summary>
+    public static SpectrogramColorPalette ColorPalette => _colorPalette;
+
+    /// <summary>色調を切り替える。変わったときだけ true。</summary>
+    public static bool SetColorPalette(SpectrogramColorPalette palette)
+    {
+        if (_colorPalette == palette)
+        {
+            return false;
+        }
+
+        _colorPalette = palette;
+        ColorLut = palette == SpectrogramColorPalette.Red ? RedColorLut : BlueColorLut;
+        return true;
+    }
 
     public static readonly double[] FrequencyMarks =
     [
@@ -329,32 +348,47 @@ internal static class SpectrogramEngine
         return table;
     }
 
-    private static int[] CreateColorLut()
+    private static int[] CreateColorLut(SpectrogramColorPalette palette)
     {
         var lut = new int[ColorLutSize];
         for (var i = 0; i < ColorLutSize; i++)
         {
-            lut[i] = SampleGradient(i / (float)(ColorLutSize - 1));
+            lut[i] = SampleGradient(i / (float)(ColorLutSize - 1), palette);
         }
 
         return lut;
     }
 
-    private static int SampleGradient(float t)
+    private static int SampleGradient(float t, SpectrogramColorPalette palette)
     {
         t = Math.Clamp(t, 0f, 1f);
-        ReadOnlySpan<(float P, byte R, byte G, byte B)> stops =
-        [
-            (0.00f, 4, 0, 20),
-            (0.10f, 55, 12, 95),
-            (0.22f, 140, 18, 115),
-            (0.36f, 215, 28, 55),
-            (0.50f, 250, 85, 22),
-            (0.62f, 255, 175, 18),
-            (0.74f, 255, 235, 45),
-            (0.86f, 255, 252, 175),
-            (1.00f, 255, 255, 255),
-        ];
+        ReadOnlySpan<(float P, byte R, byte G, byte B)> stops = palette switch
+        {
+            SpectrogramColorPalette.Red =>
+            [
+                (0.00f, 4, 0, 20),
+                (0.10f, 55, 12, 95),
+                (0.22f, 140, 18, 115),
+                (0.36f, 215, 28, 55),
+                (0.50f, 250, 85, 22),
+                (0.62f, 255, 175, 18),
+                (0.74f, 255, 235, 45),
+                (0.86f, 255, 252, 175),
+                (1.00f, 255, 255, 255),
+            ],
+            _ =>
+            [
+                (0.00f, 0, 4, 20),
+                (0.10f, 8, 30, 95),
+                (0.22f, 12, 55, 160),
+                (0.36f, 18, 110, 220),
+                (0.50f, 22, 175, 250),
+                (0.62f, 60, 220, 255),
+                (0.74f, 140, 245, 255),
+                (0.86f, 210, 252, 255),
+                (1.00f, 255, 255, 255),
+            ],
+        };
         var i = 0;
         for (; i < stops.Length - 2; i++)
         {

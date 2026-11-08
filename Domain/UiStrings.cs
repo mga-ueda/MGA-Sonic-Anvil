@@ -367,6 +367,11 @@ internal static partial class UiStrings
     public static string ButtonOpenColorSettings => Get(
         "色設定を開く (Ctrl+Shift+C)",
         "Open color settings (Ctrl+Shift+C)");
+    public static string LabelSpectrogramColorPalette => Get(
+        "スペクトログラムの色",
+        "Spectrogram colors");
+    public static string LabelSpectrogramColorPaletteBlue => Get("青系", "Blue");
+    public static string LabelSpectrogramColorPaletteRed => Get("赤系", "Red");
     public static string LabelLibraryExplorerRoots => Get("ツリーのルート", "Tree roots");
     public static string LabelLibraryListColumns => Get("プレイリストの列", "Playlist columns");
     public static string LabelLibraryListColumnsWave => Get("WAVE / AIFF のとき", "For WAVE / AIFF");

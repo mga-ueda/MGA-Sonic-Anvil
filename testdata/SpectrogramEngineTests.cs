@@ -201,16 +201,75 @@ public sealed class SpectrogramEngineTests
     }
 
     [Fact]
-    public void ColorBgra_MidHighIsYellowishAndPeakIsNearWhite()
+    public void ColorBgra_MidHighIsCyanishAndPeakIsNearWhite_OnBluePalette()
     {
         static (int R, int G, int B) Unpack(int bgra) =>
             ((bgra >> 16) & 0xFF, (bgra >> 8) & 0xFF, bgra & 0xFF);
 
-        var mid = Unpack(SpectrogramEngine.ColorBgra(-18f));
-        Assert.True(mid.R > 220 && mid.G > 160 && mid.B < 120);
+        var previous = SpectrogramEngine.ColorPalette;
+        try
+        {
+            Assert.True(SpectrogramEngine.SetColorPalette(SpectrogramColorPalette.Blue)
+                || previous == SpectrogramColorPalette.Blue);
 
-        var peak = Unpack(SpectrogramEngine.ColorBgra(SpectrogramEngine.CeilingDb));
-        Assert.True(peak.R > 250 && peak.G > 250 && peak.B > 250);
+            var mid = Unpack(SpectrogramEngine.ColorBgra(-30f));
+            Assert.True(mid.B > mid.R && mid.B > 140 && mid.R < 80);
+
+            var high = Unpack(SpectrogramEngine.ColorBgra(-12f));
+            Assert.True(high.B > 200 && high.G > 160 && high.R < high.B);
+
+            var peak = Unpack(SpectrogramEngine.ColorBgra(SpectrogramEngine.CeilingDb));
+            Assert.True(peak.R > 250 && peak.G > 250 && peak.B > 250);
+        }
+        finally
+        {
+            SpectrogramEngine.SetColorPalette(previous);
+        }
+    }
+
+    [Fact]
+    public void ColorBgra_MidHighIsYellowishAndPeakIsNearWhite_OnRedPalette()
+    {
+        static (int R, int G, int B) Unpack(int bgra) =>
+            ((bgra >> 16) & 0xFF, (bgra >> 8) & 0xFF, bgra & 0xFF);
+
+        var previous = SpectrogramEngine.ColorPalette;
+        try
+        {
+            Assert.True(SpectrogramEngine.SetColorPalette(SpectrogramColorPalette.Red)
+                || previous == SpectrogramColorPalette.Red);
+
+            var mid = Unpack(SpectrogramEngine.ColorBgra(-18f));
+            Assert.True(mid.R > 220 && mid.G > 160 && mid.B < 120);
+
+            var peak = Unpack(SpectrogramEngine.ColorBgra(SpectrogramEngine.CeilingDb));
+            Assert.True(peak.R > 250 && peak.G > 250 && peak.B > 250);
+        }
+        finally
+        {
+            SpectrogramEngine.SetColorPalette(previous);
+        }
+    }
+
+    [Fact]
+    public void SetColorPalette_SwitchesLutAndIsIdempotent()
+    {
+        var previous = SpectrogramEngine.ColorPalette;
+        try
+        {
+            SpectrogramEngine.SetColorPalette(SpectrogramColorPalette.Blue);
+            var blue = SpectrogramEngine.ColorBgra(-18f);
+            Assert.False(SpectrogramEngine.SetColorPalette(SpectrogramColorPalette.Blue));
+            Assert.True(SpectrogramEngine.SetColorPalette(SpectrogramColorPalette.Red));
+            var red = SpectrogramEngine.ColorBgra(-18f);
+            Assert.NotEqual(blue, red);
+            Assert.True(SpectrogramEngine.SetColorPalette(SpectrogramColorPalette.Blue));
+            Assert.Equal(blue, SpectrogramEngine.ColorBgra(-18f));
+        }
+        finally
+        {
+            SpectrogramEngine.SetColorPalette(previous);
+        }
     }
 
     [Fact]

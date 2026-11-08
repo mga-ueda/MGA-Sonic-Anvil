@@ -1,4 +1,5 @@
 using System.IO;
+using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 
@@ -107,6 +108,7 @@ internal static class AppStorage
         TransportToolbarCatalog.NormalizeStoredSettings(Settings);
         SettingsReset = reset;
         Loaded = true;
+        SpectrogramEngine.SetColorPalette(Settings.ResolvedSpectrogramColorPalette());
         LibraryPlaylistDocuments.ApplyFromSettings(Settings);
         // 全表示既定への正規化で Layout スナップショットを捨てたときはディスクにも書く。
         var layoutAfter = Settings.TransportToolbarLayout ?? [];
