@@ -3,7 +3,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -219,7 +218,7 @@ internal sealed class EditHistoryOverlay : Border
 
     private Thumb CreateResizeGrip()
     {
-        var gripSize = DesignMetrics.EditHistoryOverlayResizeGrip;
+        var gripSize = DesignMetrics.WindowResizeGripSize;
         var thumb = new Thumb
         {
             Width = gripSize,
@@ -229,43 +228,11 @@ internal sealed class EditHistoryOverlay : Border
             Cursor = Cursors.SizeNWSE,
             Focusable = false,
             Margin = new Thickness(0, 0, 2, 2),
-            Template = CreateGripTemplate(gripSize),
+            Template = WindowResizeGripMark.CreateThumbTemplate(gripSize),
         };
         thumb.DragDelta += (_, e) => ResizeBy(e.HorizontalChange, e.VerticalChange);
         thumb.DragCompleted += (_, _) => PersistSize();
         return thumb;
-    }
-
-    private static ControlTemplate CreateGripTemplate(double size)
-    {
-        var template = new ControlTemplate(typeof(Thumb));
-        var root = new FrameworkElementFactory(typeof(Grid));
-        var hit = new FrameworkElementFactory(typeof(Border));
-        hit.SetValue(Border.BackgroundProperty, Brushes.Transparent);
-        root.AppendChild(hit);
-
-        var canvas = new FrameworkElementFactory(typeof(Canvas));
-        canvas.SetValue(WidthProperty, size);
-        canvas.SetValue(HeightProperty, size);
-        canvas.SetValue(IsHitTestVisibleProperty, false);
-        AppendGripLineFactory(canvas, size, inset: 4);
-        AppendGripLineFactory(canvas, size, inset: 8);
-        root.AppendChild(canvas);
-        template.VisualTree = root;
-        return template;
-    }
-
-    private static void AppendGripLineFactory(FrameworkElementFactory canvas, double size, double inset)
-    {
-        var line = new FrameworkElementFactory(typeof(Line));
-        line.SetValue(Line.X1Property, inset);
-        line.SetValue(Line.Y1Property, size - 2);
-        line.SetValue(Line.X2Property, size - 2);
-        line.SetValue(Line.Y2Property, inset);
-        line.SetValue(Shape.StrokeThicknessProperty, 1.0);
-        line.SetResourceReference(Shape.StrokeProperty, "MutedForeBrush");
-        line.SetValue(UIElement.OpacityProperty, 0.7);
-        canvas.AppendChild(line);
     }
 
     private void ResizeBy(double dx, double dy)
