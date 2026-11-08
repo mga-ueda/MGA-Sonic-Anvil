@@ -1049,6 +1049,121 @@ public sealed class DocumentSessionStoreTests
         return new AudioDocument(samples, 48000, 2, 16, AudioFileKind.Wave, null);
     }
 
+    [Fact]
+    public void CaptureAndApplyChainSnapshot_ReplacesAllSlotsIncludingClears()
+    {
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Keep.vst3";
+        chain.Slots[0].DisplayName = "Keep";
+        chain.Slots[1].PluginPath = @"C:\Gone.vst3";
+        chain.Slots[1].DisplayName = "Gone";
+        chain.Slots[1].StateBlob = [1, 2];
+        chain.Slots[2].PluginPath = @"C:\Swap.vst3";
+        chain.Slots[2].DisplayName = "Swap";
+
+        var snap = DocumentSessionStore.CaptureChain(chain);
+        Assert.Equal(@"C:\Keep.vst3", snap[0].PluginPath);
+        Assert.Equal(@"C:\Gone.vst3", snap[1].PluginPath);
+        Assert.False(string.IsNullOrWhiteSpace(snap[1].StateBase64));
+
+        snap[1] = new VstInsertSlotSnapshot();
+        snap[2] = new VstInsertSlotSnapshot
+        {
+            PluginPath = @"C:\New.vst3",
+            DisplayName = "New",
+            Bypassed = true,
+            StateBase64 = Convert.ToBase64String([9]),
+        };
+
+        Assert.True(DocumentSessionStore.ApplyChainSnapshot(chain, snap));
+        Assert.Equal(@"C:\Keep.vst3", chain.Slots[0].PluginPath);
+        Assert.True(chain.Slots[1].IsEmpty);
+        Assert.Equal(@"C:\New.vst3", chain.Slots[2].PluginPath);
+        Assert.True(chain.Slots[2].Bypassed);
+        Assert.Equal(new byte[] { 9 }, chain.Slots[2].StateBlob);
+        Assert.False(DocumentSessionStore.ApplyChainSnapshot(chain, snap));
+    }
+
+    [Fact]
+    public void CollectPresetOverwriteSlots_ListsOnlyFilledSlotsThatChange()
+    {
+        var chain = new VstInsertChain();
+        chain.Slots[0].PluginPath = @"C:\Same.vst3";
+        chain.Slots[0].DisplayName = "Same";
+        chain.Slots[0].StateBlob = [1];
+        chain.Slots[1].PluginPath = @"C:\Old.vst3";
+        chain.Slots[1].DisplayName = "Old";
+        chain.Slots[3].PluginPath = @"C:\Clear.vst3";
+        chain.Slots[3].DisplayName = "Clear";
+
+        var preset = DocumentSessionStore.CaptureChain(chain);
+        preset[1] = new VstInsertSlotSnapshot
+        {
+            PluginPath = @"C:\New.vst3",
+            DisplayName = "New",
+        };
+        preset[3] = new VstInsertSlotSnapshot();
+
+        var hits = DocumentSessionStore.CollectPresetOverwriteSlots(chain, preset);
+        Assert.Equal(2, hits.Count);
+        Assert.Equal(1, hits[0].Index);
+        Assert.Equal("Old", hits[0].PluginLabel);
+        Assert.Equal(3, hits[1].Index);
+        Assert.Equal("Clear", hits[1].PluginLabel);
+    }
+
+    [Fact]
+    public void VstInsertChainPreset_NormalizeList_DropsEmptyNamesAndDedupesIds()
+    {
+        var a = VstInsertChainPreset.Create("Alpha", []);
+        var b = new VstInsertChainPreset
+        {
+            Id = a.Id,
+            Name = "Beta",
+            Slots = [],
+        };
+        var empty = new VstInsertChainPreset { Name = "  ", Slots = [] };
+        var list = VstInsertChainPreset.NormalizeList([a, b, empty, null!]);
+        Assert.Equal(2, list.Length);
+        Assert.Equal("Alpha", list[0].Name);
+        Assert.Equal("Beta", list[1].Name);
+        Assert.False(string.Equals(list[0].Id, list[1].Id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void AppSettings_RoundTripsVstInsertChainPresets()
+    {
+        var settings = new AppSettings { SettingsGeneration = AppSettings.CurrentGeneration };
+        var slots = new VstInsertSlotSnapshot[VstInsertChain.MaxSlots];
+        for (var i = 0; i < slots.Length; i++)
+        {
+            slots[i] = new VstInsertSlotSnapshot();
+        }
+
+        slots[0] = new VstInsertSlotSnapshot
+        {
+            PluginPath = @"C:\Program Files\Common Files\VST3\Eventide\SplitEQ.vst3",
+            ClassId = "cid",
+            DisplayName = "SplitEQ",
+            StateBase64 = Convert.ToBase64String([1, 2, 3]),
+        };
+        settings.VstInsertChainPresets =
+        [
+            VstInsertChainPreset.Create("Karaage", slots),
+        ];
+
+        var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
+        var loaded = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.NotNull(loaded);
+        Assert.Single(loaded!.VstInsertChainPresets);
+        Assert.Equal("Karaage", loaded.VstInsertChainPresets[0].Name);
+        Assert.Equal(
+            @"C:\Program Files\Common Files\VST3\Eventide\SplitEQ.vst3",
+            loaded.VstInsertChainPresets[0].Slots[0].PluginPath);
+        Assert.Equal("SplitEQ", loaded.VstInsertChainPresets[0].Slots[0].DisplayName);
+        Assert.False(string.IsNullOrWhiteSpace(loaded.VstInsertChainPresets[0].Slots[0].StateBase64));
+    }
+
     private static string NewTempDir(string suffix)
     {
         var path = Path.Combine(Path.GetTempPath(), $"mga-session-{suffix}-{Guid.NewGuid():N}");

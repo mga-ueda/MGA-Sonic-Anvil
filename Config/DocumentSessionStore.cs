@@ -624,6 +624,51 @@ internal static class DocumentSessionStore
         return false;
     }
 
+    /// <summary>インサート 1–8 のスナップショットが同じ内容か（パス／ClassId／表示名／バイパス／state）。</summary>
+    public static bool ChainSnapshotsEqual(
+        VstInsertSlotSnapshot[]? left,
+        VstInsertSlotSnapshot[]? right)
+    {
+        var a = NormalizeDefaultInserts(left);
+        var b = NormalizeDefaultInserts(right);
+        for (var i = 0; i < VstInsertChain.MaxSlots; i++)
+        {
+            if (!SlotSnapshotEquals(a[i], b[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool SlotSnapshotEquals(VstInsertSlotSnapshot a, VstInsertSlotSnapshot b)
+    {
+        var aEmpty = string.IsNullOrWhiteSpace(a.PluginPath);
+        var bEmpty = string.IsNullOrWhiteSpace(b.PluginPath);
+        if (aEmpty && bEmpty)
+        {
+            return true;
+        }
+
+        if (aEmpty || bEmpty)
+        {
+            return false;
+        }
+
+        if (!string.Equals(a.PluginPath, b.PluginPath, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(a.ClassId ?? string.Empty, b.ClassId ?? string.Empty, StringComparison.Ordinal)
+            || !string.Equals(a.DisplayName ?? string.Empty, b.DisplayName ?? string.Empty, StringComparison.Ordinal)
+            || a.Bypassed != b.Bypassed)
+        {
+            return false;
+        }
+
+        TryDecodeStateBlob(a, out var stateA);
+        TryDecodeStateBlob(b, out var stateB);
+        return StateBlobEquals(stateA, stateB);
+    }
+
     public static bool SnapshotHasPluginAt(VstInsertSlotSnapshot[]? slots, int index)
     {
         if (slots is null || (uint)index >= (uint)slots.Length)
@@ -647,6 +692,141 @@ internal static class DocumentSessionStore
                 ? Convert.ToBase64String(slot.StateBlob)
                 : null,
         };
+    }
+
+    /// <summary>チェーン 1–8 をスナップショット配列にする（空きも含む）。</summary>
+    public static VstInsertSlotSnapshot[] CaptureChain(VstInsertChain chain)
+    {
+        ArgumentNullException.ThrowIfNull(chain);
+        var slots = new VstInsertSlotSnapshot[VstInsertChain.MaxSlots];
+        for (var i = 0; i < slots.Length; i++)
+        {
+            slots[i] = CaptureSlot(chain.Slots[i]);
+        }
+
+        return slots;
+    }
+
+    /// <summary>
+    /// プリセットをチェーンへ丸ごと載せる（空きスロットも空にする）。
+    /// <see cref="ApplyPersistedInserts"/> と違い、未設定スロットも消す。
+    /// </summary>
+    /// <returns>1 つでも変えたら true。</returns>
+    public static bool ApplyChainSnapshot(VstInsertChain chain, VstInsertSlotSnapshot[]? slots)
+    {
+        ArgumentNullException.ThrowIfNull(chain);
+        var normalized = NormalizeDefaultInserts(slots);
+        var changed = false;
+        for (var i = 0; i < VstInsertChain.MaxSlots; i++)
+        {
+            var src = normalized[i];
+            var dst = chain.Slots[i];
+            if (string.IsNullOrWhiteSpace(src.PluginPath))
+            {
+                if (!dst.IsEmpty)
+                {
+                    chain.ClearSlot(i);
+                    changed = true;
+                }
+
+                continue;
+            }
+
+            if (!TryDecodeStateBlob(src, out var state))
+            {
+                state = null;
+            }
+
+            var samePlugin =
+                string.Equals(dst.PluginPath, src.PluginPath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(dst.ClassId ?? string.Empty, src.ClassId ?? string.Empty, StringComparison.Ordinal)
+                && StateBlobEquals(dst.StateBlob, state)
+                && dst.Bypassed == src.Bypassed
+                && string.Equals(
+                    dst.DisplayName ?? string.Empty,
+                    src.DisplayName ?? string.Empty,
+                    StringComparison.Ordinal);
+            if (samePlugin)
+            {
+                continue;
+            }
+
+            dst.PluginPath = src.PluginPath;
+            dst.ClassId = src.ClassId;
+            dst.DisplayName = src.DisplayName;
+            dst.Bypassed = src.Bypassed;
+            dst.Faulted = false;
+            dst.StateBlob = state is null ? null : (byte[])state.Clone();
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// プリセット適用で、使用中スロットの内容が消える／変わる番号を列挙する。
+    /// 空きへ載せるだけは含めない。
+    /// </summary>
+    public static List<(int Index, string PluginLabel)> CollectPresetOverwriteSlots(
+        VstInsertChain chain,
+        VstInsertSlotSnapshot[]? preset)
+    {
+        ArgumentNullException.ThrowIfNull(chain);
+        var normalized = NormalizeDefaultInserts(preset);
+        var result = new List<(int Index, string PluginLabel)>();
+        for (var i = 0; i < VstInsertChain.MaxSlots; i++)
+        {
+            var current = chain.Slots[i];
+            if (current.IsEmpty)
+            {
+                continue;
+            }
+
+            var incoming = normalized[i];
+            if (!PresetWouldReplaceSlot(current, incoming))
+            {
+                continue;
+            }
+
+            var label = string.IsNullOrWhiteSpace(current.DisplayName)
+                ? System.IO.Path.GetFileNameWithoutExtension(current.PluginPath ?? string.Empty)
+                : current.DisplayName.Trim();
+            if (string.IsNullOrWhiteSpace(label))
+            {
+                label = "?";
+            }
+
+            result.Add((i, label));
+        }
+
+        return result;
+    }
+
+    /// <summary>使用中スロットへプリセットを載せるとき、内容が消える／変わるか。</summary>
+    public static bool PresetWouldReplaceSlot(VstInsertSlot current, VstInsertSlotSnapshot? incoming)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        if (current.IsEmpty)
+        {
+            return false;
+        }
+
+        if (incoming is null || string.IsNullOrWhiteSpace(incoming.PluginPath))
+        {
+            return true;
+        }
+
+        if (!SlotMatchesPlugin(current, incoming))
+        {
+            return true;
+        }
+
+        if (!TryDecodeStateBlob(incoming, out var state))
+        {
+            return true;
+        }
+
+        return !StateBlobEquals(current.StateBlob, state) || current.Bypassed != incoming.Bypassed;
     }
 
     /// <summary>スロットとスナップショットが同じプラグインか（パス／ClassId）。</summary>

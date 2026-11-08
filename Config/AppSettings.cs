@@ -593,6 +593,11 @@ internal sealed class AppSettings
     /// </summary>
     public VstInsertSlotSnapshot[] DefaultVstInserts { get; set; } = [];
 
+    /// <summary>
+    /// インサート 1–8 の組を名前付きで覚えるプリセット一覧。
+    /// </summary>
+    public VstInsertChainPreset[] VstInsertChainPresets { get; set; } = [];
+
     /// <summary>F10 左のフォルダツリー幅。0 以下は既定。</summary>
     public double LibraryExplorerWidth { get; set; }
 
@@ -1236,5 +1241,7 @@ internal sealed class AppSettings
 [JsonSerializable(typeof(OpenDocumentSnapshot[]))]
 [JsonSerializable(typeof(VstInsertSlotSnapshot))]
 [JsonSerializable(typeof(VstInsertSlotSnapshot[]))]
+[JsonSerializable(typeof(VstInsertChainPreset))]
+[JsonSerializable(typeof(VstInsertChainPreset[]))]
 [JsonSourceGenerationOptions(WriteIndented = true)]
 internal partial class AppSettingsJsonContext : JsonSerializerContext;
