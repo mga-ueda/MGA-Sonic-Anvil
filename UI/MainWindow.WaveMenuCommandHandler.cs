@@ -324,9 +324,6 @@ public partial class MainWindow
             case WaveMenuCommand.AmpZoomReset:
                 Waveform.ResetAmpZoom();
                 break;
-            case WaveMenuCommand.CenterPlayhead:
-                Waveform.CenterViewOnPlayhead();
-                break;
             case WaveMenuCommand.CenterLock:
                 ToggleCenterLock();
                 break;
@@ -414,10 +411,13 @@ public partial class MainWindow
                 StatusTimes.FocusCurrentTime();
                 break;
             case WaveMenuCommand.SilentSkip:
-                SilentSkipCheck.IsChecked = SilentSkipCheck.IsChecked != true;
+                ToggleSilentSkipLatch();
+                break;
+            case WaveMenuCommand.AutoLoop:
+                LibraryBrowser.ToggleAutoLoop();
                 break;
             case WaveMenuCommand.AlwaysOnTop:
-                AlwaysOnTopCheck.IsChecked = AlwaysOnTopCheck.IsChecked != true;
+                ToggleAlwaysOnTopLatch();
                 break;
             case WaveMenuCommand.NewDocument:
                 NewDocument();

@@ -23,7 +23,7 @@ internal static partial class UiStrings
     /// <summary>表示の中。波形／スペクトログラム／重ね／ラウドネス。</summary>
     public static string WaveMenuCatAnalysis => Get("解析(_A)", "_Analysis");
     /// <summary>表示の中。F8〜F12。</summary>
-    public static string WaveMenuCatScreen => Get("画面(_F)", "Screen (_F)");
+    public static string WaveMenuCatScreen => Get("表示モード(_F)", "Display Mode (_F)");
     /// <summary>表示の中。動画／PDF の本再生。</summary>
     public static string WaveMenuCatVideo => Get("映像(_Q)", "Video (_Q)");
     /// <summary>表示の中。チャンネルソロ。</summary>
@@ -165,6 +165,7 @@ internal static partial class UiStrings
     public static string WaveMenuSoloClear => Get("ソロを解除(_E)", "Cl_ear Solo");
     public static string WaveMenuFocusTime => Get("時間へ移動(_G)", "Focus Time (_G)");
     public static string WaveMenuSilentSkip => Get("Silent Skip(_H)", "Silent Skip (_H)");
+    public static string WaveMenuAutoLoop => Get("Single Loop(_S)", "Single Loop (_S)");
     public static string WaveMenuAlwaysOnTop => Get("常に最前面(_T)", "Always on _Top");
     /// <summary>その他。マニュアル(M) と重ならない O。</summary>
     public static string WaveMenuSettings => Get("設定(_O)", "Settings (_O)");

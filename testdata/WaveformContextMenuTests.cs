@@ -194,8 +194,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.FadeIn, commands);
             Assert.Contains(WaveMenuCommand.AddMarker, commands);
             Assert.Equal(MenuGestures.AddMarker, Find(tree, WaveMenuCommand.AddMarker)?.Gesture);
-            Assert.Null(Find(tree, WaveMenuCommand.CenterPlayhead)?.Gesture);
-            Assert.Equal(MenuGestures.CenterPlayhead, Find(tree, WaveMenuCommand.CenterLock)?.Gesture);
+            Assert.Null(Find(tree, WaveMenuCommand.CenterPlayhead));
+            Assert.Equal(MenuGestures.CenterLock, Find(tree, WaveMenuCommand.CenterLock)?.Gesture);
             Assert.Equal(MenuGestures.NextTab, Find(tree, WaveMenuCommand.NextTab)?.Gesture);
             Assert.Equal(MenuGestures.PrevTab, Find(tree, WaveMenuCommand.PrevTab)?.Gesture);
             Assert.Equal(MenuGestures.ViewWaveform, Find(tree, WaveMenuCommand.ViewWaveform)?.Gesture);
@@ -274,6 +274,9 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.RangeClick, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal("Q", Find(tree, WaveMenuCommand.RangeClick)?.Gesture);
             Assert.True(Find(tree, WaveMenuCommand.RangeClick)?.Checkable);
+            Assert.Contains(WaveMenuCommand.AutoLoop, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
+            Assert.Equal("Alt+Shift+L", Find(tree, WaveMenuCommand.AutoLoop)?.Gesture);
+            Assert.True(Find(tree, WaveMenuCommand.AutoLoop)?.Checkable);
             Assert.Contains(WaveMenuCommand.Shuffle, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal("Alt+Shift+R", Find(tree, WaveMenuCommand.Shuffle)?.Gesture);
             Assert.Contains(WaveMenuCommand.AutoPlayNext, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
@@ -290,6 +293,15 @@ public sealed class WaveformContextMenuTests
             var view = Category(tree, UiStrings.WaveMenuCatView).Children!;
             Assert.Contains(UiStrings.WaveMenuCatAnalysis, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(UiStrings.WaveMenuCatScreen, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+            Assert.DoesNotContain(
+                WaveMenuCommand.AlwaysOnTop,
+                CommandsIn(view, UiStrings.WaveMenuCatScreen));
+            Assert.Contains(WaveMenuCommand.CenterLock, view.OfType<WaveMenuItemEntry>()
+                .Where(item => item.Command is not null)
+                .Select(item => item.Command!.Value));
+            Assert.Contains(WaveMenuCommand.AlwaysOnTop, view.OfType<WaveMenuItemEntry>()
+                .Where(item => item.Command is not null)
+                .Select(item => item.Command!.Value));
             Assert.Contains(UiStrings.WaveMenuCatVideo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(UiStrings.WaveMenuCatSolo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(WaveMenuCommand.ViewSpectrogram, CommandsIn(view, UiStrings.WaveMenuCatAnalysis));
@@ -432,7 +444,7 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(ready, WaveMenuCommand.FadeIn)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.AddMarkerHere)?.Enabled);
         Assert.True(Find(ready, WaveMenuCommand.Record)?.Enabled);
-        Assert.True(Find(ready, WaveMenuCommand.CenterPlayhead)?.Enabled);
+        Assert.Null(Find(ready, WaveMenuCommand.CenterPlayhead));
         Assert.True(Find(ready, WaveMenuCommand.CenterLock)?.Enabled);
         Assert.False(Find(ready, WaveMenuCommand.NormalizePerRegion)?.Enabled);
         var withRegions = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
@@ -516,7 +528,7 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(tree, WaveMenuCommand.DeleteMarkers)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.DeleteAllMarkers)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.TimeZoomIn)?.Enabled);
-        Assert.False(Find(tree, WaveMenuCommand.CenterPlayhead)?.Enabled);
+        Assert.Null(Find(tree, WaveMenuCommand.CenterPlayhead));
         Assert.False(Find(tree, WaveMenuCommand.CenterLock)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.Record)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.NewDocument)?.Enabled);
