@@ -1,4 +1,5 @@
 using System.Windows.Media;
+using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.UI;
 using Xunit;
 
@@ -28,8 +29,27 @@ public sealed class SpectrogramScaleTests
         Assert.Equal((DesignMetrics.DbScaleWidth - DesignMetrics.SpectrogramBoostThumbSize) * 0.5, DesignMetrics.SpectrogramBoostBarLeft(), 5);
         Assert.Equal(0.5, DesignMetrics.SpectrogramBoostBarLeft(20), 5);
         Assert.True(DesignMetrics.SpectrogramBoostBarLeft(20) < DesignMetrics.SpectrogramBoostBarLeft());
-        Assert.Equal(Color.FromRgb(0x9C, 0x2E, 0x00), SpectrogramBoostBar.TrackOrange);
-        Assert.Equal(Colors.White, SpectrogramBoostBar.TrackWhite);
+    }
+
+    [Fact]
+    public void BoostBar_TrackFollowsSpectrogramPalette()
+    {
+        var previous = SpectrogramEngine.ColorPalette;
+        try
+        {
+            SpectrogramEngine.SetColorPalette(SpectrogramColorPalette.Blue);
+            Assert.True(SpectrogramBoostBar.TrackFloor.B > SpectrogramBoostBar.TrackFloor.R);
+            Assert.Equal(Colors.White, SpectrogramBoostBar.TrackCeil);
+
+            SpectrogramEngine.SetColorPalette(SpectrogramColorPalette.Red);
+            Assert.True(SpectrogramBoostBar.TrackFloor.R > SpectrogramBoostBar.TrackFloor.B
+                || SpectrogramBoostBar.TrackMid.R > SpectrogramBoostBar.TrackMid.B);
+            Assert.Equal(Colors.White, SpectrogramBoostBar.TrackWhite);
+        }
+        finally
+        {
+            SpectrogramEngine.SetColorPalette(previous);
+        }
     }
 
     [Fact]
