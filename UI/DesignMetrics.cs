@@ -61,6 +61,10 @@ internal static class DesignMetrics
 
     public static CornerRadius ControlCorner => Chrome.Corner;
 
+    /// <summary>波形エリアのラウドネス着色・スペクトログラムなど、既定の GUI 角丸で切るクリップ。</summary>
+    public static RectangleGeometry ControlCornerClip(Rect bounds) =>
+        new(bounds, ControlCornerRadius, ControlCornerRadius);
+
     public static void ApplyControlCornerRadius(double radius) =>
         Chrome.Radius = AppSettings.ClampControlCornerRadius(radius);
 

@@ -146,7 +146,8 @@ internal sealed class SpectrogramRenderer
         var context = group.Open();
         context.DrawImage(_bitmap, dest);
         context.Close();
-        dc.PushClip(new RectangleGeometry(wave));
+        // 着色の外形はメニュー／コンボと同じ既定の GUI 角丸。
+        dc.PushClip(DesignMetrics.ControlCornerClip(wave));
         dc.DrawDrawing(group);
         dc.Pop();
     }
