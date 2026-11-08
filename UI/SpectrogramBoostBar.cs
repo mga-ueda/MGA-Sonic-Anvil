@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using MgaSonicAnvil.Audio;
 
 namespace MgaSonicAnvil.UI;
 
@@ -48,6 +49,7 @@ internal sealed class SpectrogramBoostBar : Slider
         }
     }
 
+    /// <summary>スペクトログラム LUT と同じ色調。設定の青系／赤系に追従する。</summary>
     internal static Brush CreateTrackBrush()
     {
         var brush = new LinearGradientBrush
@@ -55,9 +57,9 @@ internal sealed class SpectrogramBoostBar : Slider
             StartPoint = new Point(0.5, 1),
             EndPoint = new Point(0.5, 0),
         };
-        brush.GradientStops.Add(new GradientStop(Theme.Get("SpectrogramBoostFloorBrush"), 0));
-        brush.GradientStops.Add(new GradientStop(Theme.Get("SpectrogramBoostMidBrush"), 0.5));
-        brush.GradientStops.Add(new GradientStop(Theme.Get("SpectrogramBoostCeilBrush"), 1));
+        brush.GradientStops.Add(new GradientStop(TrackFloor, 0));
+        brush.GradientStops.Add(new GradientStop(TrackMid, 0.5));
+        brush.GradientStops.Add(new GradientStop(TrackCeil, 1));
         brush.Freeze();
         return brush;
     }
@@ -77,7 +79,18 @@ internal sealed class SpectrogramBoostBar : Slider
     public void Nudge(int direction) =>
         Value = NudgeUnit(Value, direction, SmallChange);
 
-    internal static Color TrackOrange => Theme.Get("SpectrogramBoostFloorBrush");
+    internal static Color TrackFloor => ColorFromBgra(SpectrogramEngine.ColorFromLutByte(0));
 
-    internal static Color TrackWhite => Theme.Get("SpectrogramBoostCeilBrush");
+    internal static Color TrackMid => ColorFromBgra(SpectrogramEngine.ColorFromLutByte(128));
+
+    internal static Color TrackCeil => ColorFromBgra(SpectrogramEngine.ColorFromLutByte(255));
+
+    internal static Color TrackWhite => TrackCeil;
+
+    private static Color ColorFromBgra(int bgra) =>
+        Color.FromArgb(
+            (byte)((bgra >> 24) & 0xFF),
+            (byte)((bgra >> 16) & 0xFF),
+            (byte)((bgra >> 8) & 0xFF),
+            (byte)(bgra & 0xFF));
 }

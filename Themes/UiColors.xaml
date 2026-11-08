@@ -110,9 +110,6 @@
     <SolidColorBrush x:Key="SpectrogramSelectionFillBrush" Color="#38FFFFFF" />
     <SolidColorBrush x:Key="SpectrogramGridBrush" Color="#1AFFFFFF" />
     <SolidColorBrush x:Key="SpectrogramScaleEdgeBrush" Color="#FF000000" />
-    <SolidColorBrush x:Key="SpectrogramBoostFloorBrush" Color="#FF9C2E00" />
-    <SolidColorBrush x:Key="SpectrogramBoostMidBrush" Color="#FFFF9A20" />
-    <SolidColorBrush x:Key="SpectrogramBoostCeilBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="SpectrogramBoostThumbFillBrush" Color="#FFF4F4F4" />
     <SolidColorBrush x:Key="SpectrogramBoostThumbStrokeBrush" Color="#FF2A2A2A" />
     <SolidColorBrush x:Key="SpectrogramBoostThumbHoverFillBrush" Color="#FFFFFFFF" />
