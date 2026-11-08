@@ -686,6 +686,7 @@ internal partial class AudioSettingsWindow
         grid.RowBackground = Brushes.Transparent;
         grid.AlternatingRowBackground = Brushes.Transparent;
         grid.AlternationCount = 0;
+        DesignMetrics.BindControlCornerClip(grid);
     }
 
     /// <summary>表の 1 行。実体は <see cref="Vst3PluginEntry"/>（振り分けを変えたら表ごと作り直す）。</summary>
