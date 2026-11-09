@@ -2495,6 +2495,13 @@ public partial class MainWindow
         var group = new GeometryGroup { FillRule = FillRule.Nonzero };
         foreach (var element in VideoHudFrostElements)
         {
+            // ドック中の波形は帯の外接一枚に含める。個別にも入れると暗幕が二重になる。
+            if (_playerWaveformDockedBesideLoudness
+                && ReferenceEquals(element, WaveformTileHost))
+            {
+                continue;
+            }
+
             if (!IsVideoHudFrostElementShown(element))
             {
                 continue;
@@ -2525,10 +2532,11 @@ public partial class MainWindow
     /// <summary>
     /// ラウドネス・モニター列・スペアナをまとめた外接矩形を一枚だけ追加する。
     /// 個別 Rect だと列マージンと MonitorToggles 上下の空きが抜ける。
+    /// ドック中は波形もこの一枚だけ（個別 frost とは排他）。
     /// </summary>
     private void TryAddLoudnessMonitorSpectrumFrost(GeometryGroup group, Visual stage)
     {
-        // ドック中は波形も同じ帯に含め、隙間を残さない。
+        // ドック中は波形も同じ帯に含め、隙間を残さない（個別側ではスキップ済み）。
         FrameworkElement[] band = _playerWaveformDockedBesideLoudness
             ? [WaveformTileHost, LoudnessMeter, MonitorToggles, Spectrum]
             : [LoudnessMeter, MonitorToggles, Spectrum];
@@ -2617,6 +2625,7 @@ public partial class MainWindow
     /// <summary>
     /// ラウドネス／モニター／スペアナは <see cref="TryAddLoudnessMonitorSpectrumFrost"/> で一枚。
     /// 個別に入れると列マージンが抜けて隙間になる。
+    /// ドック中の波形も同メソッド側だけ（ここでも入れると暗幕が二重）。
     /// </summary>
     private FrameworkElement[] VideoHudFrostElements =>
         _videoHudFrostElements ??=
