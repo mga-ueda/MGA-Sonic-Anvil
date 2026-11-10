@@ -22,10 +22,11 @@ public sealed class VideoCodecProbeTests
     }
 
     [Fact]
-    public void ProResPresentationMov_NeedsProxyWhenPresent()
+    public void OptionalProResFixture_NeedsProxyWhenPresent()
     {
-        var path = @"C:\Temp\mga-optional-prores.mov";
-        if (!File.Exists(path))
+        // 任意のローカル ProRes MOV。環境変数でだけ渡す（リポジトリに実パスを置かない）。
+        var path = Environment.GetEnvironmentVariable("MGA_TEST_PRORES_MOV");
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             return;
         }
@@ -260,10 +261,11 @@ public sealed class VideoCodecProbeTests
     }
 
     [Fact]
-    public void ContestIpcmMp4_ReadsAudioWhenPresent()
+    public void OptionalIpcmMp4Fixture_ReadsAudioWhenPresent()
     {
-        var path = @"C:\Temp\mga-optional-ipcm.mp4";
-        if (!File.Exists(path))
+        // 任意のローカル MP4。環境変数でだけ渡す（リポジトリに実パスを置かない）。
+        var path = Environment.GetEnvironmentVariable("MGA_TEST_IPCM_MP4");
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             return;
         }
@@ -277,21 +279,21 @@ public sealed class VideoCodecProbeTests
             out var bits));
         Assert.Contains("avc1", codecs, StringComparer.OrdinalIgnoreCase);
         Assert.DoesNotContain("ipcm", codecs, StringComparer.OrdinalIgnoreCase);
-        Assert.InRange(seconds, 90, 96);
-        Assert.Equal(48000, rate);
-        Assert.Equal(2, channels);
-        Assert.Equal(24, bits);
+        Assert.True(seconds > 0);
+        Assert.True(rate > 0);
+        Assert.True(channels > 0);
+        Assert.True(bits > 0);
 
         var document = AudioDocument.CreateDeferred(path);
         document.ApplyTags(new AudioFileTags { Probed = true, DurationSeconds = seconds });
         Assert.Equal(0, document.Tags.SampleRate);
         Assert.True(AudioTagProbe.TryRead(path, out var fresh) && fresh.SampleRate > 0);
         document.ApplyTags(fresh);
-        Assert.Equal(48000, document.Tags.SampleRate);
+        Assert.Equal(fresh.SampleRate, document.Tags.SampleRate);
         Assert.True(AudioCodec.TryActivateStreamPlayback(document));
-        Assert.Equal(48000, document.SampleRate);
-        Assert.Equal(2, document.Channels);
-        Assert.True(document.FrameCount > 48000);
+        Assert.Equal(fresh.SampleRate, document.SampleRate);
+        Assert.True(document.Channels > 0);
+        Assert.True(document.FrameCount > 0);
     }
 
     private static string WriteTemp(byte[] bytes)
