@@ -88,6 +88,7 @@
         <li><a href="#playback">Playback</a></li>
         <li><a href="#edit">Selection and editing</a>
           <ol>
+            <li><a href="#volume-curve">Volume Curve</a></li>
             <li><a href="#pitch-curve">Pitch Curve</a></li>
           </ol>
         </li>
@@ -571,7 +572,7 @@
         <h4>Destructive playlist edits</h4>
         <p>The player is built for listening first. Still, from the playlist right-click or the transport toolbar you can run destructive edits and exports on one or many selected files — normalize, fade, pitch, time stretch, reverse, sample rate / bit depth / channel convert, insert silence, silence &amp; hit detection, match loudness, and related export commands (whole file; applied edits are saved to disk and cannot be undone).</p>
         <div class="note">
-          <p>Because an accidental destructive edit cannot be undone, <strong>keyboard shortcuts do not run normalize / fade / pitch / time stretch / reverse / format convert / insert silence / silence detection and similar commands in the player</strong> (those menu items also hide their gesture text). Use the playlist right-click (or the menu key / <kbd>Shift</kbd>+<kbd>F10</kbd>) or the transport toolbar. Plain <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> stay previous / next / restart track. Exceptions: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> (Mixdown) and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> (volume / Match Loudness) work from the keyboard and keep their menu gestures (plain <kbd>V</kbd> stays off in the player).</p>
+          <p>Because an accidental destructive edit cannot be undone, <strong>keyboard shortcuts do not run normalize / fade / pitch / time stretch / reverse / format convert / insert silence / silence detection and similar commands in the player</strong> (those menu items also hide their gesture text). Use the playlist right-click (or the menu key / <kbd>Shift</kbd>+<kbd>F10</kbd>) or the transport toolbar. Plain <kbd>N</kbd> / <kbd>P</kbd> / <kbd>R</kbd> stay previous / next / restart track. Exceptions: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> (Mixdown) and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> (volume / Match Loudness) work from the keyboard and keep their menu gestures (editor <kbd>Ctrl</kbd>+<kbd>L</kbd> stays off in the player).</p>
         </div>
         <h4>Jacket and background</h4>
         <ul>
@@ -867,9 +868,10 @@
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear). For sample-loop seam fades, use <kbd>Shift</kbd>+<kbd>X</kbd> (<a href="#fade-adjust">Fade Adjust Tool</a>).</li>
-        <li><kbd>V</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> — on a single tab, shows the loudness curve and opens volume. Type a dB value, or use ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. The menu shows how whole-file Integrated LKFS / RMS / Peak will change. The Short Term curve and the stopped meter follow the same dB. Closing the volume popup leaves the curve. Close the curve with <kbd>Shift</kbd>+<kbd>V</kbd> (or <kbd>Esc</kbd> / <kbd>Shift</kbd>+<kbd>A</kbd>; see <a href="#spectrogram">Spectrogram / loudness analysis</a>). Both keys work in the editor; in the player only <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> is active.</li>
+        <li><kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> — on a single tab, shows the loudness curve and opens volume. Type a dB value, or use ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. The menu shows how whole-file Integrated LKFS / RMS / Peak will change. The Short Term curve and the stopped meter follow the same dB. Closing the volume popup leaves the curve. Close the curve with <kbd>Ctrl</kbd>+<kbd>L</kbd> again or <kbd>Esc</kbd> (see <a href="#spectrogram">Spectrogram / loudness analysis</a>). Both keys work in the editor; in the player only <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> is active.</li>
+        <li><kbd>V</kbd> — <a href="#volume-curve">Volume Curve</a> edit mode (editor only; red curve over the waveform, bar below. With a selection, starts from a trapezoid plateau; otherwise flat 0 dB). Press <kbd>V</kbd> again or Cancel / Esc to leave.</li>
         <li><kbd>E</kbd> — while the loudness curve is up, switch to the pen (again to leave it). The button at the top right of the curve and a right-click on the curve do the same. Dragging does not change the time selection, and the original curve stays visible. Releasing the mouse sets the volume to the drawn height. Moving back in time erases the later part of the stroke, so each time has one level. A short fade joins both ends. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes that stroke. <kbd>Esc</kbd> clears the pen before leaving the curve.</li>
-        <li><strong>Match Loudness</strong> (playlist right-click / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> in the player, or <kbd>V</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> with multiple editor tabs) — simple whole-file gain to a target LKFS (defaults to Settings). Not the curve-based volume picker used for a single editor file. In the player, files are saved in place afterward and cannot be undone; plain <kbd>V</kbd> stays off there. Non–Wave/AIFF files are skipped; if none qualify, a notice is shown.</li>
+        <li><strong>Match Loudness</strong> (playlist right-click / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> in the player, or <kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> with multiple editor tabs) — simple whole-file gain to a target LKFS (defaults to Settings). Not the constant volume picker (<kbd>Ctrl</kbd>+<kbd>L</kbd>) or <a href="#volume-curve">Volume Curve</a> (<kbd>V</kbd>). In the player, files are saved in place afterward and cannot be undone; <kbd>Ctrl</kbd>+<kbd>L</kbd> stays off there. Non–Wave/AIFF files are skipped; if none qualify, a notice is shown.</li>
         <li><kbd>P</kbd> — pitch. On a single tab, opens the <a href="#pitch-curve">Pitch Curve</a> window (selection if any, else the whole file). With multiple tabs selected, opens a batch semitone dialog instead. A dim overlay shows progress while it runs.</li>
         <li><kbd>T</kbd> — time stretch (pitch stays). Uses the selection, or the whole file. Destination time and ratio (%) stay linked. ↑↓ / wheel (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; ratio: 0.1 / Shift 1 / Ctrl 10 / Ctrl+Shift 25%). <kbd>Tab</kbd> switches fields. Space previews, Enter applies. Range is 10–1000%. A dim overlay shows progress while it runs.</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> — fit the peak to -0.1 dB.</li>
@@ -942,6 +944,23 @@
           </ul>
         </li>
         <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> also redo) — undo / redo an edit. In the player, disposable A-B and temporary markers only.</li>
+      </ul>
+
+      <h3 id="volume-curve">Volume Curve</h3>
+      <p>Draw a red gain curve (dB) over time on the waveform, preview it live, then bake it in. Separate from constant volume (<kbd>Ctrl</kbd>+<kbd>L</kbd>) and Match Loudness.</p>
+      <ul>
+        <li><strong>Open</strong> — Editor <kbd>V</kbd> only (not in the player). A bar appears under the waveform; the curve and points overlay the main view.</li>
+        <li><strong>Edit range</strong> — Always the whole file. Entering with a selection places a trapezoid of four points for that range (short outer pads). With no selection, starts flat at 0 dB.</li>
+        <li><strong>Vertical axis</strong> — 0 dB at center. About 70% of each half is a fine ±40 dB zone; the outer parts are coarse. The bottom end is −∞.</li>
+        <li><strong>Points</strong> (default) — Drag control points. Selected point: ↑↓ ±1 dB (<kbd>Shift</kbd>+↑↓ ±6). ←→ moves in time (<kbd>Shift</kbd> faster). With no point selected, ←→ seeks as usual. <kbd>Alt</kbd>+←→ selects the previous/next point. <kbd>Delete</kbd> removes the selected point. <kbd>Alt</kbd>+<kbd>A</kbd> or Add Point inserts at the playhead (even from Brush, switching to Points first).</li>
+        <li><strong>Brush</strong> — Drag to draw the curve. Add Point and the curve-shape icons gray out while Brush is active.</li>
+        <li><strong>Gain box</strong> (<kbd>Alt</kbd>+<kbd>N</kbd>) — On a flat curve, sets the constant gain. With points, the delta shifts the whole curve. You can type −∞. ↑↓ / wheel also work.</li>
+        <li><strong>Curve shape</strong> — Same 1–9 as fades; applies to the selected outgoing segment. Digit keys work in Points mode.</li>
+        <li><strong>Clip marks</strong> — Where preview gain would exceed 0 dBFS, a red horizontal capsule appears at the waveform tip (Color settings → Preview · clip).</li>
+        <li><strong>Playback</strong> (<kbd>Space</kbd>) — Normal play/stop with the live curve preview applied.</li>
+        <li><strong>Reset</strong> — Back to a constant 0 dB curve.</li>
+        <li><strong>OK / Cancel</strong> — OK (<kbd>Alt</kbd>+<kbd>O</kbd>) bakes and exits (undo with the main <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel / <kbd>V</kbd> again / Esc (after clearing point focus) discards. If the result would clip, you can lower the whole curve by the shown amount. In-mode point edits undo/redo with <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>).</li>
+        <li><strong>While active</strong> — Other destructive keys and switching to player chrome (F9 / F10) warn and stay blocked. Spectrogram/overlay toggle when already visible, leaving loudness with <kbd>Ctrl</kbd>+<kbd>L</kbd>, and some marker keys still work.</li>
       </ul>
 
       <h3 id="pitch-curve">Pitch Curve</h3>
@@ -1175,8 +1194,8 @@
       <h3>Switching</h3>
       <ul>
         <li><kbd>A</kbd> switches spectrogram and overlay. With the loudness curve up, <kbd>A</kbd> goes to the spectrogram (not a three-way cycle).</li>
-        <li><kbd>V</kbd> shows the loudness analysis (Short Term curve) and opens volume.</li>
-        <li><kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>A</kbd>, or <kbd>Shift</kbd>+<kbd>V</kbd> returns to the normal waveform from any of these views. <kbd>Esc</kbd> clears open prompts, the selection, and the pen cursor first. Closing the volume popup alone leaves the curve up.</li>
+        <li><kbd>Ctrl</kbd>+<kbd>L</kbd> shows the loudness analysis (Short Term curve) and opens volume.</li>
+        <li>From spectrogram / overlay, <kbd>Shift</kbd>+<kbd>A</kbd> or <kbd>Esc</kbd> returns to the normal waveform. Close the loudness curve with <kbd>Ctrl</kbd>+<kbd>L</kbd> again or <kbd>Esc</kbd> (<kbd>Shift</kbd>+<kbd>A</kbd> does not leave loudness). <kbd>Esc</kbd> clears open prompts, the selection, and the pen cursor first. Closing the volume popup alone leaves the curve up.</li>
         <li>The toolbar loudness button toggles the view only.</li>
         <li><kbd>L</kbd> jumps to 3 seconds before the end of the selection (or the sample loop / <code>-L</code>) and loops forever (while stopped or while playing).</li>
       </ul>
@@ -1191,7 +1210,7 @@
       </ul>
       <div class="note">
         <p>The pen line is not a command to force the loudness onto that exact height. Matching every peak and dip to the stroke would push the sound too hard and often feel unnatural. The pen reads how the audio already sounds, then reflects the lift or ease you drew.</p>
-        <p>For an exact level, select a range and set it with volume (<kbd>V</kbd>). Even then, an extreme dB value is only lightly smoothed and can still sound unnatural.</p>
+        <p>For an exact level, select a range and set it with volume (<kbd>Ctrl</kbd>+<kbd>L</kbd>). Even then, an extreme dB value is only lightly smoothed and can still sound unnatural.</p>
       </div>
       <h3>Overlay</h3>
       <ul>
@@ -1318,8 +1337,8 @@
           <tr><td><kbd>A</kbd></td><td>Switch spectrogram / overlay (from loudness, goes to spectrogram; not a three-way cycle)</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>Return to the waveform (from any view)</td></tr>
           <tr><td><kbd>Alt</kbd>+↑ / ↓</td><td>Lift spectrogram dark energy (hold to repeat)</td></tr>
-          <tr><td><kbd>V</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>Show loudness analysis and open volume input (both in the editor; player: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> only)</td></tr>
-          <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>Return to the waveform (from any view)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>Show loudness analysis and open volume input (toggle; both in the editor; player: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> only)</td></tr>
+          <tr><td><kbd>V</kbd></td><td>Volume Curve edit mode (editor only; toggle again to leave; see <a href="#volume-curve">Volume Curve</a>)</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Solo a channel (next / previous; past the last clears it; or click a name on the left; Ctrl+click adds; Shift+click mutes / unmutes; the time selection does not change; edits stay on those lanes; muted lanes go gray)</td></tr>
           <tr><td><kbd>G</kbd></td><td>Edit NOW POS in the status bar (time / samples: right-click a status field or the large current-position timecode left of the edit-history strip; both stay in sync)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Always on Top (pin / unpin the window; works in every mode, including F8 / F9)</td></tr>
@@ -1354,14 +1373,15 @@
 
       <h3 id="shortcuts-edit">Edit</h3>
       <p>With multiple tabs selected, fade / normalize (incl. per region) / volume / pitch / time stretch / reverse / insert silence / Silence &amp; Hit Detection / sample-rate, bit-depth and channel conversion apply to every selected file. Save (<kbd>Ctrl</kbd>+<kbd>S</kbd>) and Save As (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) do the same (menu names change to “… Selected Files”; Silence &amp; Hit Detection only confirms then applies the current settings; insert silence uses the click on the active file, or the playhead for <kbd>Ctrl</kbd>+<kbd>Ins</kbd>, and each other file’s playhead; files the edit cannot apply to are skipped; a dim overlay shows progress and blocks input while running).</p>
-      <p>In the player (<kbd>F10</kbd>), the same family of destructive edits can run on multiple files from the playlist right-click or the transport toolbar, but listening comes first — an accidental destructive edit cannot be undone, so <strong>the destructive keys in the table below (I / O / X / N / R / P / T / S / B / C / Delete / Shift+Delete / Ctrl+T / Ctrl+D / Ctrl+Ins, and similar) do not run in the player</strong> (gesture text is hidden on the menu too; Trim itself is absent from the player menu; exceptions: Mixdown <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> work from the key and keep their menu gestures; plain <kbd>V</kbd> stays off in the player — see <a href="#layout-player">Player mode → Destructive playlist edits</a>).</p>
+      <p>In the player (<kbd>F10</kbd>), the same family of destructive edits can run on multiple files from the playlist right-click or the transport toolbar, but listening comes first — an accidental destructive edit cannot be undone, so <strong>the destructive keys in the table below (I / O / X / N / R / P / T / S / B / C / Delete / Shift+Delete / Ctrl+T / Ctrl+D / Ctrl+Ins, and similar) do not run in the player</strong> (gesture text is hidden on the menu too; Trim itself is absent from the player menu; exceptions: Mixdown <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> and volume <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> work from the key and keep their menu gestures; editor <kbd>Ctrl</kbd>+<kbd>L</kbd> stays off in the player — see <a href="#layout-player">Player mode → Destructive playlist edits</a>).</p>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>I</kbd></td><td>Fade in</td></tr>
           <tr><td><kbd>O</kbd></td><td>Fade out</td></tr>
           <tr><td><kbd>X</kbd></td><td>Fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear). Not a multi-tab batch command</td></tr>
-          <tr><td><kbd>V</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>Single tab: loudness curve + volume (type dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first; closing the popup leaves the curve; close with <kbd>Shift</kbd>+<kbd>V</kbd> / <kbd>Esc</kbd> / <kbd>Shift</kbd>+<kbd>A</kbd>). Multi-tab: Match Loudness (simple). Both keys in the editor; player: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> only (plain <kbd>V</kbd> off; playlist right-click also works)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>Single tab: loudness curve + volume (type dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first; closing the popup leaves the curve; close with <kbd>Ctrl</kbd>+<kbd>L</kbd> again / <kbd>Esc</kbd>). Multi-tab: Match Loudness (simple). Both keys in the editor; player: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> only (<kbd>Ctrl</kbd>+<kbd>L</kbd> off; playlist right-click also works)</td></tr>
+          <tr><td><kbd>V</kbd></td><td><a href="#volume-curve">Volume Curve</a> edit mode (editor only; toggle)</td></tr>
           <tr><td><kbd>E</kbd></td><td>While the loudness curve is up, switch to the pen (again to leave it; same as the button or a right-click on the curve; the original curve stays while dragging; releasing sets the volume, with fades at the ends; <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the stroke; <kbd>Esc</kbd> clears the pen first)</td></tr>
           <tr><td><kbd>P</kbd></td><td>Pitch. Single tab opens the <a href="#pitch-curve">Pitch Curve</a> window (selection or whole file). Multiple selected tabs use a batch semitone dialog. Dim overlay while running</td></tr>
           <tr><td><kbd>T</kbd></td><td>Time stretch (time and ratio stay linked; Space preview, Enter apply; a dim overlay while running)</td></tr>
@@ -1548,6 +1568,22 @@
           <tr><td><kbd>Space</kbd></td><td>Preview</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Apply</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
+        </tbody>
+      </table>
+      <p>While Volume Curve edit mode is on (see <a href="#volume-curve">Volume Curve</a>)</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>V</kbd> / Cancel / Esc</td><td>Leave (Esc clears point focus first; confirms if there are unapplied edits)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>O</kbd></td><td>OK (bake and exit)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Add Point at the playhead (switches to Points even from Brush)</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>Focus the gain box</td></tr>
+          <tr><td>↑ / ↓ (selected point)</td><td>±1 dB (<kbd>Shift</kbd>+↑↓ for ±6)</td></tr>
+          <tr><td>← / → (selected point)</td><td>Move in time (<kbd>Shift</kbd> faster). With no selection, seek. <kbd>Alt</kbd>+←→ selects previous / next point</td></tr>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Curve shape for the selected point (Points mode)</td></tr>
+          <tr><td><kbd>Delete</kbd></td><td>Delete the selected point</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Play / stop as usual (with the live curve preview)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd></td><td>Undo / redo in-mode point edits (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> also redo)</td></tr>
         </tbody>
       </table>
       <p>While the Pitch Curve window is open (see <a href="#pitch-curve">Pitch Curve</a>)</p>

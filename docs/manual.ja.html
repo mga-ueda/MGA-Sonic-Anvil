@@ -88,6 +88,7 @@
         <li><a href="#playback">再生</a></li>
         <li><a href="#edit">選択と編集</a>
           <ol>
+            <li><a href="#volume-curve">音量カーブ</a></li>
             <li><a href="#pitch-curve">ピッチカーブ</a></li>
           </ol>
         </li>
@@ -610,7 +611,7 @@
         <h4>プレイリストの破壊編集</h4>
         <p>プレイヤーは再生が主です。それでもプレイリストの右クリック、またはツールバーのボタンから、選択中の複数ファイルへノーマライズ／フェード／ピッチ／タイムストレッチ／リバース／サンプルレート・ビット深度・チャンネル変換／無音の挿入／無音・ヒット検出／ラウドネス揃えなどの破壊編集や書き出しができます（ファイル全体が対象。適用後はディスクへ保存し、アンドゥはできません）。</p>
         <div class="note">
-          <p>誤操作で破壊編集が走ると戻せないため、<strong>ノーマライズ／フェード／ピッチ／タイムストレッチ／リバース／フォーマット変換／無音挿入／無音検出などのショートカット・キーでは実行しません</strong>（メニューにもそれらのジェスチャーは出しません）。右クリック（またはメニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd>）、あるいはツールバーから選んでください。<kbd>N</kbd>／<kbd>P</kbd>／<kbd>R</kbd> は前後曲・頭出しのままです。例外として、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>（ミックスダウン）と <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>（音量／ラウドネス揃え）はキーでもメニュー表記でも使えます（素の <kbd>V</kbd> はプレイヤーでは無効）。</p>
+          <p>誤操作で破壊編集が走ると戻せないため、<strong>ノーマライズ／フェード／ピッチ／タイムストレッチ／リバース／フォーマット変換／無音挿入／無音検出などのショートカット・キーでは実行しません</strong>（メニューにもそれらのジェスチャーは出しません）。右クリック（またはメニューキー／<kbd>Shift</kbd>+<kbd>F10</kbd>）、あるいはツールバーから選んでください。<kbd>N</kbd>／<kbd>P</kbd>／<kbd>R</kbd> は前後曲・頭出しのままです。例外として、<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>（ミックスダウン）と <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>（音量／ラウドネス揃え）はキーでもメニュー表記でも使えます（エディタの <kbd>Ctrl</kbd>+<kbd>L</kbd> はプレイヤーでは無効）。</p>
         </div>
 
         <h4>ジャケットと背景</h4>
@@ -931,9 +932,10 @@
       <ul>
         <li><span class="ui">FADE IN</span> <kbd>I</kbd>／<span class="ui">FADE OUT</span> <kbd>O</kbd> …… カーブを選び Space で試聴、Enter で実行。1–9 でカーブ。</li>
         <li><kbd>X</kbd> …… シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。サンプルループの継ぎ目向けの調整は <kbd>Shift</kbd>+<kbd>X</kbd>（<a href="#fade-adjust">フェード調整ツール</a>）。</li>
-        <li><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> …… 単一タブではラウドネス曲線を表示して音量。dB を直接入力、または ↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。Short Term 曲線と停止中メーターも同じ dB で追従します。音量の入力を閉じただけでは曲線は残ります。曲線を閉じるのは <kbd>Shift</kbd>+<kbd>V</kbd>（または <kbd>Esc</kbd>／<kbd>Shift</kbd>+<kbd>A</kbd>。くわしくは <a href="#spectrogram">スペクトログラム／ラウドネス解析</a>）。エディタでは両方、プレイヤーでは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ有効です。</li>
+        <li><kbd>Ctrl</kbd>+<kbd>L</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> …… 単一タブではラウドネス曲線を表示して音量。dB を直接入力、または ↑↓／ホイールで 0.1 dB（Shift 1／Ctrl 3／Ctrl+Shift 6）。Space で試聴、Enter で実行。メニューに波形全体の Integrated LKFS／RMS／Peak の変化を先に出します。Short Term 曲線と停止中メーターも同じ dB で追従します。音量の入力を閉じただけでは曲線は残ります。曲線を閉じるのは <kbd>Ctrl</kbd>+<kbd>L</kbd> の再押下または <kbd>Esc</kbd>（くわしくは <a href="#spectrogram">スペクトログラム／ラウドネス解析</a>）。エディタでは両方、プレイヤーでは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ有効です。</li>
+        <li><kbd>V</kbd> …… <a href="#volume-curve">音量カーブ</a>編集モード（エディタのみ。波形の上に赤いカーブを重ね、下部バーで操作。選択があれば台形の起点を打ち、無ければ平坦 0 dB から）。もう一度 <kbd>V</kbd> または Cancel／Esc で終了。</li>
         <li><kbd>E</kbd> …… ラウドネス曲線が出ているときペンにする（もう一度で戻す。右上のボタン、曲線上の右クリックでも同じ。ドラッグは範囲選択せず、元の曲線は残る。離すと音量を反映。両端はフェード。<kbd>Ctrl</kbd>+<kbd>Z</kbd> で一筆を戻す。<kbd>Esc</kbd> はペンを先に戻す。くわしくは <a href="#spectrogram">スペクトログラム／ラウドネス解析</a>）。</li>
-        <li><strong>ラウドネスを揃える</strong>（プレイヤーのプレイリスト右クリック／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>、またはエディタでタブを複数選択して <kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>）…… 選択中の Wave／AIFF を指定 LKFS（既定は設定のラウドネスターゲット）へファイル全体のゲインで揃える簡易調整です。曲線ベースの音量（単一ファイルの <kbd>V</kbd>）とは別です。プレイヤーでは揃え後に既存パスへ保存し、この編集は元に戻せません。素の <kbd>V</kbd> はプレイヤーでは無効です。MP3 など非対応はスキップ／対象なしなら案内します。</li>
+        <li><strong>ラウドネスを揃える</strong>（プレイヤーのプレイリスト右クリック／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>、またはエディタでタブを複数選択して <kbd>Ctrl</kbd>+<kbd>L</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>）…… 選択中の Wave／AIFF を指定 LKFS（既定は設定のラウドネスターゲット）へファイル全体のゲインで揃える簡易調整です。曲線ベースの音量（単一ファイルの <kbd>Ctrl</kbd>+<kbd>L</kbd>）や<a href="#volume-curve">音量カーブ</a>（<kbd>V</kbd>）とは別です。プレイヤーでは揃え後に既存パスへ保存し、この編集は元に戻せません。<kbd>Ctrl</kbd>+<kbd>L</kbd> はプレイヤーでは無効です。MP3 など非対応はスキップ／対象なしなら案内します。</li>
         <li><kbd>P</kbd> …… ピッチ。単一タブでは<a href="#pitch-curve">ピッチカーブ</a>ウィンドウを開きます（選択があればその範囲、無ければ全体）。タブを複数選んでいるときは一括用の半音指定ダイアログです。実行中は半透明の画面で進捗を出します。</li>
         <li><kbd>T</kbd> …… タイムストレッチ（ピッチ据え置き）。選択があればその時間、無ければ全体。伸ばした時間と割合（％）が連動。↑↓／ホイール（時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分。割合は 0.1／Shift 1／Ctrl 10／Ctrl+Shift 25％）。<kbd>Tab</kbd> で時間と割合。Space で試聴、Enter で実行。10–1000％。実行中は半透明の画面。</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> …… ピークを -0.1 dB に合わせる。</li>
@@ -1000,6 +1002,23 @@
           </ul>
         </li>
         <li><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd>（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> でもやり直し）…… 編集を元に戻す／やり直す。プレイヤーでは捨て A-B と一時マーカーだけです。</li>
+      </ul>
+
+      <h3 id="volume-curve">音量カーブ</h3>
+      <p>時間に沿ってゲイン（dB）を変える赤いカーブを波形の上に描き、プレビューしてから焼き込む編集モードです。定数の音量入力（<kbd>Ctrl</kbd>+<kbd>L</kbd>）やラウドネス揃えとは別です。</p>
+      <ul>
+        <li><strong>開き方</strong> …… エディタで <kbd>V</kbd>。プレイヤーでは使いません。波形直下に操作バーが出て、メイン波形の上にカーブと制御点を重ねます。</li>
+        <li><strong>編集範囲</strong> …… 常にファイル全体。入場時に選択があるときは、その範囲を上げ下げしやすい台形の 4 点を初期状態として打ちます（外側に短い足）。選択が無ければ 0 dB の平坦カーブからです。</li>
+        <li><strong>縦軸</strong> …… 中央が 0 dB。各半面の約 70% が ±40 dB の細かい目盛り、外側が粗目盛り。下端は −∞ です。</li>
+        <li><strong>ポイント</strong>（既定）…… 制御点をドラッグ。選択点は ↑↓ で ±1 dB（<kbd>Shift</kbd>+↑↓ で ±6）。←→ で時間移動（<kbd>Shift</kbd> で速く）。未選択の ←→ は通常のシーク。<kbd>Alt</kbd>+←→ で前後の点へ。<kbd>Delete</kbd> で選択点を削除。<kbd>Alt</kbd>+<kbd>A</kbd> または「ポイントを追加」で再生位置へ追加（ブラシ中でもポイントへ切り替えて追加）。</li>
+        <li><strong>ブラシ</strong> …… ドラッグでカーブを描きます。このあいだ「ポイントを追加」とカーブ形状アイコンはグレーアウトして使えません。</li>
+        <li><strong>ゲイン数値欄</strong>（<kbd>Alt</kbd>+<kbd>N</kbd>）…… 平坦カーブのときは全体の定数ゲイン。点があるときは欄の差分でカーブ全体を平行移動します。−∞ と書けます。↑↓／ホイールでも可。</li>
+        <li><strong>カーブ形状</strong>…… フェードと同じ 1–9。選択中の出セグメントに効きます。数字キーでも選べます（ポイントモード時）。</li>
+        <li><strong>クリップ表示</strong> …… プレビュー適用後に 0 dBFS を超える箇所は、波形の上端／下端に赤い横カプセルを出します（色設定の「プレビュー・クリップ」）。</li>
+        <li><strong>再生</strong>（<kbd>Space</kbd>）…… カーブ付きのライブプレビューで通常再生／停止できます。</li>
+        <li><strong>リセット</strong> …… カーブを 0 dB の定数に戻します。</li>
+        <li><strong>OK／Cancel</strong> …… OK（<kbd>Alt</kbd>+<kbd>O</kbd>）で焼き込みして終了（取り消しは本体の <kbd>Ctrl</kbd>+<kbd>Z</kbd>）。Cancel／もう一度 <kbd>V</kbd>／Esc（ポイント解除のあと）は破棄。0 dBFS を超えるときは全体を何 dB 下げて収めるか確認します。モード内の点編集は <kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>）で元に戻す／やり直しできます。</li>
+        <li><strong>モード中の制限</strong> …… ほかの破壊編集キーやプレイヤー枠（F9／F10）への推移は警告して拒否します。すでに出ているスペクトログラム／重ねの相互トグルや、ラウドネス表示中の <kbd>Ctrl</kbd>+<kbd>L</kbd> 解除、マーカー系の一部キーは使えます。</li>
       </ul>
 
       <h3 id="pitch-curve">ピッチカーブ</h3>
@@ -1245,8 +1264,8 @@
       <h3>切り替え</h3>
       <ul>
         <li><kbd>A</kbd> でスペクトログラムと重ね表示を切り替えます。ラウドネス曲線が出ているときはスペクトログラムへ移ります（三状態の巡回ではありません）。</li>
-        <li><kbd>V</kbd> でラウドネス解析（Short Term 曲線）を出して音量入力を開きます。</li>
-        <li>抜けるのは <kbd>Esc</kbd>、<kbd>Shift</kbd>+<kbd>A</kbd>、または <kbd>Shift</kbd>+<kbd>V</kbd> です。今の表示にかかわらず通常の波形へ戻ります。<kbd>Esc</kbd> は入力、選択、ペンカーソルを先に解除します。音量の入力を閉じただけでは曲線は残ります。</li>
+        <li><kbd>Ctrl</kbd>+<kbd>L</kbd> でラウドネス解析（Short Term 曲線）を出して音量入力を開きます。</li>
+        <li>スペクトログラム／重ねから通常波形へ戻すのは <kbd>Shift</kbd>+<kbd>A</kbd> または <kbd>Esc</kbd> です。ラウドネス曲線を閉じるのは <kbd>Ctrl</kbd>+<kbd>L</kbd> の再押下または <kbd>Esc</kbd> です（<kbd>Shift</kbd>+<kbd>A</kbd> ではラウドネスを閉じません）。<kbd>Esc</kbd> は入力、選択、ペンカーソルを先に解除します。音量の入力を閉じただけでは曲線は残ります。</li>
         <li>ツールバーのラウドネスボタンは表示だけ切り替えます。</li>
         <li><kbd>L</kbd> は選択（無ければサンプルループ／<code>-L</code>）の末尾 3 秒前へジャンプして無限ループします（停止中でも再生中でも同じ）。</li>
       </ul>
@@ -1261,7 +1280,7 @@
       </ul>
       <div class="note">
         <p>ペンで描いた線は、その高さへラウドネスをぴったり合わせるためのものではありません。山や谷の一つ一つまで線の通りに動かすと、変化が強くなりすぎて、音楽として不自然に聞こえることがあります。ペンは、いまの鳴り方を読んだうえで、描いた線から「ここを上げたい」「ここを下げたい」という意図を汲み、音量へ反映します。</p>
-        <p>厳密に音量を合わせたいときは、範囲を選んで音量（<kbd>V</kbd>）で指定する方が向いています。その場合も、極端な dB を入れると、わずかなスムージングは入るものの、やはり不自然に聞こえることがあります。</p>
+        <p>厳密に音量を合わせたいときは、範囲を選んで音量（<kbd>Ctrl</kbd>+<kbd>L</kbd>）で指定する方が向いています。その場合も、極端な dB を入れると、わずかなスムージングは入るものの、やはり不自然に聞こえることがあります。</p>
       </div>
       <h3>重ね表示</h3>
       <ul>
@@ -1388,8 +1407,8 @@
           <tr><td><kbd>A</kbd></td><td>スペクトログラム／重ね表示の切替（ラウドネス曲線中はスペクトログラムへ。三状態の巡回ではない）</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>A</kbd></td><td>通常の波形表示へ（今の表示にかかわらず）</td></tr>
           <tr><td><kbd>Alt</kbd>+↑／↓</td><td>スペクトログラムの暗部持ち上げ（押しっぱなしで連続）</td></tr>
-          <tr><td><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>ラウドネス解析を表示して音量入力（エディタは両方、プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ）</td></tr>
-          <tr><td><kbd>Shift</kbd>+<kbd>V</kbd></td><td>通常の波形表示へ（今の表示にかかわらず）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>ラウドネス解析を表示して音量入力（トグル。エディタは両方、プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ）</td></tr>
+          <tr><td><kbd>V</kbd></td><td>音量カーブ編集モード（エディタのみ。もう一度で終了。くわしくは <a href="#volume-curve">音量カーブ</a>）</td></tr>
           <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>チャンネルをソロ（次／前。最後の次で解除。左端の名前をクリックでも可。Ctrl＋クリックで追加。Shift＋クリックでミュート／解除。時間選択は変えない。編集はそのレーンだけ。ミュートはグレー）</td></tr>
           <tr><td><kbd>G</kbd></td><td>ステータスバーの NOW POS を入力（時間／サンプル数切替はステータス欄または編集履歴の左の大きな現在位置タイムコードの右クリック。表示は同期）</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Always on Top（ウィンドウを最前面に固定／解除。どのモードでも。F8／F9 中も効く）</td></tr>
@@ -1424,14 +1443,15 @@
 
       <h3 id="shortcuts-edit">編集</h3>
       <p>タブを複数選択していると、フェード／ノーマライズ（リージョン毎含む）／音量／ピッチ／タイムストレッチ／リバース／無音を挿入／無音・ヒット検出／サンプルレート・ビット深度・チャンネル変換は選択したファイル全部へ一括適用します。保存（<kbd>Ctrl</kbd>+<kbd>S</kbd>）と名前を付けて保存（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>）も同じです（メニュー名は「選択ファイルを〜」に変化。無音・ヒット検出は確認のみで現在設定を適用。無音の挿入はクリック位置、<kbd>Ctrl</kbd>+<kbd>Ins</kbd> のときは再生位置。ほかの選択ファイルは再生位置。適用できないファイルはスキップ。実行中は半透明の画面で進捗を表示し操作を抑制）。</p>
-      <p>プレイヤー（<kbd>F10</kbd>）では、プレイリストの右クリックまたはツールバーから同じ系統の破壊編集を複数ファイルへ行えますが、再生が主であり誤操作で破壊編集するとアンドゥできないため、<strong>下表の破壊編集キー（I／O／X／N／R／P／T／S／B／C／Delete／Shift+Delete／Ctrl+T／Ctrl+D／Ctrl+Ins など）はプレイヤーでは実行しません</strong>（メニューでもジェスチャーを出しません。トリム自体はプレイヤーのメニューに出ません。例外のミックスダウン <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> と音量 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> はキーでも表記でも使えます。素の <kbd>V</kbd> はプレイヤーでは無効。詳しくは <a href="#layout-player">プレイヤーモード → プレイリストの破壊編集</a>）。</p>
+      <p>プレイヤー（<kbd>F10</kbd>）では、プレイリストの右クリックまたはツールバーから同じ系統の破壊編集を複数ファイルへ行えますが、再生が主であり誤操作で破壊編集するとアンドゥできないため、<strong>下表の破壊編集キー（I／O／X／N／R／P／T／S／B／C／Delete／Shift+Delete／Ctrl+T／Ctrl+D／Ctrl+Ins など）はプレイヤーでは実行しません</strong>（メニューでもジェスチャーを出しません。トリム自体はプレイヤーのメニューに出ません。例外のミックスダウン <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> と音量 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> はキーでも表記でも使えます。エディタの <kbd>Ctrl</kbd>+<kbd>L</kbd> はプレイヤーでは無効。詳しくは <a href="#layout-player">プレイヤーモード → プレイリストの破壊編集</a>）。</p>
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>I</kbd></td><td>フェードイン</td></tr>
           <tr><td><kbd>O</kbd></td><td>フェードアウト</td></tr>
           <tr><td><kbd>X</kbd></td><td>シークバー前後をフェード。シークを境に、今見えている前だけアウト／後ろだけイン（リニア）。一括適用の対象外</td></tr>
-          <tr><td><kbd>V</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>単一タブ: ラウドネス曲線を表示して音量（dB を直接入力。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示。入力を閉じても曲線は残る。曲線を閉じるのは <kbd>Shift</kbd>+<kbd>V</kbd>／<kbd>Esc</kbd>／<kbd>Shift</kbd>+<kbd>A</kbd>）。複数タブ選択時: ラウドネスを揃える（簡易）。エディタは両方有効。プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ（素の <kbd>V</kbd> は無効。プレイリスト右クリックからも可）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>単一タブ: ラウドネス曲線を表示して音量（dB を直接入力。↑↓／ホイール、Space 試聴、Enter 実行。波形全体の LKFS／RMS／Peak を先に表示。入力を閉じても曲線は残る。曲線を閉じるのは <kbd>Ctrl</kbd>+<kbd>L</kbd> 再押下／<kbd>Esc</kbd>）。複数タブ選択時: ラウドネスを揃える（簡易）。エディタは両方有効。プレイヤーは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> のみ（<kbd>Ctrl</kbd>+<kbd>L</kbd> は無効。プレイリスト右クリックからも可）</td></tr>
+          <tr><td><kbd>V</kbd></td><td><a href="#volume-curve">音量カーブ</a>編集モード（エディタのみ。トグル）</td></tr>
           <tr><td><kbd>E</kbd></td><td>ラウドネス曲線が出ているときペンにする（もう一度で戻す。右上のボタン、曲線上の右クリックでも同じ。ドラッグは範囲選択せず、元の曲線は残る。離すと音量を反映。両端はフェード。<kbd>Ctrl</kbd>+<kbd>Z</kbd> で一筆を戻す。<kbd>Esc</kbd> はペンを先に戻す）</td></tr>
           <tr><td><kbd>P</kbd></td><td>ピッチ。単一タブは<a href="#pitch-curve">ピッチカーブ</a>ウィンドウ（選択または全体）。複数タブ選択時は一括の半音指定。実行中は半透明の画面</td></tr>
           <tr><td><kbd>T</kbd></td><td>タイムストレッチ（時間と割合を連動。Space 試聴、Enter 実行。実行中は半透明の画面）</td></tr>
@@ -1618,6 +1638,22 @@
           <tr><td><kbd>Space</kbd></td><td>試聴</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>実行</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>閉じる</td></tr>
+        </tbody>
+      </table>
+      <p>音量カーブ編集中（くわしくは <a href="#volume-curve">音量カーブ</a>）</p>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>V</kbd>／Cancel／Esc</td><td>終了（Esc はポイント解除を先にする。未確定があるときは確認）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>O</kbd></td><td>OK（焼き込みして終了）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>ポイントを追加（再生位置。ブラシ中でもポイントへ切替）</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>ゲイン数値欄へフォーカス</td></tr>
+          <tr><td>↑／↓（選択点）</td><td>±1 dB（<kbd>Shift</kbd>+↑↓ で ±6）</td></tr>
+          <tr><td>←／→（選択点）</td><td>時間移動（<kbd>Shift</kbd> で速く）。未選択時はシーク。<kbd>Alt</kbd>+←→ で前後の点へ</td></tr>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>選択点のカーブ形状（ポイントモード時）</td></tr>
+          <tr><td><kbd>Delete</kbd></td><td>選択点を削除</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>通常どおり再生／停止（カーブ付きプレビュー）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Y</kbd></td><td>モード内の点編集を元に戻す／やり直し（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> もやり直し）</td></tr>
         </tbody>
       </table>
       <p>ピッチカーブが開いているとき（くわしくは <a href="#pitch-curve">ピッチカーブ</a>）</p>
