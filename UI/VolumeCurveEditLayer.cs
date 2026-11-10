@@ -14,7 +14,7 @@ namespace MgaSonicAnvil.UI;
 /// メイン波形（<see cref="WaveformView"/>）の手前に重ねる音量カーブ編集オーバーレイ。
 /// 波形そのものは描かない（ライブ振幅プレビューは対象波形の <see cref="WaveformView.SetPreviewGain"/> 側）。
 /// 赤いカーブ・制御点・dB ガイドだけを描画し、マウス編集（ポイント／ブラシ／セグメント平行リフト／
-/// 線ドラッグ中の追加 Shift＝全体上下、ポイント外の Shift＋ドラッグ全体シフト、
+/// 線・ポイント上の Ctrl＋ドラッグ＝全体上下、線の既定＝自由／Shift＝水平／Alt＝垂直、
 /// ポイントの Alt＝垂直／Shift＝水平固定）を扱う。
 /// 旧 <c>VolumeCurveEditorDialog.VolumeCurveWavePreview</c> のポイント編集ロジックを、
 /// 対象波形のビューポート（ズーム／パン）にマッピングして移植したもの。
@@ -61,8 +61,11 @@ internal sealed class VolumeCurveEditLayer : Control
     private int _dragSegment = -1;
     private float _segStartDb0;
     private float _segStartDb1;
+    private double _segStartT0;
+    private double _segStartT1;
+    private double _segOriginX;
     private double _segOriginY;
-    /// <summary>Shift＋ドラッグの全体シフト。</summary>
+    /// <summary>Ctrl＋ドラッグの全体シフト。</summary>
     private bool _shiftAll;
     private VolumeCurve? _shiftStartCurve;
     private float _shiftRefDb;
@@ -1325,11 +1328,16 @@ internal sealed class VolumeCurveEditLayer : Control
             _dragSegment = -1;
             if (hitPoint >= 0)
             {
-                // ポイント掴み。Alt=垂直固定 / Shift=水平固定（ドラッグ途中の押下も原点基準で有効）。
+                // ポイント掴み。Alt=垂直 / Shift=水平 / Ctrl=全体上下（途中押下も原点基準で有効）。
                 _dragPoint = hitPoint;
                 var origin = _curve.Points[_dragPoint];
                 _dragOriginT = origin.T;
                 _dragOriginGainDb = origin.GainDb;
+                // 途中で Ctrl を足した全体上下用の基準（開始時カーブ）。
+                _shiftStartCurve = _curve.Clone();
+                _shiftRefDb = origin.GainDb;
+                _shiftOriginY = pos.Y;
+                _shiftAll = false;
                 if (_dragPoint != prev)
                 {
                     SelectionChanged?.Invoke();
@@ -1343,7 +1351,7 @@ internal sealed class VolumeCurveEditLayer : Control
                 return;
             }
 
-            // ポイント以外: 選択解除。Shift は全体シフト、セグメントは上下ドラッグ。
+            // ポイント以外: 選択解除。線上の Ctrl＝全体シフト、線＝自由（Shift＝左右／Alt＝上下）。
             if (prev >= 0)
             {
                 _dragPoint = -1;
@@ -1351,7 +1359,7 @@ internal sealed class VolumeCurveEditLayer : Control
                 InvalidateVisual();
             }
 
-            if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
             {
                 BeginShiftAll(pos, t);
                 e.Handled = true;
@@ -1366,15 +1374,18 @@ internal sealed class VolumeCurveEditLayer : Control
                 var b = _curve.Points[_dragSegment + 1];
                 _segStartDb0 = a.GainDb;
                 _segStartDb1 = b.GainDb;
+                _segStartT0 = a.T;
+                _segStartT1 = b.T;
+                _segOriginX = pos.X;
                 _segOriginY = pos.Y;
-                // 途中で Shift を足した全体上下用の基準（開始時カーブ）。
+                // 途中で Ctrl を足した全体上下用の基準（開始時カーブ）。
                 _shiftStartCurve = _curve.Clone();
                 _shiftRefDb = Math.Max(_segStartDb0, _segStartDb1);
                 _shiftOriginY = pos.Y;
                 _shiftAll = false;
                 _dragging = true;
                 CaptureMouse();
-                Cursor = Cursors.SizeNS;
+                Cursor = SegmentDragCursor(Keyboard.Modifiers);
                 e.Handled = true;
                 return;
             }
@@ -1383,7 +1394,7 @@ internal sealed class VolumeCurveEditLayer : Control
             return;
         }
 
-        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 && _tool != EditTool.Brush)
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && _tool != EditTool.Brush)
         {
             BeginShiftAll(pos, t);
             e.Handled = true;
@@ -1438,14 +1449,14 @@ internal sealed class VolumeCurveEditLayer : Control
 
         if (_tool == EditTool.Points && _dragSegment >= 0)
         {
-            ApplySegmentDrag(pos.Y);
+            ApplySegmentDrag(pos);
             e.Handled = true;
             return;
         }
 
         if (_tool == EditTool.Points && _dragPoint >= 0 && _dragPoint < _curve.Points.Count)
         {
-            ApplyPointDrag(t, gainDb);
+            ApplyPointDrag(pos);
             e.Handled = true;
             return;
         }
@@ -1463,8 +1474,9 @@ internal sealed class VolumeCurveEditLayer : Control
     /// <summary>
     /// ポイントドラッグ中の移動。Alt/Shift はドラッグ開始時点の座標を軸固定の基準にする
     /// （途中押下でも「いまの位置」ではなく元ポイントへ制限する）。
+    /// Ctrl を押しているあいだは開始時カーブ全体を同じ ΔdB で上下する。
     /// </summary>
-    private void ApplyPointDrag(double t, float gainDb)
+    private void ApplyPointDrag(Point pos)
     {
         if (_dragPoint < 0 || _dragPoint >= _curve.Points.Count)
         {
@@ -1473,6 +1485,24 @@ internal sealed class VolumeCurveEditLayer : Control
 
         NotifyBeforePointEditOnce();
         var mods = Keyboard.Modifiers;
+        if ((mods & ModifierKeys.Control) != 0 && _shiftStartCurve is not null)
+        {
+            var deltaDb = DeltaDbFromDrag(_shiftRefDb, _shiftOriginY, pos.Y);
+            var snappedDelta = VolumeCurve.SoftSnapZero(_shiftRefDb + deltaDb, ZeroSnapRadius) - _shiftRefDb;
+            _curve.RestoreShiftedFrom(_shiftStartCurve, snappedDelta);
+            Cursor = Cursors.SizeNS;
+            CurveChanged?.Invoke();
+            InvalidateVisual();
+            return;
+        }
+
+        if (_shiftStartCurve is not null)
+        {
+            // Ctrl 解除後は全体シフトを巻き戻してから、ポイント移動を再適用する。
+            _curve.CopyFrom(_shiftStartCurve);
+        }
+
+        MapPoint(pos, out var t, out var gainDb, snapTimeline: true, escapeFromT: _dragOriginT);
         // Alt: 時間固定（垂直のみ） / Shift: ゲイン固定（水平のみ）
         if ((mods & ModifierKeys.Alt) != 0 && (mods & ModifierKeys.Shift) == 0)
         {
@@ -1495,10 +1525,10 @@ internal sealed class VolumeCurveEditLayer : Control
     }
 
     /// <summary>
-    /// 線（セグメント）ドラッグ。通常は当該線だけ上下。
-    /// 追加で Shift を押しているあいだは開始時カーブ全体を同じ ΔdB で上下する。
+    /// 線（セグメント）ドラッグ。既定は自由移動、Shift＝左右、Alt＝上下。
+    /// Ctrl を押しているあいだは開始時カーブ全体を同じ ΔdB で上下する。
     /// </summary>
-    private void ApplySegmentDrag(double currentY)
+    private void ApplySegmentDrag(Point pos)
     {
         if (_dragSegment < 0 || _shiftStartCurve is null)
         {
@@ -1506,26 +1536,54 @@ internal sealed class VolumeCurveEditLayer : Control
         }
 
         NotifyBeforePointEditOnce();
+        var mods = Keyboard.Modifiers;
         var refDb = _shiftRefDb;
-        var deltaDb = DeltaDbFromDrag(refDb, _segOriginY, currentY);
+        var deltaDb = DeltaDbFromDrag(refDb, _segOriginY, pos.Y);
         var snappedDelta = VolumeCurve.SoftSnapZero(refDb + deltaDb, ZeroSnapRadius) - refDb;
-        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        if ((mods & ModifierKeys.Control) != 0)
         {
             _curve.RestoreShiftedFrom(_shiftStartCurve, snappedDelta);
+            Cursor = Cursors.SizeNS;
         }
         else
         {
-            // Shift 解除後は全体シフトを巻き戻し、線だけ再適用する。
+            // Ctrl 解除後は全体シフトを巻き戻し、線だけ再適用する。
             _curve.CopyFrom(_shiftStartCurve);
-            _curve.SetSegmentGainDb(_dragSegment, _segStartDb0 + snappedDelta, _segStartDb1 + snappedDelta);
+            var t0 = _segStartT0;
+            var t1 = _segStartT1;
+            var gain0 = _segStartDb0 + snappedDelta;
+            var gain1 = _segStartDb1 + snappedDelta;
+            var shiftOnly = (mods & ModifierKeys.Shift) != 0 && (mods & ModifierKeys.Alt) == 0;
+            var altOnly = (mods & ModifierKeys.Alt) != 0 && (mods & ModifierKeys.Shift) == 0;
+            if (!altOnly)
+            {
+                var deltaT = DeltaTFromDrag(_segOriginX, pos.X);
+                (t0, t1) = ClampSegmentTranslate(_dragSegment, _segStartT0, _segStartT1, deltaT);
+            }
+
+            if (shiftOnly)
+            {
+                gain0 = _segStartDb0;
+                gain1 = _segStartDb1;
+                Cursor = Cursors.SizeWE;
+            }
+            else if (altOnly)
+            {
+                Cursor = Cursors.SizeNS;
+            }
+            else
+            {
+                Cursor = Cursors.SizeAll;
+            }
+
+            _curve.SetSegmentEnds(_dragSegment, t0, gain0, t1, gain1);
         }
 
-        Cursor = Cursors.SizeNS;
         CurveChanged?.Invoke();
         InvalidateVisual();
     }
 
-    /// <summary>ドラッグ中に Alt/Shift が変わったら、マウスを動かさなくても即反映する。</summary>
+    /// <summary>ドラッグ中に修飾キーが変わったら、マウスを動かさなくても即反映する。</summary>
     private void RefreshDragFromModifiers()
     {
         if (!_dragging || _tool != EditTool.Points || Mouse.LeftButton != MouseButtonState.Pressed)
@@ -1536,7 +1594,7 @@ internal sealed class VolumeCurveEditLayer : Control
         var pos = Mouse.GetPosition(this);
         if (_dragSegment >= 0)
         {
-            ApplySegmentDrag(pos.Y);
+            ApplySegmentDrag(pos);
             return;
         }
 
@@ -1545,15 +1603,14 @@ internal sealed class VolumeCurveEditLayer : Control
             return;
         }
 
-        MapPoint(pos, out var t, out var gainDb, snapTimeline: true, escapeFromT: _dragOriginT);
-        ApplyPointDrag(t, gainDb);
+        ApplyPointDrag(pos);
     }
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
         if (e.Key is Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift
-            or Key.System)
+            or Key.LeftCtrl or Key.RightCtrl or Key.System)
         {
             RefreshDragFromModifiers();
         }
@@ -1563,7 +1620,7 @@ internal sealed class VolumeCurveEditLayer : Control
     {
         base.OnPreviewKeyUp(e);
         if (e.Key is Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift
-            or Key.System)
+            or Key.LeftCtrl or Key.RightCtrl or Key.System)
         {
             RefreshDragFromModifiers();
         }
@@ -1618,6 +1675,11 @@ internal sealed class VolumeCurveEditLayer : Control
 
     private static Cursor PointDragCursor(ModifierKeys mods)
     {
+        if ((mods & ModifierKeys.Control) != 0)
+        {
+            return Cursors.SizeNS;
+        }
+
         if ((mods & ModifierKeys.Alt) != 0 && (mods & ModifierKeys.Shift) == 0)
         {
             return Cursors.SizeNS;
@@ -1626,6 +1688,26 @@ internal sealed class VolumeCurveEditLayer : Control
         if ((mods & ModifierKeys.Shift) != 0 && (mods & ModifierKeys.Alt) == 0)
         {
             return Cursors.SizeWE;
+        }
+
+        return Cursors.SizeAll;
+    }
+
+    private static Cursor SegmentDragCursor(ModifierKeys mods)
+    {
+        if ((mods & ModifierKeys.Control) != 0)
+        {
+            return Cursors.SizeNS;
+        }
+
+        if ((mods & ModifierKeys.Shift) != 0 && (mods & ModifierKeys.Alt) == 0)
+        {
+            return Cursors.SizeWE;
+        }
+
+        if ((mods & ModifierKeys.Alt) != 0 && (mods & ModifierKeys.Shift) == 0)
+        {
+            return Cursors.SizeNS;
         }
 
         return Cursors.SizeAll;
@@ -1641,6 +1723,64 @@ internal sealed class VolumeCurveEditLayer : Control
         return (float)(Math.Round(delta / step) * step);
     }
 
+    private double DeltaTFromDrag(double originX, double currentX)
+    {
+        var contentW = Math.Max(1d, ContentWidth);
+        var frameDelta = ((currentX - originX) / contentW) * ViewSpanFrames;
+        var length = Math.Max(1L, _range.Length - 1);
+        return frameDelta / length;
+    }
+
+    /// <summary>
+    /// セグメント両端を Δt だけ動かす。内側セグメントは幅を保った平行移動。
+    /// 端点（t=0/1）は固定し、端セグメントは内側の点だけ時間移動する。
+    /// </summary>
+    private (double T0, double T1) ClampSegmentTranslate(int segmentIndex, double t0, double t1, double deltaT)
+    {
+        if (_shiftStartCurve is null || segmentIndex < 0 || segmentIndex >= _shiftStartCurve.Points.Count - 1)
+        {
+            return (t0, t1);
+        }
+
+        var points = _shiftStartCurve.Points;
+        const double eps = 1e-9;
+        var leftLocked = segmentIndex == 0;
+        var rightLocked = segmentIndex + 1 == points.Count - 1;
+        if (leftLocked && rightLocked)
+        {
+            return (t0, t1);
+        }
+
+        if (!leftLocked && !rightLocked)
+        {
+            var width = t1 - t0;
+            if (width <= 1e-12)
+            {
+                return (t0, t1);
+            }
+
+            var minT = points[segmentIndex - 1].T + eps;
+            var maxT = points[segmentIndex + 2].T - eps;
+            if (maxT - minT <= width)
+            {
+                var mid = (minT + maxT) * 0.5;
+                return (mid - width * 0.5, mid + width * 0.5);
+            }
+
+            var nextT0 = Math.Clamp(t0 + deltaT, minT, maxT - width);
+            return (nextT0, nextT0 + width);
+        }
+
+        if (leftLocked)
+        {
+            var maxT = points[segmentIndex + 2].T - eps;
+            return (0, Math.Clamp(t1 + deltaT, eps, maxT));
+        }
+
+        var minTRight = points[segmentIndex - 1].T + eps;
+        return (Math.Clamp(t0 + deltaT, minTRight, 1d - eps), 1);
+    }
+
     private void UpdateHoverCursor(Point pos)
     {
         if (_tool == EditTool.Brush || pos.X < ContentX || _range.IsEmpty)
@@ -1652,12 +1792,18 @@ internal sealed class VolumeCurveEditLayer : Control
         MapPoint(pos, out var t, out var gainDb);
         if (_curve.HitTestPoint(t, gainDb, PointHitTRadius(), PointHitDbRadius()) >= 0)
         {
-            Cursor = Cursors.SizeAll;
+            Cursor = PointDragCursor(Keyboard.Modifiers);
             return;
         }
 
         const float segRadius = 7.2f;
-        if (_curve.HitTestSegment(t, gainDb, segRadius) >= 0 || (Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        if (_curve.HitTestSegment(t, gainDb, segRadius) >= 0)
+        {
+            Cursor = SegmentDragCursor(Keyboard.Modifiers);
+            return;
+        }
+
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
         {
             Cursor = Cursors.SizeNS;
             return;

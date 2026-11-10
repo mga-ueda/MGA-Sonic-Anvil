@@ -190,7 +190,9 @@ internal sealed class VolumeCurveBar : UserControl
         ActionButtonLooks.ApplyClear(_cancelButton);
         _cancelButton.Click += (_, _) => Cancelled?.Invoke();
 
-        var optionsRow = new StackPanel
+        _addPointButton.Margin = new Thickness(16, 0, 8, 0);
+        _resetButton.Margin = new Thickness(0, 0, 8, 0);
+        var root = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -199,37 +201,19 @@ internal sealed class VolumeCurveBar : UserControl
         };
         var gainAccessLabel = CreateAccessLabel(UiStrings.LabelVolumeCurveGainValue, _gainBox);
         gainAccessLabel.Margin = new Thickness(0, 0, 4, 0);
-        optionsRow.Children.Add(gainAccessLabel);
-        optionsRow.Children.Add(_gainBox);
-        optionsRow.Children.Add(CreateLabel(UiStrings.LabelDb, margin: new Thickness(6, 0, 0, 0)));
-        optionsRow.Children.Add(_pointsRadio);
-        optionsRow.Children.Add(_brushRadio);
-        optionsRow.Children.Add(CreateLabel(
+        root.Children.Add(gainAccessLabel);
+        root.Children.Add(_gainBox);
+        root.Children.Add(CreateLabel(UiStrings.LabelDb, margin: new Thickness(6, 0, 0, 0)));
+        root.Children.Add(_pointsRadio);
+        root.Children.Add(_brushRadio);
+        root.Children.Add(CreateLabel(
             UiStrings.LabelPitchCurveShape,
             margin: new Thickness(16, 0, 6, 0)));
-        optionsRow.Children.Add(_shapeButtons);
-
-        _addPointButton.Margin = new Thickness(0, 0, 8, 0);
-        _resetButton.Margin = new Thickness(0, 0, 8, 0);
-        var actionRow = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(10, 2, 10, 4),
-        };
-        actionRow.Children.Add(_addPointButton);
-        actionRow.Children.Add(_resetButton);
-        actionRow.Children.Add(_okButton);
-        actionRow.Children.Add(_cancelButton);
-
-        var root = new StackPanel
-        {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        root.Children.Add(optionsRow);
-        root.Children.Add(actionRow);
+        root.Children.Add(_shapeButtons);
+        root.Children.Add(_addPointButton);
+        root.Children.Add(_resetButton);
+        root.Children.Add(_okButton);
+        root.Children.Add(_cancelButton);
         Content = root;
 
         SelectShape(_selectedShape);

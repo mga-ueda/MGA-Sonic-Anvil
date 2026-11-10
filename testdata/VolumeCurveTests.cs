@@ -31,6 +31,26 @@ public sealed class VolumeCurveTests
     }
 
     [Fact]
+    public void SetSegmentEnds_MovesInteriorSegmentInTime()
+    {
+        var curve = new VolumeCurve(
+            [
+                new VolumeCurvePoint(0, 0),
+                new VolumeCurvePoint(0.25, -6),
+                new VolumeCurvePoint(0.75, -6),
+                new VolumeCurvePoint(1, 0),
+            ],
+            [FadeShape.Linear, FadeShape.Linear, FadeShape.Linear]);
+        Assert.True(curve.SetSegmentEnds(1, 0.3, -3f, 0.6, -3f));
+        Assert.Equal(0.3, curve.Points[1].T, 6);
+        Assert.Equal(0.6, curve.Points[2].T, 6);
+        Assert.Equal(-3f, curve.Points[1].GainDb);
+        Assert.Equal(-3f, curve.Points[2].GainDb);
+        Assert.Equal(0d, curve.Points[0].T);
+        Assert.Equal(1d, curve.Points[3].T);
+    }
+
+    [Fact]
     public void RestoreShiftedFrom_AppliesDeltaWithoutAccumulating()
     {
         var start = new VolumeCurve(

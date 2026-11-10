@@ -534,6 +534,47 @@ internal sealed class VolumeCurve
         return true;
     }
 
+    /// <summary>セグメント両端の時間と dB を書き換える（Alt 付き平行移動用）。端点は t=0/1 固定。</summary>
+    public bool SetSegmentEnds(int segmentIndex, double t0, float gainDb0, double t1, float gainDb1)
+    {
+        if (segmentIndex < 0 || segmentIndex >= _points.Count - 1)
+        {
+            return false;
+        }
+
+        const double eps = 1e-9;
+        if (segmentIndex == 0)
+        {
+            t0 = 0;
+        }
+        else
+        {
+            var minT = _points[segmentIndex - 1].T + eps;
+            var maxT = Math.Max(minT, t1 - eps);
+            t0 = Math.Clamp(t0, minT, maxT);
+        }
+
+        if (segmentIndex + 1 == _points.Count - 1)
+        {
+            t1 = 1;
+        }
+        else
+        {
+            var maxT = _points[segmentIndex + 2].T - eps;
+            var minT = Math.Min(maxT, t0 + eps);
+            t1 = Math.Clamp(t1, minT, maxT);
+        }
+
+        if (t1 <= t0)
+        {
+            t1 = Math.Min(1d, t0 + eps);
+        }
+
+        _points[segmentIndex] = new VolumeCurvePoint(t0, Snap(gainDb0));
+        _points[segmentIndex + 1] = new VolumeCurvePoint(t1, Snap(gainDb1));
+        return true;
+    }
+
     /// <summary>全制御点の dB に同じ量を加算（全体シフト）。</summary>
     public void ShiftAll(float deltaDb)
     {
