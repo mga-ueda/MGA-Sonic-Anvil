@@ -11,11 +11,16 @@ internal static partial class ProcessEdits
     /// <param name="lowerClippedCrossfade">
     /// true なら、焼き込み区間のピークが 0 dBFS を超えるとき波形全体をフルスケールへ下げる。
     /// </param>
+    /// <param name="sampleLoopBeforeForUndo">
+    /// アンドゥ時に戻すサンプルループ。フェード調整中はドラフトを履歴なしで仮反映するため、
+    /// 入場前のループを渡す（省略時は現在の <see cref="AudioDocument.SampleLoop"/>）。
+    /// </param>
     public static IEditCommand? ApplyLoopMix(
         AudioDocument document,
         CrossfadeEditState draft,
         bool lowerClippedCrossfade,
-        out TabMerge.BounceClipInfo clip)
+        out TabMerge.BounceClipInfo clip,
+        WaveSelection? sampleLoopBeforeForUndo = null)
     {
         clip = default;
         if (document.FrameCount <= 0 || document.Channels < 1 || draft.LoopLength <= 0)
@@ -129,6 +134,8 @@ internal static partial class ProcessEdits
         }
 
         var summary = UiStrings.EditHistoryName("Loop Mix");
+        // UI は入場前ループを仮上書きするため、アンドゥ用 before は明示指定を優先する。
+        var loopBefore = sampleLoopBeforeForUndo ?? document.SampleLoop;
         var command = new SpliceRangeCommand(
             "Loop Mix",
             startFrame: 0,
@@ -140,7 +147,7 @@ internal static partial class ProcessEdits
             cursorAfter,
             document.SnapshotMarkers(),
             markersAfter,
-            document.SampleLoop,
+            loopBefore,
             loopAfter,
             document.SnapshotRegions(),
             regionsAfter,
@@ -149,11 +156,13 @@ internal static partial class ProcessEdits
         var source = state.Clone();
         var sourceRate = document.SampleRate;
         var lower = lowerClippedCrossfade;
+        var undoLoop = sampleLoopBeforeForUndo;
         command.Replay = target => ApplyLoopMix(
             target,
             RemapState(source, sourceRate, target),
             lower,
-            out _);
+            out _,
+            undoLoop);
         command.Persist = new HistoryRecipe
         {
             Kind = HistoryRecipes.LoopMix,

@@ -461,11 +461,13 @@ public partial class MainWindow
         }
 
         _crossfadeEdit.Clamp(_document.FrameCount);
+        // 編集中はドラフトを SampleLoop へ仮反映しているので、アンドゥ用に入場前ループを渡す。
         var command = ProcessEdits.ApplyLoopMix(
             _document,
             _crossfadeEdit,
             lowerClippedCrossfade: false,
-            out var clip);
+            out var clip,
+            sampleLoopBeforeForUndo: _crossfadeLoopBefore);
         if (command is null)
         {
             return;
@@ -486,7 +488,8 @@ public partial class MainWindow
                     _document,
                     _crossfadeEdit,
                     lowerClippedCrossfade: true,
-                    out _);
+                    out _,
+                    sampleLoopBeforeForUndo: _crossfadeLoopBefore);
                 if (command is null)
                 {
                     return;

@@ -508,6 +508,37 @@ public sealed class CrossfadeEditTests
     }
 
     [Fact]
+    public void LoopMix_UndoRestoresLoopEvenWhenDraftAlreadyApplied()
+    {
+        // UI はフェード調整中にドラフトを SampleLoop へ仮反映する。
+        // その状態で Apply しても、入場前ループへアンドゥできなければならない。
+        var document = MakeDocument(200);
+        FillRamp(document);
+        var originalLoop = WaveSelection.Empty;
+        document.SetSampleLoop(originalLoop);
+
+        var state = new CrossfadeEditState
+        {
+            StartFrame = 40,
+            EndFrame = 120,
+            PreCrossfadeFrames = 8,
+            PostCrossfadeFrames = 4,
+        };
+        document.SetSampleLoop(state.LoopRange, markDirty: false);
+
+        var command = ProcessEdits.ApplyLoopMix(
+            document,
+            state,
+            lowerClippedCrossfade: false,
+            out _,
+            sampleLoopBeforeForUndo: originalLoop)!;
+        command.Apply(document);
+        Assert.Equal(new WaveSelection(40, 120), document.SampleLoop);
+        command.Revert(document);
+        Assert.True(document.SampleLoop.IsEmpty);
+    }
+
+    [Fact]
     public void LoopMix_ReportsClipWhenEqualPowerStyleSumExceedsFullScale()
     {
         var frames = 200;
