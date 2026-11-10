@@ -42,6 +42,9 @@ internal static class DesignMetrics
 
     public static double WaapiBarHeight => From96(32);
 
+    /// <summary>V キーの音量カーブ編集モード下部バー。数値・ツール・形状の行＋ボタン行の約 2 段。</summary>
+    public static double VolumeCurveBarHeight => From96(76);
+
     /// <summary>メーター列の WAAPI トグルとピーク LED のあいだ。</summary>
     public static double WaapiToPeakLampGap => From96(5);
 

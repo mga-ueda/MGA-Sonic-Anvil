@@ -105,6 +105,7 @@ internal static class HistoryRecipes
     public const string PenGain = "PenGain";
     public const string PitchShift = "PitchShift";
     public const string PitchCurve = "PitchCurve";
+    public const string VolumeCurve = "VolumeCurve";
     public const string TimeStretch = "TimeStretch";
     public const string Reverse = "Reverse";
     public const string NormalizePerRegion = "NormalizePerRegion";
@@ -143,6 +144,7 @@ internal static class HistoryRecipes
         PenGain,
         PitchShift,
         PitchCurve,
+        VolumeCurve,
         TimeStretch,
         Reverse,
         NormalizePerRegion,
@@ -182,6 +184,7 @@ internal static class HistoryRecipes
         PenGain,
         PitchShift,
         PitchCurve,
+        VolumeCurve,
         TimeStretch,
         Reverse,
         NormalizePerRegion,
@@ -288,6 +291,28 @@ internal static class HistoryRecipes
                 Timing0 = ClickGuard.ClampFadeMs(edgeFadeMs),
                 Amount = documentGainScale,
                 Flag = !timeStretch,
+                ClipSamples = curve.ToPackedSamples(),
+                Frames = curve.ToShapeIds(),
+                ClipChannels = 1,
+                ClipRate = sourceRate,
+            },
+            channel,
+            channelMask);
+
+    public static HistoryRecipe FromVolumeCurve(
+        int sourceRate,
+        WaveSelection range,
+        Audio.VolumeCurve curve,
+        int channel = ChannelSolo.Off,
+        int channelMask = 0) =>
+        WithChannel(
+            new HistoryRecipe
+            {
+                Kind = VolumeCurve,
+                SourceRate = sourceRate,
+                Start = range.StartFrame,
+                End = range.EndFrame,
+                Value = (int)curve.DefaultShape,
                 ClipSamples = curve.ToPackedSamples(),
                 Frames = curve.ToShapeIds(),
                 ClipChannels = 1,
@@ -426,6 +451,14 @@ internal static class HistoryRecipes
                 documentGainScale: recipe.Amount > 0 && recipe.Amount <= 1 ? (float)recipe.Amount : 1f,
                 channelMask: MaskOf(recipe),
                 timeStretch: !recipe.Flag),
+            VolumeCurve => ProcessEdits.VolumeCurve(
+                document,
+                RangeOf(recipe),
+                Audio.VolumeCurve.FromPackedSamples(
+                    recipe.ClipSamples,
+                    recipe.Frames,
+                    FadeCurves.ParseStored(((FadeShape)recipe.Value).ToString())),
+                channelMask: MaskOf(recipe)),
             TimeStretch => ProcessEdits.TimeStretch(
                 document,
                 RangeOf(recipe),

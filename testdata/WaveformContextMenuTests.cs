@@ -245,7 +245,7 @@ public sealed class WaveformContextMenuTests
             var volume = Find(tree, WaveMenuCommand.Volume);
             var loudness = Find(tree, WaveMenuCommand.ViewLoudness);
             Assert.Equal(MenuGestures.Volume, volume?.Gesture);
-            Assert.Equal("V", loudness?.Gesture);
+            Assert.Equal("Ctrl+L", loudness?.Gesture);
             Assert.Contains(WaveMenuCommand.ExportWave, commands);
             Assert.Contains(WaveMenuCommand.ExportByChannels, CommandsIn(tree, UiStrings.WaveMenuCatExport));
             Assert.Contains(WaveMenuCommand.Channels, CommandsIn(tree, UiStrings.WaveMenuCatFormat));

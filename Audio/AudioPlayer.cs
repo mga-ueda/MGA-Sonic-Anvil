@@ -255,6 +255,9 @@ internal sealed class AudioPlayer : IDisposable
 
     public void SetSoloMask(int mask) => _provider.SetSoloMask(mask);
 
+    /// <summary>再生中のフレームゲイン（音量カーブ試聴など）。null で解除。</summary>
+    public void SetFrameGain(Func<long, float>? frameGain) => _provider.SetFrameGain(frameGain);
+
     public bool MonitorMono => _provider.MonitorMono;
 
     public void SetMonitorMono(bool enabled) => _provider.SetMonitorMono(enabled);

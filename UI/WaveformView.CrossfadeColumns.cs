@@ -397,7 +397,7 @@ internal sealed partial class WaveformView
 
     private void ApplyPreviewGainToColumns(long startFrame, long endFrame, int count, int channels)
     {
-        if (_previewGainAtFrame is null || count <= 0)
+        if (_previewGainAtFrame is null || count <= 0 || channels <= 0)
         {
             return;
         }
@@ -496,16 +496,40 @@ internal sealed partial class WaveformView
 
         var collectDots = ShouldDrawSamplePoints(count, width / scaleX);
         var dotRadius = Math.Max(1, (int)Math.Round(SamplePointRadius * scaleX));
-        var color = WavePaintBgraFor(channel);
+        var baseColor = WavePaintBgraFor(channel);
+        var markClip = _previewGainAtFrame is not null && _waveClipBgra != 0;
+
+        void PaintClipTip(int x, float sample, int y)
+        {
+            if (!markClip || Math.Abs(sample) <= 1f)
+            {
+                return;
+            }
+
+            FillHorizontalCapsule(
+                buffer,
+                stride,
+                width,
+                clipTop,
+                clipBottom,
+                x,
+                y,
+                capsuleWidth: 14,
+                capsuleThickness: 10,
+                _waveClipBgra);
+        }
 
         if (count == 1)
         {
             var x = (int)Math.Round(FrameToX(first, start, span, width));
-            var y = SampleY(SampleAt(0));
-            FillVLine(buffer, stride, width, clipTop, clipBottom, x, y - 3, y + 3, color);
+            var sample = SampleAt(0);
+            var y = SampleY(sample);
+            FillVLine(buffer, stride, width, clipTop, clipBottom, x, y - 3, y + 3, baseColor);
+            PaintClipTip(x, sample, y);
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, color);
+                var dotColor = markClip && Math.Abs(sample) > 1f ? _waveClipBgra : baseColor;
+                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, dotColor);
             }
 
             return;
@@ -517,18 +541,21 @@ internal sealed partial class WaveformView
         for (var i = 0; i < count; i++)
         {
             var x = (int)Math.Round(FrameToX(first + i, start, span, width));
-            var y = SampleY(SampleAt(i));
+            var sample = SampleAt(i);
+            var y = SampleY(sample);
             if (havePrev)
             {
-                DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY, x, y, color);
+                DrawThickLine(buffer, stride, width, clipTop, clipBottom, prevX, prevY, x, y, baseColor);
             }
 
+            PaintClipTip(x, sample, y);
             prevX = x;
             prevY = y;
             havePrev = true;
             if (collectDots)
             {
-                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, color);
+                var dotColor = markClip && Math.Abs(sample) > 1f ? _waveClipBgra : baseColor;
+                FillDot(buffer, stride, width, clipTop, clipBottom, x, y, dotRadius, dotColor);
             }
         }
     }

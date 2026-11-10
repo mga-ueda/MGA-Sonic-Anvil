@@ -332,6 +332,9 @@ internal sealed class AppSettings
     /// <summary>ピッチカーブプレビューを軽量演算にする。規定は false。OK 本適用には使わない。</summary>
     public bool PitchCurveLightweightMode { get; set; }
 
+    /// <summary>音量カーブ既定の補間形状。</summary>
+    public string VolumeCurveDefaultShape { get; set; } = "Linear";
+
     public global::MgaSonicAnvil.Audio.SilenceDetectOptions ResolvedSilenceDetectOptions(bool edgesOnly) =>
         new global::MgaSonicAnvil.Audio.SilenceDetectOptions(
             SilenceDetectOpenThresholdDb,

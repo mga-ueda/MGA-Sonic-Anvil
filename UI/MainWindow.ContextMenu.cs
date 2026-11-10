@@ -1082,11 +1082,13 @@ public partial class MainWindow
         var busy = IsUiBusy;
         var selectedTabs = SelectedTabsInOrder();
         // フェード調整中は破壊編集メニューを無効化（再生・シーク系の CanNavigate は残す）。
-        var canEdit = hasDoc
+        // V モード中は波形破壊編集だけ落とし、マーカー／リージョンは CanEditMarkers で残す。
+        var canEditMarkers = hasDoc
             && !busy
             && !recording
             && !IsLibraryMaximized
-            && !BlocksOutsideFadeToolActions;
+            && !IsCrossfadeEditMode;
+        var canEdit = canEditMarkers && !IsVolumeCurveMode;
         var canScratch = hasDoc && !busy && !recording && IsPlayerScratchContext();
         var canNavigate = hasDoc && !busy && !recording;
         var hasSelection = hasDoc && !document!.Selection.IsEmpty;
@@ -1097,6 +1099,8 @@ public partial class MainWindow
         {
             HasDocument = hasDoc,
             CanEdit = canEdit,
+            CanEditMarkers = canEditMarkers,
+            RestrictMenusToNavigateAndMarkers = IsVolumeCurveMode,
             CanNavigate = canNavigate,
             IsBusy = busy,
             IsPlaying = IsPlaybackActive(),
@@ -1206,7 +1210,7 @@ public partial class MainWindow
                     || document.TryGetRoleSpan(MarkerRole.Loop, Waveform.PlayheadFrame, out _)),
             CanAddMarkerHere = IsLibraryMaximized
                 ? canScratch && !scratchHasAtHit
-                : canEdit && !document!.HasMarkerAt(hit.Frame),
+                : canEditMarkers && !document!.HasMarkerAt(hit.Frame),
             AnalysisView = Waveform.AnalysisView,
             Hit = hit,
         };

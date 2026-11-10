@@ -18,10 +18,10 @@ public partial class MainWindow
     internal bool IsCrossfadeEditMode => _crossfadeEdit is { IsActive: true };
 
     /// <summary>
-    /// フェード調整ツール表示中は、他モード切替と破壊的な波形編集を受け付けない。
-    /// 再生・シーク・ズーム、およびツール自身（Escape で閉じる等）は許可する。
+    /// フェード調整ツール表示中（または音量カーブ編集モード中）は、他モード切替と破壊的な波形編集を
+    /// 受け付けない。再生・シーク・ズーム、およびツール自身（Escape で閉じる等）は許可する。
     /// </summary>
-    internal bool BlocksOutsideFadeToolActions => IsCrossfadeEditMode;
+    internal bool BlocksOutsideFadeToolActions => IsCrossfadeEditMode || IsVolumeCurveMode;
 
     /// <summary>トランスポートから受け付ける操作か（フェード調整中のフィルタ）。</summary>
     internal static bool IsAllowedTransportDuringFadeTool(TransportCommand command) =>
@@ -52,7 +52,6 @@ public partial class MainWindow
             or TransportCommand.AmpZoomOut
             or TransportCommand.AmpZoomMax
             or TransportCommand.AmpZoomReset
-            or TransportCommand.ToggleLoudnessView
             or TransportCommand.ToggleMinimalChrome
             or TransportCommand.MaximizeWaveform
             or TransportCommand.OpenManual
@@ -68,8 +67,148 @@ public partial class MainWindow
         // ウィンドウは初回オープン時に生成する。
     }
 
-    /// <summary>フェード調整中の外部編集・モード切替を拒否する。true なら呼び出し側は何もしない。</summary>
-    private bool RejectOutsideFadeToolAction() => BlocksOutsideFadeToolActions;
+    /// <summary>
+    /// フェード調整／音量カーブ中の外部編集・モード切替を拒否する。true なら呼び出し側は何もしない。
+    /// 音量カーブ中はダイアログで理由を出す（フェード調整中は従来どおり無言拒否）。
+    /// <paramref name="allowDuringVolumeCurve"/> が true のときだけ、V モード中のマーカー／リージョン系を通す。
+    /// </summary>
+    private bool RejectOutsideFadeToolAction(bool allowDuringVolumeCurve = false)
+    {
+        if (IsVolumeCurveMode)
+        {
+            if (allowDuringVolumeCurve)
+            {
+                return false;
+            }
+
+            WarnVolumeCurveModeBlocked();
+            return true;
+        }
+
+        return IsCrossfadeEditMode;
+    }
+
+    /// <summary>F11/F12。エディタ側レイアウト枠。</summary>
+    private static bool IsEditorLayoutSlot(WindowLayoutSlot slot) =>
+        slot is WindowLayoutSlot.F11 or WindowLayoutSlot.F12;
+
+    /// <summary>
+    /// V モード中でも、すでに入っている表示モードのトグル
+    /// （ラウドネス解除、スペクトログラム↔重ね、WAAPI 閉じ、エディタ枠 F11/F12）は許容する。
+    /// プレイヤー枠（F9/F10）への推移は許容しない。
+    /// </summary>
+    private bool IsSameModeToggleDuringVolumeCurve(TransportCommand command) =>
+        command switch
+        {
+            TransportCommand.ToggleLoudnessView or TransportCommand.Volume =>
+                Waveform.AnalysisView == WaveformAnalysisView.Loudness,
+            TransportCommand.ToggleSpectrogram or TransportCommand.ToggleAnalysis =>
+                Waveform.AnalysisView is WaveformAnalysisView.Spectrogram or WaveformAnalysisView.Overlay,
+            TransportCommand.ToggleWaapi => _waapiPanelVisible,
+            TransportCommand.MaximizeWaveform or TransportCommand.ToggleAnalyzerMaximize => true,
+            _ => false,
+        };
+
+    /// <summary>V モード中にメニューから同モード解除／エディタ枠切替できるコマンドか。</summary>
+    private bool IsSameModeToggleWaveMenu(WaveMenuCommand command) =>
+        command switch
+        {
+            WaveMenuCommand.Volume or WaveMenuCommand.ViewLoudness =>
+                Waveform.AnalysisView == WaveformAnalysisView.Loudness,
+            WaveMenuCommand.ViewSpectrogram =>
+                Waveform.AnalysisView is WaveformAnalysisView.Spectrogram or WaveformAnalysisView.Overlay,
+            WaveMenuCommand.ViewOverlay =>
+                Waveform.AnalysisView == WaveformAnalysisView.Overlay,
+            WaveMenuCommand.ViewWaveform =>
+                Waveform.AnalysisView != WaveformAnalysisView.Waveform,
+            WaveMenuCommand.WaapiPanel => _waapiPanelVisible,
+            WaveMenuCommand.MaximizeWaveform or WaveMenuCommand.MaximizeAnalyzers => true,
+            WaveMenuCommand.VideoMini => IsVideoMiniPlayerActive(),
+            _ => false,
+        };
+
+    /// <summary>ツールバー上は有効のままにし、クリック時に抑制ダイアログへ届けるコマンド。</summary>
+    private static bool IsWarnableTransportDuringVolumeCurve(TransportCommand command) =>
+        command is TransportCommand.Volume
+            or TransportCommand.ToggleLoudnessView
+            or TransportCommand.ToggleSpectrogram
+            or TransportCommand.ToggleAnalysis
+            or TransportCommand.ToggleWaapi
+            or TransportCommand.MaximizeWaveform
+            or TransportCommand.ToggleAnalyzerMaximize
+            or TransportCommand.ToggleLibraryMaximize
+            or TransportCommand.ToggleMinimalChrome
+            or TransportCommand.Pitch
+            or TransportCommand.TimeStretch
+            or TransportCommand.Normalize
+            or TransportCommand.NormalizePerRegion
+            or TransportCommand.Reverse
+            or TransportCommand.FadeIn
+            or TransportCommand.FadeOut
+            or TransportCommand.CrossfadeEdit
+            or TransportCommand.Bounce
+            or TransportCommand.History
+            or TransportCommand.Delete
+            or TransportCommand.Trim
+            or TransportCommand.Undo
+            or TransportCommand.Redo;
+
+    /// <summary>
+    /// V モード中にツールバー／トランスポートから受け付ける操作。
+    /// 再生・カーソル移動・ズームと、マーカー／リージョン／ループ系のみ。
+    /// </summary>
+    internal static bool IsAllowedTransportDuringVolumeCurve(TransportCommand command) =>
+        command is TransportCommand.TogglePlayback
+            or TransportCommand.Stop
+            or TransportCommand.JumpToTime
+            or TransportCommand.GoToStart
+            or TransportCommand.PreviousPage
+            or TransportCommand.PreviousMarker
+            or TransportCommand.NextMarker
+            or TransportCommand.NextPage
+            or TransportCommand.GoToEnd
+            or TransportCommand.SeekViewLeft
+            or TransportCommand.SeekViewRight
+            or TransportCommand.LoopPlay
+            or TransportCommand.Restart
+            or TransportCommand.Preroll
+            or TransportCommand.RangeClick
+            or TransportCommand.CenterLock
+            or TransportCommand.TimeZoomIn
+            or TransportCommand.TimeZoomOut
+            or TransportCommand.TimeZoomMax
+            or TransportCommand.TimeZoomReset
+            or TransportCommand.AmpZoomIn
+            or TransportCommand.AmpZoomOut
+            or TransportCommand.AmpZoomMax
+            or TransportCommand.AmpZoomReset
+            or TransportCommand.SetRegion
+            or TransportCommand.SetLoop
+            or TransportCommand.DeleteMarkers
+            or TransportCommand.DeleteAllMarkers
+            or TransportCommand.DeleteRegions
+            or TransportCommand.DeleteAllRegions
+            or TransportCommand.SelectAll
+            or TransportCommand.ClearSelection
+            or TransportCommand.SelectToStart
+            or TransportCommand.SelectToEnd
+            or TransportCommand.CopySelectionTime;
+
+    private void WarnVolumeCurveModeBlocked() =>
+        OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ErrorVolumeCurveModeActive,
+            UiStrings.AppName,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+
+    private void WarnVolumeCurveModeBlocksTile() =>
+        OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ErrorVolumeCurveModeBlocksTile,
+            UiStrings.AppName,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
 
     private CrossfadeEditWindow EnsureCrossfadeWindow()
     {
@@ -109,6 +248,19 @@ public partial class MainWindow
             return false;
         }
 
+        if (IsCrossfadeEditMode)
+        {
+            EnsureCrossfadeWindow().Present();
+            return true;
+        }
+
+        // 音量カーブ中はフェード調整へ入れない（警告ダイアログ）。
+        if (IsVolumeCurveMode)
+        {
+            WarnVolumeCurveModeBlocked();
+            return true;
+        }
+
         if (!_document.AllowsRegionsAndLoops)
         {
             OwnerCenteredMessageBox.Show(
@@ -117,12 +269,6 @@ public partial class MainWindow
                 UiStrings.AppName,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
-            return true;
-        }
-
-        if (IsCrossfadeEditMode)
-        {
-            EnsureCrossfadeWindow().Present();
             return true;
         }
 

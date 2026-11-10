@@ -185,7 +185,20 @@ internal sealed class WaveformContextMenuModel
 {
     public bool HasDocument { get; init; }
     public bool CanEdit { get; init; }
+
+    /// <summary>
+    /// マーカー／リージョン／ループの編集可否。
+    /// V モード中は <see cref="CanEdit"/> が false でも true にして、メタデータ編集だけ残す。
+    /// </summary>
+    public bool CanEditMarkers { get; init; }
+
     public bool CanNavigate { get; init; }
+
+    /// <summary>
+    /// true のとき、メニュー／ツールバー相当の項目をカーソル移動とマーカー／リージョン系以外は無効化する（V モード）。
+    /// </summary>
+    public bool RestrictMenusToNavigateAndMarkers { get; init; }
+
     public bool IsBusy { get; init; }
     public bool IsPlaying { get; init; }
     public bool IsRecording { get; init; }
@@ -292,6 +305,7 @@ internal sealed class WaveformContextMenuModel
         SelectedTabsHaveSampleLoop = hasSelectedTabs,
         HasDocument = true,
         CanEdit = true,
+        CanEditMarkers = true,
         CanNavigate = true,
         IsPlaying = true,
         HasSelection = true,
@@ -442,9 +456,150 @@ internal static class WaveformContextMenuBuilder
         items.Add(Sub(UiStrings.WaveMenuCatAudio, AudioItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatWwise, WwiseItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatOther, OtherItems(m)));
-        return m.LibraryMaximized
+        var built = m.LibraryMaximized
             ? StripDestructiveGestures(items)
             : items;
+        return m.RestrictMenusToNavigateAndMarkers
+            ? RestrictToNavigateAndMarkers(built, m)
+            : built;
+    }
+
+    /// <summary>V モード中にメニューから操作できるコマンドか（ナビ／マーカー／ループ系）。</summary>
+    public static bool IsAllowedDuringVolumeCurveMode(WaveMenuCommand command) =>
+        command switch
+        {
+            WaveMenuCommand.PlayFromHere
+                or WaveMenuCommand.SeekHere
+                or WaveMenuCommand.SelectSpanHere
+                or WaveMenuCommand.SelectAll
+                or WaveMenuCommand.ClearSelection
+                or WaveMenuCommand.SelectToStart
+                or WaveMenuCommand.SelectToEnd
+                or WaveMenuCommand.CopySelectionTime
+                or WaveMenuCommand.CopySelectionTimePath
+                or WaveMenuCommand.PrevMarker
+                or WaveMenuCommand.NextMarker
+                or WaveMenuCommand.GoStart
+                or WaveMenuCommand.GoEnd
+                or WaveMenuCommand.ViewLeft
+                or WaveMenuCommand.ViewRight
+                or WaveMenuCommand.TimeZoomIn
+                or WaveMenuCommand.TimeZoomOut
+                or WaveMenuCommand.TimeZoomMax
+                or WaveMenuCommand.TimeZoomFit
+                or WaveMenuCommand.AmpZoomIn
+                or WaveMenuCommand.AmpZoomOut
+                or WaveMenuCommand.AmpZoomMax
+                or WaveMenuCommand.AmpZoomReset
+                or WaveMenuCommand.CenterPlayhead
+                or WaveMenuCommand.CenterLock
+                or WaveMenuCommand.TogglePlayback
+                or WaveMenuCommand.PauseHere
+                or WaveMenuCommand.Preroll
+                or WaveMenuCommand.Restart
+                or WaveMenuCommand.LoopPlay
+                or WaveMenuCommand.FocusTime
+                or WaveMenuCommand.RangeClick
+                or WaveMenuCommand.AddMarkerHere
+                or WaveMenuCommand.AddMarker
+                or WaveMenuCommand.RenameMarker
+                or WaveMenuCommand.DeleteMarkers
+                or WaveMenuCommand.DeleteAllMarkers
+                or WaveMenuCommand.ClearMarkers
+                or WaveMenuCommand.SetRegion
+                or WaveMenuCommand.RenameRegion
+                or WaveMenuCommand.DeleteRegions
+                or WaveMenuCommand.DeleteAllRegions
+                or WaveMenuCommand.ClearRegion
+                or WaveMenuCommand.SetLoop
+                or WaveMenuCommand.ClearLoop
+                or WaveMenuCommand.ClearLoopItem => true,
+            _ => false,
+        };
+
+    /// <summary>同モード解除／エディタ枠（F11/F12）切替（メニュー有効判定用）。プレイヤー枠は含めない。</summary>
+    public static bool IsSameModeToggleDuringVolumeCurve(WaveMenuCommand command, WaveformContextMenuModel m) =>
+        command switch
+        {
+            WaveMenuCommand.Volume or WaveMenuCommand.ViewLoudness =>
+                m.AnalysisView == WaveformAnalysisView.Loudness,
+            WaveMenuCommand.ViewSpectrogram =>
+                m.AnalysisView is WaveformAnalysisView.Spectrogram or WaveformAnalysisView.Overlay,
+            WaveMenuCommand.ViewOverlay =>
+                m.AnalysisView == WaveformAnalysisView.Overlay,
+            WaveMenuCommand.ViewWaveform =>
+                m.AnalysisView != WaveformAnalysisView.Waveform,
+            WaveMenuCommand.WaapiPanel => m.WaapiVisible,
+            WaveMenuCommand.MaximizeWaveform or WaveMenuCommand.MaximizeAnalyzers => true,
+            WaveMenuCommand.VideoMini => m.VideoMini,
+            _ => false,
+        };
+
+    /// <summary>
+    /// メニュー上は有効のままにし、実行時に抑制ダイアログへ届けるコマンド。
+    /// グレーアウトするとダイアログに届かない。
+    /// </summary>
+    public static bool IsWarnableDuringVolumeCurveMode(WaveMenuCommand command) =>
+        command is WaveMenuCommand.Volume
+            or WaveMenuCommand.ViewLoudness
+            or WaveMenuCommand.ViewSpectrogram
+            or WaveMenuCommand.ViewOverlay
+            or WaveMenuCommand.ViewWaveform
+            or WaveMenuCommand.WaapiPanel
+            or WaveMenuCommand.MaximizeWaveform
+            or WaveMenuCommand.MaximizeAnalyzers
+            or WaveMenuCommand.MaximizeLibrary
+            or WaveMenuCommand.MinimalChrome
+            or WaveMenuCommand.VideoMini
+            or WaveMenuCommand.Pitch
+            or WaveMenuCommand.TimeStretch
+            or WaveMenuCommand.Normalize
+            or WaveMenuCommand.NormalizePerRegion
+            or WaveMenuCommand.Reverse
+            or WaveMenuCommand.FadeIn
+            or WaveMenuCommand.FadeOut
+            or WaveMenuCommand.CrossfadeEdit
+            or WaveMenuCommand.Bounce
+            or WaveMenuCommand.History
+            or WaveMenuCommand.Delete
+            or WaveMenuCommand.Trim
+            or WaveMenuCommand.Cut
+            or WaveMenuCommand.Paste
+            or WaveMenuCommand.Undo
+            or WaveMenuCommand.Redo;
+
+    private static IReadOnlyList<WaveMenuEntry> RestrictToNavigateAndMarkers(
+        IReadOnlyList<WaveMenuEntry> entries,
+        WaveformContextMenuModel m)
+    {
+        var list = new List<WaveMenuEntry>(entries.Count);
+        foreach (var entry in entries)
+        {
+            if (entry is WaveMenuSeparatorEntry)
+            {
+                list.Add(entry);
+                continue;
+            }
+
+            if (entry is not WaveMenuItemEntry item)
+            {
+                continue;
+            }
+
+            var children = item.Children is { Count: > 0 }
+                ? RestrictToNavigateAndMarkers(item.Children, m)
+                : item.Children;
+            var enabled = item.Command is { } command
+                ? item.Enabled
+                    && (IsAllowedDuringVolumeCurveMode(command)
+                        || IsSameModeToggleDuringVolumeCurve(command, m)
+                        || IsWarnableDuringVolumeCurveMode(command))
+                : children is { Count: > 0 }
+                    && children.OfType<WaveMenuItemEntry>().Any(child => child.Enabled);
+            list.Add(item with { Enabled = enabled, Children = children });
+        }
+
+        return list;
     }
 
     /// <summary>プレイヤーでは破壊編集のショートカット表記だけ消す（項目は有効のまま）。</summary>
@@ -575,6 +730,10 @@ internal static class WaveformContextMenuBuilder
     private static bool CanEditOpenFile(WaveformContextMenuModel m) =>
         m.CanEdit || (m.LibraryMaximized && m.HasDocument);
 
+    /// <summary>マーカー／リージョン／ループ。V モード中は CanEditMarkers で残す。</summary>
+    private static bool CanEditTimelineMeta(WaveformContextMenuModel m) =>
+        m.CanEditMarkers || CanEditOpenFile(m);
+
     private static void AddContextual(List<WaveMenuEntry> items, WaveformContextMenuModel m)
     {
         if (m.Hit.HitMarker)
@@ -582,7 +741,7 @@ internal static class WaveformContextMenuBuilder
             items.Add(Cmd(
                 m.Hit.MarkerFrames.Count > 1 ? UiStrings.WaveMenuClearMarkers : UiStrings.WaveMenuClearMarker,
                 WaveMenuCommand.ClearMarkers,
-                enabled: SingleFileOnly(m) && CanEditOpenFile(m)));
+                enabled: SingleFileOnly(m) && CanEditTimelineMeta(m)));
         }
 
         if (m.Hit.HitRegion)
@@ -590,7 +749,7 @@ internal static class WaveformContextMenuBuilder
             items.Add(Cmd(
                 UiStrings.WaveMenuClearRegion,
                 WaveMenuCommand.ClearRegion,
-                enabled: SingleFileOnly(m) && m.CanEdit));
+                enabled: SingleFileOnly(m) && CanEditTimelineMeta(m)));
         }
 
         if (m.Hit.HitLoop)
@@ -598,7 +757,7 @@ internal static class WaveformContextMenuBuilder
             items.Add(Cmd(
                 UiStrings.WaveMenuClearLoop,
                 WaveMenuCommand.ClearLoop,
-                enabled: SingleFileOnly(m) && CanEditOpenFile(m)));
+                enabled: SingleFileOnly(m) && CanEditTimelineMeta(m)));
         }
     }
 
@@ -810,53 +969,53 @@ internal static class WaveformContextMenuBuilder
             UiStrings.WaveMenuAddMarker,
             WaveMenuCommand.AddMarker,
             MenuGestures.AddMarker,
-            SingleFileOnly(m) && CanEditOpenFile(m)),
+            SingleFileOnly(m) && CanEditTimelineMeta(m)),
         Cmd(
             UiStrings.WaveMenuRenameMarker,
             WaveMenuCommand.RenameMarker,
             "Ctrl+Shift+R",
-            SingleFileOnly(m) && CanEditOpenFile(m) && m.CanRenameMarker),
+            SingleFileOnly(m) && CanEditTimelineMeta(m) && m.CanRenameMarker),
         Cmd(
             UiStrings.WaveMenuDeleteMarkers,
             WaveMenuCommand.DeleteMarkers,
             "Ctrl+Delete",
-            SingleFileOnly(m) && CanEditOpenFile(m) && m.HasMarkers),
+            SingleFileOnly(m) && CanEditTimelineMeta(m) && m.HasMarkers),
         Cmd(
             UiStrings.WaveMenuDeleteAllMarkers,
             WaveMenuCommand.DeleteAllMarkers,
-            enabled: CanEditOpenFile(m)
+            enabled: CanEditTimelineMeta(m)
                 && (m.HasMarkers || m.SelectedTabsHaveMarkers)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             UiStrings.WaveMenuSetRegion,
             WaveMenuCommand.SetRegion,
             "Shift+R",
-            SingleFileOnly(m) && m.CanEdit && m.HasSelection && m.AllowsRegionsAndLoops),
+            SingleFileOnly(m) && CanEditTimelineMeta(m) && m.HasSelection && m.AllowsRegionsAndLoops),
         Cmd(
             UiStrings.WaveMenuRenameRegion,
             WaveMenuCommand.RenameRegion,
-            enabled: SingleFileOnly(m) && m.CanEdit && m.CanRenameRegion),
+            enabled: SingleFileOnly(m) && CanEditTimelineMeta(m) && m.CanRenameRegion),
         Cmd(
             UiStrings.WaveMenuDeleteRegions,
             WaveMenuCommand.DeleteRegions,
             MenuGestures.Delete,
-            SingleFileOnly(m) && m.CanEdit && m.HasSelectedRegions),
+            SingleFileOnly(m) && CanEditTimelineMeta(m) && m.HasSelectedRegions),
         Cmd(
             UiStrings.WaveMenuDeleteAllRegions,
             WaveMenuCommand.DeleteAllRegions,
-            enabled: (m.CanEdit && m.HasRegions && m.AllowsRegionsAndLoops)
-                || (CanEditOpenFile(m) && m.SelectedTabsHaveRegions)),
+            enabled: (CanEditTimelineMeta(m) && m.HasRegions && m.AllowsRegionsAndLoops)
+                || (CanEditTimelineMeta(m) && m.SelectedTabsHaveRegions)),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             UiStrings.WaveMenuSetLoop,
             WaveMenuCommand.SetLoop,
             "Shift+L",
-            SingleFileOnly(m) && m.CanEdit && m.HasSelection && m.AllowsRegionsAndLoops),
+            SingleFileOnly(m) && CanEditTimelineMeta(m) && m.HasSelection && m.AllowsRegionsAndLoops),
         Cmd(
             UiStrings.WaveMenuClearLoopItem,
             WaveMenuCommand.ClearLoopItem,
-            enabled: (m.CanEdit && m.HasSampleLoop)
-                || (CanEditOpenFile(m) && m.SelectedTabsHaveSampleLoop)),
+            enabled: (CanEditTimelineMeta(m) && m.HasSampleLoop)
+                || (CanEditTimelineMeta(m) && m.SelectedTabsHaveSampleLoop)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> PlaybackItems(WaveformContextMenuModel m) =>
@@ -896,7 +1055,7 @@ internal static class WaveformContextMenuBuilder
         Cmd(UiStrings.WaveMenuRestart, WaveMenuCommand.Restart, "Alt+Enter", SingleFileOnly(m) && m.CanNavigate),
         Check(UiStrings.WaveMenuSilentSkip, WaveMenuCommand.SilentSkip, "Alt+Shift+S", m.SilentSkip, enabled: true),
         Check(UiStrings.WaveMenuAutoLoop, WaveMenuCommand.AutoLoop, "Alt+Shift+L", m.AutoLoop, enabled: true),
-        Check(UiStrings.WaveMenuRangeClick, WaveMenuCommand.RangeClick, "Q", m.RangeClick, SingleFileOnly(m) && m.CanEdit),
+        Check(UiStrings.WaveMenuRangeClick, WaveMenuCommand.RangeClick, "Q", m.RangeClick, SingleFileOnly(m) && CanEditTimelineMeta(m)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> PlaylistPlaybackItems(WaveformContextMenuModel m) =>
@@ -1001,7 +1160,7 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuViewWaveform, WaveMenuCommand.ViewWaveform, MenuGestures.ViewWaveform, m.AnalysisView == WaveformAnalysisView.Waveform, m.HasDocument && !m.IsBusy),
         Check(UiStrings.WaveMenuViewSpectrogram, WaveMenuCommand.ViewSpectrogram, "A", m.AnalysisView == WaveformAnalysisView.Spectrogram, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         Check(UiStrings.WaveMenuViewOverlay, WaveMenuCommand.ViewOverlay, "A", m.AnalysisView == WaveformAnalysisView.Overlay, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
-        Check(UiStrings.WaveMenuViewLoudness, WaveMenuCommand.ViewLoudness, "V", m.AnalysisView == WaveformAnalysisView.Loudness, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
+        Check(UiStrings.WaveMenuViewLoudness, WaveMenuCommand.ViewLoudness, "Ctrl+L", m.AnalysisView == WaveformAnalysisView.Loudness, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> ZoomViewItems(WaveformContextMenuModel m) =>

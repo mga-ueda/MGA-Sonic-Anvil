@@ -400,9 +400,12 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.V, ModifierKeys.Control | ModifierKeys.Shift));
+        // V 素押しはエディタの音量カーブ。プレイヤーでは破壊編集として拒否する。
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.V, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsDestructiveEditShortcut(
             Key.V, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsDestructiveEditShortcut(Key.L, ModifierKeys.Control));
+        Assert.False(LibraryPlayerMode.AllowsKey(Key.L, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.N, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.D, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.IsDestructiveEditShortcut(Key.T, ModifierKeys.Control));

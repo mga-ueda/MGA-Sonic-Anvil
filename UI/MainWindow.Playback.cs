@@ -23,12 +23,26 @@ public partial class MainWindow
             return;
         }
 
-        if (BlocksOutsideFadeToolActions && !IsAllowedTransportDuringFadeTool(command))
+        if (IsVolumeCurveMode)
+        {
+            // すでに入っている表示モードのトグル解除／相互切替は許容。
+            if (IsSameModeToggleDuringVolumeCurve(command))
+            {
+                // fall through
+            }
+            else if (!IsAllowedTransportDuringVolumeCurve(command))
+            {
+                WarnVolumeCurveModeBlocked();
+                return;
+            }
+        }
+        else if (BlocksOutsideFadeToolActions && !IsAllowedTransportDuringFadeTool(command))
         {
             // フェード調整中はボタンが押せるままなので、無反応にせず理由を出す。
             if (command == TransportCommand.Bounce)
             {
                 _ = BakeVstInsertsAsync();
+                return;
             }
 
             return;
@@ -729,6 +743,7 @@ public partial class MainWindow
                 preferStream: IsLibraryMaximized,
                 allowBeforePlayWindowStart: allowBeforePlayWindowStart);
             ApplyFadeToolPlaybackLayers(playRange);
+            SyncVolumeCurvePlaybackGain();
             SyncRangeClicks();
             _player.Play();
             _playbackGeneration = _player.Generation;
@@ -821,6 +836,7 @@ public partial class MainWindow
                 loop: ShouldLoopResolvedPlayWindow(playRange),
                 preferStream: true);
             ApplyFadeToolPlaybackLayers(playRange);
+            SyncVolumeCurvePlaybackGain();
             _player.Play();
             _playbackGeneration = _player.Generation;
             _playTimer.Start();
@@ -1141,11 +1157,13 @@ public partial class MainWindow
             _player.SetPlayWindow(null, loop: false);
             // フェード調整中はループ無しでもプレビュー合成を維持する。
             ApplyFadeToolPlaybackLayers(null);
+            SyncVolumeCurvePlaybackGain();
             return;
         }
 
         _player.SetPlayWindow(playRange, loop: ShouldLoopResolvedPlayWindow(playRange));
         ApplyFadeToolPlaybackLayers(playRange);
+        SyncVolumeCurvePlaybackGain();
     }
 
     /// <summary>
@@ -2265,7 +2283,7 @@ public partial class MainWindow
 
     private void SetSampleLoopFromSelection()
     {
-        if (RejectOutsideFadeToolAction() || _document is null)
+        if (RejectOutsideFadeToolAction(allowDuringVolumeCurve: true) || _document is null)
         {
             return;
         }
@@ -2300,7 +2318,7 @@ public partial class MainWindow
 
     private void ClearSampleLoop()
     {
-        if (RejectOutsideFadeToolAction())
+        if (RejectOutsideFadeToolAction(allowDuringVolumeCurve: true))
         {
             return;
         }
@@ -2338,7 +2356,7 @@ public partial class MainWindow
 
     private bool TrySetRegionFromSelection(bool quiet = false)
     {
-        if (RejectOutsideFadeToolAction() || _document is null)
+        if (RejectOutsideFadeToolAction(allowDuringVolumeCurve: true) || _document is null)
         {
             return false;
         }
@@ -2450,9 +2468,21 @@ public partial class MainWindow
         bool fromSettingsPreview = false)
     {
         // 設定プレビューはフェードツール中でもクローム（位置上下など）を即反映する。
-        if (!fromSettingsPreview && RejectOutsideFadeToolAction())
+        // V モード中はエディタ枠（F11/F12）同士の切替・全画面トグルを許容し、プレイヤー枠（F9/F10）へは拒否。
+        if (!fromSettingsPreview)
         {
-            return;
+            if (IsVolumeCurveMode)
+            {
+                if (!IsEditorLayoutSlot(slot))
+                {
+                    WarnVolumeCurveModeBlocked();
+                    return;
+                }
+            }
+            else if (RejectOutsideFadeToolAction())
+            {
+                return;
+            }
         }
 
         if (IsVideoMiniPlayerActive()

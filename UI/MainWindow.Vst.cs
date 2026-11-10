@@ -945,7 +945,12 @@ public partial class MainWindow
             return UiStrings.ErrorVstBouncePlayer;
         }
 
-        if (BlocksOutsideFadeToolActions)
+        if (IsVolumeCurveMode)
+        {
+            return UiStrings.ErrorVolumeCurveModeActive;
+        }
+
+        if (IsCrossfadeEditMode)
         {
             return UiStrings.ErrorVstBounceFadeTool;
         }

@@ -477,6 +477,22 @@ public partial class MainWindow
             return;
         }
 
+        // 音量カーブ編集中は Alt+A（ポイント追加）等がメニュー AccessKey（オーディオ(_A)）より優先。
+        // menuModifiers は Key.System / 物理 Alt でも Alt ビットを立てる（EffectiveShortcutModifiers とは別）。
+        if (_volumeCurveMode
+            && !e.IsRepeat
+            && TryProcessVolumeCurveShortcut(key, menuModifiers))
+        {
+            // Alt コードを消費したので、続く Alt アップを「単独 Alt」扱いにしない。
+            if ((menuModifiers & ModifierKeys.Alt) != 0)
+            {
+                _altMenuChordHadOtherKey = true;
+            }
+
+            e.Handled = true;
+            return;
+        }
+
         // Alt+F 等はアプリショートカットより先に上部メニューを開く（MenuItem.OnAccessKey 相当）。
         if (!e.IsRepeat && TryOpenMainMenuAccessKey(key, menuModifiers))
         {
@@ -514,6 +530,19 @@ public partial class MainWindow
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         key = LibraryPlayerMode.ResolveDigitKey(key, e.ImeProcessedKey);
+        if (_volumeCurveMode)
+        {
+            if (key is Key.Left or Key.Right)
+            {
+                VolumeCurveEditLayer.StopTimeNudge();
+            }
+
+            if (key is Key.Up or Key.Down)
+            {
+                VolumeCurveEditLayer.ResetPointEditCapture();
+            }
+        }
+
         if (key is Key.LeftShift or Key.RightShift)
         {
             if (_transportSelectionExtend && _transportSelectionDigit >= 0)
@@ -852,6 +881,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (TryProcessVolumeCurveShortcut(key, modifiers))
+        {
+            return true;
+        }
+
         if (TryProcessEscapeShortcut(key, modifiers))
         {
             return true;
@@ -867,8 +901,11 @@ public partial class MainWindow
             return TryProcessFadeMenuShortcut(fadeMenu, key, modifiers);
         }
 
-        // Shift+A／V も大文字入力と同じ修飾。文字入力中は上の ShouldDeferShortcutToTextInput で既に返している。
-        if (LibraryPlayerMode.IsShiftLetterChord(key, modifiers) && key is Key.A or Key.V)
+        // Shift+A も大文字入力と同じ修飾。文字入力中は上の ShouldDeferShortcutToTextInput で既に返している。
+        // スペクトログラム／重ねの解除のみ。ラウドネス解除は Ctrl+L トグル／Esc（Shift+A は使わない）。
+        if (LibraryPlayerMode.IsShiftLetterChord(key, modifiers)
+            && key == Key.A
+            && Waveform.AnalysisView != WaveformAnalysisView.Loudness)
         {
             CloseVolumeGainPicker();
             Waveform.ExitAnalysisView();
@@ -1097,8 +1134,22 @@ public partial class MainWindow
 
         if (key == Key.A && modifiers == ModifierKeys.None)
         {
-            // スペクトログラム／重ね。フェード調整中はロック。
-            if (!BlocksOutsideFadeToolActions)
+            // スペクトログラム／重ね。V モード中は表示中の相互トグルのみ許容。
+            if (IsVolumeCurveMode)
+            {
+                if (Waveform.AnalysisView is WaveformAnalysisView.Spectrogram or WaveformAnalysisView.Overlay)
+                {
+                    Waveform.ToggleSpectrogramView();
+                }
+                else
+                {
+                    WarnVolumeCurveModeBlocked();
+                }
+
+                return true;
+            }
+
+            if (!RejectOutsideFadeToolAction())
             {
                 Waveform.ToggleSpectrogramView();
             }
@@ -1217,25 +1268,35 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.V && modifiers == ModifierKeys.None)
+        if (key == Key.L && modifiers == ModifierKeys.Control)
         {
-            // 音量。フェード調整中はロック（PromptVolume 側でも拒否）。
-            if (!BlocksOutsideFadeToolActions)
-            {
-                PromptVolume();
-            }
-
+            // 音量／ラウドネス（トグル）。同モード解除は PromptVolume 側で許容。
+            PromptVolume();
             return true;
         }
 
-        if (key == Key.E && modifiers == ModifierKeys.None && Waveform.TryToggleLoudnessPen())
+        if (key == Key.E && modifiers == ModifierKeys.None)
         {
-            return true;
+            if (RejectOutsideFadeToolAction())
+            {
+                return true;
+            }
+
+            if (Waveform.TryToggleLoudnessPen())
+            {
+                return true;
+            }
         }
 
         if (key == Key.P && modifiers == ModifierKeys.None)
         {
             PromptPitch();
+            return true;
+        }
+
+        if (key == Key.V && modifiers == ModifierKeys.None)
+        {
+            PromptVolumeCurve();
             return true;
         }
 
@@ -1501,59 +1562,82 @@ public partial class MainWindow
         return TryToggleVstInsertSlotShortcut(key - Key.D1);
     }
 
+    /// <summary>
+    /// F9–F12。V モード中はエディタ枠（F11/F12）を通し、プレイヤー枠（F9/F10）への推移は警告する。
+    /// </summary>
+    private bool HandleLayoutChromeShortcut(WindowLayoutSlot slot, Action toggle)
+    {
+        if (!BlocksOutsideFadeToolActions)
+        {
+            toggle();
+            return true;
+        }
+
+        if (IsVolumeCurveMode && IsEditorLayoutSlot(slot))
+        {
+            toggle();
+            return true;
+        }
+
+        if (IsVolumeCurveMode)
+        {
+            WarnVolumeCurveModeBlocked();
+        }
+
+        return true;
+    }
+
     /// <summary>F8–F12、ステータス／モニター列など、モード横断のトグル。</summary>
     private bool TryProcessChromeShortcut(Key key, ModifierKeys modifiers)
     {
         if (key == Key.F11 && modifiers == ModifierKeys.None)
         {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                ToggleWaveformMaximize();
-            }
-
-            return true;
+            return HandleLayoutChromeShortcut(WindowLayoutSlot.F11, ToggleWaveformMaximize);
         }
 
         if (key == Key.F12 && modifiers == ModifierKeys.None)
         {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                ToggleAnalyzerMaximize();
-            }
-
-            return true;
+            return HandleLayoutChromeShortcut(WindowLayoutSlot.F12, ToggleAnalyzerMaximize);
         }
 
         if (key == Key.F8 && modifiers == ModifierKeys.None)
         {
-            if (!BlocksOutsideFadeToolActions)
+            if (BlocksOutsideFadeToolActions)
             {
-                ToggleVideoMiniPlayer();
+                // 動画ミニ表示中の再押下（解除）だけ V モード中も許容。
+                if (IsVolumeCurveMode && IsVideoMiniPlayerActive())
+                {
+                    ToggleVideoMiniPlayer();
+                    return true;
+                }
+
+                if (IsVolumeCurveMode)
+                {
+                    WarnVolumeCurveModeBlocked();
+                }
+
+                return true;
             }
 
+            ToggleVideoMiniPlayer();
             return true;
         }
 
         if (key == Key.F9 && modifiers == ModifierKeys.None)
         {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                ToggleLibraryMinimalChrome();
-            }
-
-            return true;
+            return HandleLayoutChromeShortcut(WindowLayoutSlot.F9, ToggleLibraryMinimalChrome);
         }
 
         if (key == Key.F10 && modifiers == ModifierKeys.None)
         {
-            if (!BlocksOutsideFadeToolActions)
-            {
-                StopSeekNudge();
-                StopVideoFrameStep();
-                ToggleLibraryMaximize();
-            }
-
-            return true;
+            return HandleLayoutChromeShortcut(
+                WindowLayoutSlot.F10,
+                () =>
+                {
+                    StopSeekNudge();
+                    StopVideoFrameStep();
+                    ToggleLibraryMaximize();
+                });
         }
 
         // ステータスバー系は F8／F9 でバーが隠れても、エディタ／プレイヤー共通で効かせる。
@@ -2353,6 +2437,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (IsVolumeCurveMode)
+        {
+            CancelVolumeCurveMode();
+            return true;
+        }
+
         // ツリーのタイプアヘッド打ち込みを先に捨てる（1秒待ちの代わりに即クリア）。
         if (IsLibraryMaximized
             && LibraryBrowser.IsExplorerTreeFocused
@@ -2556,12 +2646,8 @@ public partial class MainWindow
 
         if (key == Key.V && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            // 音量／ラウドネス揃え。エディタ・プレイヤー共通。素の V はエディタのみ。
-            if (!BlocksOutsideFadeToolActions)
-            {
-                PromptVolume();
-            }
-
+            // 音量／ラウドネス揃え。エディタ・プレイヤー共通。同モード解除は PromptVolume 側で許容。
+            PromptVolume();
             return true;
         }
 
@@ -2752,8 +2838,8 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.V
-            && modifiers is ModifierKeys.None or (ModifierKeys.Control | ModifierKeys.Shift))
+        if ((key == Key.L && modifiers == ModifierKeys.Control)
+            || (key == Key.V && modifiers == (ModifierKeys.Control | ModifierKeys.Shift)))
         {
             return true;
         }

@@ -324,6 +324,30 @@ public sealed class ProcessEditsTests
     }
 
     [Fact]
+    public void VolumeCurve_AppliesDbAndUndoRestores()
+    {
+        var document = MakeConstant(frames: 64, value: 0.5f);
+        var original = (float[])document.Interleaved.Clone();
+        var history = new EditHistory();
+        var curve = Audio.VolumeCurve.Flat(-6f);
+        var command = ProcessEdits.VolumeCurve(document, new WaveSelection(0, 64), curve);
+        Assert.NotNull(command);
+        history.Do(document, command!);
+        Assert.Equal("Volume", command!.Name);
+        Assert.True(document.Interleaved[0] < original[0]);
+        Assert.True(history.Undo(document));
+        Assert.Equal(original, document.Interleaved);
+    }
+
+    [Fact]
+    public void VolumeCurve_ReturnsNullWhenFlatZero()
+    {
+        var document = MakeConstant(frames: 64, value: 0.5f);
+        Assert.Null(ProcessEdits.VolumeCurve(document, new WaveSelection(0, 64), Audio.VolumeCurve.Flat(0)));
+        Assert.Null(ProcessEdits.VolumeCurve(document, WaveSelection.Empty, Audio.VolumeCurve.Flat(-3f)));
+    }
+
+    [Fact]
     public void TimeStretch_ChangesLengthAndUndoRestores()
     {
         var document = MakeSine(frames: 48000);

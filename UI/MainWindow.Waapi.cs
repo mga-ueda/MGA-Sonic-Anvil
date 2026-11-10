@@ -129,17 +129,23 @@ public partial class MainWindow
 
     private void ToggleWaapiPanel()
     {
-        if (RejectOutsideFadeToolAction() || IsLibraryMaximized)
+        if (IsLibraryMaximized)
         {
             return;
         }
 
+        // V モード中でも、すでに開いている WAAPI パネルを閉じる同モードトグルは許容。
         if (_waapiPanelVisible)
         {
             _waapiPanelVisible = false;
             ApplyWaapiPanelVisible();
             AppStorage.Settings.WaapiPanelVisible = false;
             AppStorage.Save();
+            return;
+        }
+
+        if (RejectOutsideFadeToolAction())
+        {
             return;
         }
 

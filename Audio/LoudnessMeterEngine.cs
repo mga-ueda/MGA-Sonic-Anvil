@@ -176,7 +176,8 @@ internal sealed class LoudnessMeterEngine
         int sampleRate,
         double targetLufs = DefaultTargetLufs,
         int sampleCount = -1,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null,
+        Func<long, float>? frameGain = null)
     {
         channels = Math.Max(1, channels);
         sampleRate = Math.Max(1000, sampleRate);
@@ -203,9 +204,11 @@ internal sealed class LoudnessMeterEngine
             var n = Math.Min(chunk, frames - offset);
             for (var i = 0; i < n; i++)
             {
-                var origin = (offset + i) * channels;
-                left[i] = interleaved[origin];
-                right[i] = channels > 1 ? interleaved[origin + 1] : left[i];
+                var frame = offset + i;
+                var origin = frame * channels;
+                var gain = frameGain?.Invoke(frame) ?? 1f;
+                left[i] = interleaved[origin] * gain;
+                right[i] = channels > 1 ? interleaved[origin + 1] * gain : left[i];
             }
 
             engine.Process(left.AsSpan(0, n), right.AsSpan(0, n), n, sampleRate);
@@ -620,7 +623,8 @@ internal sealed class LoudnessMeterEngine
     public static LoudnessProfile BuildShortTermProfile(
         float[] interleaved,
         int channels,
-        int sampleRate)
+        int sampleRate,
+        Func<long, float>? frameGain = null)
     {
         channels = Math.Max(1, channels);
         sampleRate = Math.Max(1000, sampleRate);
@@ -652,8 +656,9 @@ internal sealed class LoudnessMeterEngine
         for (var i = 0; i < frames; i++)
         {
             var origin = i * channels;
-            var left = interleaved[origin];
-            var right = channels > 1 ? interleaved[origin + 1] : left;
+            var gain = frameGain?.Invoke(i) ?? 1f;
+            var left = interleaved[origin] * gain;
+            var right = (channels > 1 ? interleaved[origin + 1] : interleaved[origin]) * gain;
             var ms = rlbL.Process(preL.Process(left));
             var rs = rlbR.Process(preR.Process(right));
             var power = ms * ms + rs * rs;

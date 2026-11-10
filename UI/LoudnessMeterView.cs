@@ -48,6 +48,8 @@ internal sealed class LoudnessMeterView : Grid
     private bool _offlinePending;
     private bool _offlineMode = true;
     private float _previewLinear = 1f;
+    private LoudnessSnapshot? _frameGainPreview;
+    private int _frameGainPreviewGen;
     private bool _hasSelectionLoudness;
     private FileLoudness _selectionLoudness;
     private bool _paintedSelectionAverage;
@@ -188,6 +190,78 @@ internal sealed class LoudnessMeterView : Grid
         if (!IsLivePlayback())
         {
             PaintSnapshot(_lastSnap, _offlineMode);
+        }
+    }
+
+    /// <summary>
+    /// フレームごとのプレビューゲインで停止中メーターを測り直す（音量カーブ編集のドラッグ後など）。
+    /// </summary>
+    public void RefreshOfflineWithFrameGain(Func<long, float> frameGain)
+    {
+        ArgumentNullException.ThrowIfNull(frameGain);
+        if (IsLivePlayback())
+        {
+            return;
+        }
+
+        var document = _document;
+        if (document is null)
+        {
+            return;
+        }
+
+        var gen = ++_frameGainPreviewGen;
+        var samples = document.Interleaved;
+        var used = Math.Clamp(document.SampleCount, 0, samples.Length);
+        var rate = document.SampleRate;
+        var channels = document.Channels;
+        var target = _engine.TargetLufs;
+        Task.Run(() =>
+        {
+            LoudnessSnapshot snap;
+            try
+            {
+                snap = LoudnessMeterEngine.MeasureFile(
+                    samples,
+                    channels,
+                    rate,
+                    target,
+                    used,
+                    progress: null,
+                    frameGain: frameGain);
+            }
+            catch (Exception ex) when (ex is ArgumentException
+                                           or InvalidOperationException
+                                           or IndexOutOfRangeException)
+            {
+                snap = LoudnessSnapshot.Idle with { TargetLufs = target };
+            }
+
+            Dispatcher.BeginInvoke(
+                () =>
+                {
+                    if (gen != _frameGainPreviewGen || IsLivePlayback())
+                    {
+                        return;
+                    }
+
+                    _frameGainPreview = snap;
+                    _previewLinear = 1f;
+                    ApplySnapshot(snap, offline: true);
+                },
+                DispatcherPriority.Background);
+        });
+    }
+
+    /// <summary>フレームゲインプレビューを捨て、通常の停止中計測へ戻す。</summary>
+    public void ClearFrameGainPreview()
+    {
+        _frameGainPreviewGen++;
+        _frameGainPreview = null;
+        _previewLinear = 1f;
+        if (!IsLivePlayback())
+        {
+            RefreshOffline();
         }
     }
 
@@ -345,6 +419,12 @@ internal sealed class LoudnessMeterView : Grid
             InvalidateOffline();
             _previewLinear = 1f;
             ApplySnapshot(LoudnessSnapshot.Idle, offline: true);
+            return;
+        }
+
+        if (_frameGainPreview is { } preview)
+        {
+            ApplySnapshot(preview, offline: true);
             return;
         }
 

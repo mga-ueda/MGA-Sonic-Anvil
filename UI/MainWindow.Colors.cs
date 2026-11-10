@@ -78,6 +78,7 @@ public partial class MainWindow
         DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
         PlayerChrome.SyncLatchToggleWashBrushes();
         ForEachWaveform(view => view.RefreshAppearance());
+        VolumeCurveEditLayer.RefreshAppearance();
         RefreshTileChrome();
         Overview.RefreshAppearance();
         Spectrum.RefreshAppearance();

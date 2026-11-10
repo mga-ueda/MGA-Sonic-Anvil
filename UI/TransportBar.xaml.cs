@@ -290,6 +290,25 @@ internal partial class TransportBar : UserControl
         Visibility = HasVisibleCommands ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>
+    /// V モード用。許可リスト外のツールバーボタンを強制的に無効化する
+    /// （Open／設定などメニュー未連動で常時有効だったものも含む）。
+    /// </summary>
+    public void RestrictCommands(Func<TransportCommand, bool> allowed)
+    {
+        ArgumentNullException.ThrowIfNull(allowed);
+        foreach (var (command, button) in _buttons)
+        {
+            if (!allowed(command))
+            {
+                button.IsEnabled = false;
+            }
+        }
+
+        RefreshGroupVisibility();
+        Visibility = HasVisibleCommands ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     /// <summary>メニュー項目の Enabled。プレイヤーでは実行拒否のコマンドをグレーにする。</summary>
     public static bool TryMenuEnabled(
         IReadOnlyList<WaveMenuEntry> menu,

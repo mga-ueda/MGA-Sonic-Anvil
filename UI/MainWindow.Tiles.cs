@@ -83,6 +83,25 @@ public partial class MainWindow
 
     private void CycleWaveformTile()
     {
+        if (IsVolumeCurveMode)
+        {
+            // 解除方向（→ Off）だけ通す。タイルへ進む／別配置へ進むのは拒否。
+            if (_tileMode)
+            {
+                var (w, h) = TileHostSize();
+                var peek = WaveformTileLayout.Next(_tileArrange, _sessions.Count, w, h);
+                if (peek == WaveformTileArrange.Off)
+                {
+                    ExitWaveformTileMode();
+                    Keyboard.Focus(Waveform);
+                    return;
+                }
+            }
+
+            WarnVolumeCurveModeBlocksTile();
+            return;
+        }
+
         if (RejectOutsideFadeToolAction())
         {
             return;
@@ -135,6 +154,18 @@ public partial class MainWindow
             }
 
             Keyboard.Focus(Waveform);
+            return;
+        }
+
+        if (IsVolumeCurveMode)
+        {
+            WarnVolumeCurveModeBlocksTile();
+            Keyboard.Focus(Waveform);
+            return;
+        }
+
+        if (RejectOutsideFadeToolAction())
+        {
             return;
         }
 
@@ -262,6 +293,12 @@ public partial class MainWindow
 
     private void ApplyTileArrange(WaveformTileArrange arrange)
     {
+        if (IsVolumeCurveMode)
+        {
+            WarnVolumeCurveModeBlocksTile();
+            return;
+        }
+
         if (IsLibraryMaximized || arrange == WaveformTileArrange.Off || !TileArrangeFits(arrange))
         {
             return;
@@ -1071,6 +1108,13 @@ public partial class MainWindow
             if (origin is WaveformView view)
             {
                 return view;
+            }
+
+            // 音量カーブ編集中はオーバーレイがメイン波形の手前を覆うため、
+            // ホイールズーム等はオーバーレイが指す対象波形へ委譲する。
+            if (origin is VolumeCurveEditLayer overlay)
+            {
+                return overlay.TargetWaveform;
             }
 
             origin = NextAncestor(origin);

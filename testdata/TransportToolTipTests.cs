@@ -24,7 +24,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("Ctrl+Shift+M", UiStrings.TooltipSaveMp3);
         Assert.Contains("Ctrl+R", UiStrings.TooltipRecord);
         Assert.Contains("(X)", UiStrings.TooltipFadeAround);
-        Assert.Contains("(V / Ctrl+Shift+V)", UiStrings.TooltipVolume);
+        Assert.Contains("(Ctrl+L / Ctrl+Shift+V)", UiStrings.TooltipVolume);
         Assert.Contains("(E)", UiStrings.TooltipLoudnessPen);
         var language = UiStrings.Language;
         try
@@ -38,10 +38,10 @@ public sealed class TransportToolTipTests
         {
             UiStrings.SetLanguage(language);
         }
-        Assert.Contains("(V)", UiStrings.TooltipLoudnessView);
+        Assert.Contains("(Ctrl+L)", UiStrings.TooltipLoudnessView);
         Assert.Contains("Esc", UiStrings.TooltipLoudnessView);
-        Assert.Contains("Shift+A", UiStrings.TooltipLoudnessView);
-        Assert.Contains("Shift+V", UiStrings.TooltipLoudnessView);
+        Assert.DoesNotContain("Shift+A", UiStrings.TooltipLoudnessView);
+        Assert.DoesNotContain("Shift+V", UiStrings.TooltipLoudnessView);
         Assert.Contains("(P)", UiStrings.TooltipPitch);
         Assert.Contains("(T)", UiStrings.TooltipTimeStretch);
         Assert.Contains("(R)", UiStrings.TooltipReverse);
@@ -54,7 +54,7 @@ public sealed class TransportToolTipTests
         Assert.Contains("(A)", UiStrings.TooltipSpectrogramView);
         Assert.Contains("Esc", UiStrings.TooltipSpectrogramView);
         Assert.Contains("Shift+A", UiStrings.TooltipSpectrogramView);
-        Assert.Contains("Shift+V", UiStrings.TooltipSpectrogramView);
+        Assert.DoesNotContain("Shift+V", UiStrings.TooltipSpectrogramView);
         Assert.Contains("(Z", UiStrings.TooltipCenterLock);
         Assert.Contains("(U)", UiStrings.TooltipHistory);
         Assert.Contains("F10", UiStrings.TooltipLibraryMaximize);

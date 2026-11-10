@@ -223,6 +223,14 @@ internal static partial class UiStrings
     public static string ErrorVstBounceFadeTool => Get(
         "フェード調整中はバウンスできません。",
         "Cannot bounce while the fade tool is open.");
+
+    public static string ErrorVolumeCurveModeActive => Get(
+        "音量カーブ調整中です。終了してからほかのモードへ切り替えてください。",
+        "Volume curve editing is active. Exit it before switching to another mode.");
+
+    public static string ErrorVolumeCurveModeBlocksTile => Get(
+        "音量カーブ調整中はタイル表示に切り替えられません。",
+        "Cannot switch to tile view while volume curve editing is active.");
     public static string ErrorVstBounceRecording => Get(
         "録音中はバウンスできません。",
         "Cannot bounce while recording.");
@@ -1110,6 +1118,43 @@ internal static partial class UiStrings
 
     public static string DialogPitchConstantTitle => Get("ピッチシフト（一括）", "Pitch Shift (Batch)");
 
+    // --- 音量カーブ（VolumeCurveEditorDialog）。選択範囲／全体サフィックス、ブラシ／ポイント／追加／
+    // 再生／停止／形状／リセットのラベルはピッチカーブ側の UiStrings を共有（文言が同一のため）。
+    public static string DialogVolumeCurveTitle => Get("音量カーブ", "Volume Curve");
+
+    /// <summary>音量カーブエディタの数値欄ラベル。Alt+N でフォーカス。</summary>
+    public static string LabelVolumeCurveGainValue => Get("音量(_N)", "Volume (_N)");
+
+    /// <summary>音量カーブバーの OK。O にアンダーバー（Alt+O）。</summary>
+    public static string ButtonVolumeCurveOk => Get("_OK", "_OK");
+
+    /// <summary>未確定のまま Esc／キャンセルで抜けるときの確認。</summary>
+    public static string ConfirmVolumeCurveDiscard => Get(
+        "音量カーブの編集はまだ確定されていません。破棄して終了しますか？",
+        "Volume curve edits are not applied yet. Discard them and exit?");
+
+    public static string ErrorVolumeCurveFailed => Get(
+        "音量処理に失敗しました。",
+        "Volume processing failed.");
+
+    public static string FormatSignedGainDb(float gainDb)
+    {
+        if (float.IsNegativeInfinity(gainDb) || gainDb <= Audio.VolumeCurve.FiniteSilenceDb)
+        {
+            return "-∞ " + LabelDb;
+        }
+
+        var value = Math.Clamp(gainDb, Audio.VolumeCurve.FiniteSilenceDb, Audio.VolumeCurve.MaxGainDb);
+        return value.ToString("+0.0;-0.0;0.0", System.Globalization.CultureInfo.InvariantCulture)
+            + " "
+            + LabelDb;
+    }
+
+    public static string FormatVolumeCurveExtra(Audio.VolumeCurve curve) =>
+        curve.IsConstant(out var gainDb)
+            ? FormatSignedGainDb(gainDb)
+            : Get($"カーブ {curve.Points.Count} 点", $"curve {curve.Points.Count} pts");
+
     public static string MenuOpen => Get("開く", "Open");
     public static string MenuSaveAs => Get("名前を付けて保存", "Save As");
 
@@ -1188,9 +1233,15 @@ internal static partial class UiStrings
         sampleRate,
         channels,
         bits);
-    public static string ConfirmPenClip => Get(
-        "描いた音量が 0 dBFS を超えています。このままでは歪む可能性があります。\n\nOK: 描いた範囲全体を下げて 0 dBFS 以内に収める\nCancel: この一筆を取り消して描き直す",
-        "The stroke goes above 0 dBFS and may distort.\n\nOK: lower the whole stroke to stay within 0 dBFS\nCancel: discard this stroke and draw it again");
+    public static string ConfirmPenClip(string lowerDb) => Format(
+        "描いた音量が 0 dBFS を超えています。このままでは歪む可能性があります。\n\nOK: 描いた範囲全体を {0} dB 下げて 0 dBFS 以内に収める\nCancel: この一筆を取り消して描き直す",
+        "The stroke goes above 0 dBFS and may distort.\n\nOK: lower the whole stroke by {0} dB to stay within 0 dBFS\nCancel: discard this stroke and draw it again",
+        lowerDb);
+
+    public static string ConfirmVolumeCurveClip(string lowerDb) => Format(
+        "適用後の音量が 0 dBFS を超えます。このままでは歪む可能性があります。\n\nOK: カーブ全体を {0} dB 下げて 0 dBFS 以内に収める\nCancel: 適用をやめて編集に戻る",
+        "Applying this curve would go above 0 dBFS and may distort.\n\nOK: lower the whole curve by {0} dB to stay within 0 dBFS\nCancel: cancel apply and keep editing",
+        lowerDb);
 
     public static string WarnMergeClip(string overDb) => Format(
         "加算結果が 0 dBFS を {0} dB 超えています。このまま 16bit / 24bit で書くと、超えた分は切り詰められます。\n\nOK: ミックス全体を {0} dB 下げてミックスダウンする\nCancel: ミックスダウンを中止する",
@@ -1425,7 +1476,7 @@ internal static partial class UiStrings
     public static string TooltipFadeAround => Get(
         "シークバー前後をフェード (X)  見えている前だけアウト／後ろだけイン",
         "Fade around seek bar (X)  fade out visible before / fade in visible after");
-    public static string TooltipVolume => Get("音量 (V / Ctrl+Shift+V)", "Volume (V / Ctrl+Shift+V)");
+    public static string TooltipVolume => Get("音量 (Ctrl+L / Ctrl+Shift+V)", "Volume (Ctrl+L / Ctrl+Shift+V)");
     public static string TooltipPitch => Get("ピッチ (P)", "Pitch (P)");
     public static string TooltipTimeStretch => Get("タイムストレッチ (T)", "Time stretch (T)");
     public static string TooltipReverse => Get("リバース (R)", "Reverse (R)");
@@ -1435,8 +1486,8 @@ internal static partial class UiStrings
     public static string TooltipOpen => Get("開く (Ctrl+O)", "Open (Ctrl+O)");
     public static string TooltipNew => Get("新規 (Ctrl+N)", "New (Ctrl+N)");
     public static string TooltipSaveAs => Get("名前を付けて保存 (Ctrl+Shift+S)  複数選択時は保存先フォルダ", "Save As (Ctrl+Shift+S)  pick a folder when several tabs are selected");
-    public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Esc / Shift+A / Shift+V)", "Spectrogram / overlay (A)  leave (Esc / Shift+A / Shift+V)");
-    public static string TooltipLoudnessView => Get("ラウドネス (V)  解除 (Esc / Shift+A / Shift+V)", "Loudness (V)  leave (Esc / Shift+A / Shift+V)");
+    public static string TooltipSpectrogramView => Get("スペクトログラム / 重ね (A)  解除 (Esc / Shift+A)", "Spectrogram / overlay (A)  leave (Esc / Shift+A)");
+    public static string TooltipLoudnessView => Get("ラウドネス (Ctrl+L)  解除 (Ctrl+L / Esc)", "Loudness (Ctrl+L)  leave (Ctrl+L / Esc)");
     public static string LabelLoudnessPenToggle => Get("Eキーで切替", "Press E to toggle");
     public static string TooltipLoudnessPen => Get(
         "ペンで描く (E)  離すと音量になる。描いているあいだ元の曲線は残る。取り消しは Ctrl+Z。曲線の右クリックでも切り替え",

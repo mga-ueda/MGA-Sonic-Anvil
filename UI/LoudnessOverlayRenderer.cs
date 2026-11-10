@@ -44,7 +44,7 @@ internal sealed class LoudnessOverlayRenderer
 
     public void Dispose() => Invalidate();
 
-    public void Ensure(AudioDocument document, Action onUpdated)
+    public void Ensure(AudioDocument document, Action onUpdated, Func<long, float>? frameGain = null)
     {
         int gen;
         float[] samples;
@@ -52,7 +52,9 @@ internal sealed class LoudnessOverlayRenderer
         int channels;
         lock (_gate)
         {
-            if (ReferenceEquals(_samples, document.Interleaved)
+            // プレビューゲイン付きは毎回測り直す（同じ PCM でもカーブが変わる）。
+            if (frameGain is null
+                && ReferenceEquals(_samples, document.Interleaved)
                 && _sampleRate == document.SampleRate
                 && _channels == document.Channels)
             {
@@ -63,7 +65,8 @@ internal sealed class LoudnessOverlayRenderer
             samples = document.Interleaved;
             rate = document.SampleRate;
             channels = document.Channels;
-            _samples = samples;
+            // ゲイン付き計測はキャッシュキーにしない（解除後に素の計測へ戻せるように）。
+            _samples = frameGain is null ? samples : null;
             _sampleRate = rate;
             _channels = channels;
             _profile = null;
@@ -71,7 +74,7 @@ internal sealed class LoudnessOverlayRenderer
 
         Task.Run(() =>
         {
-            var profile = LoudnessMeterEngine.BuildShortTermProfile(samples, channels, rate);
+            var profile = LoudnessMeterEngine.BuildShortTermProfile(samples, channels, rate, frameGain);
             lock (_gate)
             {
                 if (gen != _generation)

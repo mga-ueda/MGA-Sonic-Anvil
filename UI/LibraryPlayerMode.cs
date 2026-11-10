@@ -292,7 +292,7 @@ internal static class LibraryPlayerMode
             (Key.M, ModifierKeys.Control | ModifierKeys.Shift) => true,
             // ミックスダウン（選択ファイルを重ねて合成）。
             (Key.X, ModifierKeys.Control | ModifierKeys.Shift) => true,
-            // 音量／ラウドネス揃え（素の V は不可。Ctrl+Shift+V のみ）。
+            // 音量／ラウドネス揃え（Ctrl+L はエディタのみ。プレイヤーは Ctrl+Shift+V）。
             (Key.V, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Tab, ModifierKeys.Control) => true,
             (Key.Tab, ModifierKeys.Control | ModifierKeys.Shift) => true,
@@ -341,7 +341,7 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// プレイヤーでは破壊編集の InputGestureText を消す。
-    /// 音量は <see cref="MenuGestures.VolumePlayer"/>（Ctrl+Shift+V）だけ残す。
+    /// 音量は <see cref="MenuGestures.VolumePlayer"/>（Ctrl+Shift+V）だけ残す（エディタの Ctrl+L は出さない）。
     /// </summary>
     public static string? MenuGesture(bool playerMode, WaveMenuCommand command, string? gesture)
     {
@@ -520,7 +520,7 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// Shift＋A–Z。大文字入力と同じ修飾なので、テキスト入力中はアプリショートカットへ回さない。
-    /// （Shift+C＝同色選択、Shift+X＝フェード調整、Shift+A／V＝解析解除、Shift+L／R＝ループ／リージョン、Shift+T＝タイル巡回 など）
+    /// （Shift+C＝同色選択、Shift+X＝フェード調整、Shift+A＝スペクトログラム／重ね解除、Shift+L／R＝ループ／リージョン、Shift+T＝タイル巡回 など）
     /// </summary>
     public static bool IsShiftLetterChord(Key key, ModifierKeys modifiers) =>
         modifiers == ModifierKeys.Shift && key is >= Key.A and <= Key.Z;

@@ -180,6 +180,8 @@
                              MouseRightButtonDown="Overview_MouseRightButtonDown" />
           </Border>
         </Grid>
+        <!-- V モードの操作バーは波形描画エリア直下（トランスポートより上）。 -->
+        <ui:VolumeCurveBar x:Name="VolumeCurveBar" DockPanel.Dock="Bottom" />
         <Border x:Name="WaveformHostBorder"
                 Background="Transparent"
                 MinHeight="{x:Static ui:DesignMetrics.WaveformHostMinHeight}"
@@ -215,9 +217,10 @@
               <Grid x:Name="WaveformTileHost"
                     Background="Transparent"
                     SizeChanged="WaveformTileHost_SizeChanged">
-                <DockPanel x:Name="SingleWaveformHost">
+                <Grid x:Name="SingleWaveformHost">
                   <ui:WaveformView x:Name="PrimaryWaveform" ClipToBounds="True" />
-                </DockPanel>
+                  <ui:VolumeCurveEditLayer x:Name="VolumeCurveEditLayer" ClipToBounds="True" />
+                </Grid>
               </Grid>
             </DockPanel>
             <Border x:Name="TileSearchHost"

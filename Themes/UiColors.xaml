@@ -30,6 +30,15 @@
     <SolidColorBrush x:Key="WaveformBackBrush" Color="#FF262626" />
     <SolidColorBrush x:Key="WaveformRecordBackBrush" Color="#FF3A1C1C" />
     <SolidColorBrush x:Key="WaveFillBrush" Color="#FFC6D9FF" />
+    <!-- 音量カーブ等のプレビューで 0 dBFS 超えになる波形。 -->
+    <SolidColorBrush x:Key="WavePreviewClipBrush" Color="#FFC02828" />
+    <!-- V キー音量カーブ編集オーバーレイ。 -->
+    <SolidColorBrush x:Key="VolumeCurveLineBrush" Color="#FFE23B3B" />
+    <SolidColorBrush x:Key="VolumeCurveTimeGuideBrush" Color="#E0E23B3B" />
+    <SolidColorBrush x:Key="VolumeCurvePointFillBrush" Color="#FFFF6B6B" />
+    <SolidColorBrush x:Key="VolumeCurvePointLabelBrush" Color="#FFFFD0D0" />
+    <SolidColorBrush x:Key="VolumeCurveSelectedPointStrokeBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="VolumeCurveDbGridBrush" Color="#60F0F0F0" />
     <!-- 無音・ヒット検出プレビュー専用。 -->
     <SolidColorBrush x:Key="SilenceDetectWaveformBackBrush" Color="#FF262626" />
     <SolidColorBrush x:Key="SilenceDetectWaveFillBrush" Color="#FF919FBB" />

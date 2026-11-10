@@ -3387,6 +3387,15 @@ public partial class MainWindow
         Transport.ApplyMenuEnabled(
             WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(CaptureMenuBarHit())),
             playerMode: IsLibraryMaximized);
+        if (IsVolumeCurveMode)
+        {
+            // 許可操作＋同モードトグル＋抑制ダイアログへ届けるモード切替ボタンは有効のまま。
+            Transport.RestrictCommands(cmd =>
+                IsAllowedTransportDuringVolumeCurve(cmd)
+                || IsSameModeToggleDuringVolumeCurve(cmd)
+                || IsWarnableTransportDuringVolumeCurve(cmd));
+        }
+
         // 押せるボタンが無いグループを畳んだあと、ツールバー領域自体の表示も合わせる。
         ApplyTransportToolbarVisibility();
         // ツールバーと同じタイミングで、タイムライン等のルート有効状態も直す。

@@ -193,6 +193,13 @@ public sealed class EditReplayCoverageTests
             return (longDoc, HistoryRecipes.FromPitchCurve(48000, new WaveSelection(0, 2048), curve));
         }
 
+        if (kind == HistoryRecipes.VolumeCurve)
+        {
+            var longDoc = MakeConstant(2048, 1f);
+            var curve = Audio.VolumeCurve.Flat(-3f);
+            return (longDoc, HistoryRecipes.FromVolumeCurve(48000, new WaveSelection(0, 2048), curve));
+        }
+
         var document = Stocked();
         var recipe = kind switch
         {

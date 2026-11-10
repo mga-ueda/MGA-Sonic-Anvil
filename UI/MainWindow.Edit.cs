@@ -93,6 +93,14 @@ public partial class MainWindow
 
     private void PromptVolume()
     {
+        // ラウドネス表示中のトグル解除は V モード中も許容（同モード解除）。
+        if (Waveform.AnalysisView == WaveformAnalysisView.Loudness)
+        {
+            CloseVolumeGainPicker();
+            Waveform.ExitAnalysisView();
+            return;
+        }
+
         if (RejectOutsideFadeToolAction())
         {
             return;
@@ -125,15 +133,7 @@ public partial class MainWindow
             return;
         }
 
-        if (_volumeMenu is { IsOpen: true })
-        {
-            return;
-        }
-
-        if (Waveform.AnalysisView != WaveformAnalysisView.Loudness)
-        {
-            Waveform.SetAnalysisView(WaveformAnalysisView.Loudness);
-        }
+        Waveform.SetAnalysisView(WaveformAnalysisView.Loudness);
 
         CloseFadeCurvePicker();
         CloseFormatConvertPicker();
@@ -1886,7 +1886,7 @@ public partial class MainWindow
 
     private bool TryAddMarkerAtPlayhead()
     {
-        if (RejectOutsideFadeToolAction()
+        if (RejectOutsideFadeToolAction(allowDuringVolumeCurve: true)
             || _document is null
             || LibraryPlayerMode.BlocksEditorMarkerPlacement(IsLibraryMaximized))
         {
@@ -2086,15 +2086,25 @@ public partial class MainWindow
 
     private void ApplyDelete()
     {
-        if (RejectOutsideFadeToolAction() || _document is null)
+        if (_document is null)
         {
             return;
         }
 
         if (Waveform.HasSelectedMarkers || Waveform.HasSelectedRegions)
         {
+            if (RejectOutsideFadeToolAction(allowDuringVolumeCurve: true))
+            {
+                return;
+            }
+
             ApplyDeleteSelectedMarkers();
             ApplyDeleteSelectedRegions();
+            return;
+        }
+
+        if (RejectOutsideFadeToolAction())
+        {
             return;
         }
 
@@ -3227,9 +3237,12 @@ public partial class MainWindow
 
         if (LoudnessPenGain.WouldClip(rendered.Peak))
         {
+            var peak = Math.Max(rendered.Peak, 1e-8f);
+            var factor = LoudnessPenGain.HeadroomLinear / peak;
+            var lowerDbText = TabMerge.FormatOverDb(-20d * Math.Log10(factor));
             var answer = OwnerCenteredMessageBox.Show(
                 this,
-                UiStrings.ConfirmPenClip,
+                UiStrings.ConfirmPenClip(lowerDbText),
                 UiStrings.AppName,
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Warning);

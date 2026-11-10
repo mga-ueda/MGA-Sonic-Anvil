@@ -44,8 +44,20 @@ internal sealed class WaveformGainAnalyzer
 
     public WaveformGainReading Current { get; }
 
-    public static double LinearFromDb(double gainDb) =>
-        Math.Pow(10d, gainDb / 20d);
+    public static double LinearFromDb(double gainDb)
+    {
+        if (double.IsNegativeInfinity(gainDb) || gainDb <= -200d)
+        {
+            return 0d;
+        }
+
+        if (!double.IsFinite(gainDb))
+        {
+            return 1d;
+        }
+
+        return Math.Pow(10d, gainDb / 20d);
+    }
 
     public static double SnapGainDb(double gainDb)
     {

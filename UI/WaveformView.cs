@@ -287,6 +287,8 @@ internal sealed partial class WaveformView : Grid
     private readonly List<(long Frame, long TickMs)> _exitTrailSamples = [];
     private bool _trailActive;
     private Func<long, float>? _previewGainAtFrame;
+    /// <summary>Short Term 曲線にプレビューゲインを焼き込み済みなら、描画時の二重適用を避ける。</summary>
+    private bool _loudnessPreviewGainBaked;
 
     private AudioDocument? _document;
     private ChannelLayout _speakerLayout = ChannelLayout.Stereo;
@@ -361,6 +363,7 @@ internal sealed partial class WaveformView : Grid
     private int _waveOverlayBgra;
     private int _loudnessWaveBgra;
     private int _loudnessWaveBodyBgra;
+    private int _waveClipBgra;
     private int _zeroBgra;
     private double _viewStart;
     private double _timeZoom = 1d;
@@ -1170,6 +1173,25 @@ internal sealed partial class WaveformView : Grid
 
     public double ViewStart => _viewStart;
 
+    /// <summary>波形コンテンツ領域の左端 X（dB 目盛り列を除く）。オーバーレイのマッピング用。</summary>
+    public double ContentOffsetX => ContentLeft;
+
+    /// <summary>波形コンテンツ領域の幅。オーバーレイのマッピング用。</summary>
+    public double ContentAreaWidth => ContentWidth;
+
+    /// <summary>波形コンテンツ領域の上端 Y（マーカー／タイムルーラー行を除く）。</summary>
+    public double ContentAreaTop => Math.Min(ChromeTopHeight, Math.Max(0, ActualHeight));
+
+    /// <summary>波形コンテンツ領域の高さ。</summary>
+    public double ContentAreaHeight => Math.Max(0, ActualHeight - ContentAreaTop);
+
+    /// <summary>フレーム → このコントロール内の X 座標（dB 目盛り列を含むオフセット済み）。オーバーレイ用。</summary>
+    public double FrameToContentX(double frame) =>
+        ContentOffsetX + FrameToX(frame, _viewStart, ViewSpanFrames, ContentWidth);
+
+    /// <summary>このコントロール内の X 座標 → フレーム。オーバーレイのヒットテスト用。</summary>
+    public long ContentXToFrame(double x) => XToFrame(x);
+
     /// <summary>クロスフェード編集モードのドラフト。非 null のとき S/E/X/ポストを重ね描画。</summary>
     public CrossfadeEditState? CrossfadeDraft
     {
@@ -1486,6 +1508,7 @@ internal sealed partial class WaveformView : Grid
         _waveOverlayBgra = 0;
         _loudnessWaveBgra = 0;
         _loudnessWaveBodyBgra = 0;
+        _waveClipBgra = 0;
         _zeroBgra = 0;
         _playheadCore = null;
         _exitPlayheadCore = null;
@@ -1611,6 +1634,27 @@ internal sealed partial class WaveformView : Grid
     public event EventHandler<PenStrokeEventArgs>? PenStrokeUpdated;
 
     public event EventHandler<PenStrokeEventArgs>? PenStrokeCompleted;
+
+    /// <summary>
+    /// プレビューゲイン込みで Short Term ラウドネス曲線を測り直す（音量カーブ編集のドラッグ後など）。
+    /// </summary>
+    public void RefreshLoudnessWithPreviewGain(Func<long, float>? frameGain)
+    {
+        _loudnessPreviewGainBaked = frameGain is not null;
+        if (!LoudnessVisible || _document is null)
+        {
+            return;
+        }
+
+        _loudness.Invalidate();
+        _loudness.Ensure(
+            _document,
+            () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness),
+            frameGain);
+    }
+
+    private Func<long, float>? LoudnessDrawPreviewGain =>
+        _loudnessPreviewGainBaked ? null : _previewGainAtFrame;
 
     /// <summary>サンプルを書き換えた直後。波形は毎回、ラウドネス曲線は間引いて更新する。</summary>
     public void RefreshAfterPenEdit(bool forceLoudness = false)
@@ -3287,7 +3331,7 @@ internal sealed partial class WaveformView : Grid
                 _loudnessTargetLufs,
                 _viewStart,
                 ViewSpanFrames,
-                _previewGainAtFrame))
+                LoudnessDrawPreviewGain))
         {
             return false;
         }
@@ -3508,7 +3552,7 @@ internal sealed partial class WaveformView : Grid
                     _loudnessTargetLufs,
                     start,
                     span,
-                    _previewGainAtFrame);
+                    LoudnessDrawPreviewGain);
             }
         }
 
@@ -4764,7 +4808,8 @@ internal sealed partial class WaveformView : Grid
         EnsureColumnEdges(width);
         var amp = ampHeight * 0.5 * _ampZoom;
         var bottom = top + laneHeight;
-        var color = colorOverride ?? WavePaintBgraFor(channel);
+        var baseColor = colorOverride ?? WavePaintBgraFor(channel);
+        var markClip = colorOverride is null && _previewGainAtFrame is not null && _waveClipBgra != 0;
         var px1 = Math.Min(width, px0 + count);
         for (var i = 0; i < count; i++)
         {
@@ -4813,14 +4858,141 @@ internal sealed partial class WaveformView : Grid
                     px,
                     hi,
                     lo,
-                    color,
+                    baseColor,
                     mid,
                     laneHeight * 0.5);
             }
             else
             {
-                FillVLine(buffer, stride, width, clipTop, clipBottom, px, hi, lo, color);
+                FillVLine(buffer, stride, width, clipTop, clipBottom, px, hi, lo, baseColor);
             }
+        }
+
+        // 波形のあとでカプセルを重ねる（隣列の縦塗りで厚みが潰されないように）。
+        if (!markClip || amp <= 0)
+        {
+            return;
+        }
+
+        for (var px = px0; px < px1; px++)
+        {
+            var i = px - px0;
+            var index = i * channels + channel;
+            if ((uint)index >= (uint)_columnMaxs.Length)
+            {
+                continue;
+            }
+
+            PaintPreviewClipTips(
+                buffer,
+                stride,
+                width,
+                clipTop,
+                clipBottom,
+                px,
+                top,
+                bottom,
+                mid,
+                amp,
+                _columnMins[index],
+                _columnMaxs[index],
+                _waveClipBgra);
+        }
+    }
+
+    /// <summary>
+    /// プレビューゲイン後に |peak|&gt;1 のとき、包絡の上端／下端に横カプセル（厚さ約 5px）を赤く置く。
+    /// </summary>
+    private static unsafe void PaintPreviewClipTips(
+        int* buffer,
+        int stride,
+        int width,
+        int clipTop,
+        int clipBottom,
+        int px,
+        double top,
+        double bottom,
+        double mid,
+        double amp,
+        float min,
+        float max,
+        int clipColor)
+    {
+        // 厚さ 10px・幅 14px の横カプセル。
+        const int CapsuleThickness = 10;
+        const int CapsuleWidth = 14;
+        if (amp <= 0)
+        {
+            return;
+        }
+
+        var halfH = CapsuleThickness / 2;
+        if (max > 1f)
+        {
+            var tipY = (int)Math.Round(mid - max * amp);
+            tipY = (int)Math.Clamp(tipY, top + halfH, bottom - halfH);
+            FillHorizontalCapsule(
+                buffer,
+                stride,
+                width,
+                clipTop,
+                clipBottom,
+                px,
+                tipY,
+                CapsuleWidth,
+                CapsuleThickness,
+                clipColor);
+        }
+
+        if (min < -1f)
+        {
+            var tipY = (int)Math.Round(mid - min * amp);
+            tipY = (int)Math.Clamp(tipY, top + halfH, bottom - halfH);
+            FillHorizontalCapsule(
+                buffer,
+                stride,
+                width,
+                clipTop,
+                clipBottom,
+                px,
+                tipY,
+                CapsuleWidth,
+                CapsuleThickness,
+                clipColor);
+        }
+    }
+
+    /// <summary>横長カプセル（両端丸）。厚さ・幅はピクセル指定。</summary>
+    private static unsafe void FillHorizontalCapsule(
+        int* buffer,
+        int stride,
+        int width,
+        int clipTop,
+        int clipBottom,
+        int cx,
+        int cy,
+        int capsuleWidth,
+        int capsuleThickness,
+        int color)
+    {
+        var halfW = Math.Max(1, capsuleWidth / 2);
+        var halfH = Math.Max(1, capsuleThickness / 2);
+        var radius = halfH;
+        var bodyHalf = Math.Max(0, halfW - radius);
+        var y0 = Math.Max(clipTop, cy - halfH);
+        var y1 = Math.Min(clipBottom - 1, cy + halfH);
+        for (var y = y0; y <= y1; y++)
+        {
+            var dy = Math.Abs(y - cy);
+            if (dy > radius)
+            {
+                continue;
+            }
+
+            // スタジアム: 中央の矩形 + 両端の半円。
+            var cap = Math.Sqrt((radius * radius) - (dy * dy));
+            var span = (int)Math.Round(bodyHalf + cap);
+            FillHLine(buffer, stride, width, cx - span, cx + span + 1, y, color);
         }
     }
 
@@ -4866,7 +5038,7 @@ internal sealed partial class WaveformView : Grid
             return count;
         }
 
-        if (!useRawColumns && _previewGainAtFrame is not null)
+        if (_previewGainAtFrame is not null)
         {
             ApplyPreviewGainToColumns(startFrame, endFrame, count, channels);
         }
@@ -5152,7 +5324,11 @@ internal sealed partial class WaveformView : Grid
 
     private void EnsureWavePens()
     {
-        if (_waveBgra != 0 && _waveOverlayBgra != 0 && _loudnessWaveBgra != 0 && _loudnessWaveBodyBgra != 0)
+        if (_waveBgra != 0
+            && _waveOverlayBgra != 0
+            && _loudnessWaveBgra != 0
+            && _loudnessWaveBodyBgra != 0
+            && _waveClipBgra != 0)
         {
             return;
         }
@@ -5161,6 +5337,7 @@ internal sealed partial class WaveformView : Grid
         _waveOverlayBgra = ToBgra(Theme.Get("WaveFillOverlayBrush"));
         _loudnessWaveBgra = ToBgra(Theme.Get("LoudnessWaveFillBrush"));
         _loudnessWaveBodyBgra = _loudnessWaveBgra;
+        _waveClipBgra = ToBgra(Theme.Get("WavePreviewClipBrush"));
         _zeroBgra = ToBgra(Theme.Get("WaveZeroLineBrush"));
     }
 
@@ -7980,10 +8157,9 @@ internal sealed partial class WaveformView : Grid
         _deferWaveReload = false;
         if (playbackFollow)
         {
-            // 追従スクロール。シークバー層は毎回更新。静的層（波形＋スペクトログラム）は
-            // 実測描画コストに応じて間引く：軽ければ毎フレーム（≒60fps）で滑らかに流し、
-            // 深い拡大で重い場合は間隔を広げ、ディスパッチャに入力処理の余地を残す
-            // （Render 優先度の連続再描画がマウス／キー入力を飢餓させて操作不能になるのを防ぐ）。
+            // 追従スクロール。シークバー層は毎回更新。ピークの再ラスタは実測コストで間引き、
+            // 間引き中はキャッシュビットマップのずらし描画だけにして滑らかに流す
+            // （Render 優先度の連続フル再描画が入力を飢餓させるのを防ぐ）。
             InvalidatePlayheadOnly();
             // TickCount64 は分解能約 15ms で毎フレーム判定に使えないため Stopwatch。
             var nowMs = System.Diagnostics.Stopwatch.GetTimestamp()
@@ -7998,10 +8174,18 @@ internal sealed partial class WaveformView : Grid
             if (nowMs - lastMs >= idleMs)
             {
                 _followRebuildAtMs = nowMs;
+                _deferWaveReload = false;
                 InvalidateStaticLayer();
-                RaiseViewChanged();
+            }
+            else
+            {
+                // ずらし描画のみ。音量カーブ等の ViewChanged も毎フレームで線の遅れを防ぐ。
+                _deferWaveReload = true;
+                _staticHost.InvalidateVisual();
+                _overlayHost.InvalidateVisual();
             }
 
+            RaiseViewChanged();
             return;
         }
 

@@ -219,7 +219,8 @@ internal sealed class RoundedButton : Button
 
     protected override Size MeasureOverride(Size constraint)
     {
-        var text = Content as string ?? Content?.ToString() ?? string.Empty;
+        var raw = Content as string ?? Content?.ToString() ?? string.Empty;
+        var text = ResolveAccessDisplayText(raw, out _);
         var stroke = Math.Max(0d, BorderSize);
         // 枠線＋日本語 Bold のはみ出し余裕
         var width = Padding.Left + Padding.Right + stroke * 2d + 2d;
@@ -296,7 +297,8 @@ internal sealed class RoundedButton : Button
 
         dc.DrawGeometry(WpfControlHelpers.FrozenBrush(ResolveFillColor()), pen, geometry);
 
-        var text = Content as string ?? Content?.ToString() ?? string.Empty;
+        var raw = Content as string ?? Content?.ToString() ?? string.Empty;
+        var text = ResolveAccessDisplayText(raw, out var underlineIndex);
         if (string.IsNullOrEmpty(text))
         {
             return;
@@ -305,6 +307,7 @@ internal sealed class RoundedButton : Button
         var textColor = IsEnabled
             ? Foreground is SolidColorBrush solid ? solid.Color : Theme.Get("PrimaryForeBrush")
             : DisabledForeColor;
+        var brush = WpfControlHelpers.FrozenBrush(textColor);
         var innerW = Math.Max(1d, ActualWidth - Padding.Left - Padding.Right - stroke * 2d);
         var typeface = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
         var dip = UiDpi.Get(this).PixelsPerDip;
@@ -314,7 +317,7 @@ internal sealed class RoundedButton : Button
             FlowDirection,
             typeface,
             FontSize,
-            WpfControlHelpers.FrozenBrush(textColor),
+            brush,
             dip);
         var formatted = natural;
         if (natural.WidthIncludingTrailingWhitespace > innerW + 0.5d)
@@ -325,7 +328,7 @@ internal sealed class RoundedButton : Button
                 FlowDirection,
                 typeface,
                 FontSize,
-                WpfControlHelpers.FrozenBrush(textColor),
+                brush,
                 dip)
             {
                 MaxTextWidth = innerW,
@@ -342,6 +345,82 @@ internal sealed class RoundedButton : Button
         var textX = Padding.Left + stroke + alignPad;
         var textY = (ActualHeight - formatted.Height) / 2d;
         dc.DrawText(formatted, new Point(textX, textY));
+
+        if ((uint)underlineIndex < (uint)text.Length)
+        {
+            var prefix = text[..underlineIndex];
+            var mark = text.Substring(underlineIndex, 1);
+            var prefixW = prefix.Length == 0
+                ? 0d
+                : new FormattedText(
+                    prefix,
+                    CultureInfo.CurrentUICulture,
+                    FlowDirection,
+                    typeface,
+                    FontSize,
+                    brush,
+                    dip).WidthIncludingTrailingWhitespace;
+            var markW = new FormattedText(
+                mark,
+                CultureInfo.CurrentUICulture,
+                FlowDirection,
+                typeface,
+                FontSize,
+                brush,
+                dip).WidthIncludingTrailingWhitespace;
+            if (markW > 0.5d)
+            {
+                var y = textY + formatted.Height - Math.Max(1d, FontSize * 0.08d);
+                var underline = new Pen(brush, Math.Max(1d, FontSize * 0.06d));
+                if (underline.CanFreeze)
+                {
+                    underline.Freeze();
+                }
+
+                dc.DrawLine(
+                    underline,
+                    new Point(textX + prefixW, y),
+                    new Point(textX + prefixW + markW, y));
+            }
+        }
+    }
+
+    /// <summary>WPF AccessText と同様に先頭の <c>_X</c> をニーモニック、 <c>__</c> を文字 "_" とする。</summary>
+    private static string ResolveAccessDisplayText(string text, out int underlineIndex)
+    {
+        underlineIndex = -1;
+        if (string.IsNullOrEmpty(text) || text.IndexOf('_') < 0)
+        {
+            return text;
+        }
+
+        var chars = new char[text.Length];
+        var n = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '_' && i + 1 < text.Length)
+            {
+                if (text[i + 1] == '_')
+                {
+                    chars[n++] = '_';
+                    i++;
+                    continue;
+                }
+
+                if (underlineIndex < 0)
+                {
+                    underlineIndex = n;
+                }
+
+                chars[n++] = text[i + 1];
+                i++;
+                continue;
+            }
+
+            chars[n++] = text[i];
+        }
+
+        return new string(chars, 0, n);
     }
 
     private Color ResolveFillColor()

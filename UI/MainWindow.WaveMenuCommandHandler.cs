@@ -18,6 +18,14 @@ public partial class MainWindow
             return;
         }
 
+        if (IsVolumeCurveMode
+            && !IsSameModeToggleWaveMenu(command)
+            && !WaveformContextMenuBuilder.IsAllowedDuringVolumeCurveMode(command))
+        {
+            WarnVolumeCurveModeBlocked();
+            return;
+        }
+
         switch (command)
         {
             case WaveMenuCommand.ClearMarkers:
@@ -339,16 +347,37 @@ public partial class MainWindow
                 ToggleCenterLock();
                 break;
             case WaveMenuCommand.ViewWaveform:
-                Waveform.SetAnalysisView(WaveformAnalysisView.Waveform);
-                break;
             case WaveMenuCommand.ViewSpectrogram:
-                Waveform.SetAnalysisView(WaveformAnalysisView.Spectrogram);
-                break;
             case WaveMenuCommand.ViewOverlay:
-                Waveform.SetAnalysisView(WaveformAnalysisView.Overlay);
-                break;
             case WaveMenuCommand.ViewLoudness:
-                Waveform.SetAnalysisView(WaveformAnalysisView.Loudness);
+                if (IsVolumeCurveMode)
+                {
+                    // 同モード解除のみ（入場はゲートで拒否済み）。
+                    if (command is WaveMenuCommand.ViewLoudness or WaveMenuCommand.ViewWaveform)
+                    {
+                        CloseVolumeGainPicker();
+                        Waveform.ExitAnalysisView();
+                    }
+                    else
+                    {
+                        Waveform.ToggleSpectrogramView();
+                    }
+
+                    break;
+                }
+
+                if (RejectOutsideFadeToolAction())
+                {
+                    break;
+                }
+
+                Waveform.SetAnalysisView(command switch
+                {
+                    WaveMenuCommand.ViewSpectrogram => WaveformAnalysisView.Spectrogram,
+                    WaveMenuCommand.ViewOverlay => WaveformAnalysisView.Overlay,
+                    WaveMenuCommand.ViewLoudness => WaveformAnalysisView.Loudness,
+                    _ => WaveformAnalysisView.Waveform,
+                });
                 break;
             case WaveMenuCommand.TileOff:
                 SetWaveformTileArrange(WaveformTileArrange.Off);
