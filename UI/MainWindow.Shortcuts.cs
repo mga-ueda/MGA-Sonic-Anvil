@@ -2636,11 +2636,8 @@ public partial class MainWindow
 
         if (key == Key.X && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            if (CanMergeSelectedTabs())
-            {
-                MergeSelectedTabs();
-            }
-
+            // 対象不足時も MergeSelectedTabs 側でダイアログを出す（サイレントにしない）。
+            MergeSelectedTabs();
             return true;
         }
 

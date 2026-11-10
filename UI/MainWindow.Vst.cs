@@ -1028,11 +1028,14 @@ public partial class MainWindow
         return UiStrings.ErrorVstBounceNoInsert;
     }
 
-    /// <summary>ミックスダウン可能か（選択が 2 本以上。メニュー／ツールバー共通）。</summary>
+    /// <summary>
+    /// ミックスダウン操作を受け付けるか。対象が 2 本未満でもメニューとツールバーは押せるようにし、
+    /// 実行時に理由のダイアログを出す。録音中・処理中は押せない。
+    /// </summary>
     private bool CanMergeSelectedTabs() =>
         !IsUiBusy
         && !IsRecording
-        && ResolveBatchEditTargets().Length >= 2;
+        && (HasTabSelection || IsLibraryMaximized || _activeSession is not null);
 
     private async Task BakeVstInsertsAsync()
     {

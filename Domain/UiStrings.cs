@@ -1233,6 +1233,10 @@ internal static partial class UiStrings
     public static string ErrorMergeFailed => Get(
         "ミックスダウンに失敗しました。",
         "Failed to mix down the tabs.");
+    /// <summary>ミックスダウンは 2 本以上が必要（1 本だけではやらない）。</summary>
+    public static string ErrorMergeNeedMultiple => Get(
+        "ミックスダウンには2つ以上のファイルが必要です。",
+        "Mixdown needs two or more files.");
     public static string ErrorMergeFormatMismatch(string firstFile, string mismatches) => Format(
         "フォーマットが違うファイルがあるため、ミックスダウンを中止しました。サンプルレート、チャンネル数、ビット深度は変換しません。\n先頭: {0}\n一致しないファイル:\n{1}",
         "Mixdown was cancelled because some files do not match the first file. Sample rate, channel count, and bit depth were not converted.\nFirst file: {0}\nFiles that do not match:\n{1}",

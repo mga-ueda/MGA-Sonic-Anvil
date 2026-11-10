@@ -1575,6 +1575,17 @@ public partial class MainWindow
         var sources = ResolveBatchEditTargets();
         if (sources.Length < 2)
         {
+            // 1 本だけ（または未選択）は混ぜない。無反応にせず理由を出す。
+            if (IsLoaded)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    UiStrings.ErrorMergeNeedMultiple,
+                    UiStrings.TitleMergeTabs,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
             return;
         }
 
