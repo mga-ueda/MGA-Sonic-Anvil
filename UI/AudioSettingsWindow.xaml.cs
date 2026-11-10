@@ -442,7 +442,8 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(TransportToolbarCustomizeButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
-        AppDialogKeys.PrepareActionButton(OkButton, isDefault: true);
+        // Enter では確定しない。確定は Alt+O（ラベル _OK）または OK ボタンのクリック。
+        AppDialogKeys.PrepareActionButton(OkButton);
         AppDialogKeys.PrepareActionButton(CancelButton, isCancel: true);
         AppDialogKeys.PrepareActionButton(LameBrowseButton);
         AppDialogKeys.PrepareActionButton(FfmpegBrowseButton);
@@ -477,6 +478,18 @@ internal partial class AudioSettingsWindow : Window
                 _fadeCurveMenu.IsOpen = false;
                 return true;
             });
+        // Preview で OK したあと、AccessKeyManager（例: MOV (_O)）へ Alt+O が渡らないようにする。
+        KeyDown += (_, e) =>
+        {
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            var modifiers = Keyboard.Modifiers;
+            if (key == Key.O
+                && (modifiers & ModifierKeys.Alt) != 0
+                && (modifiers & (ModifierKeys.Control | ModifierKeys.Windows)) == 0)
+            {
+                e.Handled = true;
+            }
+        };
 
         _fadeInRow = CreateFadeRow(UiStrings.LabelDefaultFadeIn, fadeIn, isFadeIn: true, row: 0);
         _fadeOutRow = CreateFadeRow(UiStrings.LabelDefaultFadeOut, fadeOut, isFadeIn: false, row: 1);
@@ -2477,7 +2490,18 @@ internal partial class AudioSettingsWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (!TrySettingsTabDelta(key, Keyboard.Modifiers, out var delta))
+        var modifiers = Keyboard.Modifiers;
+        // Alt+O: OK。IsDefault を付けないので Enter では確定しない。
+        if (key == Key.O
+            && (modifiers & ModifierKeys.Alt) != 0
+            && (modifiers & (ModifierKeys.Control | ModifierKeys.Windows)) == 0)
+        {
+            OkButton_Click(OkButton, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (!TrySettingsTabDelta(key, modifiers, out var delta))
         {
             return;
         }

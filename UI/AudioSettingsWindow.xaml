@@ -1435,11 +1435,10 @@
                   HorizontalAlignment="Right"
                   Margin="0,16,0,0">
         <ui:RoundedButton x:Name="OkButton"
-                          Content="{x:Static domain:UiStrings.ButtonOk}"
+                          Content="{x:Static domain:UiStrings.ButtonOkMnemonic}"
                           Width="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
                           Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
                           Margin="0,0,12,0"
-                          IsDefault="True"
                           Click="OkButton_Click" />
         <ui:RoundedButton x:Name="CancelButton"
                           Content="{x:Static domain:UiStrings.ButtonCancel}"

@@ -733,6 +733,8 @@ internal static partial class UiStrings
     public static string LabelAudioApiWasapi => Get("WASAPI", "WASAPI");
     public static string LabelAudioApiAsio => Get("ASIO", "ASIO");
     public static string ButtonOk => Get("OK", "OK");
+    /// <summary>OK。O にアンダーバー（Alt+O）。設定など Enter では確定しないダイアログ向け。</summary>
+    public static string ButtonOkMnemonic => Get("_OK", "_OK");
     public static string ButtonCancel => Get("Cancel", "Cancel");
     public static string ButtonClose => Get("Close", "Close");
     public static string ButtonNo => Get("No", "No");
@@ -1126,7 +1128,7 @@ internal static partial class UiStrings
     public static string LabelVolumeCurveGainValue => Get("音量(_N)", "Volume (_N)");
 
     /// <summary>音量カーブバーの OK。O にアンダーバー（Alt+O）。</summary>
-    public static string ButtonVolumeCurveOk => Get("_OK", "_OK");
+    public static string ButtonVolumeCurveOk => ButtonOkMnemonic;
 
     /// <summary>未確定のまま Esc／キャンセルで抜けるときの確認。</summary>
     public static string ConfirmVolumeCurveDiscard => Get(
