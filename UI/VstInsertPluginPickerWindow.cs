@@ -110,10 +110,10 @@ internal sealed class VstInsertPluginPickerWindow : Window
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 12, 0, 0),
         };
-        var ok = CreateButton(UiStrings.ButtonOk, accent: true, isDefault: true);
+        var ok = CreateButton(UiStrings.ButtonOkMnemonic, accent: true, isDefault: true);
         ok.Click += (_, _) => TryAcceptSelected();
         buttons.Children.Add(ok);
-        var cancel = CreateButton(UiStrings.ButtonCancel, accent: false, isCancel: true);
+        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accent: false, isCancel: true);
         cancel.Click += (_, _) => Close();
         buttons.Children.Add(cancel);
 

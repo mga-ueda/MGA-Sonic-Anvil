@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using MgaSonicAnvil.Domain;
 
@@ -8,6 +9,9 @@ namespace MgaSonicAnvil.UI;
 /// <summary>OK／Cancel（2択）と OK／No／Cancel（3択）をアプリの文言で出す確認。OS の MessageBox にはしない。</summary>
 internal sealed class ConfirmChoiceWindow : Window
 {
+    private readonly Dictionary<MessageBoxResult, Button> _choiceButtons = [];
+    private readonly MessageBoxButton _buttons;
+
     public MessageBoxResult Result { get; private set; }
 
     public static MessageBoxResult Show(
@@ -67,6 +71,23 @@ internal sealed class ConfirmChoiceWindow : Window
         return choice == MessageBoxResult.Yes;
     }
 
+    /// <summary>
+    /// Alt+O／Y／N／C の割当。
+    /// OK 系は O、Yes は Y（および OK ラベル時の O）、No は N、Cancel は C（YesNo の Cancel ラベル No 含む）。
+    /// </summary>
+    internal static MessageBoxResult? ChoiceForAltKey(Key key, MessageBoxButton buttons) =>
+        key switch
+        {
+            Key.O when buttons is MessageBoxButton.OK or MessageBoxButton.OKCancel => MessageBoxResult.OK,
+            Key.O when buttons is MessageBoxButton.YesNo or MessageBoxButton.YesNoCancel => MessageBoxResult.Yes,
+            Key.Y when buttons is MessageBoxButton.YesNo or MessageBoxButton.YesNoCancel => MessageBoxResult.Yes,
+            Key.N when buttons is MessageBoxButton.YesNo or MessageBoxButton.YesNoCancel => MessageBoxResult.No,
+            Key.C when buttons == MessageBoxButton.OKCancel => MessageBoxResult.Cancel,
+            Key.C when buttons == MessageBoxButton.YesNo => MessageBoxResult.No,
+            Key.C when buttons == MessageBoxButton.YesNoCancel => MessageBoxResult.Cancel,
+            _ => null,
+        };
+
     private ConfirmChoiceWindow(
         string text,
         string caption,
@@ -77,6 +98,7 @@ internal sealed class ConfirmChoiceWindow : Window
         string? cancelText = null,
         bool orangeNo = false)
     {
+        _buttons = buttons;
         Result = DismissResult(buttons);
         Title = caption;
         Foreground = (Brush)FindResource("PrimaryForeBrush");
@@ -98,64 +120,92 @@ internal sealed class ConfirmChoiceWindow : Window
         {
             var okDefault = defaultResult != MessageBoxResult.Cancel;
             row.Children.Add(CreateButton(
-                UiStrings.ButtonOk,
+                UiStrings.ButtonOkMnemonic,
                 MessageBoxResult.OK,
                 accent: true,
-                isDefault: okDefault,
-                isCancel: buttons == MessageBoxButton.OK));
+                isDefault: okDefault));
             if (buttons == MessageBoxButton.OKCancel)
             {
                 row.Children.Add(CreateButton(
-                    UiStrings.ButtonCancel,
+                    UiStrings.ButtonCancelMnemonic,
                     MessageBoxResult.Cancel,
-                    isDefault: !okDefault,
-                    isCancel: true));
+                    isDefault: !okDefault));
             }
         }
         else if (buttons == MessageBoxButton.YesNo)
         {
             // 2択は OK／Cancel に統一（戻り値は従来どおり Yes／No）。
             row.Children.Add(CreateButton(
-                string.IsNullOrEmpty(yesText) ? UiStrings.ButtonOk : yesText,
+                string.IsNullOrEmpty(yesText) ? UiStrings.ButtonOkMnemonic : yesText,
                 MessageBoxResult.Yes,
                 accent: true,
                 isDefault: IsDefaultChoice(MessageBoxResult.Yes, defaultResult, buttons)));
             row.Children.Add(CreateButton(
-                string.IsNullOrEmpty(noText) ? UiStrings.ButtonCancel : noText,
+                string.IsNullOrEmpty(noText) ? UiStrings.ButtonCancelMnemonic : noText,
                 MessageBoxResult.No,
                 orange: orangeNo,
-                isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons),
-                isCancel: true));
+                isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons)));
         }
         else
         {
             // 3択は OK／No／Cancel（中間の Discard／Skip 相当は No）。
             row.Children.Add(CreateButton(
-                string.IsNullOrEmpty(yesText) ? UiStrings.ButtonOk : yesText,
+                string.IsNullOrEmpty(yesText) ? UiStrings.ButtonOkMnemonic : yesText,
                 MessageBoxResult.Yes,
                 accent: true,
                 isDefault: IsDefaultChoice(MessageBoxResult.Yes, defaultResult, buttons)));
             row.Children.Add(CreateButton(
-                string.IsNullOrEmpty(noText) ? UiStrings.ButtonNo : noText,
+                string.IsNullOrEmpty(noText) ? UiStrings.ButtonNoMnemonic : noText,
                 MessageBoxResult.No,
                 orange: orangeNo,
                 isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons)));
             row.Children.Add(CreateButton(
-                string.IsNullOrEmpty(cancelText) ? UiStrings.ButtonYesNoCancel : cancelText,
+                string.IsNullOrEmpty(cancelText) ? UiStrings.ButtonCancelMnemonic : cancelText,
                 MessageBoxResult.Cancel,
-                isDefault: IsDefaultChoice(MessageBoxResult.Cancel, defaultResult, buttons),
-                isCancel: true));
+                isDefault: IsDefaultChoice(MessageBoxResult.Cancel, defaultResult, buttons)));
         }
 
         var root = new StackPanel();
         root.Children.Add(message);
         root.Children.Add(row);
         AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
-        AppDialogKeys.Attach(this, () =>
+        // Esc では閉じない。Alt+O／Y／N／C は下で結果ボタンへ。
+        AppDialogKeys.Attach(
+            this,
+            onCancel: () => { },
+            closeOnEscape: false,
+            bindAltLetterShortcuts: false);
+        PreviewKeyDown += OnChoicePreviewKeyDown;
+    }
+
+    private void OnChoicePreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var modifiers = Keyboard.Modifiers;
+        if (key is not (Key.O or Key.Y or Key.N or Key.C)
+            || !AppDialogKeys.IsAltLetter(key, modifiers, key))
         {
-            Result = DismissResult(buttons);
-            Close();
-        });
+            return;
+        }
+
+        var choice = ChoiceForAltKey(key, _buttons);
+        if (choice is null || !TryClickChoice(choice.Value))
+        {
+            return;
+        }
+
+        e.Handled = true;
+    }
+
+    private bool TryClickChoice(MessageBoxResult choice)
+    {
+        if (!_choiceButtons.TryGetValue(choice, out var button) || !button.IsEnabled)
+        {
+            return false;
+        }
+
+        button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        return true;
     }
 
     private RoundedButton CreateButton(
@@ -163,8 +213,7 @@ internal sealed class ConfirmChoiceWindow : Window
         MessageBoxResult choice,
         bool accent = false,
         bool orange = false,
-        bool isDefault = false,
-        bool isCancel = false)
+        bool isDefault = false)
     {
         var button = new RoundedButton
         {
@@ -173,7 +222,8 @@ internal sealed class ConfirmChoiceWindow : Window
             Height = DesignMetrics.AudioDialogButtonHeight,
             Margin = new Thickness(8, 0, 0, 0),
         };
-        AppDialogKeys.PrepareActionButton(button, isDefault, isCancel);
+        // Esc で閉じないため IsCancel は付けない。Enter 用の IsDefault のみ。
+        AppDialogKeys.PrepareActionButton(button, isDefault, isCancel: false);
         if (accent)
         {
             ActionButtonLooks.ApplyAccent(button);
@@ -192,6 +242,7 @@ internal sealed class ConfirmChoiceWindow : Window
             Result = choice;
             Close();
         };
+        _choiceButtons[choice] = button;
         return button;
     }
 }

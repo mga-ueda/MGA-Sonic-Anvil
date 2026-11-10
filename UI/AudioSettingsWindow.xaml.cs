@@ -442,7 +442,7 @@ internal partial class AudioSettingsWindow : Window
         ActionButtonLooks.ApplyClear(TransportToolbarCustomizeButton);
         ApplyLibraryExplorerRootButtons();
         ApplyLibraryExplorerRootsChrome();
-        // Enter では確定しない。確定は Alt+O（ラベル _OK）または OK ボタンのクリック。
+        // Enter では確定しない。確定は Alt+O（ラベル _OK）または OK ボタンのクリック。キャンセルは Alt+C（_Cancel）。
         AppDialogKeys.PrepareActionButton(OkButton);
         AppDialogKeys.PrepareActionButton(CancelButton, isCancel: true);
         AppDialogKeys.PrepareActionButton(LameBrowseButton);
@@ -478,12 +478,12 @@ internal partial class AudioSettingsWindow : Window
                 _fadeCurveMenu.IsOpen = false;
                 return true;
             });
-        // Preview で OK したあと、AccessKeyManager（例: MOV (_O)）へ Alt+O が渡らないようにする。
+        // Preview で OK／Cancel したあと、AccessKeyManager（例: MOV (_O)）へ Alt+O／Alt+C が渡らないようにする。
         KeyDown += (_, e) =>
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
             var modifiers = Keyboard.Modifiers;
-            if (key == Key.O
+            if ((key == Key.O || key == Key.C)
                 && (modifiers & ModifierKeys.Alt) != 0
                 && (modifiers & (ModifierKeys.Control | ModifierKeys.Windows)) == 0)
             {
@@ -2500,6 +2500,8 @@ internal partial class AudioSettingsWindow : Window
             e.Handled = true;
             return;
         }
+
+        // Alt+C は AppDialogKeys（onCancel）側。
 
         if (!TrySettingsTabDelta(key, modifiers, out var delta))
         {

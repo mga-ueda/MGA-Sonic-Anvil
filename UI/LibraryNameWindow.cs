@@ -55,14 +55,14 @@ internal static class LibraryNameWindow
             };
             var ok = new RoundedButton
             {
-                Content = UiStrings.ButtonOk,
+                Content = UiStrings.ButtonOkMnemonic,
                 MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
                 Height = DesignMetrics.AudioDialogButtonHeight,
                 Margin = new Thickness(8, 0, 0, 0),
             };
             var cancel = new RoundedButton
             {
-                Content = UiStrings.LibraryCancel,
+                Content = UiStrings.ButtonCancelMnemonic,
                 MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
                 Height = DesignMetrics.AudioDialogButtonHeight,
                 Margin = new Thickness(8, 0, 0, 0),

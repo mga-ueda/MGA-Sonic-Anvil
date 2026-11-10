@@ -36,8 +36,8 @@ internal sealed class NewDocumentWindow : Window
         AcrylicDialogChrome.Prepare(this);
         AudioFormatComboFill.Fill(_rateCombo, _bitsCombo, _layoutCombo, current, _visibleIds);
                         
-        var ok = CreateButton(UiStrings.ButtonOk, accept: true, accent: true, isDefault: true);
-        var cancel = CreateButton(UiStrings.ButtonCancel, accept: false, isCancel: true);
+        var ok = CreateButton(UiStrings.ButtonOkMnemonic, accept: true, accent: true, isDefault: true);
+        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accept: false, isCancel: true);
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,

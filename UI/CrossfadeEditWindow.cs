@@ -1186,13 +1186,13 @@ internal sealed class CrossfadeEditWindow : Window
         _deleteAfterLoopCheck.VerticalAlignment = VerticalAlignment.Center;
         right.Children.Add(_deleteAfterLoopCheck);
         right.Children.Add(MakeDialogActionButton(
-            UiStrings.ButtonOk,
+            UiStrings.ButtonOkMnemonic,
             UiStrings.CrossfadeTipLoopMix,
             () => LoopMixRequested?.Invoke(),
             accent: true,
             isDefault: true));
         right.Children.Add(MakeDialogActionButton(
-            UiStrings.ButtonCancel,
+            UiStrings.ButtonCancelMnemonic,
             UiStrings.CrossfadeTipExit,
             RequestExit,
             accent: false,

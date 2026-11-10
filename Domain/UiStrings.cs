@@ -206,8 +206,10 @@ internal static partial class UiStrings
     public static string ConfirmVstBounceIncludeTail => Get(
         "バウンス時にテイルを付加しますか？\n残す：残響が消えるまで波形を伸ばします\n切る：元の長さのまま切ります",
         "Include effect tails when bouncing?\nKeep: extend the waveform until tails die out\nCut: keep the original length");
-    public static string ButtonVstBounceKeepTail => Get("残す", "Keep");
-    public static string ButtonVstBounceCutTail => Get("切る", "Cut");
+    /// <summary>VST バウンス確認の Yes 相当。Y アクセスキー（Alt+Y）。</summary>
+    public static string ButtonVstBounceKeepTail => Get("残す(_Y)", "Keep(_Y)");
+    /// <summary>VST バウンス確認の No 相当。N アクセスキー（Alt+N）。</summary>
+    public static string ButtonVstBounceCutTail => Get("切る(_N)", "Cut(_N)");
     public static string ErrorVstBounceNoInsert => Get(
         "バウンスできるインサートがありません。",
         "There are no inserts to bounce.");
@@ -736,9 +738,17 @@ internal static partial class UiStrings
     /// <summary>OK。O にアンダーバー（Alt+O）。設定など Enter では確定しないダイアログ向け。</summary>
     public static string ButtonOkMnemonic => Get("_OK", "_OK");
     public static string ButtonCancel => Get("Cancel", "Cancel");
+    /// <summary>Cancel。C にアンダーバー（Alt+C）。設定ダイアログ向け。</summary>
+    public static string ButtonCancelMnemonic => Get("_Cancel", "_Cancel");
     public static string ButtonClose => Get("Close", "Close");
+    /// <summary>Close。C にアンダーバー（Alt+C）。Esc では閉じないウィンドウ向け。</summary>
+    public static string ButtonCloseMnemonic => Get("_Close", "_Close");
     public static string ButtonNo => Get("No", "No");
-    public static string ButtonYesNoCancel => Get("Cancel", "Cancel");
+    /// <summary>No。N にアンダーバー（Alt+N）。</summary>
+    public static string ButtonNoMnemonic => Get("_No", "_No");
+    /// <summary>Yes。Y にアンダーバー（Alt+Y）。</summary>
+    public static string ButtonYesMnemonic => Get("_Yes", "_Yes");
+    public static string ButtonYesNoCancel => ButtonCancelMnemonic;
     public static string ButtonSaveAllAndClose => Get("すべて保存して閉じる", "Save all and close");
     public static string ButtonDiscardAllAndClose => Get("すべて保存せずに閉じる", "Close without saving any");
     public static string ButtonSaveAll => Get("すべて保存", "Save all");

@@ -847,6 +847,15 @@ public partial class MainWindow
             return true;
         }
 
+        // Alt+C: Cancel（ラベル _Cancel）。
+        if (key == Key.C
+            && (modifiers & ModifierKeys.Alt) != 0
+            && (modifiers & (ModifierKeys.Control | ModifierKeys.Windows)) == 0)
+        {
+            CancelVolumeCurveMode();
+            return true;
+        }
+
         var focusedTextBox = Keyboard.FocusedElement is System.Windows.Controls.TextBox;
 
         if (key == Key.Z && modifiers == ModifierKeys.Control)

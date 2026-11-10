@@ -50,8 +50,9 @@ internal sealed class TabTimeTableWindow : Window
         AppDialogKeys.PrepareActionButton(_copyButton, isDefault: true);
         AppDialogKeys.PrepareActionButton(_csvButton);
         AppDialogKeys.PrepareActionButton(_pdfButton);
-        AppDialogKeys.PrepareActionButton(_closeButton, isCancel: true);
-        AppDialogKeys.Attach(this, Close);
+        // Esc では閉じない。閉じるのは Alt+C（ラベル _Close）または Close クリック。
+        AppDialogKeys.PrepareActionButton(_closeButton);
+        AppDialogKeys.Attach(this, Close, closeOnEscape: false);
         ApplyButtonLooks();
         ApplyGridStyles();
     }
@@ -71,7 +72,7 @@ internal sealed class TabTimeTableWindow : Window
         _copyButton.Content = UiStrings.TabTimeCopy;
         _csvButton.Content = UiStrings.TabTimeSaveCsv;
         _pdfButton.Content = UiStrings.TabTimeSavePdf;
-        _closeButton.Content = UiStrings.ButtonClose;
+        _closeButton.Content = UiStrings.ButtonCloseMnemonic;
         _copyMenuItem.Header = UiStrings.MenuCopy;
                                     }
 

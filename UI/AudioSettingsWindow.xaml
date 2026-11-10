@@ -1441,7 +1441,7 @@
                           Margin="0,0,12,0"
                           Click="OkButton_Click" />
         <ui:RoundedButton x:Name="CancelButton"
-                          Content="{x:Static domain:UiStrings.ButtonCancel}"
+                          Content="{x:Static domain:UiStrings.ButtonCancelMnemonic}"
                           Width="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
                           Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
                           IsCancel="True"

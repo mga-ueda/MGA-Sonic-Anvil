@@ -31,9 +31,12 @@ internal static partial class UiStrings
         "\"{0}\" already exists. Overwrite, rename, or cancel?",
         name);
 
-    public static string LibraryOverwrite => Get("上書き", "Overwrite");
-    public static string LibraryRename => Get("リネーム", "Rename");
-    public static string LibraryCancel => Get("キャンセル", "Cancel");
+    /// <summary>名衝突確認の Yes 相当。Y アクセスキー（Alt+Y）。</summary>
+    public static string LibraryOverwrite => Get("上書き(_Y)", "Overwrite(_Y)");
+    /// <summary>名衝突確認の No 相当。N アクセスキー（Alt+N）。</summary>
+    public static string LibraryRename => Get("リネーム(_N)", "Rename(_N)");
+    /// <summary>名衝突確認の Cancel。C アクセスキー（Alt+C）。</summary>
+    public static string LibraryCancel => Get("キャンセル(_C)", "_Cancel");
     public static string LibraryRenameTitle => Get("名前の変更", "Rename");
     public static string LibraryNewFolderTitle => Get("新しいフォルダ", "New Folder");
 

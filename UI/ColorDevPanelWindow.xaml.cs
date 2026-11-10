@@ -61,8 +61,9 @@ internal partial class ColorDevPanelWindow : Window
         AppDialogKeys.PrepareActionButton(ExportButton);
         AppDialogKeys.PrepareActionButton(ResetButton);
         AppDialogKeys.PrepareActionButton(ResetThisButton);
-        AppDialogKeys.PrepareActionButton(CloseButton, isCancel: true);
-        AppDialogKeys.Attach(this, Close);
+        // Esc では閉じない。閉じるのは Alt+C（ラベル 閉じる(_C)／_Close）または Close クリック。
+        AppDialogKeys.PrepareActionButton(CloseButton);
+        AppDialogKeys.Attach(this, Close, closeOnEscape: false);
     }
 
     /// <summary>初回は一覧とピッカーの描画後に表示する。既に出ている場合は前面へ。</summary>

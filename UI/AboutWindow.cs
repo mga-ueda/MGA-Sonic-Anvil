@@ -85,7 +85,7 @@ internal sealed class AboutWindow : Window
 
         var ok = new RoundedButton
         {
-            Content = UiStrings.ButtonOk,
+            Content = UiStrings.ButtonOkMnemonic,
             MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             HorizontalAlignment = HorizontalAlignment.Center,

@@ -363,8 +363,8 @@ internal sealed class PitchCurveEditorDialog : Window
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        rightActions.Children.Add(CreateButton(UiStrings.ButtonOk, accept: true, accent: true, isDefault: true));
-        rightActions.Children.Add(CreateButton(UiStrings.ButtonCancel, accept: false, isCancel: true));
+        rightActions.Children.Add(CreateButton(UiStrings.ButtonOkMnemonic, accept: true, accent: true, isDefault: true));
+        rightActions.Children.Add(CreateButton(UiStrings.ButtonCancelMnemonic, accept: false, isCancel: true));
 
         var actionRow = new Grid
         {
@@ -1889,7 +1889,7 @@ internal static class PitchConstantBatchDialog
         };
         var cancel = new RoundedButton
         {
-            Content = UiStrings.ButtonCancel,
+            Content = UiStrings.ButtonCancelMnemonic,
             MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             Margin = new Thickness(8, 0, 0, 0),
@@ -1899,7 +1899,7 @@ internal static class PitchConstantBatchDialog
         cancel.Click += (_, _) => window.Close();
         var accept = new RoundedButton
         {
-            Content = UiStrings.ButtonOk,
+            Content = UiStrings.ButtonOkMnemonic,
             MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             Margin = new Thickness(8, 0, 0, 0),

@@ -5,7 +5,8 @@ internal static partial class UiStrings
     /// <summary>実行時の配色はダーク固定。</summary>
     public static string ColorDevTitleFor() =>
         Get("色設定", "Color settings");
-    public static string ColorDevClose => Get("閉じる", "Close");
+    /// <summary>閉じる。C にアクセスキー（Alt+C）。Esc では閉じない。</summary>
+    public static string ColorDevClose => Get("閉じる(_C)", "_Close");
     public static string ColorDevResetToDefaults => Get("既定に戻す", "Reset to defaults");
     public static string ColorDevResetThis => Get("この色を既定に戻す", "Reset this color");
     public static string ColorDevExport => Get("エクスポート", "Export");

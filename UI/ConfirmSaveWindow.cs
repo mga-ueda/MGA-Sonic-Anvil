@@ -49,7 +49,7 @@ internal sealed class ConfirmSaveWindow : Window
             Margin = new Thickness(0, 0, 0, 16),
         };
 
-        var yes = CreateButton(UiStrings.ButtonOk, ConfirmSaveChoice.Save, accent: true, isDefault: true);
+        var yes = CreateButton(UiStrings.ButtonOkMnemonic, ConfirmSaveChoice.Save, accent: true, isDefault: true);
         var no = CreateButton(UiStrings.ButtonNo, ConfirmSaveChoice.Discard);
         var saveAll = CreateButton(
             closing ? UiStrings.ButtonSaveAllAndClose : UiStrings.ButtonSaveAll,
@@ -57,7 +57,7 @@ internal sealed class ConfirmSaveWindow : Window
         var discardAll = CreateButton(
             closing ? UiStrings.ButtonDiscardAllAndClose : UiStrings.ButtonDiscardAll,
             ConfirmSaveChoice.DiscardAll);
-        var cancel = CreateButton(UiStrings.ButtonYesNoCancel, ConfirmSaveChoice.Cancel, isCancel: true);
+        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, ConfirmSaveChoice.Cancel, isCancel: true);
 
         var first = new StackPanel
         {

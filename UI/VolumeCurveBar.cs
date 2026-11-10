@@ -182,7 +182,7 @@ internal sealed class VolumeCurveBar : UserControl
 
         _cancelButton = new RoundedButton
         {
-            Content = UiStrings.ButtonCancel,
+            Content = UiStrings.ButtonCancelMnemonic,
             MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             Margin = new Thickness(8, 0, 0, 0),

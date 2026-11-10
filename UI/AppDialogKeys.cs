@@ -6,17 +6,46 @@ using System.Windows.Media;
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// ダイアログ共通。Tab で入力とボタンを循環し、Esc はキャンセル。
+/// ダイアログ共通。Tab で入力とボタンを循環し、既定は Esc／Alt+C でキャンセル、Alt+O で既定ボタン。
 /// </summary>
 internal static class AppDialogKeys
 {
-    public static void Attach(Window window, Action onCancel, Func<bool>? interceptEscape = null)
+    public static void Attach(
+        Window window,
+        Action onCancel,
+        Func<bool>? interceptEscape = null,
+        bool closeOnEscape = true,
+        bool bindAltLetterShortcuts = true)
     {
         KeyboardNavigation.SetTabNavigation(window, KeyboardNavigationMode.Cycle);
         window.PreviewKeyDown += (_, e) =>
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
-            if (!IsEscape(key, Keyboard.Modifiers))
+            var modifiers = Keyboard.Modifiers;
+
+            if (bindAltLetterShortcuts)
+            {
+                // Alt+O: IsDefault の OK など（ラベル _OK）。Enter とは別に明示ショートカット。
+                if (IsAltLetter(key, modifiers, Key.O))
+                {
+                    if (TryClickDefaultButton(window))
+                    {
+                        e.Handled = true;
+                    }
+
+                    return;
+                }
+
+                // Alt+C: Cancel／Close（ラベル _Cancel／_Close）。
+                if (IsAltLetter(key, modifiers, Key.C))
+                {
+                    onCancel();
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            if (!closeOnEscape || !IsEscape(key, modifiers))
             {
                 return;
             }
@@ -63,6 +92,30 @@ internal static class AppDialogKeys
         key == Key.Escape
         && (modifiers & (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Windows))
             == ModifierKeys.None;
+
+    internal static bool IsAltLetter(Key key, ModifierKeys modifiers, Key letter) =>
+        key == letter
+        && (modifiers & ModifierKeys.Alt) != 0
+        && (modifiers & (ModifierKeys.Control | ModifierKeys.Windows)) == 0;
+
+    internal static bool TryClickDefaultButton(Window window)
+    {
+        foreach (var child in Walk(window))
+        {
+            if (child is not Button button
+                || !button.IsDefault
+                || !button.IsEnabled
+                || button.Visibility != Visibility.Visible)
+            {
+                continue;
+            }
+
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            return true;
+        }
+
+        return false;
+    }
 
     internal static bool IsInputTabStop(DependencyObject element)
     {

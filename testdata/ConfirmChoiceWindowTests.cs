@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
 using Xunit;
@@ -80,17 +81,43 @@ public sealed class ConfirmChoiceWindowTests
             Assert.Equal("OK", UiStrings.ButtonOk);
             Assert.Equal("Cancel", UiStrings.ButtonCancel);
             Assert.Equal("No", UiStrings.ButtonNo);
-            Assert.Equal("Cancel", UiStrings.ButtonYesNoCancel);
+            Assert.Equal("_Cancel", UiStrings.ButtonYesNoCancel);
             Assert.Equal("Close", UiStrings.ButtonClose);
+            Assert.Equal("_OK", UiStrings.ButtonOkMnemonic);
+            Assert.Equal("_Cancel", UiStrings.ButtonCancelMnemonic);
+            Assert.Equal("_No", UiStrings.ButtonNoMnemonic);
+            Assert.Equal("_Yes", UiStrings.ButtonYesMnemonic);
             UiStrings.SetLanguage(UiLanguage.English);
             Assert.Equal("OK", UiStrings.ButtonOk);
             Assert.Equal("Cancel", UiStrings.ButtonCancel);
             Assert.Equal("No", UiStrings.ButtonNo);
-            Assert.Equal("Cancel", UiStrings.ButtonYesNoCancel);
+            Assert.Equal("_Cancel", UiStrings.ButtonYesNoCancel);
         }
         finally
         {
             UiStrings.SetLanguage(previous);
         }
+    }
+
+    [Theory]
+    [InlineData(Key.O, MessageBoxButton.OK, MessageBoxResult.OK)]
+    [InlineData(Key.O, MessageBoxButton.OKCancel, MessageBoxResult.OK)]
+    [InlineData(Key.C, MessageBoxButton.OKCancel, MessageBoxResult.Cancel)]
+    [InlineData(Key.O, MessageBoxButton.YesNo, MessageBoxResult.Yes)]
+    [InlineData(Key.Y, MessageBoxButton.YesNo, MessageBoxResult.Yes)]
+    [InlineData(Key.C, MessageBoxButton.YesNo, MessageBoxResult.No)]
+    [InlineData(Key.N, MessageBoxButton.YesNo, MessageBoxResult.No)]
+    [InlineData(Key.O, MessageBoxButton.YesNoCancel, MessageBoxResult.Yes)]
+    [InlineData(Key.Y, MessageBoxButton.YesNoCancel, MessageBoxResult.Yes)]
+    [InlineData(Key.N, MessageBoxButton.YesNoCancel, MessageBoxResult.No)]
+    [InlineData(Key.C, MessageBoxButton.YesNoCancel, MessageBoxResult.Cancel)]
+    [InlineData(Key.C, MessageBoxButton.OK, null)]
+    [InlineData(Key.N, MessageBoxButton.OKCancel, null)]
+    public void ChoiceForAltKey_MapsPresentButtons(
+        Key key,
+        MessageBoxButton buttons,
+        MessageBoxResult? expected)
+    {
+        Assert.Equal(expected, ConfirmChoiceWindow.ChoiceForAltKey(key, buttons));
     }
 }

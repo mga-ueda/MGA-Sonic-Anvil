@@ -17,6 +17,22 @@ public sealed class AppDialogKeysTests
         Assert.Equal(expected, AppDialogKeys.IsEscape(key, modifiers));
     }
 
+    [Theory]
+    [InlineData(Key.O, ModifierKeys.Alt, Key.O, true)]
+    [InlineData(Key.C, ModifierKeys.Alt, Key.C, true)]
+    [InlineData(Key.O, ModifierKeys.Alt | ModifierKeys.Shift, Key.O, true)]
+    [InlineData(Key.O, ModifierKeys.Alt | ModifierKeys.Control, Key.O, false)]
+    [InlineData(Key.O, ModifierKeys.None, Key.O, false)]
+    [InlineData(Key.C, ModifierKeys.Alt, Key.O, false)]
+    public void IsAltLetter_RequiresAltWithoutCtrlWin(
+        Key key,
+        ModifierKeys modifiers,
+        Key letter,
+        bool expected)
+    {
+        Assert.Equal(expected, AppDialogKeys.IsAltLetter(key, modifiers, letter));
+    }
+
     [Fact]
     public void ShouldFocusDefaultButton_WhenNoInputs()
     {
