@@ -668,6 +668,24 @@ public partial class MainWindow
         // 再開後に Enter で止められるよう、一時停止ホールドはここで外す（再生開始でクロームは隠れる）。
         ClearPlaylistVideoImmersivePause(sync: false);
 
+        // ピッチカーブ編集中は原音の通常再生に落とさない（テンキー 5／Alt+Enter／プリロール等）。
+        // Space／L と同じく、反映済みプレビューへシークまたは開始する。
+        if (IsPitchCurveMode)
+        {
+            Waveform.SeekKeepingSelection(startFrame);
+            _lastPlaybackStart = startFrame;
+            _selectionPlayOneShot = selectionOneShot ?? IsSelectionPlayWindow();
+            if (_pitchPreview.Previewing)
+            {
+                SyncPlayWindowFromDocument();
+                _player.Seek(MapPitchCurveHostCursorToPreview(startFrame));
+                return;
+            }
+
+            _ = StartPitchCurveModePreviewAsync(ignoreCurve: _pitchCurveIgnoreCurve);
+            return;
+        }
+
         if (IsLibraryMaximized && LibraryPlaylistDocuments.IsVisual(_document))
         {
             _lastPlaybackStart = startFrame;
@@ -2307,22 +2325,16 @@ public partial class MainWindow
 
         var preroll = _document.SampleRate * 3L;
         var start = range.Length < preroll ? range.StartFrame : range.EndFrame - preroll;
-        _lastPlaybackStart = start;
-        _selectionPlayOneShot = false;
 
+        // ピッチカーブ編集中は StartPlayback 側で反映プレビューへ回す。
         if (IsPitchCurveMode)
         {
-            Waveform.SeekKeepingSelection(start);
-            if (_pitchPreview.Previewing)
-            {
-                SyncPlayWindowFromDocument();
-                _player.Seek(MapPitchCurveHostCursorToPreview(start));
-                return;
-            }
-
-            _ = StartPitchCurveModePreviewAsync(ignoreCurve: _pitchCurveIgnoreCurve);
+            StartPlayback(start, prerollSeconds: 0, selectionOneShot: false);
             return;
         }
+
+        _lastPlaybackStart = start;
+        _selectionPlayOneShot = false;
 
         if (_player.IsPlaying || IsLibraryVideoPlayheadClock())
         {
