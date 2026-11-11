@@ -681,6 +681,19 @@ public partial class MainWindow
             }
         }
 
+        if (_pitchCurveMode)
+        {
+            if (key is Key.Left or Key.Right)
+            {
+                PitchCurveEditLayer.StopTimeNudge();
+            }
+
+            if (key is Key.Up or Key.Down)
+            {
+                PitchCurveEditLayer.ResetPointEditCapture();
+            }
+        }
+
         if (key is Key.LeftShift or Key.RightShift)
         {
             if (_transportSelectionExtend && _transportSelectionDigit >= 0)

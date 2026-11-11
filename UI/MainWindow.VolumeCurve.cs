@@ -79,8 +79,8 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Esc／キャンセル／V トグルオフ。ポイント選択があれば先に解除し、
-    /// 未確定編集があるときだけ破棄確認してからモードを抜ける。
+    /// Cancel／Alt+C／V トグルオフ。ポイント選択があれば先に解除し、
+    /// 未確定編集があるときだけ破棄確認してからモードを抜ける（Esc では呼ばない）。
     /// </summary>
     private void CancelVolumeCurveMode()
     {

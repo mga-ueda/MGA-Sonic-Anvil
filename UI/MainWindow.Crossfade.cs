@@ -19,7 +19,7 @@ public partial class MainWindow
 
     /// <summary>
     /// フェード調整ツール表示中（または音量カーブ編集モード中）は、他モード切替と破壊的な波形編集を
-    /// 受け付けない。再生・シーク・ズーム、およびツール自身（Escape で閉じる等）は許可する。
+    /// 受け付けない。再生・シーク・ズーム、およびツール自身（Cancel／Alt+C で閉じる等）は許可する。
     /// </summary>
     internal bool BlocksOutsideFadeToolActions => IsCrossfadeEditMode || IsVolumeCurveMode || IsPitchCurveMode;
 

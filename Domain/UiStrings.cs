@@ -1081,12 +1081,6 @@ internal static partial class UiStrings
             : text;
     }
 
-    public static string DialogPitchCurveTitle => Get("ピッチカーブ", "Pitch Curve");
-
-    public static string DialogPitchCurveSelectionSuffix => Get("（選択範囲）", " (selection)");
-
-    public static string DialogPitchCurveEntireSuffix => Get("（全体）", " (entire)");
-
     public static string LabelPitchCurveBrush => Get("ブラシ(_B)", "_Brush");
 
     public static string LabelPitchCurvePoints => Get("ポイント(_I)", "Po_ints");
@@ -1095,14 +1089,6 @@ internal static partial class UiStrings
     public static string LabelPitchCurveSeekBar => Get("シークバー(_F)", "Seek Bar (_F)");
 
     public static string LabelPitchCurveAddPoint => Get("ポイントを追加 (Alt+A)", "Add Point (Alt+A)");
-
-    public static string LabelPitchCurvePlay => Get("再生 (Alt+P)", "Play (Alt+P)");
-
-    public static string LabelPitchCurveStop => Get("停止 (Alt+P)", "Stop (Alt+P)");
-
-    public static string TipPitchCurvePlay => Get(
-        "Alt+Pで再生",
-        "Play with Alt+P");
 
     public static string LabelPitchCurveShape => Get("カーブ形状", "Curve Shape");
 
@@ -1152,10 +1138,7 @@ internal static partial class UiStrings
 
     public static string DialogPitchConstantTitle => Get("ピッチシフト（一括）", "Pitch Shift (Batch)");
 
-    // --- 音量カーブ（VolumeCurveEditorDialog）。選択範囲／全体サフィックス、ブラシ／ポイント／追加／
-    // 再生／停止／形状／リセットのラベルはピッチカーブ側の UiStrings を共有（文言が同一のため）。
-    public static string DialogVolumeCurveTitle => Get("音量カーブ", "Volume Curve");
-
+    // --- 音量カーブ。ブラシ／ポイント／追加／形状／リセットのラベルはピッチカーブ側を共有。
     /// <summary>音量カーブエディタの数値欄ラベル。Alt+N でフォーカス。</summary>
     public static string LabelVolumeCurveGainValue => Get("音量(_N)", "Volume (_N)");
 
