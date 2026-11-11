@@ -103,7 +103,7 @@ public sealed class WaveformZeroLineTests
         resources["MouseGuideOnSelectionBrush"] = new SolidColorBrush(Color.FromArgb(0xDC, 0x00, 0x00, 0x00));
         resources["WaveFillBrush"] = new SolidColorBrush(Color.FromArgb(0xFF, 0xC6, 0xD9, 0xFF));
         resources["WaveFillOverlayBrush"] = new SolidColorBrush(Color.FromArgb(0xFF, 0x3A, 0xB8, 0xE8));
-        resources["LoudnessWaveFillBrush"] = new SolidColorBrush(Color.FromArgb(0xFF, 0x4A, 0x4A, 0x50));
+        resources["LoudnessWaveFillBrush"] = new SolidColorBrush(Color.FromArgb(0xFF, 0x6F, 0x6F, 0x78));
         resources["WaveZeroLineBrush"] = new SolidColorBrush(Color.FromArgb(0x5A, 0xCC, 0xCC, 0xCC));
     }
 

@@ -127,7 +127,7 @@ public sealed class WaveformCenterLineTests
         resources["MouseGuideOnSelectionBrush"] = Frozen(0xDC, 0x00, 0x00, 0x00);
         resources["WaveFillBrush"] = Frozen(0xFF, 0xC6, 0xD9, 0xFF);
         resources["WaveFillOverlayBrush"] = Frozen(0xFF, 0x3A, 0xB8, 0xE8);
-        resources["LoudnessWaveFillBrush"] = Frozen(0xFF, 0x4A, 0x4A, 0x50);
+        resources["LoudnessWaveFillBrush"] = Frozen(0xFF, 0x6F, 0x6F, 0x78);
         resources["WaveZeroLineBrush"] = Frozen(0x5A, 0xCC, 0xCC, 0xCC);
     }
 

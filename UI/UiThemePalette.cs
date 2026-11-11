@@ -223,7 +223,7 @@ internal static class UiThemePalette
         ["LoudnessSafeBrush"] = Rgb(0x00, 0xFF, 0xFF),
         ["LoudnessCautionBrush"] = Rgb(0xD8, 0x98, 0x20),
         ["LoudnessDangerBrush"] = Rgb(0xB8, 0x38, 0x40),
-        ["LoudnessWaveFillBrush"] = Rgb(0x4A, 0x4A, 0x50),
+        ["LoudnessWaveFillBrush"] = Rgb(0x6F, 0x6F, 0x78),
         ["LoudnessChipForeBrush"] = Rgb(0xEB, 0xEB, 0xEB),
         ["LoudnessGridBrush"] = Argb(0x24, 0xFF, 0xFF, 0xFF),
         ["LoudnessTargetLineBrush"] = Argb(0xC8, 0xFF, 0xFF, 0xFF),
