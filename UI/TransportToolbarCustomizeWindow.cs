@@ -116,7 +116,7 @@ internal sealed class TransportToolbarCustomizeWindow : Window
         ActionButtonLooks.ApplyClear(resetButton);
 
         var ok = CreateDialogButton(UiStrings.ButtonOkMnemonic, accept: true, accent: true, isDefault: true);
-        var cancel = CreateDialogButton(UiStrings.ButtonCancelMnemonic, accept: false, isCancel: true);
+        var cancel = CreateDialogButton(UiStrings.ButtonCancelMnemonic, accept: false);
 
         var midButtons = new StackPanel
         {

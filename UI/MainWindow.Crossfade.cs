@@ -667,12 +667,7 @@ public partial class MainWindow
             return false;
         }
 
-        if (modifiers == ModifierKeys.None && key == Key.Escape)
-        {
-            ExitCrossfadeEditMode(apply: false);
-            return true;
-        }
-
+        // Esc では退出しない（Cancel／Alt+C）。Enter は Loop Mix 確定。
         if (modifiers == ModifierKeys.None && key == Key.Enter)
         {
             ExitCrossfadeEditMode(apply: true);

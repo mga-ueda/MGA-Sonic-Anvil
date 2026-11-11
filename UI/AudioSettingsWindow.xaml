@@ -1444,7 +1444,6 @@
                           Content="{x:Static domain:UiStrings.ButtonCancelMnemonic}"
                           Width="{x:Static ui:DesignMetrics.AudioDialogButtonWidth}"
                           Height="{x:Static ui:DesignMetrics.AudioDialogButtonHeight}"
-                          IsCancel="True"
                           Click="CancelButton_Click" />
       </StackPanel>
     </Grid>

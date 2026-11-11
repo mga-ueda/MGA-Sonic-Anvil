@@ -97,7 +97,7 @@ internal sealed class MatchLoudnessTargetWindow : Window
         row.Children.Add(unit);
 
         var ok = CreateButton(UiStrings.ButtonOkMnemonic, accept: true, accent: true, isDefault: true);
-        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accept: false, isCancel: true);
+        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accept: false);
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,

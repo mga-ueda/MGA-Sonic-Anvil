@@ -2431,15 +2431,16 @@ public partial class MainWindow
             return false;
         }
 
+        // クロスフェード／音量カーブは Cancel・Alt+C（音量は V も）で退出。Esc 一発では閉じない。
         if (IsCrossfadeEditMode)
         {
-            ExitCrossfadeEditMode(apply: false);
             return true;
         }
 
         if (IsVolumeCurveMode)
         {
-            CancelVolumeCurveMode();
+            // ポイントフォーカスだけ Esc で解除。モード自体は閉じない。
+            VolumeCurveEditLayer.TryClearPointFocus();
             return true;
         }
 

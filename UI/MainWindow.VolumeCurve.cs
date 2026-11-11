@@ -826,7 +826,7 @@ public partial class MainWindow
             return false;
         }
 
-        // Esc は TryProcessEscapeShortcut 側（ポイント解除→未確定確認→退出）。
+        // Esc は TryProcessEscapeShortcut 側（ポイントフォーカス解除のみ。モード退出はしない）。
         if (key == Key.Escape)
         {
             return false;

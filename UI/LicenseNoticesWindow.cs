@@ -65,11 +65,9 @@ internal sealed class LicenseNoticesWindow : Window
             Height = DesignMetrics.AudioDialogButtonHeight,
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 12, 0, 0),
-            IsDefault = true,
-            IsCancel = true,
         };
         ActionButtonLooks.ApplyAccent(ok);
-        AppDialogKeys.PrepareActionButton(ok, isDefault: true, isCancel: true);
+        AppDialogKeys.PrepareActionButton(ok, isDefault: true);
         ok.Click += (_, _) =>
         {
             DialogResult = true;

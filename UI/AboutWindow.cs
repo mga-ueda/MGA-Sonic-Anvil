@@ -89,11 +89,9 @@ internal sealed class AboutWindow : Window
             MinWidth = DesignMetrics.ConfirmSaveButtonWidth,
             Height = DesignMetrics.AudioDialogButtonHeight,
             HorizontalAlignment = HorizontalAlignment.Center,
-            IsDefault = true,
-            IsCancel = true,
         };
         ActionButtonLooks.ApplyAccent(ok);
-        AppDialogKeys.PrepareActionButton(ok, isDefault: true, isCancel: true);
+        AppDialogKeys.PrepareActionButton(ok, isDefault: true);
         ok.Click += (_, _) =>
         {
             DialogResult = true;

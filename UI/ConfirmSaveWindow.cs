@@ -57,7 +57,7 @@ internal sealed class ConfirmSaveWindow : Window
         var discardAll = CreateButton(
             closing ? UiStrings.ButtonDiscardAllAndClose : UiStrings.ButtonDiscardAll,
             ConfirmSaveChoice.DiscardAll);
-        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, ConfirmSaveChoice.Cancel, isCancel: true);
+        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, ConfirmSaveChoice.Cancel);
 
         var first = new StackPanel
         {

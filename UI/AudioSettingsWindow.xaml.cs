@@ -444,7 +444,7 @@ internal partial class AudioSettingsWindow : Window
         ApplyLibraryExplorerRootsChrome();
         // Enter では確定しない。確定は Alt+O（ラベル _OK）または OK ボタンのクリック。キャンセルは Alt+C（_Cancel）。
         AppDialogKeys.PrepareActionButton(OkButton);
-        AppDialogKeys.PrepareActionButton(CancelButton, isCancel: true);
+        AppDialogKeys.PrepareActionButton(CancelButton);
         AppDialogKeys.PrepareActionButton(LameBrowseButton);
         AppDialogKeys.PrepareActionButton(FfmpegBrowseButton);
         AppDialogKeys.PrepareActionButton(VideoProxyClearAllButton);

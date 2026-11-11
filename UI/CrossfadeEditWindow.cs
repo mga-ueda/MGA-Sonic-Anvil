@@ -1195,8 +1195,7 @@ internal sealed class CrossfadeEditWindow : Window
             UiStrings.ButtonCancelMnemonic,
             UiStrings.CrossfadeTipExit,
             RequestExit,
-            accent: false,
-            isCancel: true));
+            accent: false));
         row.Children.Add(right);
         return row;
     }

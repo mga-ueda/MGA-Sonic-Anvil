@@ -113,7 +113,7 @@ internal sealed class VstInsertPluginPickerWindow : Window
         var ok = CreateButton(UiStrings.ButtonOkMnemonic, accent: true, isDefault: true);
         ok.Click += (_, _) => TryAcceptSelected();
         buttons.Children.Add(ok);
-        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accent: false, isCancel: true);
+        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accent: false);
         cancel.Click += (_, _) => Close();
         buttons.Children.Add(cancel);
 

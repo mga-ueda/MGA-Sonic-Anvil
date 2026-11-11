@@ -6,7 +6,8 @@ using System.Windows.Media;
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
-/// ダイアログ共通。Tab で入力とボタンを循環し、既定は Esc／Alt+C でキャンセル、Alt+O で既定ボタン。
+/// ダイアログ共通。Tab で入力とボタンを循環し、既定は Alt+C でキャンセル、Alt+O で既定ボタン。
+/// Esc で閉じるのは closeOnEscape: true のときのみ（既定 false）。interceptEscape は closeOnEscape に関係なく先に効く。
 /// </summary>
 internal static class AppDialogKeys
 {
@@ -14,7 +15,7 @@ internal static class AppDialogKeys
         Window window,
         Action onCancel,
         Func<bool>? interceptEscape = null,
-        bool closeOnEscape = true,
+        bool closeOnEscape = false,
         bool bindAltLetterShortcuts = true)
     {
         KeyboardNavigation.SetTabNavigation(window, KeyboardNavigationMode.Cycle);
@@ -45,14 +46,20 @@ internal static class AppDialogKeys
                 }
             }
 
-            if (!closeOnEscape || !IsEscape(key, modifiers))
+            if (!IsEscape(key, modifiers))
             {
                 return;
             }
 
+            // 検索クリア等。閉じる前に消費する（closeOnEscape が false でも有効）。
             if (interceptEscape?.Invoke() == true)
             {
                 e.Handled = true;
+                return;
+            }
+
+            if (!closeOnEscape)
+            {
                 return;
             }
 

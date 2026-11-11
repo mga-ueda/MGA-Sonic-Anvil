@@ -37,7 +37,7 @@ internal sealed class NewDocumentWindow : Window
         AudioFormatComboFill.Fill(_rateCombo, _bitsCombo, _layoutCombo, current, _visibleIds);
                         
         var ok = CreateButton(UiStrings.ButtonOkMnemonic, accept: true, accent: true, isDefault: true);
-        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accept: false, isCancel: true);
+        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accept: false);
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,

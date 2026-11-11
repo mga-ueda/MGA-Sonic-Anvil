@@ -68,7 +68,7 @@ internal static class LibraryNameWindow
                 Margin = new Thickness(8, 0, 0, 0),
             };
             AppDialogKeys.PrepareActionButton(ok, isDefault: true, isCancel: false);
-            AppDialogKeys.PrepareActionButton(cancel, isDefault: false, isCancel: true);
+            AppDialogKeys.PrepareActionButton(cancel, isDefault: false);
             ActionButtonLooks.ApplyAccent(ok);
             ActionButtonLooks.ApplyClear(cancel);
             ok.Click += (_, _) =>

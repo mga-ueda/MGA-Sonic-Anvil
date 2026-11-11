@@ -104,7 +104,7 @@ internal sealed class ConfirmRecordSilentSkipWindow : Window
         Loaded += (_, _) => SyncAddRegionEnabled();
 
         var ok = CreateButton(UiStrings.ButtonOkMnemonic, ConfirmRecordSilentSkipChoice.Record, accent: true, isDefault: true);
-        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, ConfirmRecordSilentSkipChoice.Cancel, isCancel: true);
+        var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, ConfirmRecordSilentSkipChoice.Cancel);
 
         var buttons = new StackPanel
         {
