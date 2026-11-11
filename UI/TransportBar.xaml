@@ -7,10 +7,10 @@
              ToolTipService.IsEnabled="True"
              MinHeight="{x:Static ui:DesignMetrics.TransportRowHeight}"
              Background="Transparent">
-  <!-- グループは丸みベール単位。幅が足りないときはその単位で折り返す。 -->
-  <WrapPanel x:Name="ItemsHost"
-             Orientation="Horizontal"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Top"
-             Margin="8,1,8,1" />
+  <!-- グループは丸みベール単位。幅が足りないときはその単位で折り返す。中央寄せ時は各行をセンタリング。 -->
+  <ui:AlignedWrapPanel x:Name="ItemsHost"
+                       LineAlignment="Center"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Top"
+                       Margin="8,1,8,1" />
 </UserControl>

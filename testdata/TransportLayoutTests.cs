@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
@@ -84,5 +86,54 @@ public sealed class TransportLayoutTests
         var scale = Assert.IsType<ScaleTransform>(transform);
         Assert.Equal(1.5, scale.ScaleX);
         Assert.Equal(1.5, scale.ScaleY);
+    }
+
+    [Fact]
+    public void AlignedWrapPanel_Center_CentersSecondLineUnderFirst()
+    {
+        RunSta(() =>
+        {
+            var panel = new AlignedWrapPanel
+            {
+                LineAlignment = HorizontalAlignment.Center,
+            };
+            // 幅 100 に 40+40 が 1 行目、余り 40 が 2 行目。中央なら 2 行目 x=(100-40)/2=30。
+            panel.Children.Add(new Border { Width = 40, Height = 10 });
+            panel.Children.Add(new Border { Width = 40, Height = 10 });
+            panel.Children.Add(new Border { Width = 40, Height = 10 });
+            panel.Measure(new Size(100, 40));
+            panel.Arrange(new Rect(0, 0, 100, 40));
+
+            Point Origin(int index) =>
+                ((FrameworkElement)panel.Children[index]).TransformToAncestor(panel).Transform(new Point(0, 0));
+
+            Assert.Equal(10, Origin(0).X, 0.5); // (100-80)/2
+            Assert.Equal(50, Origin(1).X, 0.5);
+            Assert.Equal(30, Origin(2).X, 0.5);
+            Assert.True(Origin(2).Y > Origin(0).Y);
+        });
+    }
+
+    private static void RunSta(Action action)
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+        {
+            ExceptionDispatchInfo.Capture(error).Throw();
+        }
     }
 }
