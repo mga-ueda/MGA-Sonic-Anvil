@@ -412,7 +412,7 @@ public sealed class WaveContainerStructureTests
             Assert.DoesNotContain(
                 UiStrings.WaveStructureDataTruncated(600, WaveContainerStructure.DataPreviewPageBytes),
                 custom.Content);
-            Assert.Contains("00000250", custom.Content); // offset past the old 512-byte page
+            Assert.Contains("00000250", custom.Content); // offset past the data-preview page size
         }
         finally
         {

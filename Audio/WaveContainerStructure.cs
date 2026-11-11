@@ -453,7 +453,7 @@ internal sealed class WaveStructureDocument
 internal static class WaveContainerStructure
 {
     /// <summary>data / SSND / wavl のプレビュー長（1 ページ分）。続きは読まない。</summary>
-    public const int DataPreviewPageBytes = 512;
+    public const int DataPreviewPageBytes = 1536;
 
     /// <summary>サンプル以外のバイナリ全文表示の上限（異常に巨大な JUNK 等の保険）。</summary>
     public const int BinaryFullPreviewMaxBytes = 4 * 1024 * 1024;
