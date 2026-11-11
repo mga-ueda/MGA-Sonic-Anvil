@@ -26,6 +26,14 @@ public partial class MainWindow
             return;
         }
 
+        if (IsPitchCurveMode
+            && !IsSameModeToggleWaveMenu(command)
+            && !WaveformContextMenuBuilder.IsAllowedDuringVolumeCurveMode(command))
+        {
+            WarnPitchCurveModeBlocked();
+            return;
+        }
+
         switch (command)
         {
             case WaveMenuCommand.ClearMarkers:
@@ -350,7 +358,7 @@ public partial class MainWindow
             case WaveMenuCommand.ViewSpectrogram:
             case WaveMenuCommand.ViewOverlay:
             case WaveMenuCommand.ViewLoudness:
-                if (IsVolumeCurveMode)
+                if (IsVolumeCurveMode || IsPitchCurveMode)
                 {
                     // 同モード解除のみ（入場はゲートで拒否済み）。
                     if (command is WaveMenuCommand.ViewLoudness or WaveMenuCommand.ViewWaveform)

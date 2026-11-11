@@ -287,6 +287,9 @@ internal sealed partial class WaveformView : Grid
     private readonly List<(long Frame, long TickMs)> _exitTrailSamples = [];
     private bool _trailActive;
     private Func<long, float>? _previewGainAtFrame;
+    /// <summary>ピッチカーブ等、差し替え PCM で波形／クリップカプセルを描くときの仮サンプル。</summary>
+    private float[]? _previewSamples;
+    private int _previewSampleChannels = 1;
     /// <summary>Short Term 曲線にプレビューゲインを焼き込み済みなら、描画時の二重適用を避ける。</summary>
     private bool _loudnessPreviewGainBaked;
 
@@ -369,6 +372,8 @@ internal sealed partial class WaveformView : Grid
     private double _timeZoom = 1d;
     private double _ampZoom = 1d;
     private bool _showScaleLane = true;
+    /// <summary>false のとき左レーン幅は残しつつ dB 目盛り描画だけ抑止（ピッチ鍵盤と重ねない）。</summary>
+    private bool _paintDbScale = true;
     private long _playheadFrame;
     private double? _pointerX;
     private double? _mouseGuideX;
@@ -561,6 +566,8 @@ internal sealed partial class WaveformView : Grid
             CancelPointerInteraction();
             DiscardInvertBitmap();
             _previewGainAtFrame = null;
+            _previewSamples = null;
+            _previewSampleChannels = 1;
             // 前ファイルの緑／赤重ね・帯差分・パッチ用キャッシュを破棄。
             DiscardCrossfadeRenderCaches();
             ClearTimelineSelection(refresh: false);
@@ -586,8 +593,54 @@ internal sealed partial class WaveformView : Grid
     public void SetPreviewGain(Func<long, float>? gainAtFrame)
     {
         _previewGainAtFrame = gainAtFrame;
+        if (gainAtFrame is not null)
+        {
+            _previewSamples = null;
+            _previewSampleChannels = 1;
+        }
+
         InvalidateWaveform();
     }
+
+    /// <summary>
+    /// ピッチカーブ編集など、差し替え PCM で波形とクリップ赤カプセルを描く（尺はドキュメントと一致必須）。
+    /// null で解除。
+    /// </summary>
+    public void SetPreviewSamples(float[]? interleaved, int channels)
+    {
+        if (interleaved is null || interleaved.Length == 0 || _document is null)
+        {
+            _previewSamples = null;
+            _previewSampleChannels = 1;
+            InvalidateWaveform();
+            return;
+        }
+
+        channels = Math.Max(1, channels);
+        if (channels != _document.Channels
+            || interleaved.Length < channels
+            || interleaved.Length / channels != _document.FrameCount)
+        {
+            _previewSamples = null;
+            _previewSampleChannels = 1;
+            InvalidateWaveform();
+            return;
+        }
+
+        _previewSamples = interleaved;
+        _previewSampleChannels = channels;
+        _previewGainAtFrame = null;
+        InvalidateWaveform();
+    }
+
+    private bool HasMatchingPreviewSamples =>
+        _previewSamples is not null
+        && _document is not null
+        && _previewSampleChannels == _document.Channels
+        && _previewSamples.Length / Math.Max(1, _previewSampleChannels) == _document.FrameCount;
+
+    private bool PreviewClipTipsEnabled =>
+        (_previewGainAtFrame is not null || HasMatchingPreviewSamples) && _waveClipBgra != 0;
 
     public long PlayheadFrame
     {
@@ -864,6 +917,25 @@ internal sealed partial class WaveformView : Grid
             _deferWaveReload = false;
             _waveDirty = true;
             SyncSpectrogramBoostBar();
+            InvalidateStaticLayer();
+        }
+    }
+
+    /// <summary>
+    /// 左レーンの dB 目盛りを描くか。レーン幅（<see cref="ShowScaleLane"/>）とは独立。
+    /// ピッチカーブ編集でピアノ鍵盤を重ねるときは false にする。
+    /// </summary>
+    public bool PaintDbScale
+    {
+        get => _paintDbScale;
+        set
+        {
+            if (_paintDbScale == value)
+            {
+                return;
+            }
+
+            _paintDbScale = value;
             InvalidateStaticLayer();
         }
     }
@@ -1651,6 +1723,26 @@ internal sealed partial class WaveformView : Grid
             _document,
             () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness),
             frameGain);
+    }
+
+    /// <summary>
+    /// 差し替え済み PCM で Short Term ラウドネス曲線を測り直す（ピッチカーブ編集プレビュー）。
+    /// 尺が元ドキュメントと異なるときは呼ばない（曲線の時間軸がずれるため）。
+    /// </summary>
+    public void RefreshLoudnessWithPreviewSamples(float[] interleaved, int channels, int sampleRate)
+    {
+        _loudnessPreviewGainBaked = true;
+        if (!LoudnessVisible)
+        {
+            return;
+        }
+
+        _loudness.Invalidate();
+        _loudness.EnsureFromSamples(
+            interleaved,
+            channels,
+            sampleRate,
+            () => Dispatcher.BeginInvoke(InvalidateStaticLayerForLoudness));
     }
 
     private Func<long, float>? LoudnessDrawPreviewGain =>
@@ -3563,13 +3655,17 @@ internal sealed partial class WaveformView : Grid
             var channels = SeekAndSelectOnly ? 1 : Math.Max(1, _document.Channels);
             var laneGap = channels > 1 ? 4d : 0d;
             var laneHeight = (wave.Height - laneGap * (channels - 1)) / channels;
-            DrawDbScaleTicks(dc, bounds, wave, channels, laneGap, laneHeight);
+            if (_paintDbScale)
+            {
+                DrawDbScaleTicks(dc, bounds, wave, channels, laneGap, laneHeight);
+            }
+
             if (!SeekAndSelectOnly && channels > 1)
             {
                 DrawChannelLabels(dc, bounds, wave, channels, laneGap, laneHeight);
             }
         }
-        else if (_showScaleLane && overlay)
+        else if (_showScaleLane && overlay && _paintDbScale)
         {
             ResolveWaveLane(overlay: true, wave.Height, 1, 0, _ampZoom, out var laneHeight, out var origin, out var ampHeight);
             var overlayWave = new Rect(wave.X, wave.Y + origin, wave.Width, laneHeight);
@@ -4809,7 +4905,7 @@ internal sealed partial class WaveformView : Grid
         var amp = ampHeight * 0.5 * _ampZoom;
         var bottom = top + laneHeight;
         var baseColor = colorOverride ?? WavePaintBgraFor(channel);
-        var markClip = colorOverride is null && _previewGainAtFrame is not null && _waveClipBgra != 0;
+        var markClip = colorOverride is null && PreviewClipTipsEnabled;
         var px1 = Math.Min(width, px0 + count);
         for (var i = 0; i < count; i++)
         {
@@ -5020,7 +5116,8 @@ internal sealed partial class WaveformView : Grid
             return FillLiveColumnPeaks(document, startFrame, endFrame, width, channels);
         }
 
-        var count = useRawColumns
+        // 差し替え PCM があるときは常に生サンプルから列を作り、クリップ赤カプセルを出す。
+        var count = HasMatchingPreviewSamples || useRawColumns
             ? FillRawColumnPeaks(document, startFrame, endFrame, width, channels)
             : document.Peaks.ReadRangePacked(
                 startFrame,
@@ -5038,13 +5135,13 @@ internal sealed partial class WaveformView : Grid
             return count;
         }
 
-        if (_previewGainAtFrame is not null)
+        if (_previewGainAtFrame is not null && !HasMatchingPreviewSamples)
         {
             ApplyPreviewGainToColumns(startFrame, endFrame, count, channels);
         }
 
         // ピーク／生カラムどちらでも、クロス区間はフェード曲線付きミックスで上書きする。
-        if (_crossfadeDraft is { IsActive: true })
+        if (_crossfadeDraft is { IsActive: true } && !HasMatchingPreviewSamples)
         {
             PatchColumnsWithCrossfadeWavePreview(document, startFrame, endFrame, count, channels);
         }

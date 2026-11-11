@@ -89,6 +89,39 @@ internal sealed class LoudnessOverlayRenderer
         });
     }
 
+    /// <summary>差し替え済み PCM で Short Term プロファイルを測り直す（ピッチプレビュー用）。</summary>
+    public void EnsureFromSamples(float[] interleaved, int channels, int sampleRate, Action onUpdated)
+    {
+        ArgumentNullException.ThrowIfNull(interleaved);
+        int gen;
+        lock (_gate)
+        {
+            gen = ++_generation;
+            _samples = null;
+            _sampleRate = Math.Max(1000, sampleRate);
+            _channels = Math.Max(1, channels);
+            _profile = null;
+        }
+
+        var rate = Math.Max(1000, sampleRate);
+        var ch = Math.Max(1, channels);
+        Task.Run(() =>
+        {
+            var profile = LoudnessMeterEngine.BuildShortTermProfile(interleaved, ch, rate);
+            lock (_gate)
+            {
+                if (gen != _generation)
+                {
+                    return;
+                }
+
+                _profile = profile;
+            }
+
+            onUpdated();
+        });
+    }
+
     public void DrawUnderlay(DrawingContext dc, Rect wave, double target)
     {
         if (wave.Width <= 1 || wave.Height <= 1)

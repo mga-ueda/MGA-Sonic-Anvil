@@ -325,11 +325,14 @@ internal sealed partial class WaveformView
             return 0;
         }
 
-        var samples = document.Interleaved;
-        var frameCount = document.FrameCount;
+        var usePreview = HasMatchingPreviewSamples;
+        var samples = usePreview ? _previewSamples! : document.Interleaved;
+        var frameCount = usePreview
+            ? samples.Length / Math.Max(1, _previewSampleChannels)
+            : document.FrameCount;
         var destBase = destColumn * channels;
         var destEnd = destBase + buckets * channels;
-        var draft = _crossfadeDraft is { IsActive: true } active ? active : null;
+        var draft = !usePreview && _crossfadeDraft is { IsActive: true } active ? active : null;
         var fade = draft is not null ? LoopFadePreview.From(draft) : default;
         for (var i = destBase; i < destEnd; i++)
         {
@@ -352,7 +355,7 @@ internal sealed partial class WaveformView
             for (var frame = f0; frame < f1; frame++)
             {
                 var src = (int)frame * channels;
-                var gain = PreviewGain(frame);
+                var gain = usePreview ? 1f : PreviewGain(frame);
                 for (var ch = 0; ch < channels; ch++)
                 {
                     float sample;
@@ -459,9 +462,10 @@ internal sealed partial class WaveformView
         }
 
         var count = (int)(last - first + 1);
-        var samples = document.Interleaved;
+        var usePreview = HasMatchingPreviewSamples;
+        var samples = usePreview ? _previewSamples! : document.Interleaved;
         var amp = ampHeight * 0.5 * _ampZoom;
-        var draft = _crossfadeDraft is { IsActive: true } active ? active : null;
+        var draft = !usePreview && _crossfadeDraft is { IsActive: true } active ? active : null;
         var fade = draft is not null ? LoopFadePreview.From(draft) : default;
         int SampleY(float sample)
         {
@@ -472,7 +476,7 @@ internal sealed partial class WaveformView
         float SampleAt(int index)
         {
             var frame = first + index;
-            var gain = channel >= 0 && IsLaneMuted(channel) ? 1f : PreviewGain(frame);
+            var gain = usePreview || (channel >= 0 && IsLaneMuted(channel)) ? 1f : PreviewGain(frame);
             if (channel < 0)
             {
                 if (draft is not null
@@ -497,7 +501,7 @@ internal sealed partial class WaveformView
         var collectDots = ShouldDrawSamplePoints(count, width / scaleX);
         var dotRadius = Math.Max(1, (int)Math.Round(SamplePointRadius * scaleX));
         var baseColor = WavePaintBgraFor(channel);
-        var markClip = _previewGainAtFrame is not null && _waveClipBgra != 0;
+        var markClip = PreviewClipTipsEnabled;
 
         void PaintClipTip(int x, float sample, int y)
         {

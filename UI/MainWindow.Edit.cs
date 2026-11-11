@@ -527,6 +527,12 @@ public partial class MainWindow
 
     private void PromptPitch()
     {
+        // 入場中の再呼び出しは無視（退出は Cancel／Alt+C／OK のみ。P では抜けない）。
+        if (IsPitchCurveMode)
+        {
+            return;
+        }
+
         if (RejectOutsideFadeToolAction() || IsUiBusy)
         {
             return;
@@ -566,47 +572,14 @@ public partial class MainWindow
             return;
         }
 
-        var selectionScoped = !_document.Selection.IsEmpty;
-        var range = ActiveRange();
-        if (range.IsEmpty)
-        {
-            OwnerCenteredMessageBox.Show(this, UiStrings.ErrorNoSelection, UiStrings.AppName, MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        _pitchPreview.ResumeFrame = _document.CursorFrame;
-        var playback = new PitchCurvePreviewPlayback
-        {
-            Play = StartPitchCurvePreviewPlayback,
-            Stop = () => StopPitchCurvePreview(restoreCursor: true),
-            IsPlaying = () => _pitchPreview.Previewing && _player.IsPlaying,
-            CursorFrame = () => _player.SmoothCursorFrame,
-        };
-        var result = PitchCurveEditorDialog.Show(
-            this,
-            _document,
-            range,
-            EditMask(),
-            selectionScoped,
-            playback);
-        StopPitchCurvePreview(restoreCursor: true);
-        if (!result.Accepted)
-        {
-            return;
-        }
-
-        _ = ApplyPitchCurveAsync(
-            result.Curve,
-            result.Range,
-            result.DocumentGainScale,
-            result.EdgeFadeMs,
-            result.TimeStretch,
-            result.PrecomputedAfterRange);
+        // 単一ドキュメント: モーダルダイアログではなく、音量カーブと同じメインウィンドウ内編集モードへ入る。
+        PromptPitchCurve();
     }
 
     /// <summary>
-    /// ピッチカーブダイアログのプレビュー。本体と同じ <see cref="_player"/> を Rebind するだけなので音は一系統。
-    /// モーダル中は本体の再生ヘッド／トランスポートを動かさず、二重再生に見えないようにする。
+    /// ピッチカーブ編集モードのプレビュー。本体と同じ <see cref="_player"/> を Rebind するだけなので音は一系統。
+    /// メイン窓モードではシークバー／再生ヘッドを動かす（旧モーダルダイアログの HideHostTransport は使わない）。
+    /// タイムストレッチなしで尺が変わるときはホスト選択／カーソルをプレビュー座標へ写してから窓・開始位置を決める。
     /// </summary>
     private void StartPitchCurvePreviewPlayback(
         AudioDocument preview,
@@ -625,29 +598,43 @@ public partial class MainWindow
                 _player.Pause();
             }
 
-            // 本体側の再生 UI を止めたまま、音声だけ差し替える（二重に聞こえない／見えない）。
-            Waveform.SetTrailRecording(false);
-            Transport.SetPlaying(false);
+            _playTimer.Stop();
             _meter.Reset();
             LoudnessMeter.Reset();
+
+            var hostPlay = ResolvePlayLoopRange();
+            var loop = ShouldLoopResolvedPlayWindow(hostPlay);
+            var playWindow = previewRange;
+            if (hostPlay is { } host)
+            {
+                var mapped = MapPitchCurveHostRangeToPreview(host);
+                if (mapped is { IsEmpty: false } window)
+                {
+                    playWindow = window;
+                }
+            }
+
+            var start = MapPitchCurveHostCursorToPreview(_document.CursorFrame);
+            start = AutoLoopPlayback.ClampStartFrame(start, playWindow, allowBeforeStart: false);
+
             if (_player.HasOutputDevice)
             {
-                _player.Rebind(preview, 0, previewRange, loop: false);
+                _player.Rebind(preview, start, playWindow, loop: loop);
             }
             else
             {
-                _player.Prepare(preview, 0, previewRange, loop: false);
+                _player.Prepare(preview, start, playWindow, loop: loop);
             }
 
             _pitchPreview.Origin = originFrame;
-            EffectPreviewSession.MarkStarted(_pitchPreview, hideHostTransport: true);
+            EffectPreviewSession.MarkStarted(_pitchPreview);
             _player.Play();
             _playbackGeneration = _player.Generation;
-            // ASIO の終端検知用。SyncPreviewPlayhead は HideHostTransport で抑止する。
-            if (!_playTimer.IsEnabled)
-            {
-                _playTimer.Start();
-            }
+            _playTimer.Start();
+            StartMeterRendering();
+            Waveform.SetTrailRecording(true);
+            Transport.SetPlaying(true);
+            Waveform.SetPlayheadFromPlayback(MapPitchCurvePreviewCursorToHost(start));
         }
         catch (Exception ex)
         {
@@ -655,8 +642,7 @@ public partial class MainWindow
                 this,
                 _pitchPreview,
                 ex,
-                () => PausePlaybackSoft(),
-                clearHideHostTransport: true);
+                () => PausePlaybackSoft());
         }
     }
 

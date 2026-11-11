@@ -21,7 +21,7 @@ public partial class MainWindow
     /// フェード調整ツール表示中（または音量カーブ編集モード中）は、他モード切替と破壊的な波形編集を
     /// 受け付けない。再生・シーク・ズーム、およびツール自身（Escape で閉じる等）は許可する。
     /// </summary>
-    internal bool BlocksOutsideFadeToolActions => IsCrossfadeEditMode || IsVolumeCurveMode;
+    internal bool BlocksOutsideFadeToolActions => IsCrossfadeEditMode || IsVolumeCurveMode || IsPitchCurveMode;
 
     /// <summary>トランスポートから受け付ける操作か（フェード調整中のフィルタ）。</summary>
     internal static bool IsAllowedTransportDuringFadeTool(TransportCommand command) =>
@@ -82,6 +82,17 @@ public partial class MainWindow
             }
 
             WarnVolumeCurveModeBlocked();
+            return true;
+        }
+
+        if (IsPitchCurveMode)
+        {
+            if (allowDuringVolumeCurve)
+            {
+                return false;
+            }
+
+            WarnPitchCurveModeBlocked();
             return true;
         }
 
@@ -210,6 +221,22 @@ public partial class MainWindow
             MessageBoxButton.OK,
             MessageBoxImage.Information);
 
+    private void WarnPitchCurveModeBlocked() =>
+        OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ErrorPitchCurveModeActive,
+            UiStrings.AppName,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+
+    private void WarnPitchCurveModeBlocksTile() =>
+        OwnerCenteredMessageBox.Show(
+            this,
+            UiStrings.ErrorPitchCurveModeBlocksTile,
+            UiStrings.AppName,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+
     private CrossfadeEditWindow EnsureCrossfadeWindow()
     {
         if (_crossfadeWindow is not null)
@@ -254,10 +281,16 @@ public partial class MainWindow
             return true;
         }
 
-        // 音量カーブ中はフェード調整へ入れない（警告ダイアログ）。
+        // 音量／ピッチカーブ中はフェード調整へ入れない（警告ダイアログ）。
         if (IsVolumeCurveMode)
         {
             WarnVolumeCurveModeBlocked();
+            return true;
+        }
+
+        if (IsPitchCurveMode)
+        {
+            WarnPitchCurveModeBlocked();
             return true;
         }
 

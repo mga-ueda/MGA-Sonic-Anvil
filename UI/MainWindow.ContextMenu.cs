@@ -1090,7 +1090,7 @@ public partial class MainWindow
             && !recording
             && !IsLibraryMaximized
             && !IsCrossfadeEditMode;
-        var canEdit = canEditMarkers && !IsVolumeCurveMode;
+        var canEdit = canEditMarkers && !IsVolumeCurveMode && !IsPitchCurveMode;
         var canScratch = hasDoc && !busy && !recording && IsPlayerScratchContext();
         var canNavigate = hasDoc && !busy && !recording;
         var hasSelection = hasDoc && !document!.Selection.IsEmpty;
@@ -1102,7 +1102,7 @@ public partial class MainWindow
             HasDocument = hasDoc,
             CanEdit = canEdit,
             CanEditMarkers = canEditMarkers,
-            RestrictMenusToNavigateAndMarkers = IsVolumeCurveMode,
+            RestrictMenusToNavigateAndMarkers = IsVolumeCurveMode || IsPitchCurveMode,
             CanNavigate = canNavigate,
             IsBusy = busy,
             IsPlaying = IsPlaybackActive(),

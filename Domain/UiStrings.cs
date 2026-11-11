@@ -233,6 +233,10 @@ internal static partial class UiStrings
     public static string ErrorVolumeCurveModeBlocksTile => Get(
         "音量カーブ調整中はタイル表示に切り替えられません。",
         "Cannot switch to tile view while volume curve editing is active.");
+
+    public static string ErrorLoudnessPenBlocksVolumeCurve => Get(
+        "ラウドネス調整中です。E キーでペンを終了してから音量カーブへ切り替えてください。",
+        "Loudness pen is active. Press E to leave the pen before entering volume curve mode.");
     public static string ErrorVstBounceRecording => Get(
         "録音中はバウンスできません。",
         "Cannot bounce while recording.");
@@ -1087,6 +1091,9 @@ internal static partial class UiStrings
 
     public static string LabelPitchCurvePoints => Get("ポイント(_I)", "Po_ints");
 
+    /// <summary>波形クリックでシークするための非編集モード。Alt+F。</summary>
+    public static string LabelPitchCurveSeekBar => Get("シークバー(_F)", "Seek Bar (_F)");
+
     public static string LabelPitchCurveAddPoint => Get("ポイントを追加 (Alt+A)", "Add Point (Alt+A)");
 
     public static string LabelPitchCurvePlay => Get("再生 (Alt+P)", "Play (Alt+P)");
@@ -1107,8 +1114,8 @@ internal static partial class UiStrings
         "Snap to _scale");
 
     public static string LabelPitchCurveNoTimeStretch => Get(
-        "タイムストレッチをしない(_T)",
-        "Don't _time stretch");
+        "タイムストレッチをしない(_H)",
+        "Don't time stretc_h");
 
     public static string LabelPitchCurveLightweightMode => Get(
         "軽量演算モード(_L)（視聴時のみ有効）",
@@ -1124,9 +1131,24 @@ internal static partial class UiStrings
         "ピッチカーブを無視して再生",
         "Play Ignoring Pitch Curve");
 
-    public static string MessagePitchCurveClipAsk => Get(
-        "処理後にクリップが発生します。波形全体の音量を下げてから適用しますか？",
-        "The result will clip. Lower the volume of the entire waveform before applying?");
+    /// <summary>ピッチカーブ OK 時のクリップ確認。{0} は下げる dB（V モードと同形式）。</summary>
+    public static string ConfirmPitchCurveClip(string lowerDb) => Format(
+        "処理後の音量が 0 dBFS を超えます。このままでは歪む可能性があります。\n\nYes: 波形全体を {0} dB 下げてから適用する\nNo: 音量を変えずに適用する（クリップする）\nCancel: 適用をやめて編集に戻る",
+        "Applying this pitch curve would go above 0 dBFS and may distort.\n\nYes: lower the whole waveform by {0} dB before applying\nNo: apply without changing level (will clip)\nCancel: cancel apply and keep editing",
+        lowerDb);
+
+    /// <summary>未確定のまま Esc／キャンセルで抜けるときの確認（音量カーブと同文言パターン）。</summary>
+    public static string ConfirmPitchCurveDiscard => Get(
+        "ピッチカーブの編集はまだ確定されていません。破棄して終了しますか？",
+        "Pitch curve edits are not applied yet. Discard them and exit?");
+
+    public static string ErrorPitchCurveModeActive => Get(
+        "ピッチカーブ調整中です。終了してからほかのモードへ切り替えてください。",
+        "Pitch curve editing is active. Exit it before switching to another mode.");
+
+    public static string ErrorPitchCurveModeBlocksTile => Get(
+        "ピッチカーブ調整中はタイル表示に切り替えられません。",
+        "Cannot switch to tile view while pitch curve editing is active.");
 
     public static string DialogPitchConstantTitle => Get("ピッチシフト（一括）", "Pitch Shift (Batch)");
 

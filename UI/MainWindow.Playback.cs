@@ -23,7 +23,7 @@ public partial class MainWindow
             return;
         }
 
-        if (IsVolumeCurveMode)
+        if (IsVolumeCurveMode || IsPitchCurveMode)
         {
             // すでに入っている表示モードのトグル解除／相互切替は許容。
             if (IsSameModeToggleDuringVolumeCurve(command))
@@ -32,7 +32,15 @@ public partial class MainWindow
             }
             else if (!IsAllowedTransportDuringVolumeCurve(command))
             {
-                WarnVolumeCurveModeBlocked();
+                if (IsVolumeCurveMode)
+                {
+                    WarnVolumeCurveModeBlocked();
+                }
+                else
+                {
+                    WarnPitchCurveModeBlocked();
+                }
+
                 return;
             }
         }
@@ -55,6 +63,11 @@ public partial class MainWindow
                 {
                     // プレイヤーの Space と同じ（動画本再生中は一時停止／再開。ほかは停止で開始位置へ）。
                     PlayLibrarySelectionOnceOrToggle();
+                }
+                else if (IsPitchCurveMode)
+                {
+                    // Space と同じくピッチ反映プレビュー。
+                    TogglePitchCurvePreview();
                 }
                 else
                 {
@@ -934,7 +947,7 @@ public partial class MainWindow
             : _player.CursorFrame;
         if (_pitchPreview.Previewing)
         {
-            frame += _pitchPreview.Origin;
+            frame = MapPitchCurvePreviewCursorToHost(frame);
         }
 
         if (_timeStretchPreview.Previewing)
@@ -1086,18 +1099,21 @@ public partial class MainWindow
                 TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)));
         }
 
-        if (_player.IsPlaying)
+        if (_player.IsPlaying || _pitchPreview.Previewing)
         {
             SyncPlayWindowFromDocument();
         }
 
+        var playerFrame = _pitchPreview.Previewing
+            ? MapPitchCurveHostCursorToPreview(frame)
+            : frame;
         if (crossfadeMilliseconds > 0 && _player.IsPlaying)
         {
-            _player.SeekWithCrossfade(frame, crossfadeMilliseconds);
+            _player.SeekWithCrossfade(playerFrame, crossfadeMilliseconds);
         }
         else
         {
-            _player.Seek(frame);
+            _player.Seek(playerFrame);
         }
 
         SyncOverviewPlayhead();
@@ -1134,10 +1150,13 @@ public partial class MainWindow
                 TimeSpan.FromSeconds(frame / (double)Math.Max(1, _document.SampleRate)));
         }
 
-        if (_player.IsPlaying && !Waveform.IsInteracting)
+        if ((_player.IsPlaying || _pitchPreview.Previewing) && !Waveform.IsInteracting)
         {
             SyncPlayWindowFromDocument();
-            _player.Seek(frame);
+            var playerFrame = _pitchPreview.Previewing
+                ? MapPitchCurveHostCursorToPreview(frame)
+                : frame;
+            _player.Seek(playerFrame);
         }
 
         SyncOverviewPlayhead();
@@ -1152,6 +1171,25 @@ public partial class MainWindow
         }
 
         var playRange = ResolvePlayLoopRange();
+        if (_pitchPreview.Previewing)
+        {
+            if (playRange is null)
+            {
+                _player.SetPlayWindow(null, loop: false);
+                return;
+            }
+
+            var mapped = MapPitchCurveHostRangeToPreview(playRange.Value);
+            if (mapped is null || mapped.Value.IsEmpty)
+            {
+                _player.SetPlayWindow(null, loop: false);
+                return;
+            }
+
+            _player.SetPlayWindow(mapped, loop: ShouldLoopResolvedPlayWindow(playRange));
+            return;
+        }
+
         if (playRange is null)
         {
             _player.SetPlayWindow(null, loop: false);
@@ -1451,7 +1489,7 @@ public partial class MainWindow
 
         if (AnyEffectPreviewing)
         {
-            // ピッチカーブダイアログ中は本体ヘッドを動かさない（音は一系統のまま）。
+            // HideHostTransport のプレビューだけ本体ヘッドを抑止（ピッチモードはシークを動かす）。
             if (!ActivePreviewHidesHostTransport)
             {
                 SyncPreviewPlayhead();
@@ -1835,7 +1873,8 @@ public partial class MainWindow
         var frame = _player.SmoothCursorFrame;
         if (_pitchPreview.Previewing)
         {
-            frame += _pitchPreview.Origin;
+            // タイムストレッチなしだと尺が変わるので、単純な Origin 加算ではなく読み位置マップへ。
+            frame = MapPitchCurvePreviewCursorToHost(frame);
         }
 
         if (_timeStretchPreview.Previewing)
@@ -2242,6 +2281,7 @@ public partial class MainWindow
     /// <summary>
     /// L: 選択（なければサンプルループ／Loop リージョン）の末尾付近へジャンプして無限ループ確認。
     /// 再生中でも一通停止にはせず、同じジャンプ＋ループにする。
+    /// ピッチカーブ編集中は本体ではなくピッチ反映プレビューでループする。
     /// </summary>
     private void JumpToLoopPrerollAndPlay()
     {
@@ -2269,6 +2309,20 @@ public partial class MainWindow
         var start = range.Length < preroll ? range.StartFrame : range.EndFrame - preroll;
         _lastPlaybackStart = start;
         _selectionPlayOneShot = false;
+
+        if (IsPitchCurveMode)
+        {
+            Waveform.SeekKeepingSelection(start);
+            if (_pitchPreview.Previewing)
+            {
+                SyncPlayWindowFromDocument();
+                _player.Seek(MapPitchCurveHostCursorToPreview(start));
+                return;
+            }
+
+            _ = StartPitchCurveModePreviewAsync(ignoreCurve: _pitchCurveIgnoreCurve);
+            return;
+        }
 
         if (_player.IsPlaying || IsLibraryVideoPlayheadClock())
         {
@@ -2471,11 +2525,19 @@ public partial class MainWindow
         // V モード中はエディタ枠（F11/F12）同士の切替・全画面トグルを許容し、プレイヤー枠（F9/F10）へは拒否。
         if (!fromSettingsPreview)
         {
-            if (IsVolumeCurveMode)
+            if (IsVolumeCurveMode || IsPitchCurveMode)
             {
                 if (!IsEditorLayoutSlot(slot))
                 {
-                    WarnVolumeCurveModeBlocked();
+                    if (IsVolumeCurveMode)
+                    {
+                        WarnVolumeCurveModeBlocked();
+                    }
+                    else
+                    {
+                        WarnPitchCurveModeBlocked();
+                    }
+
                     return;
                 }
             }

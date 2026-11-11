@@ -118,8 +118,19 @@ public partial class MainWindow
     private void EnterVolumeCurveMode()
     {
         // フェード調整中の拒否は無言のまま。音量カーブ自身の入場では警告ダイアログを出さない。
-        if (_volumeCurveMode || IsCrossfadeEditMode || IsUiBusy || IsLibraryMaximized)
+        if (_volumeCurveMode || IsCrossfadeEditMode || IsPitchCurveMode || IsUiBusy || IsLibraryMaximized)
         {
+            return;
+        }
+
+        if (Waveform.LoudnessPenActive)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorLoudnessPenBlocksVolumeCurve,
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 

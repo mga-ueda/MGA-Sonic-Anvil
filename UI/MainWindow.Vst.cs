@@ -950,6 +950,11 @@ public partial class MainWindow
             return UiStrings.ErrorVolumeCurveModeActive;
         }
 
+        if (IsPitchCurveMode)
+        {
+            return UiStrings.ErrorPitchCurveModeActive;
+        }
+
         if (IsCrossfadeEditMode)
         {
             return UiStrings.ErrorVstBounceFadeTool;

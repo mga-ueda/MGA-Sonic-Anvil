@@ -83,7 +83,7 @@ public partial class MainWindow
 
     private void CycleWaveformTile()
     {
-        if (IsVolumeCurveMode)
+        if (IsVolumeCurveMode || IsPitchCurveMode)
         {
             // 解除方向（→ Off）だけ通す。タイルへ進む／別配置へ進むのは拒否。
             if (_tileMode)
@@ -98,7 +98,15 @@ public partial class MainWindow
                 }
             }
 
-            WarnVolumeCurveModeBlocksTile();
+            if (IsVolumeCurveMode)
+            {
+                WarnVolumeCurveModeBlocksTile();
+            }
+            else
+            {
+                WarnPitchCurveModeBlocksTile();
+            }
+
             return;
         }
 
@@ -160,6 +168,13 @@ public partial class MainWindow
         if (IsVolumeCurveMode)
         {
             WarnVolumeCurveModeBlocksTile();
+            Keyboard.Focus(Waveform);
+            return;
+        }
+
+        if (IsPitchCurveMode)
+        {
+            WarnPitchCurveModeBlocksTile();
             Keyboard.Focus(Waveform);
             return;
         }
@@ -296,6 +311,12 @@ public partial class MainWindow
         if (IsVolumeCurveMode)
         {
             WarnVolumeCurveModeBlocksTile();
+            return;
+        }
+
+        if (IsPitchCurveMode)
+        {
+            WarnPitchCurveModeBlocksTile();
             return;
         }
 

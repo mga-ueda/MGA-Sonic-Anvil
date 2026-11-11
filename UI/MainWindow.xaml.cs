@@ -489,6 +489,7 @@ public partial class MainWindow : Window
         ApplyLibraryWashChrome(true);
         InitializeWaapi();
         InitializeVolumeCurveBar();
+        InitializePitchCurveBar();
         RefreshLocalizedText();
         // 表示前にフルスクリーンへ入れる。出したあとに最大化を外すと作業領域のままタスクバーが残る。
         // タブ復元があるときは復元後に EnterStartupMode（クローク中）。無いときだけここで入れる。

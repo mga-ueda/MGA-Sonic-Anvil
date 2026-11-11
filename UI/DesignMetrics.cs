@@ -45,6 +45,12 @@ internal static class DesignMetrics
     /// <summary>V キーの音量カーブ編集モード下部バー（1 行）。</summary>
     public static double VolumeCurveBarHeight => From96(40);
 
+    /// <summary>P キーのピッチカーブ編集モード下部バー（幅に余裕があるときの 1 行）。</summary>
+    public static double PitchCurveBarSingleRowHeight => VolumeCurveBarHeight;
+
+    /// <summary>P キーのピッチカーブ編集モード下部バー（狭いときの 2 行）。</summary>
+    public static double PitchCurveBarHeight => From96(76);
+
     /// <summary>メーター列の WAAPI トグルとピーク LED のあいだ。</summary>
     public static double WaapiToPeakLampGap => From96(5);
 

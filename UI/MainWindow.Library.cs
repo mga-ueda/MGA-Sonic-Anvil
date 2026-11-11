@@ -3387,7 +3387,7 @@ public partial class MainWindow
         Transport.ApplyMenuEnabled(
             WaveformContextMenuBuilder.Build(CaptureWaveMenuModel(CaptureMenuBarHit())),
             playerMode: IsLibraryMaximized);
-        if (IsVolumeCurveMode)
+        if (IsVolumeCurveMode || IsPitchCurveMode)
         {
             // 許可操作＋同モードトグル＋抑制ダイアログへ届けるモード切替ボタンは有効のまま。
             Transport.RestrictCommands(cmd =>

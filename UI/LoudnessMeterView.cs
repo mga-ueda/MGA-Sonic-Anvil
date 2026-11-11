@@ -253,6 +253,57 @@ internal sealed class LoudnessMeterView : Grid
         });
     }
 
+    /// <summary>
+    /// 差し替え済み PCM（ピッチカーブ編集プレビューなど）で停止中メーターを測り直す。
+    /// </summary>
+    public void RefreshOfflineWithPreviewSamples(float[] interleaved, int channels, int sampleRate)
+    {
+        ArgumentNullException.ThrowIfNull(interleaved);
+        if (IsLivePlayback())
+        {
+            return;
+        }
+
+        channels = Math.Max(1, channels);
+        sampleRate = Math.Max(1000, sampleRate);
+        var gen = ++_frameGainPreviewGen;
+        var used = interleaved.Length;
+        var target = _engine.TargetLufs;
+        Task.Run(() =>
+        {
+            LoudnessSnapshot snap;
+            try
+            {
+                snap = LoudnessMeterEngine.MeasureFile(
+                    interleaved,
+                    channels,
+                    sampleRate,
+                    target,
+                    used);
+            }
+            catch (Exception ex) when (ex is ArgumentException
+                                           or InvalidOperationException
+                                           or IndexOutOfRangeException)
+            {
+                snap = LoudnessSnapshot.Idle with { TargetLufs = target };
+            }
+
+            Dispatcher.BeginInvoke(
+                () =>
+                {
+                    if (gen != _frameGainPreviewGen || IsLivePlayback())
+                    {
+                        return;
+                    }
+
+                    _frameGainPreview = snap;
+                    _previewLinear = 1f;
+                    ApplySnapshot(snap, offline: true);
+                },
+                DispatcherPriority.Background);
+        });
+    }
+
     /// <summary>フレームゲインプレビューを捨て、通常の停止中計測へ戻す。</summary>
     public void ClearFrameGainPreview()
     {

@@ -83,6 +83,7 @@ public partial class MainWindow
         PlayerChrome.SyncLatchToggleWashBrushes();
         ForEachWaveform(view => view.RefreshAppearance());
         VolumeCurveEditLayer.RefreshAppearance();
+        PitchCurveEditLayer.RefreshAppearance();
         RefreshTileChrome();
         Overview.RefreshAppearance();
         Spectrum.RefreshAppearance();

@@ -617,6 +617,20 @@ public partial class MainWindow
             return;
         }
 
+        // ピッチカーブ編集中も同様（Alt+A／Alt+N／Alt+P 等をメニュー AccessKey より優先）。
+        if (_pitchCurveMode
+            && !e.IsRepeat
+            && TryProcessPitchCurveShortcut(key, menuModifiers))
+        {
+            if ((menuModifiers & ModifierKeys.Alt) != 0)
+            {
+                _altMenuChordHadOtherKey = true;
+            }
+
+            e.Handled = true;
+            return;
+        }
+
         // Alt+F 等はアプリショートカットより先に上部メニューを開く（MenuItem.OnAccessKey 相当）。
         if (!e.IsRepeat && TryOpenMainMenuAccessKey(key, menuModifiers))
         {
@@ -1010,6 +1024,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (TryProcessPitchCurveShortcut(key, modifiers))
+        {
+            return true;
+        }
+
         if (TryProcessEscapeShortcut(key, modifiers))
         {
             return true;
@@ -1258,16 +1277,20 @@ public partial class MainWindow
 
         if (key == Key.A && modifiers == ModifierKeys.None)
         {
-            // スペクトログラム／重ね。V モード中は表示中の相互トグルのみ許容。
-            if (IsVolumeCurveMode)
+            // スペクトログラム／重ね。V／P モード中は表示中の相互トグルのみ許容。
+            if (IsVolumeCurveMode || IsPitchCurveMode)
             {
                 if (Waveform.AnalysisView is WaveformAnalysisView.Spectrogram or WaveformAnalysisView.Overlay)
                 {
                     Waveform.ToggleSpectrogramView();
                 }
-                else
+                else if (IsVolumeCurveMode)
                 {
                     WarnVolumeCurveModeBlocked();
+                }
+                else
+                {
+                    WarnPitchCurveModeBlocked();
                 }
 
                 return true;
@@ -1697,7 +1720,7 @@ public partial class MainWindow
             return true;
         }
 
-        if (IsVolumeCurveMode && IsEditorLayoutSlot(slot))
+        if ((IsVolumeCurveMode || IsPitchCurveMode) && IsEditorLayoutSlot(slot))
         {
             toggle();
             return true;
@@ -1706,6 +1729,10 @@ public partial class MainWindow
         if (IsVolumeCurveMode)
         {
             WarnVolumeCurveModeBlocked();
+        }
+        else if (IsPitchCurveMode)
+        {
+            WarnPitchCurveModeBlocked();
         }
 
         return true;
@@ -1728,8 +1755,8 @@ public partial class MainWindow
         {
             if (BlocksOutsideFadeToolActions)
             {
-                // 動画ミニ表示中の再押下（解除）だけ V モード中も許容。
-                if (IsVolumeCurveMode && IsVideoMiniPlayerActive())
+                // 動画ミニ表示中の再押下（解除）だけ V／P モード中も許容。
+                if ((IsVolumeCurveMode || IsPitchCurveMode) && IsVideoMiniPlayerActive())
                 {
                     ToggleVideoMiniPlayer();
                     return true;
@@ -1738,6 +1765,10 @@ public partial class MainWindow
                 if (IsVolumeCurveMode)
                 {
                     WarnVolumeCurveModeBlocked();
+                }
+                else if (IsPitchCurveMode)
+                {
+                    WarnPitchCurveModeBlocked();
                 }
 
                 return true;
@@ -2565,6 +2596,13 @@ public partial class MainWindow
         {
             // ポイントフォーカスだけ Esc で解除。モード自体は閉じない。
             VolumeCurveEditLayer.TryClearPointFocus();
+            return true;
+        }
+
+        if (IsPitchCurveMode)
+        {
+            // ポイントフォーカスだけ Esc で解除。モード自体は閉じない。
+            PitchCurveEditLayer.TryClearPointFocus();
             return true;
         }
 
