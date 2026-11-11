@@ -882,6 +882,19 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>現在の設定でピッチ変換キャッシュが使えるか（すりガラス省略判定用）。</summary>
+    private bool IsPitchCurveRenderCacheReady(bool forPreview)
+    {
+        if (_document is null || _pitchCurveRange.IsEmpty || _pitchCurveCachedAfterRange is null)
+        {
+            return false;
+        }
+
+        var timeStretch = WantsPitchCurveTimeStretch();
+        var lightweight = forPreview && WantsPitchCurveLightweightPreview();
+        return _pitchCurveCacheKey == BuildPitchCurveRenderCacheKey(timeStretch, lightweight);
+    }
+
     private string BuildPitchCurveRenderCacheKey(bool timeStretch, bool lightweight)
     {
         var sb = new System.Text.StringBuilder(256);
@@ -950,9 +963,9 @@ public partial class MainWindow
         var timeStretch = WantsPitchCurveTimeStretch();
         var lightweight = forPreview && WantsPitchCurveLightweightPreview();
         var key = BuildPitchCurveRenderCacheKey(timeStretch, lightweight);
-        if (_pitchCurveCachedAfterRange is not null && _pitchCurveCacheKey == key)
+        if (IsPitchCurveRenderCacheReady(forPreview))
         {
-            return (_pitchCurveCachedAfterRange, _pitchCurveCachedPeak);
+            return (_pitchCurveCachedAfterRange!, _pitchCurveCachedPeak);
         }
 
         // 先にすりガラスを描いてから重い変換へ（Yield しないと表示が遅れる）。
@@ -1099,8 +1112,9 @@ public partial class MainWindow
 
         var op = ++_pitchCurveOpEpoch;
         var needsPitchRender = !ignoreCurve && !_pitchCurve.IsNoOp();
-        // バックグラウンド計測の完了待ちや変換前に、先にすりガラスを出す。
-        if (needsPitchRender)
+        // キャッシュがあるときはすりガラスを出さず即再生。未計算のときだけ先に出す。
+        var pitchCacheReady = needsPitchRender && IsPitchCurveRenderCacheReady(forPreview: true);
+        if (needsPitchRender && !pitchCacheReady)
         {
             await ShowPitchShiftBusyGlassAndYieldAsync().ConfigureAwait(true);
         }
@@ -1111,7 +1125,7 @@ public partial class MainWindow
             await WaitUntilPitchCurveNotRenderingAsync().ConfigureAwait(true);
             if (op != _pitchCurveOpEpoch || !_pitchCurveMode || !IsLoaded)
             {
-                if (needsPitchRender)
+                if (_busyGlass.IsShowingBusy)
                 {
                     _busyGlass.BeginFadeOut();
                 }
@@ -1136,7 +1150,6 @@ public partial class MainWindow
                 var rendered = await EnsurePitchCurveRenderAsync(token, forPreview: true).ConfigureAwait(true);
                 if (op != _pitchCurveOpEpoch || rendered is null || token.IsCancellationRequested || !_pitchCurveMode || !IsLoaded)
                 {
-                    // Ensure がキャッシュ命中で finally を通らない／キャンセル時はここで消す。
                     if (_busyGlass.IsShowingBusy)
                     {
                         _busyGlass.BeginFadeOut();
@@ -1157,13 +1170,12 @@ public partial class MainWindow
                     return;
                 }
 
-                // キャッシュ命中時は Ensure がすりガラスを閉じないので、再生前に消す。
+                // キャッシュ命中で Ensure が finally を通らない場合のすりガラス残りを消す。
                 if (_busyGlass.IsShowingBusy)
                 {
                     _busyGlass.BeginFadeOut();
                 }
 
-                // プレビュー用レンダ結果でラウドネスも揃える（キャッシュ命中）。
                 OnPitchCurveEditCompleted();
             }
 
