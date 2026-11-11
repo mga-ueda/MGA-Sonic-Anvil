@@ -1099,9 +1099,10 @@ internal static partial class UiStrings
         "音階にスナップする(_S)",
         "Snap to _scale");
 
+    /// <summary>メニュー「この位置(_H)」と被らないよう D（Don't）。</summary>
     public static string LabelPitchCurveNoTimeStretch => Get(
-        "タイムストレッチをしない(_H)",
-        "Don't time stretc_h");
+        "タイムストレッチをしない(_D)",
+        "_Don't time stretch");
 
     public static string LabelPitchCurveLightweightMode => Get(
         "軽量演算モード(_L)（視聴時のみ有効）",
