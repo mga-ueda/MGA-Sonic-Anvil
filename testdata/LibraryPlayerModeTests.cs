@@ -720,6 +720,9 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsPlayerDigitJump(explorerFocused: false));
         Assert.False(LibraryPlayerMode.AllowsPlayerLetterTransport(explorerFocused: true));
         Assert.True(LibraryPlayerMode.AllowsPlayerLetterTransport(explorerFocused: false));
+        Assert.False(LibraryPlayerMode.AllowsPlayerLetterTransport(
+            explorerFocused: false,
+            headerStructureFocused: true));
         Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Divide, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsExplorerCollapseSubtree(Key.Oem2, ModifierKeys.Shift));

@@ -245,28 +245,59 @@ internal static class LibrarySplitterReveal
         GridSplitter vertical,
         GridSplitter horizontal,
         ColumnDefinition treeColumn,
-        RowDefinition explorerRow)
+        RowDefinition explorerRow,
+        GridSplitter? structureVertical = null,
+        ColumnDefinition? structureColumn = null)
     {
         root.PreviewMouseMove += (_, e) =>
         {
-            Update(root, e, vertical, horizontal, treeColumn, explorerRow, idle: false);
-            LibraryHoverIdle.Arm(root, () => OnSplitterIdle(root, vertical, horizontal));
+            Update(
+                root,
+                e,
+                vertical,
+                horizontal,
+                treeColumn,
+                explorerRow,
+                structureVertical,
+                structureColumn,
+                idle: false);
+            LibraryHoverIdle.Arm(
+                root,
+                () => OnSplitterIdle(root, vertical, horizontal, structureVertical));
         };
         root.MouseLeave += (_, _) =>
         {
             LibraryHoverIdle.Disarm(root);
             Reveal(vertical, show: false, idle: true);
             Reveal(horizontal, show: false, idle: true);
+            if (structureVertical is not null)
+            {
+                Reveal(structureVertical, show: false, idle: true);
+            }
         };
     }
 
-    private static void OnSplitterIdle(FrameworkElement root, GridSplitter vertical, GridSplitter horizontal)
+    private static void OnSplitterIdle(
+        FrameworkElement root,
+        GridSplitter vertical,
+        GridSplitter horizontal,
+        GridSplitter? structureVertical)
     {
         Reveal(vertical, show: false, idle: true);
         Reveal(horizontal, show: false, idle: true);
-        if (vertical.IsDragging || horizontal.IsDragging)
+        if (structureVertical is not null)
         {
-            LibraryHoverIdle.Arm(root, () => OnSplitterIdle(root, vertical, horizontal));
+            Reveal(structureVertical, show: false, idle: true);
+        }
+
+        var dragging = vertical.IsDragging
+            || horizontal.IsDragging
+            || (structureVertical?.IsDragging ?? false);
+        if (dragging)
+        {
+            LibraryHoverIdle.Arm(
+                root,
+                () => OnSplitterIdle(root, vertical, horizontal, structureVertical));
         }
     }
 
@@ -277,6 +308,8 @@ internal static class LibrarySplitterReveal
         GridSplitter horizontal,
         ColumnDefinition treeColumn,
         RowDefinition explorerRow,
+        GridSplitter? structureVertical,
+        ColumnDefinition? structureColumn,
         bool idle)
     {
         var pos = e.GetPosition(root);
@@ -287,6 +320,11 @@ internal static class LibrarySplitterReveal
             horizontal,
             pos.X <= treeWidth + distance && IsNearLine(pos.Y, explorerRow.ActualHeight, distance),
             idle);
+        if (structureVertical is not null && structureColumn is not null)
+        {
+            var structureLine = root.ActualWidth - structureColumn.ActualWidth;
+            Reveal(structureVertical, IsNearLine(pos.X, structureLine, distance), idle);
+        }
     }
 
     private static void Reveal(GridSplitter splitter, bool show, bool idle) =>

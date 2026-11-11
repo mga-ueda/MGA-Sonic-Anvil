@@ -209,10 +209,11 @@ public sealed class LibraryBrowserSelectionTests
         {
             EnsureTheme();
             var view = new LibraryBrowserView();
-            Assert.Equal(3, view.RootColumnCount);
+            Assert.Equal(5, view.RootColumnCount);
             Assert.Equal(UiStrings.LibraryExplorerLabel, view.ExplorerPaneTitle);
             Assert.Equal(UiStrings.LibraryFavoritesLabel, view.FavoritesPaneTitle);
             Assert.Equal(UiStrings.LibraryPlaylistLabel, view.PlaylistPaneTitle);
+            Assert.Equal(UiStrings.LibraryHeaderStructureLabel, view.HeaderStructurePaneTitle);
             Assert.Equal(Dock.Right, view.PlaylistGroupDock);
             Assert.Equal(DesignMetrics.LibraryFavoritesSplitterHitHeight, view.FavoritesSplitter.Height);
             Assert.Equal(VerticalAlignment.Top, view.FavoritesSplitter.VerticalAlignment);
@@ -220,8 +221,12 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Equal(DesignMetrics.LibrarySplitterHitThickness, view.ExplorerSplitter.Width);
             Assert.Equal(HorizontalAlignment.Left, view.ExplorerSplitter.HorizontalAlignment);
             Assert.Equal(Cursors.SizeWE, view.ExplorerSplitter.Cursor);
+            Assert.Equal(DesignMetrics.LibrarySplitterHitThickness, view.StructureSplitter.Width);
+            Assert.Equal(HorizontalAlignment.Left, view.StructureSplitter.HorizontalAlignment);
+            Assert.Equal(Cursors.SizeWE, view.StructureSplitter.Cursor);
             Assert.False(view.ExplorerSplitter.Focusable);
             Assert.False(view.FavoritesSplitter.Focusable);
+            Assert.False(view.StructureSplitter.Focusable);
         });
     }
 

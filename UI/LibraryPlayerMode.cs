@@ -616,15 +616,19 @@ internal static class LibraryPlayerMode
 
     /// <summary>
     /// プレイヤーの上段数字ジャンプ（割合／マーカー）。
-    /// ツリーフォーカス中は使わず、Shift+8 の配下展開などを優先する。
+    /// ツリー／ヘッダ構造フォーカス中は使わず、Shift+8 の配下展開などを優先する。
     /// </summary>
-    public static bool AllowsPlayerDigitJump(bool explorerFocused) => !explorerFocused;
+    public static bool AllowsPlayerDigitJump(
+        bool explorerFocused,
+        bool headerStructureFocused = false) =>
+        !explorerFocused && !headerStructureFocused;
 
     /// <summary>
     /// ツリー／検索フォーカス中は N／P／R／J／K をタイプアヘッド（または検索入力）に譲る。
     /// テンキーの前後曲・再生し直しは別経路のまま。
     /// </summary>
-    public static bool AllowsPlayerLetterTransport(bool explorerFocused) => !explorerFocused;
+    public static bool AllowsPlayerLetterTransport(bool explorerFocused, bool headerStructureFocused = false) =>
+        !explorerFocused && !headerStructureFocused;
 
     /// <summary>
     /// ツリーフォーカス中は I／O／M をタイプアヘッドに譲る。Ins は捨てマーカーのまま。
@@ -2662,21 +2666,25 @@ internal static class LibraryPlayerMode
     /// Ctrl+F の行き先。プレイリストならリスト検索、ツリー／お気に入りはライブラリ検索。
     /// </summary>
     public static LibraryPane SearchPane(LibraryPane current) =>
-        current == LibraryPane.List ? LibraryPane.List : LibraryPane.Explorer;
+        current is LibraryPane.List or LibraryPane.HeaderStructure
+            ? LibraryPane.List
+            : LibraryPane.Explorer;
 
-    /// <summary>Tab：ツリー → お気に入り → プレイリスト → ツリー。Shift+Tab は逆。</summary>
+    /// <summary>Tab：ツリー → お気に入り → プレイリスト → ツリー。Shift+Tab は逆。ヘッダ構造は Tab 外。</summary>
     public static LibraryPane NextPane(LibraryPane current, bool reverse) =>
         reverse
             ? current switch
             {
                 LibraryPane.List => LibraryPane.Favorites,
                 LibraryPane.Favorites => LibraryPane.Explorer,
+                LibraryPane.HeaderStructure => LibraryPane.List,
                 _ => LibraryPane.List,
             }
             : current switch
             {
                 LibraryPane.Explorer => LibraryPane.Favorites,
                 LibraryPane.Favorites => LibraryPane.List,
+                LibraryPane.HeaderStructure => LibraryPane.Explorer,
                 _ => LibraryPane.Explorer,
             };
 
@@ -2705,6 +2713,7 @@ internal enum LibraryPane
     Explorer,
     Favorites,
     List,
+    HeaderStructure,
 }
 
 internal enum LibraryNumpadCommand

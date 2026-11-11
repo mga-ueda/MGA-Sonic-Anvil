@@ -1537,14 +1537,15 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.Up && modifiers == ModifierKeys.Control)
+        // プレイヤーでは波形の時間拡縮をしない（Ctrl+↑↓ はペイン移動）。
+        if (!IsLibraryMaximized && key == Key.Up && modifiers == ModifierKeys.Control)
         {
             Waveform.ZoomTimeToMax();
             Waveform.CenterViewOnPlayhead();
             return true;
         }
 
-        if (key == Key.Down && modifiers == ModifierKeys.Control)
+        if (!IsLibraryMaximized && key == Key.Down && modifiers == ModifierKeys.Control)
         {
             Waveform.ResetTimeZoom();
             Waveform.CenterViewOnPlayhead();
@@ -1575,7 +1576,9 @@ public partial class MainWindow
             return true;
         }
 
-        if (TryHandleWaveformTimelineNavKey(key, modifiers))
+        // 情報エリアフォーカス中は Home／End／Page をシークに使わない。
+        if (!LibraryBrowser.IsHeaderStructureDetailFocused
+            && TryHandleWaveformTimelineNavKey(key, modifiers))
         {
             return true;
         }
@@ -1661,31 +1664,34 @@ public partial class MainWindow
             return NudgePlayheadOrSelection(1);
         }
 
-        if (key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt)
+        // プレイヤーでは波形拡縮・スペアナブーストをしない。
+        if (!IsLibraryMaximized
+            && key is Key.Up or Key.Down
+            && modifiers == ModifierKeys.Alt)
         {
             return BeginOrContinueSpectrogramBoostNudge(key == Key.Up ? 1 : -1);
         }
 
-        if (key == Key.Up && modifiers == ModifierKeys.Shift)
+        if (!IsLibraryMaximized && key == Key.Up && modifiers == ModifierKeys.Shift)
         {
             Waveform.ZoomAmpIn();
             return true;
         }
 
-        if (key == Key.Down && modifiers == ModifierKeys.Shift)
+        if (!IsLibraryMaximized && key == Key.Down && modifiers == ModifierKeys.Shift)
         {
             Waveform.ZoomAmpOut();
             return true;
         }
 
-        if (key == Key.Up && modifiers == ModifierKeys.None)
+        if (!IsLibraryMaximized && key == Key.Up && modifiers == ModifierKeys.None)
         {
             Waveform.ZoomTimeIn();
             Waveform.CenterViewOnPlayhead();
             return true;
         }
 
-        if (key == Key.Down && modifiers == ModifierKeys.None)
+        if (!IsLibraryMaximized && key == Key.Down && modifiers == ModifierKeys.None)
         {
             Waveform.ZoomTimeOut();
             Waveform.CenterViewOnPlayhead();
@@ -2014,7 +2020,9 @@ public partial class MainWindow
 
         // P／N は前後曲（テンキー 4／6）。ツリー／検索フォーカス中はタイプアヘッド（検索入力）を優先。
         if (IsLibraryMaximized
-            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
+            && LibraryPlayerMode.AllowsPlayerLetterTransport(
+                IsLibraryExplorerFocused,
+                IsLibraryHeaderStructureFocused)
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
             && !isRepeat
@@ -2026,7 +2034,9 @@ public partial class MainWindow
 
         // R は再生し直し（テンキー 5）。Alt+Shift+R のランダムより後。ツリー／検索中はタイプアヘッド優先。
         if (IsLibraryMaximized
-            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused)
+            && LibraryPlayerMode.AllowsPlayerLetterTransport(
+                IsLibraryExplorerFocused,
+                IsLibraryHeaderStructureFocused)
             && !IsLibraryGroupComboFocused
             && !ImeComposition.IsComposing
             && !isRepeat
@@ -2095,6 +2105,8 @@ public partial class MainWindow
         }
 
         // Ctrl+←／↑ ライブラリ、Ctrl+→ プレイリスト、Ctrl+↓ お気に入り。
+        // プレイリスト上の Ctrl+→ はヘッダ構造ツリー。
+        // ヘッダ構造ツリー上の Ctrl+→ は情報エリア、情報エリアの Ctrl+← はツリー、ツリーの Ctrl+← はプレイリスト。
         // プレイヤー中の Ctrl+←／→（マーカー）は上で回したのでここには来ない。暗いプレビューではペインへ。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
@@ -2103,11 +2115,41 @@ public partial class MainWindow
             switch (key)
             {
                 case Key.Left:
+                    if (LibraryBrowser.IsHeaderStructureDetailFocused)
+                    {
+                        LibraryBrowser.FocusHeaderStructure();
+                    }
+                    else if (IsLibraryHeaderStructureFocused)
+                    {
+                        LibraryBrowser.FocusList();
+                    }
+                    else
+                    {
+                        LibraryBrowser.FocusExplorer();
+                    }
+
+                    break;
                 case Key.Up:
                     LibraryBrowser.FocusExplorer();
                     break;
                 case Key.Right:
-                    LibraryBrowser.FocusList();
+                    if (LibraryBrowser.IsHeaderStructureTreeFocused)
+                    {
+                        LibraryBrowser.FocusHeaderStructureDetail();
+                    }
+                    else if (LibraryBrowser.IsHeaderStructureDetailFocused)
+                    {
+                        break;
+                    }
+                    else if (LibraryBrowser.ActivePane == LibraryPane.List)
+                    {
+                        LibraryBrowser.FocusHeaderStructure();
+                    }
+                    else
+                    {
+                        LibraryBrowser.FocusList();
+                    }
+
                     break;
                 default:
                     LibraryBrowser.FocusFavorites();
@@ -2190,7 +2232,9 @@ public partial class MainWindow
         // 上段 0–9: 無修飾＝割合。Ctrl＋上段＝マーカー番号（二桁可）。Shift＋上段は消費のみ（リージョンはエディタ専用）。
         // ツリーフォーカス中は使わない（Shift+8＝配下展開を優先。割合／マーカーは他ペインから）。
         if (IsLibraryMaximized
-            && LibraryPlayerMode.AllowsPlayerDigitJump(IsLibraryExplorerFocused)
+            && LibraryPlayerMode.AllowsPlayerDigitJump(
+                IsLibraryExplorerFocused,
+                IsLibraryHeaderStructureFocused)
             && !IsLibraryGroupComboFocused
             && !StatusTimes.IsTimeFocused
             && !IsEditingFileName
@@ -2208,7 +2252,7 @@ public partial class MainWindow
             && modifiers == ModifierKeys.None)
         {
             StopPlaybackShuttle();
-            if (IsLibraryExplorerFocused)
+            if (IsLibraryExplorerFocused || IsLibraryHeaderStructureFocused)
             {
                 return false;
             }
@@ -2342,6 +2386,51 @@ public partial class MainWindow
     {
         if (IsLibraryMaximized)
         {
+            // ヘッダ構造ツリー中は曲送りを無効。↑↓ は構造ツリー内移動。
+            // 情報エリア中はシークへ渡さない。XML の↑↓は行選択、他はスクロール。
+            // *／/／Shift+/ と三角行の←→はライブラリツリーと同じ展開操作。
+            if (IsLibraryHeaderStructureFocused)
+            {
+                if (LibraryBrowser.TryHandleHeaderStructureExpandKey(key, modifiers))
+                {
+                    return true;
+                }
+
+                if (LibraryBrowser.IsHeaderStructureDetailFocused)
+                {
+                    if ((key is Key.Up or Key.Down or Key.PageUp or Key.PageDown)
+                        && modifiers == ModifierKeys.None)
+                    {
+                        return LibraryBrowser.TryHandleHeaderStructureDetailNavKey(key);
+                    }
+
+                    return false;
+                }
+
+                if (key is Key.Up or Key.Down
+                    && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+                {
+                    LibraryBrowser.MoveHeaderStructureSelection(key == Key.Up ? -1 : 1);
+                    return true;
+                }
+
+                if (key is Key.Home or Key.End
+                    && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+                {
+                    LibraryBrowser.MoveHeaderStructureSelectionToEdge(key == Key.Home ? -1 : 1);
+                    return true;
+                }
+
+                if (key is Key.PageUp or Key.PageDown
+                    && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+                {
+                    LibraryBrowser.MoveHeaderStructureSelection(key == Key.PageUp ? -8 : 8);
+                    return true;
+                }
+
+                return false;
+            }
+
             // 選択は据え置きで表示だけ1行動かす。ツリーフォーカス時はルート並び替えが先。
             if (LibraryPlayerMode.IsPlaylistScroll(key, modifiers)
                 && !IsLibraryExplorerFocused)
@@ -3296,9 +3385,12 @@ public partial class MainWindow
     {
         // テンキー＋ J／K／,／.（プレイヤー／エディタ共通。中央寄せは Z／テンキー .）。
         var command = LibraryPlayerMode.PlayerTransportCommand(key, modifiers);
-        // ツリー／検索フォーカス中は J／K をタイプアヘッド（検索入力）に譲る。,／.／テンキーはそのまま。
-        if (command is LibraryNumpadCommand.SeekBack or LibraryNumpadCommand.SeekForward
-            && !LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused))
+        // ツリー／検索／ヘッダ構造フォーカス中は J／K をタイプアヘッド（検索入力）に譲る。
+        if ((command is LibraryNumpadCommand.SeekBack or LibraryNumpadCommand.SeekForward
+                or LibraryNumpadCommand.PreviousTrack or LibraryNumpadCommand.NextTrack)
+            && !LibraryPlayerMode.AllowsPlayerLetterTransport(
+                IsLibraryExplorerFocused,
+                IsLibraryHeaderStructureFocused))
         {
             command = LibraryNumpadCommand.None;
         }
@@ -3308,6 +3400,13 @@ public partial class MainWindow
         if (command == LibraryNumpadCommand.None && numpad)
         {
             command = LibraryPlayerMode.PlayerNumpadCommand(key, modifiers);
+        }
+
+        // ヘッダ構造中はテンキーの前後曲も無効（シークは従来どおりツリー中のみ抑制対象外）。
+        if (IsLibraryHeaderStructureFocused
+            && command is LibraryNumpadCommand.PreviousTrack or LibraryNumpadCommand.NextTrack)
+        {
+            return true;
         }
 
         if (command == LibraryNumpadCommand.None)
@@ -3598,7 +3697,9 @@ public partial class MainWindow
         if (AllowsWaveformSelectionTransport()
             && LibraryPlayerMode.IsSelectionTransportKey(key, modifiers)
             && LibraryPlayerMode.TrySelectionTransportDigit(key, out var selectionDigit)
-            && LibraryPlayerMode.AllowsPlayerLetterTransport(IsLibraryExplorerFocused))
+            && LibraryPlayerMode.AllowsPlayerLetterTransport(
+                IsLibraryExplorerFocused,
+                IsLibraryHeaderStructureFocused))
         {
             BeginSelectionTransport(selectionDigit);
             return true;

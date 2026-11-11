@@ -407,6 +407,8 @@ internal sealed partial class LibraryBrowserView
         _treeFocusLine.Background = brush;
         _favoritesFocusLine.Background = brush;
         _listFocusLine.Background = brush;
+        _structureFocusLine.Background = brush;
+        _structureDetailFocusLine.Background = brush;
     }
 
     internal static Color PaneFocusLineColor(UiTheme theme) =>

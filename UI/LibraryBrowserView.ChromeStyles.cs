@@ -706,12 +706,128 @@ internal sealed partial class LibraryBrowserView
         return template;
     }
 
-    private static ControlTemplate TreeExpanderTemplate()
+    /// <summary>
+    /// ヘッダ構造用。childIndent=0 なら字下げはキャプション側、XML は画素インデントで階層を出す。
+    /// stretchRow=false なら行幅を内容に合わせ、横スクロールで見切れを防ぐ。
+    /// </summary>
+    private static ControlTemplate StructureTreeNavTemplate(
+        Brush hover,
+        Brush selected,
+        double childIndent = 0,
+        bool stretchRow = true,
+        double expanderSize = 16,
+        double expanderGlyphSize = 9)
+    {
+        var expander = new FrameworkElementFactory(typeof(ToggleButton));
+        expander.Name = "Expander";
+        expander.SetValue(UIElement.FocusableProperty, false);
+        expander.SetValue(Control.WidthProperty, expanderSize);
+        expander.SetValue(Control.HeightProperty, expanderSize);
+        expander.SetValue(Control.ForegroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
+        expander.SetValue(Control.TemplateProperty, TreeExpanderTemplate(expanderGlyphSize));
+        expander.SetBinding(ToggleButton.IsCheckedProperty, new Binding(nameof(TreeViewItem.IsExpanded))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+            Mode = BindingMode.TwoWay,
+        });
+        expander.SetValue(DockPanel.DockProperty, Dock.Left);
+
+        var header = new FrameworkElementFactory(typeof(ContentPresenter));
+        header.SetValue(ContentPresenter.ContentSourceProperty, "Header");
+        header.SetValue(
+            FrameworkElement.HorizontalAlignmentProperty,
+            new TemplateBindingExtension(Control.HorizontalContentAlignmentProperty));
+        header.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        header.SetValue(
+            TextElement.ForegroundProperty,
+            new TemplateBindingExtension(Control.ForegroundProperty));
+
+        var row = new FrameworkElementFactory(typeof(DockPanel));
+        row.SetValue(
+            FrameworkElement.HorizontalAlignmentProperty,
+            stretchRow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left);
+        row.AppendChild(expander);
+        row.AppendChild(header);
+
+        var bd = new FrameworkElementFactory(typeof(Border));
+        bd.Name = "Bd";
+        bd.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        bd.SetValue(
+            FrameworkElement.HorizontalAlignmentProperty,
+            stretchRow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left);
+        bd.SetValue(UIElement.ClipToBoundsProperty, false);
+        bd.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+        bd.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        var corners = new MultiBinding { Converter = TreeNavCornerConverter.Instance };
+        corners.Bindings.Add(new Binding
+        {
+            Path = new PropertyPath(SelectionBandEdgeProperty),
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        corners.Bindings.Add(new Binding(nameof(TreeViewItem.IsSelected))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        corners.Bindings.Add(new Binding
+        {
+            Path = new PropertyPath(TreeMarkedProperty),
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        corners.Bindings.Add(new Binding(nameof(UIElement.IsMouseOver))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+        });
+        corners.Bindings.Add(DesignMetrics.RadiusBinding());
+        bd.SetBinding(Border.CornerRadiusProperty, corners);
+        bd.AppendChild(row);
+
+        var items = new FrameworkElementFactory(typeof(ItemsPresenter));
+        items.Name = "ItemsHost";
+        items.SetValue(FrameworkElement.MarginProperty, new Thickness(childIndent, 0, 0, 0));
+        items.SetValue(UIElement.ClipToBoundsProperty, false);
+
+        var root = new FrameworkElementFactory(typeof(StackPanel));
+        root.SetValue(UIElement.ClipToBoundsProperty, false);
+        root.AppendChild(bd);
+        root.AppendChild(items);
+
+        var template = new ControlTemplate(typeof(TreeViewItem)) { VisualTree = root };
+        template.Triggers.Add(new Trigger
+        {
+            Property = TreeViewItem.HasItemsProperty,
+            Value = false,
+            Setters = { new Setter(UIElement.VisibilityProperty, Visibility.Hidden, "Expander") },
+        });
+        template.Triggers.Add(new Trigger
+        {
+            Property = TreeViewItem.IsExpandedProperty,
+            Value = false,
+            Setters = { new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "ItemsHost") },
+        });
+        var hoverOver = new Trigger
+        {
+            SourceName = "Bd",
+            Property = UIElement.IsMouseOverProperty,
+            Value = true,
+        };
+        hoverOver.Setters.Add(new Setter(Border.BackgroundProperty, hover, "Bd"));
+        template.Triggers.Add(hoverOver);
+        template.Triggers.Add(new Trigger
+        {
+            Property = TreeViewItem.IsSelectedProperty,
+            Value = true,
+            Setters = { new Setter(Border.BackgroundProperty, selected, "Bd") },
+        });
+        return template;
+    }
+
+    private static ControlTemplate TreeExpanderTemplate(double glyphFontSize = 9)
     {
         var glyph = new FrameworkElementFactory(typeof(TextBlock));
         glyph.Name = "Glyph";
         glyph.SetValue(TextBlock.TextProperty, "▸");
-        glyph.SetValue(TextBlock.FontSizeProperty, 9d);
+        glyph.SetValue(TextBlock.FontSizeProperty, glyphFontSize);
+        glyph.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
         glyph.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         glyph.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         glyph.SetValue(TextBlock.ForegroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));

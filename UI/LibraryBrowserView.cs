@@ -19,7 +19,7 @@ using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
-/// <summary>F10 上段。左フォルダツリー、中央リスト。ジャケットは背面のぼかしだけ。</summary>
+/// <summary>F10 上段。左フォルダツリー、中央リスト、右ヘッダ構造。ジャケットは背面のぼかしだけ。</summary>
 internal sealed partial class LibraryBrowserView : UserControl
 {
     /// <summary>色抽出用の縮小長辺。ピクセル数はごく少ない。</summary>
@@ -132,10 +132,16 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly Grid _root = new();
     private readonly ColumnDefinition _treeColumn = new();
     private readonly ColumnDefinition _treeSplitterColumn = new();
+    private readonly ColumnDefinition _structureSplitterColumn = new();
+    private readonly ColumnDefinition _structureColumn = new();
+    private readonly ColumnDefinition _structureTreeColumn = new();
+    private readonly ColumnDefinition _structureDetailColumn = new();
+    private Grid? _structureBody;
     private readonly RowDefinition _explorerTreeRow = new() { Height = new GridLength(1, GridUnitType.Star) };
     private readonly RowDefinition _favoritesRow = new() { Height = new GridLength(1, GridUnitType.Star) };
     private readonly LibraryHoverSplitter _favoritesSplitter = new();
     private readonly LibraryHoverSplitter _explorerSplitter = new();
+    private readonly LibraryHoverSplitter _structureSplitter = new();
     private bool _sidePanesVisible = true;
     private double _sidePanesRememberedWidth;
     private readonly TreeView _folderTree = new();
@@ -145,6 +151,38 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly Border _treeFocusLine = CreatePaneFocusLine();
     private readonly Border _favoritesFocusLine = CreatePaneFocusLine();
     private readonly Border _listFocusLine = CreatePaneFocusLine();
+    private readonly Border _structureFocusLine = CreatePaneFocusLine();
+    private readonly Border _structureDetailFocusLine = CreatePaneFocusLine();
+    private readonly TextBlock _structureLabel = new();
+    private readonly TextBlock _structureDetailLabel = new();
+    private readonly TreeView _structureTree = new();
+    private readonly TextBox _structureDetailBox = new();
+    private readonly TreeView _structureXmlTree = new();
+    private readonly TextBlock _structureDetailMeta = new();
+    private readonly Border _structureErrorBanner = new();
+    private readonly TextBlock _structureErrorText = new();
+    private FrameworkElement? _structurePaneHost;
+    private string? _structureLoadedPath;
+    private WaveStructureDocument? _structureDocument;
+    /// <summary>直近に選んだチャンク経路（SelectionKey）。別ファイルでも同チャンクを開く。</summary>
+    private string[]? _structureRememberedChunkPath;
+    /// <summary>見つからず1行目へ退避するとき、記憶を上書きしない。</summary>
+    private bool _structureSuppressRemember;
+    /// <summary>
+    /// プレイリスト↔ヘッダ構造スプリッターのユーザー幅。
+    /// プレイヤーモード中だけ覚え、退出で捨てる。
+    /// </summary>
+    private double? _structureUserWidth;
+    /// <summary>
+    /// 自動レイアウトで達した構造ペイン幅の高水位。内容が狭くなっても勝手には下げない。
+    /// </summary>
+    private double _structureAutoHeldWidth;
+    /// <summary>和集合チャンク→プレイリスト選択のとき、ヘッダ構造の再構築を抑止する。</summary>
+    private bool _suppressHeaderStructureRefresh;
+    /// <summary>情報表示に必要な幅の高水位。ノード切替で狭くなっても勝手には下げない。</summary>
+    private double _structureDetailHeldWidth;
+    /// <summary>ヘッダ構造ツリー列に必要な幅の高水位。展開が戻っても勝手には下げない。</summary>
+    private double _structureTreeHeldWidth;
     /// <summary>フォルダツリー＋見出し。ルート登録ドロップの当たり判定用。</summary>
     private FrameworkElement? _explorerDropHost;
     private readonly ObservableCollection<LibraryFavoriteRow> _favorites = [];
@@ -614,11 +652,21 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     internal Visibility ListFocusLineVisibility => _listFocusLine.Visibility;
 
+    internal Visibility StructureFocusLineVisibility => _structureFocusLine.Visibility;
+
+    internal Visibility StructureDetailFocusLineVisibility => _structureDetailFocusLine.Visibility;
+
     internal string ExplorerPaneTitle => _explorerLabel.Text;
 
     internal string FavoritesPaneTitle => _favoritesLabel.Text;
 
     internal string PlaylistPaneTitle => _playlistLabel.Text;
+
+    internal string HeaderStructurePaneTitle => _structureLabel.Text;
+
+    internal TreeView HeaderStructureTree => _structureTree;
+
+    internal TextBox HeaderStructureDetail => _structureDetailBox;
 
     internal Dock PlaylistGroupDock => DockPanel.GetDock(_playlistGroupHost);
 
@@ -765,6 +813,8 @@ internal sealed partial class LibraryBrowserView : UserControl
     internal GridSplitter FavoritesSplitter => _favoritesSplitter;
 
     internal GridSplitter ExplorerSplitter => _explorerSplitter;
+
+    internal GridSplitter StructureSplitter => _structureSplitter;
 
     internal TreeViewItem? ExplorerFirstFolder =>
         _folderTree.Items.OfType<TreeViewItem>().FirstOrDefault();
@@ -2120,6 +2170,9 @@ internal sealed partial class LibraryBrowserView : UserControl
             case LibraryPane.Favorites:
                 FocusFavorites();
                 break;
+            case LibraryPane.HeaderStructure:
+                FocusHeaderStructure();
+                break;
             default:
                 FocusList();
                 break;
@@ -2164,6 +2217,9 @@ internal sealed partial class LibraryBrowserView : UserControl
             case LibraryPane.Favorites:
                 FocusFavorites();
                 break;
+            case LibraryPane.HeaderStructure:
+                FocusHeaderStructure();
+                break;
             default:
                 FocusList();
                 break;
@@ -2175,6 +2231,13 @@ internal sealed partial class LibraryBrowserView : UserControl
         _treeFocusLine.Visibility = IsExplorerFocused ? Visibility.Visible : Visibility.Collapsed;
         _favoritesFocusLine.Visibility = IsFavoritesFocused ? Visibility.Visible : Visibility.Collapsed;
         _listFocusLine.Visibility = IsListKeyboardFocused || IsGroupComboFocused
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        // ツリーと情報エリアで別グラデ。どちらがアクティブか分かるようにする。
+        _structureFocusLine.Visibility = IsHeaderStructureTreeFocused
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        _structureDetailFocusLine.Visibility = IsHeaderStructureDetailFocused
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
@@ -2191,6 +2254,11 @@ internal sealed partial class LibraryBrowserView : UserControl
             if (IsFavoritesFocused)
             {
                 return LibraryPane.Favorites;
+            }
+
+            if (IsHeaderStructureFocused)
+            {
+                return LibraryPane.HeaderStructure;
             }
 
             return LibraryPane.List;
@@ -3409,9 +3477,13 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         FillGroupOptions();
-                                                                                                        _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
+        _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
+        _structureLabel.Text = UiStrings.LibraryHeaderStructureLabel;
+        _structureDetailLabel.Text = UiStrings.LibraryHeaderStructureDetailLabel;
+        _structureLoadedPath = null;
+        RefreshHeaderStructure();
         _shuffleLatch.LatchLabel = UiStrings.LabelLibraryShuffle;
         _shuffleLatch.FitToLabel();
         TransportToolTip.Attach(_shuffleLatch, UiStrings.TipOptionLibraryShuffle);
@@ -3442,6 +3514,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         ApplyGridStyles();
         ApplyExplorerStyle();
         ApplyFavoritesStyle();
+        ApplyHeaderStructureTreeStyle();
+        ApplyHeaderStructureXmlTreeStyle();
         ApplyPaneFocusLineBrush();
         if (_artworkBytes is null)
         {
@@ -3929,6 +4003,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         try
         {
             ApplyRowSelectionCoreCore(active, selected);
+            // SetSessions／クリア経路はここだけで選択が変わる。通知しないと和集合などが残る。
+            NotePlaylistSelectionChanged();
         }
         finally
         {
@@ -4597,6 +4673,10 @@ internal sealed partial class LibraryBrowserView : UserControl
 
         _playlistSelectionNotifyPending = false;
         PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
+        if (!_suppressHeaderStructureRefresh)
+        {
+            RefreshHeaderStructure();
+        }
     }
 
     private void NotePlaylistSelectionChanged()
@@ -4609,6 +4689,10 @@ internal sealed partial class LibraryBrowserView : UserControl
 
         RefreshPlaylistSelectionBandEdges();
         PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
+        if (!_suppressHeaderStructureRefresh)
+        {
+            RefreshHeaderStructure();
+        }
     }
 
     /// <summary>

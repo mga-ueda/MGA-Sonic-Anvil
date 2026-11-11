@@ -549,6 +549,7 @@ internal sealed partial class LibraryBrowserView
                 FocusList();
             }
 
+            FitHeaderStructurePaneWidths();
             return;
         }
 
@@ -561,6 +562,7 @@ internal sealed partial class LibraryBrowserView
         _treeColumn.Width = new GridLength(DesignMetrics.ClampLibraryExplorerWidth(width));
         _treeSplitterColumn.Width = new GridLength(DesignMetrics.LibraryExplorerSplitterWidth);
         _explorerSplitter.Visibility = Visibility.Visible;
+        FitHeaderStructurePaneWidths();
     }
 
     public double ReadExplorerWidth()
@@ -1319,8 +1321,14 @@ internal sealed partial class LibraryBrowserView
         }
     }
 
-    /// <summary>登録パスが見つからないときの文字色（エラー文字）。</summary>
+    /// <summary>登録パスが見つからないときの文字色（エラー文字）。不正チャンクも同じ。</summary>
     internal const string MissingRegisteredPathForeBrushKey = "StatusBarErrorDetailForeBrush";
+
+    /// <summary>一般未定義の独自チャンク（オレンジ／注意色）。</summary>
+    internal const string WaveStructureCustomChunkForeBrushKey = "LoudnessCautionBrush";
+
+    /// <summary>専門メタ（iXML / bext 等）。ゴミではないが一般コアではない。</summary>
+    internal const string WaveStructureSpecializedChunkForeBrushKey = "AccentCyanBrush";
 
     /// <summary>
     /// 見出し TextBlock に色を載せる。TreeViewItem.Foreground だけだと ContentPresenter 経由で
@@ -2615,6 +2623,7 @@ internal sealed partial class LibraryBrowserView
         var width = ReadExplorerWidth();
         SetExplorerWidth(width);
         ExplorerWidthChanged?.Invoke(this, width);
+        FitHeaderStructurePaneWidths();
     }
 
     private void FavoritesSplitter_DragCompleted(object sender, DragCompletedEventArgs e)

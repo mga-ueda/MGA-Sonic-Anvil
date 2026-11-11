@@ -196,6 +196,9 @@ public partial class MainWindow
     internal bool IsLibraryFavoritesFocused =>
         IsLibraryMaximized && LibraryBrowser.IsFavoritesFocused;
 
+    internal bool IsLibraryHeaderStructureFocused =>
+        IsLibraryMaximized && LibraryBrowser.IsHeaderStructureFocused;
+
     /// <summary>
     /// 波形ホストまたはアクティブ波形にキーボードフォーカスがある。
     /// ライブラリ最大化中のツリー／お気に入り／プレイリストは波形ホスト配下にあり
@@ -205,6 +208,7 @@ public partial class MainWindow
     internal bool IsWaveformAreaFocused =>
         !IsLibraryExplorerFocused
         && !IsLibraryFavoritesFocused
+        && !IsLibraryHeaderStructureFocused
         && !(IsLibraryMaximized && LibraryBrowser.IsListKeyboardFocused)
         && (WaveformHostBorder.IsKeyboardFocusWithin || Waveform.IsKeyboardFocusWithin);
 
@@ -331,6 +335,8 @@ public partial class MainWindow
             _libraryHoldJacketWash = false;
             // チェック選択はプレイヤー専用。設定には覚えず、退出でオフへ戻す（トーストは出さない）。
             LibraryBrowser.SetCheckSelectMode(false, raise: false);
+            // ヘッダ構造スプリッター位置もモード限り。
+            LibraryBrowser.ClearHeaderStructureUserLayout();
             _ = LeaveLibraryMaximizeAsync();
             if (_videoLaunchPlacement)
             {

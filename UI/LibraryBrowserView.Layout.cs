@@ -32,6 +32,8 @@ internal sealed partial class LibraryBrowserView
         _root.ColumnDefinitions.Add(_treeColumn);
         _root.ColumnDefinitions.Add(_treeSplitterColumn);
         _root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _root.ColumnDefinitions.Add(_structureSplitterColumn);
+        _root.ColumnDefinitions.Add(_structureColumn);
 
         ApplyExplorerStyle();
         ApplyFavoritesStyle();
@@ -235,6 +237,13 @@ internal sealed partial class LibraryBrowserView
         Grid.SetColumn(listPane, 2);
         _root.Children.Add(listPane);
 
+        BuildHeaderStructurePane();
+        if (_structurePaneHost is { } structurePane)
+        {
+            Grid.SetColumn(structurePane, 4);
+            _root.Children.Add(structurePane);
+        }
+
         var splitter = _explorerSplitter;
         splitter.Width = DesignMetrics.LibrarySplitterHitThickness;
         splitter.HorizontalAlignment = HorizontalAlignment.Left;
@@ -248,6 +257,20 @@ internal sealed partial class LibraryBrowserView
         Grid.SetColumn(splitter, 1);
         Panel.SetZIndex(splitter, 8);
         _root.Children.Add(splitter);
+
+        var structureSplitter = _structureSplitter;
+        structureSplitter.Width = DesignMetrics.LibrarySplitterHitThickness;
+        structureSplitter.HorizontalAlignment = HorizontalAlignment.Left;
+        structureSplitter.VerticalAlignment = VerticalAlignment.Stretch;
+        structureSplitter.ResizeBehavior = GridResizeBehavior.PreviousAndNext;
+        structureSplitter.ResizeDirection = GridResizeDirection.Columns;
+        structureSplitter.Cursor = Cursors.SizeWE;
+        structureSplitter.SnapsToDevicePixels = true;
+        ApplyLibrarySplitterChrome(structureSplitter);
+        structureSplitter.DragCompleted += StructureSplitter_DragCompleted;
+        Grid.SetColumn(structureSplitter, 3);
+        Panel.SetZIndex(structureSplitter, 8);
+        _root.Children.Add(structureSplitter);
 
         Grid.SetColumnSpan(_glowHost, _root.ColumnDefinitions.Count);
         Grid.SetColumnSpan(_veil, _root.ColumnDefinitions.Count);
@@ -264,7 +287,17 @@ internal sealed partial class LibraryBrowserView
         LibraryScrollReveal.Attach(_folderTree);
         LibraryScrollReveal.Attach(_favoritesList);
         LibraryScrollReveal.Attach(_grid);
-        LibrarySplitterReveal.Attach(_root, _explorerSplitter, _favoritesSplitter, _treeColumn, _explorerTreeRow);
+        LibraryScrollReveal.Attach(_structureTree);
+        // 情報／iXML は常時表示スタイル（ホバー reveal しない）。
+        LibrarySplitterReveal.Attach(
+            _root,
+            _explorerSplitter,
+            _favoritesSplitter,
+            _treeColumn,
+            _explorerTreeRow,
+            _structureSplitter,
+            _structureColumn);
+        ClearHeaderStructure();
     }
 
 }

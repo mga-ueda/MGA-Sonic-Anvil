@@ -420,6 +420,27 @@ internal static class DesignMetrics
     /// <summary>F10 フォルダツリーとリストの区切り。1px。</summary>
     public static double LibraryExplorerSplitterWidth => From96(1);
 
+    /// <summary>F10 プレイリスト右のヘッダ構造ペイン幅（未レイアウト時の仮）。</summary>
+    public static double LibraryHeaderStructureWidth => From96(280);
+
+    /// <summary>ヘッダ構造ペインの最小幅（手動ドラッグ時の下限）。</summary>
+    public static double LibraryHeaderStructureMinWidth => From96(180);
+
+    /// <summary>ヘッダ構造ペインの上限。内容幅は自動拡大し、プレイリスト最低幅を残す（2等分はしない）。</summary>
+    public static double LibraryHeaderStructureMaxWidth => From96(1600);
+
+    /// <summary>ヘッダ構造ペイン内のチャンクツリー幅（空のとき）。</summary>
+    public static double LibraryHeaderStructureTreeWidth => From96(120);
+
+    /// <summary>ヘッダ構造ペイン内ツリーの最小幅。</summary>
+    public static double LibraryHeaderStructureTreeMinWidth => From96(72);
+
+    /// <summary>内容計測時に残すプレイリスト側の最低幅。</summary>
+    public static double LibraryPlaylistMinWidth => From96(160);
+
+    public static double ClampLibraryHeaderStructureWidth(double width) =>
+        Math.Clamp(width, LibraryHeaderStructureMinWidth, LibraryHeaderStructureMaxWidth);
+
     /// <summary>ツリー区切りの掴み幅。線は 1px。表示判定は LibrarySplitterRevealDistance。</summary>
     public static double LibrarySplitterHitThickness => From96(24);
 

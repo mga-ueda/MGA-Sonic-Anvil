@@ -1735,6 +1735,43 @@ internal static partial class UiStrings
     public static string LibraryExplorerPictures => Get("ピクチャ", "Pictures");
     public static string LibraryExplorerVideos => Get("ビデオ", "Videos");
     public static string LibraryFavoritesLabel => Get("お気に入り", "Favorites");
+    // 見出し（白いフェード側）は UI 言語。情報エリア本文は英語固定。
+    public static string LibraryHeaderStructureLabel => Get("ヘッダ構造", "Header Structure");
+    public static string LibraryHeaderStructureDetailLabel => Get("情報", "Info");
+    public static string WaveStructureFileMissing => "File not found.";
+    public static string WaveStructureReadFailed(string detail) => $"Failed to read. {detail}";
+    public static string WaveStructureUnsupported(string kind) =>
+        $"Container structure for {kind} is not shown (WAVE / AIFF only).";
+    public static string WaveStructureTooShort => "File is too short for a valid container.";
+    public static string WaveStructureBadContainer(string fourCc) =>
+        $"Invalid container id: '{fourCc}'";
+    public static string WaveStructureBadForm(string fourCc) =>
+        $"Invalid form type: '{fourCc}'";
+    public static string WaveStructureSizeExceedsFile(long declared, long actual) =>
+        $"Declared size ({declared:#,0}) exceeds file length ({actual:#,0}).";
+    public static string WaveStructureTrailingBytes(long bytes) =>
+        $"{bytes:#,0} trailing byte(s) after the container.";
+    public static string WaveStructureChunkTruncated(string id, long size, long remaining) =>
+        $"Chunk '{id}' is truncated (size={size:#,0}, remaining={remaining:#,0}).";
+    public static string WaveStructureBadPadding(string id) =>
+        $"Chunk '{id}' has an invalid padding boundary.";
+    public static string WaveStructureListTooSmall => "LIST chunk is too small.";
+    public static string WaveStructureListSummary(string listType, int childCount) =>
+        $"LIST type: {listType} ({childCount} child(ren))";
+    public static string WaveStructureEmptyPayload => "(empty)";
+    public static string WaveStructureFmtTooSmall => "fmt chunk is too small.";
+    public static string WaveStructureXmlInvalid =>
+        "Could not parse as XML (showing raw text).";
+    public static string WaveStructureDataTruncated(long total, int shown) =>
+        Format(
+            "…続きあり（先頭 {0:#,0} / {1:#,0} バイトを表示。残りは未読）",
+            "…more follows (showing first {0:#,0} of {1:#,0} bytes; the rest is not read)",
+            shown,
+            total);
+    public static string WaveStructureNoSelection =>
+        "Select a playlist file to inspect its header structure.";
+    public static string WaveStructureSelectNode =>
+        "Select a chunk in the tree to view its contents.";
     public static string LibraryMenuAddToFavorites => Get("お気に入りへ追加", "Add to Favorites");
     public static string LibraryMenuAddAsExplorerRoot => Get("ツリーのルートに登録", "Register as Tree Root");
     public static string LibraryMenuRemoveExplorerRoot => Get("ツリーのルートから外す", "Remove Tree Root");
