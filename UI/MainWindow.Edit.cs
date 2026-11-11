@@ -76,6 +76,8 @@ public partial class MainWindow
             {
                 _fadeMenu = null;
             }
+
+            RestoreDefaultContentFocusAfterOverlay();
         };
         Dispatcher.BeginInvoke(() => _fadeReplayOnHighlight = true, DispatcherPriority.ApplicationIdle);
     }
@@ -161,6 +163,8 @@ public partial class MainWindow
             {
                 _volumeMenu = null;
             }
+
+            RestoreDefaultContentFocusAfterOverlay();
         };
 
         var interleaved = _document.Interleaved;
@@ -849,6 +853,8 @@ public partial class MainWindow
             {
                 _timeStretchMenu = null;
             }
+
+            RestoreDefaultContentFocusAfterOverlay();
         };
     }
 
@@ -905,6 +911,8 @@ public partial class MainWindow
             {
                 _silenceMenu = null;
             }
+
+            RestoreDefaultContentFocusAfterOverlay();
         };
     }
 
@@ -2192,6 +2200,8 @@ public partial class MainWindow
             {
                 _silenceSelectionMenu = null;
             }
+
+            RestoreDefaultContentFocusAfterOverlay();
         };
     }
 

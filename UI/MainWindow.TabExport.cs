@@ -473,10 +473,12 @@ public partial class MainWindow
         };
         if (dialog.ShowDialog(this) != true)
         {
+            RestoreDefaultContentFocusAfterOverlay();
             return false;
         }
 
         RememberExportFolder(Path.GetDirectoryName(dialog.FileName));
+        RestoreDefaultContentFocusAfterOverlay();
         jobs.Add(new ExportJob(session.DisplayName, dialog.FileName, session.Document));
         return true;
     }
@@ -491,11 +493,13 @@ public partial class MainWindow
         };
         if (folderDialog.ShowDialog(this) != true)
         {
+            RestoreDefaultContentFocusAfterOverlay();
             return false;
         }
 
         folder = folderDialog.FolderName;
         RememberExportFolder(folder);
+        RestoreDefaultContentFocusAfterOverlay();
         return true;
     }
 

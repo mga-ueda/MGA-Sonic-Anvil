@@ -968,6 +968,8 @@ public partial class MainWindow
             {
                 _waveMenu = null;
             }
+
+            RestoreDefaultContentFocusAfterOverlay();
         };
         menu.IsOpen = true;
     }

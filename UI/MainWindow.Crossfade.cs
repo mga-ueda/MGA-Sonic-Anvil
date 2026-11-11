@@ -374,7 +374,7 @@ public partial class MainWindow
             }
 
             ClearCrossfadeEditUi();
-            Waveform.Focus();
+            RestoreDefaultContentFocusAfterOverlay();
         }
         finally
         {

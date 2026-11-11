@@ -61,6 +61,26 @@ public partial class MainWindow
         Waveform.Focus();
     }
 
+    /// <summary>
+    /// モーダル／ピッカー／インプレース編集などを閉じたあと、Space 等が効くよう既定の本文へフォーカスを戻す。
+    /// </summary>
+    internal void RestoreDefaultContentFocusAfterOverlay()
+    {
+        if (_closing)
+        {
+            return;
+        }
+
+        if (!IsActive)
+        {
+            Activate();
+        }
+
+        // Alt+C などで閉じた直後、残留 Alt で Space がシステムメニューになるのを防ぐ。
+        SettleAltStateAfterOwnedDialog();
+        RestoreDefaultContentFocusAfterMenu();
+    }
+
     /// <summary>すりガラス読み込み中に抑止した Sync を1回だけ流す。</summary>
     private void FlushVstSyncQueuedDuringEditorBusy()
     {
@@ -130,6 +150,8 @@ public partial class MainWindow
             {
                 _formatMenu = null;
             }
+
+            RestoreDefaultContentFocusAfterOverlay();
         };
     }
 

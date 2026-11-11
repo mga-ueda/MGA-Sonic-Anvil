@@ -1542,6 +1542,8 @@ public partial class MainWindow
             catch
             {
             }
+
+            RestoreDefaultContentFocusAfterOverlay();
         };
         _vstEditors[slotIndex] = window;
         try

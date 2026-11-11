@@ -1206,6 +1206,7 @@ public partial class MainWindow : Window
             timeItem.IsChecked = !StatusTimes.ShowSamples;
             sampleItem.IsChecked = StatusTimes.ShowSamples;
         };
+        menu.Closed += (_, _) => RestoreDefaultContentFocusAfterOverlay();
         EditorPositionTimecodeHost.ContextMenu = menu;
         EditorPositionTimecode.ContextMenu = menu;
         EditorPositionTimecode.SetDisplay("00:00.000");

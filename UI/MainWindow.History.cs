@@ -77,6 +77,7 @@ public partial class MainWindow
         }
 
         HistoryOverlay.Close();
+        RestoreDefaultContentFocusAfterOverlay();
     }
 
     private void MainWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)

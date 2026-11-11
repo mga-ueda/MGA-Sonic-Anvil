@@ -219,7 +219,7 @@ public partial class MainWindow
         _volumeCurveUndo.Clear();
         _volumeCurveRedo.Clear();
         RefreshTransportCommandsEnabled();
-        Waveform.Focus();
+        RestoreDefaultContentFocusAfterOverlay();
     }
 
     private void OnVolumeCurveEditCompleted()

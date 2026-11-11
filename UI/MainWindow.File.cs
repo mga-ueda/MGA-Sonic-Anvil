@@ -94,6 +94,8 @@ public partial class MainWindow
             RememberOpenFolder(Path.GetDirectoryName(dialog.FileName));
             OpenPaths(dialog.FileNames);
         }
+
+        RestoreDefaultContentFocusAfterOverlay();
     }
 
     private void OpenPath(string path) => OpenPaths([path]);
@@ -668,11 +670,13 @@ public partial class MainWindow
             };
             if (dialog.ShowDialog(this) != true)
             {
+                RestoreDefaultContentFocusAfterOverlay();
                 return false;
             }
 
             path = dialog.FileName;
             RememberExportFolder(Path.GetDirectoryName(path));
+            RestoreDefaultContentFocusAfterOverlay();
         }
 
         if (string.IsNullOrEmpty(path))
@@ -1660,9 +1664,11 @@ public partial class MainWindow
         }
         if (dialog.ShowDialog(this) != true)
         {
+            RestoreDefaultContentFocusAfterOverlay();
             return;
         }
 
+        RestoreDefaultContentFocusAfterOverlay();
         var destPath = dialog.FileName;
         RememberBouncePath(destPath);
         RememberExportFolder(Path.GetDirectoryName(destPath));

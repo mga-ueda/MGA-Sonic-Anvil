@@ -37,6 +37,15 @@ public partial class MainWindow
     private bool _altMenuChordHadOtherKey;
     private long _altReleasedAt = -1;
 
+    /// <summary>
+    /// 所有ダイアログを Alt+文字で閉じた直後など、親へ戻ったあとに Alt が残っているあいだ true。
+    /// この間の Space は Alt+Space（システムメニュー）にせず再生へ通す。
+    /// </summary>
+    private bool _altChordDismissGuard;
+
+    /// <summary>ダイアログ閉鎖直後の短いあいだ SC_KEYMENU を握りつぶす期限（TickCount64）。</summary>
+    private long _altChordDismissGuardUntil = -1;
+
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
@@ -87,10 +96,112 @@ public partial class MainWindow
             return;
         }
 
+        if (TryConsumeAltChordDismissGuard(ref msg, ref handled))
+        {
+            return;
+        }
+
         if (TryConsumeNumpadWindowMessage(msg.message, msg.wParam, msg.lParam))
         {
             handled = true;
         }
+    }
+
+    /// <summary>
+    /// Alt+C／Alt+O などで子ダイアログを閉じた直後、親の Space がシステムメニューになるのを防ぐ。
+    /// </summary>
+    private bool TryConsumeAltChordDismissGuard(ref MSG msg, ref bool handled)
+    {
+        var now = Environment.TickCount64;
+        var inGrace = _altChordDismissGuardUntil >= 0 && now < _altChordDismissGuardUntil;
+        if (!_altChordDismissGuard && !inGrace)
+        {
+            return false;
+        }
+
+        // KeyUp が欠けても、物理的に上がっていればガードを閉じる。
+        if (_altChordDismissGuard && !IsPhysicalAltDown())
+        {
+            _altChordDismissGuard = false;
+            ClearLatchedAlt();
+            LeaveWin32MenuMode();
+            inGrace = _altChordDismissGuardUntil >= 0 && now < _altChordDismissGuardUntil;
+            if (!inGrace)
+            {
+                return false;
+            }
+        }
+
+        const int wmSysCommand = 0x0112;
+        const int scKeyMenu = 0xF100;
+        if (msg.message == wmSysCommand
+            && (unchecked((int)msg.wParam.ToInt64()) & 0xFFF0) == scKeyMenu)
+        {
+            handled = true;
+            return true;
+        }
+
+        if (msg.message == WmSysChar)
+        {
+            var ch = unchecked((int)(msg.wParam.ToInt64() & 0xFFFF));
+            if (ch == ' ')
+            {
+                handled = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        var down = msg.message is WmKeyDown or WmSysKeyDown;
+        var up = msg.message is WmKeyUp or WmSysKeyUp;
+        if (!down && !up)
+        {
+            return false;
+        }
+
+        var virtualKey = unchecked((int)(msg.wParam.ToInt64() & 0xFFFF));
+        if (up && virtualKey is 0x12 or 0xA4 or 0xA5)
+        {
+            _altChordDismissGuard = false;
+            _altChordDismissGuardUntil = -1;
+            // NoteAltTransition / ClearLatchedAlt は通常経路へ任せる。
+            return false;
+        }
+
+        // まだ Alt が残っているあいだの Space → システムメニューではなく再生。
+        if (_altChordDismissGuard && down && virtualKey == 0x20)
+        {
+            handled = true;
+            if (!LibraryPlayerMode.IsKeyRepeat(msg.lParam.ToInt64()))
+            {
+                Dispatcher.BeginInvoke(
+                    () => TryProcessShortcut(Key.Space, ModifierKeys.None),
+                    DispatcherPriority.Send);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 所有ダイアログ／オーバーレイを閉じたあと、Alt 残留で Alt+Space システムメニューが出ないよう整える。
+    /// </summary>
+    internal void SettleAltStateAfterOwnedDialog()
+    {
+        _altMenuChordHadOtherKey = true;
+        LeaveWin32MenuMode();
+        _altChordDismissGuardUntil = Environment.TickCount64 + AltReleaseGraceMs;
+        if (IsPhysicalAltDown())
+        {
+            _altChordDismissGuard = true;
+            return;
+        }
+
+        ClearLatchedAlt();
+        LeaveWin32MenuMode();
     }
 
     /// <summary>Alt＋テンキーと、Alt を離した直後に残る SYSKEY／SYSCHAR を食う。</summary>
@@ -188,6 +299,7 @@ public partial class MainWindow
         _altNumpadDown.Clear();
         _staleSysNumpadDown.Clear();
         _numpadPercentJumpDigit = -1;
+        _altChordDismissGuard = false;
         Dispatcher.BeginInvoke(LeaveWin32MenuMode, System.Windows.Threading.DispatcherPriority.Send);
     }
 
@@ -464,6 +576,18 @@ public partial class MainWindow
         if (e.Key == Key.System || IsPhysicalAltDown())
         {
             menuModifiers |= ModifierKeys.Alt;
+        }
+
+        // Alt+文字でダイアログを閉じた直後の Space は、メッセージフィルタ漏れでも再生へ。
+        if (_altChordDismissGuard && key == Key.Space)
+        {
+            e.Handled = true;
+            if (!e.IsRepeat)
+            {
+                TryProcessShortcut(Key.Space, ModifierKeys.None);
+            }
+
+            return;
         }
 
         if (MenuAccessKeys.IsContextMenuKey(key, modifiers))

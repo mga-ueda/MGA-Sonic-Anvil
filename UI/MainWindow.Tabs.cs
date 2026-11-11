@@ -632,6 +632,7 @@ public partial class MainWindow
                 enabled: !IsUiBusy));
         }
 
+        menu.Closed += (_, _) => RestoreDefaultContentFocusAfterOverlay();
         menu.IsOpen = true;
     }
 
@@ -700,7 +701,11 @@ public partial class MainWindow
                 Owner = this,
                 Topmost = Topmost,
             };
-            _tabTimeTable.Closed += (_, _) => _tabTimeTable = null;
+            _tabTimeTable.Closed += (_, _) =>
+            {
+                _tabTimeTable = null;
+                RestoreDefaultContentFocusAfterOverlay();
+            };
         }
         else
         {
@@ -1581,6 +1586,7 @@ public partial class MainWindow
             _fileNameEditSession = null;
             _fileNameEditTitle = null;
             RefreshTabHeaders();
+            RestoreDefaultContentFocusAfterOverlay();
         }
         finally
         {

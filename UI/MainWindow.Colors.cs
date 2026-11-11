@@ -20,7 +20,11 @@ public partial class MainWindow
                 Topmost = Topmost,
             };
             _colorDevPanel.ColorsChanged += (_, _) => QueueAppColorRefresh();
-            _colorDevPanel.Closed += (_, _) => _colorDevPanel = null;
+            _colorDevPanel.Closed += (_, _) =>
+            {
+                _colorDevPanel = null;
+                RestoreDefaultContentFocusAfterOverlay();
+            };
             PositionColorDevPanel(_colorDevPanel);
         }
 

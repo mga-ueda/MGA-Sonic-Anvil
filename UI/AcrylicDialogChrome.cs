@@ -127,6 +127,9 @@ internal static class AcrylicDialogChrome
         finally
         {
             main?.ResumePlaylistVisualCursorHideAfterDialog();
+            // Cancel／No／Close／Esc を含め、閉じたあとは Space 等が効くよう本文へフォーカスを戻す。
+            // Owner が MainWindow のときだけ（入れ子ダイアログの Owner が別窓なら触らない）。
+            main?.RestoreDefaultContentFocusAfterOverlay();
         }
     }
 

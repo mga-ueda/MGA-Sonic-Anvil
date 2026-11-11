@@ -566,11 +566,13 @@ public partial class MainWindow
             };
             if (dialog.ShowDialog(this) != true)
             {
+                RestoreDefaultContentFocusAfterOverlay();
                 return;
             }
 
             WaapiBar.OutputDirectory = dialog.FolderName;
             PersistWaapiSettings();
+            RestoreDefaultContentFocusAfterOverlay();
         }
         catch (Exception ex)
         {
