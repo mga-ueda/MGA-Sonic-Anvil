@@ -1271,8 +1271,21 @@ internal sealed class VstInsertRackView : Grid
         menu.Items.Add(removeAllTabs);
 
         menu.Items.Add(new Separator());
-        var removeAll = new MenuItem { Header = UiStrings.LabelVstInsertRemoveAll };
-        removeAll.Click += (_, _) => ClearAllSlots();
+        // 1 タブしか無いときは「すべて削除」も他の全タブ系と同じくグレー。
+        var removeAll = new MenuItem
+        {
+            Header = UiStrings.LabelVstInsertRemoveAll,
+            IsEnabled = _canInsertAllTabs?.Invoke() ?? false,
+        };
+        removeAll.Click += (_, _) =>
+        {
+            if (_canInsertAllTabs?.Invoke() != true)
+            {
+                return;
+            }
+
+            ClearAllSlots();
+        };
         menu.Items.Add(removeAll);
 
         OpenContextMenu(menu, placement);
