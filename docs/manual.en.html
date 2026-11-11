@@ -870,10 +870,10 @@
         <li><span class="ui">FADE IN</span> <kbd>I</kbd> / <span class="ui">FADE OUT</span> <kbd>O</kbd> — pick a curve, Space to preview, Enter to apply. 1–9 select a curve.</li>
         <li><kbd>X</kbd> — fade around seek bar: from the playhead, fade out only the visible part before / fade in only the visible part after (linear). For sample-loop seam fades, use <kbd>Shift</kbd>+<kbd>X</kbd> (<a href="#fade-adjust">Fade Adjust Tool</a>).</li>
         <li><kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> — on a single tab, shows the loudness curve and opens volume. Type a dB value, or use ↑↓ / wheel by 0.1 dB (Shift 1 / Ctrl 3 / Ctrl+Shift 6). Space previews, Enter applies. The menu shows how whole-file Integrated LKFS / RMS / Peak will change. The Short Term curve and the stopped meter follow the same dB. Closing the volume popup leaves the curve. Close the curve with <kbd>Ctrl</kbd>+<kbd>L</kbd> again or <kbd>Esc</kbd> (see <a href="#spectrogram">Spectrogram / loudness analysis</a>). Both keys work in the editor; in the player only <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> is active.</li>
-        <li><kbd>V</kbd> — <a href="#volume-curve">Volume Curve</a> edit mode (editor only; red curve over the waveform, bar below. With a selection, starts from a trapezoid plateau; otherwise flat 0 dB). Press <kbd>V</kbd> again or Cancel / Esc to leave.</li>
+        <li><kbd>V</kbd> — <a href="#volume-curve">Volume Curve</a> edit mode (editor only; red curve over the waveform, bar below. With a selection, starts from a trapezoid plateau; otherwise flat 0 dB). Press <kbd>V</kbd> again, or Cancel / <kbd>Alt</kbd>+<kbd>C</kbd>, to leave. <kbd>Esc</kbd> only clears point focus and does not exit the mode.</li>
         <li><kbd>E</kbd> — while the loudness curve is up, switch to the pen (again to leave it). The button at the top right of the curve and a right-click on the curve do the same. Dragging does not change the time selection, and the original curve stays visible. Releasing the mouse sets the volume to the drawn height. Moving back in time erases the later part of the stroke, so each time has one level. A short fade joins both ends. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes that stroke. <kbd>Esc</kbd> clears the pen before leaving the curve.</li>
         <li><strong>Match Loudness</strong> (playlist right-click / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> in the player, or <kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> with multiple editor tabs) — simple whole-file gain to a target LKFS (defaults to Settings). Not the constant volume picker (<kbd>Ctrl</kbd>+<kbd>L</kbd>) or <a href="#volume-curve">Volume Curve</a> (<kbd>V</kbd>). In the player, files are saved in place afterward and cannot be undone; <kbd>Ctrl</kbd>+<kbd>L</kbd> stays off there. Non–Wave/AIFF files are skipped; if none qualify, a notice is shown.</li>
-        <li><kbd>P</kbd> — pitch. On a single tab, opens the <a href="#pitch-curve">Pitch Curve</a> window (selection if any, else the whole file). With multiple tabs selected, opens a batch semitone dialog instead. A dim overlay shows progress while it runs.</li>
+        <li><kbd>P</kbd> — pitch. On a single tab, enters <a href="#pitch-curve">Pitch Curve</a> edit mode (editor only; red curve over the waveform, bar below. With a selection, starts from a trapezoid plateau; otherwise flat 0 semitones). With multiple tabs selected, opens a batch semitone dialog instead. A dim overlay shows progress while applying. In the player, <kbd>P</kbd> steps tracks.</li>
         <li><kbd>T</kbd> — time stretch (pitch stays). Uses the selection, or the whole file. Destination time and ratio (%) stay linked. ↑↓ / wheel (time: 1 s / Shift 10 s / Ctrl 1 min / Ctrl+Shift 10 min; ratio: 0.1 / Shift 1 / Ctrl 10 / Ctrl+Shift 25%). <kbd>Tab</kbd> switches fields. Space previews, Enter applies. Range is 10–1000%. A dim overlay shows progress while it runs.</li>
         <li><span class="ui">NORMALIZE</span> <kbd>N</kbd> — fit the peak to -0.1 dB.</li>
         <li><kbd>R</kbd> — reverse. Uses the selection, or the whole file. Audio only; markers / regions / loops stay put.</li>
@@ -960,32 +960,29 @@
         <li><strong>Clip marks</strong> — Where preview gain would exceed 0 dBFS, a red horizontal capsule appears at the waveform tip (Color settings → Preview · clip).</li>
         <li><strong>Playback</strong> (<kbd>Space</kbd>) — Normal play/stop with the live curve preview applied.</li>
         <li><strong>Reset</strong> — Back to a constant 0 dB curve.</li>
-        <li><strong>OK / Cancel</strong> — OK (<kbd>Alt</kbd>+<kbd>O</kbd>) bakes and exits (undo with the main <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel / <kbd>V</kbd> again / Esc (after clearing point focus) discards. If the result would clip, you can lower the whole curve by the shown amount. In-mode point edits undo/redo with <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>).</li>
+        <li><strong>OK / Cancel</strong> — OK (<kbd>Alt</kbd>+<kbd>O</kbd>) bakes and exits (undo with the main <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel / <kbd>Alt</kbd>+<kbd>C</kbd> / <kbd>V</kbd> again discards. <kbd>Esc</kbd> only clears point focus and does not exit the mode. If the result would clip, you can lower the whole curve by the shown amount. In-mode point edits undo/redo with <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>).</li>
         <li><strong>While active</strong> — Other destructive keys and switching to player chrome (F9 / F10) warn and stay blocked. Spectrogram/overlay toggle when already visible, leaving loudness with <kbd>Ctrl</kbd>+<kbd>L</kbd>, and some marker keys still work.</li>
       </ul>
 
       <h3 id="pitch-curve">Pitch Curve</h3>
-      <p>Draw a red pitch curve in semitones over time, preview it, then bake it into the waveform. This is separate from the batch semitone dialog used when several tabs are selected with <kbd>P</kbd>.</p>
+      <p>Draw a red pitch curve in semitones over the waveform, preview it, then bake it. This is separate from the batch semitone dialog used when several tabs are selected with <kbd>P</kbd>.</p>
       <ul>
-        <li><strong>Open</strong> — In the editor, <kbd>P</kbd>, or waveform right-click → Audio → Pitch. Uses the selection, or the whole file. The title shows (selection) or (entire). In the player, <kbd>P</kbd> steps tracks and does not open this window (playlist right-click Pitch is the batch semitone dialog).</li>
-        <li><strong>Layout</strong> — Waveform and pitch curve on top (vertical axis in semitones: 0 / ±12 / ±24). Bottom controls sit as one centered block. No status line such as “0 semitones” under the buttons.</li>
-        <li><strong>Bottom UI</strong>
-          <ul>
-            <li>Top row (left to right in the block) — pitch value box → Points / Brush → Snap to scale / Don’t time stretch / Lightweight mode → Curve Shape (1–9). Digits in the pitch box are centered.</li>
-            <li>Bottom row — left of the block: Add Point, Reset, then Play and Play Ignoring Pitch Curve. Right edge of the block: OK / Cancel (right-aligned inside the centered block, not at the window edge).</li>
-          </ul>
-        </li>
-        <li><strong>Window size</strong> — Minimum height is about half of the previous minimum. Minimum width is measured so the bottom UI does not clip. Position and size are remembered.</li>
-        <li><strong>Points</strong> (default) — Drag control points. Selected point: ↑↓ by ±1 semitone (<kbd>Shift</kbd>+↑↓ for ±12). ←→ moves in time (<kbd>Shift</kbd> faster). <kbd>Alt</kbd>+←→ selects the previous / next point. <kbd>Delete</kbd> removes the selected point. <kbd>Alt</kbd>+<kbd>A</kbd> or Add Point inserts beside the selection.</li>
+        <li><strong>Open</strong> — In the editor, <kbd>P</kbd>, or waveform right-click → Audio → Pitch. In the player, <kbd>P</kbd> steps tracks and does not enter this mode (playlist right-click Pitch is the batch semitone dialog). A bar appears under the waveform; the curve and points overlay the main view.</li>
+        <li><strong>Edit range</strong> — Always the whole file. With a selection on entry, starts from a four-point trapezoid over that span; otherwise a flat 0-semitone curve.</li>
+        <li><strong>Vertical axis</strong> — Semitones (0 / ±12 / ±24). Snap to scale also shows a keyboard guide.</li>
+        <li><strong>Points</strong> (default) — Drag control points. Selected point: ↑↓ by ±1 semitone (<kbd>Shift</kbd>+↑↓ for ±12). ←→ moves in time (<kbd>Shift</kbd> faster). With no point selected, ←→ seeks as usual. <kbd>Alt</kbd>+←→ selects the previous / next point. <kbd>Delete</kbd> removes the selected point. <kbd>Alt</kbd>+<kbd>A</kbd> or Add Point inserts at the playhead (switches to Points even from Brush).</li>
         <li><strong>Brush</strong> — Drag to paint the curve. Add Point and Curve Shape are disabled while Brush is active.</li>
-        <li><strong>Pitch value</strong> (<kbd>Alt</kbd>+<kbd>N</kbd>) — Semitones for a flat curve. ↑↓ by ±1 (<kbd>Shift</kbd>+↑↓ for ±12); wheel works too. Enter applies and closes (does not wipe a hand-drawn curve).</li>
+        <li><strong>Seek Bar</strong> (<kbd>Alt</kbd>+<kbd>F</kbd>) — Non-edit mode for clicking the waveform to seek.</li>
+        <li><strong>Pitch value</strong> (<kbd>Alt</kbd>+<kbd>N</kbd>) — Constant semitones when the curve is flat; otherwise shifts the whole curve by the box delta. ↑↓ by ±1 (<kbd>Shift</kbd>+↑↓ for ±12); wheel works too.</li>
         <li><strong>Snap to scale</strong> (<kbd>Alt</kbd>+<kbd>S</kbd>) — Keyboard guide and snap to scale degrees. Remembered.</li>
-        <li><strong>Don’t time stretch</strong> (<kbd>Alt</kbd>+<kbd>T</kbd>) — When on, length changes (like changing playback speed). Off (default) keeps length. Remembered.</li>
+        <li><strong>Don’t time stretch</strong> (<kbd>Alt</kbd>+<kbd>H</kbd>) — When on, length changes (like changing playback speed). Off (default) keeps length. Remembered.</li>
         <li><strong>Lightweight mode</strong> (<kbd>Alt</kbd>+<kbd>L</kbd>) — Faster, coarser preview only. OK always uses full quality. Remembered.</li>
-        <li><strong>Curve Shape</strong> — Same 1–9 set as fades, for the selected segment. Number keys work too.</li>
-        <li><strong>Play</strong> (<kbd>Alt</kbd>+<kbd>P</kbd> / <kbd>Space</kbd>) — Preview with the curve, or stop. Play Ignoring Pitch Curve compares against the original. A dim overlay may show progress during preview.</li>
+        <li><strong>Curve Shape</strong> — Same 1–9 set as fades, for the selected segment. Number keys work too (Points mode).</li>
+        <li><strong>Clip marks</strong> — Where preview would exceed 0 dBFS, a red horizontal capsule appears at the waveform tip (Color settings → Preview · clip).</li>
+        <li><strong>Playback</strong> (<kbd>Space</kbd>) — Preview with the curve, or stop. Play Ignoring Pitch Curve compares against the original. A dim overlay may show progress while building the preview.</li>
         <li><strong>Reset</strong> — Flat curve at 0 semitones.</li>
-        <li><strong>OK / Cancel</strong> — OK (Enter) bakes and closes (undo with the main window’s <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel (Esc) discards. If the result would clip, you are asked whether to lower gain first. Point edits inside the window undo / redo with <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>).</li>
+        <li><strong>OK / Cancel</strong> — OK (<kbd>Alt</kbd>+<kbd>O</kbd>) bakes and exits (undo with the main window’s <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel / <kbd>Alt</kbd>+<kbd>C</kbd> discards. <kbd>P</kbd> does not exit. <kbd>Esc</kbd> only clears point focus and does not exit the mode. If the result would clip, you are asked whether to lower gain first. In-mode point edits undo / redo with <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>).</li>
+        <li><strong>While active</strong> — Other destructive keys and switching to player chrome (F9 / F10) warn and stay blocked. Some marker keys still work.</li>
       </ul>
 
       <h2 id="silence-hit">6. Silence &amp; Hit Detection</h2>
@@ -1078,7 +1075,7 @@
         <li><strong>Auto-search</strong> — Find Start, Find End, Shift Start and End. Keeps searching toward a better-matching seam.</li>
         <li><strong>Multiples of 28</strong> — when on, Start and End move only on 28-sample steps.</li>
         <li><strong>Delete before/after loop / Delete after loop</strong> — on OK, deletes audio before Start and after End, or only after End (the End side is used as material, then trimmed). Both are off by default and remember the last state.</li>
-        <li><strong>OK / Cancel</strong> — OK (Enter) bakes, commits the sample loop, and closes (undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel (Esc) discards changes and clears overlays. Destructive edits outside are blocked while the tool is open.</li>
+        <li><strong>OK / Cancel</strong> — OK (Enter / <kbd>Alt</kbd>+<kbd>O</kbd>) bakes, commits the sample loop, and closes (undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>). Cancel / <kbd>Alt</kbd>+<kbd>C</kbd> discards changes and clears overlays. <kbd>Esc</kbd> does not close. Destructive edits outside are blocked while the tool is open.</li>
         <li>Position and size are remembered. The default size is also the minimum.</li>
       </ul>
 
@@ -1384,7 +1381,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>Single tab: loudness curve + volume (type dB; ↑↓ / wheel, Space preview, Enter apply; shows whole-file LKFS / RMS / Peak first; closing the popup leaves the curve; close with <kbd>Ctrl</kbd>+<kbd>L</kbd> again / <kbd>Esc</kbd>). Multi-tab: Match Loudness (simple). Both keys in the editor; player: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> only (<kbd>Ctrl</kbd>+<kbd>L</kbd> off; playlist right-click also works)</td></tr>
           <tr><td><kbd>V</kbd></td><td><a href="#volume-curve">Volume Curve</a> edit mode (editor only; toggle)</td></tr>
           <tr><td><kbd>E</kbd></td><td>While the loudness curve is up, switch to the pen (again to leave it; same as the button or a right-click on the curve; the original curve stays while dragging; releasing sets the volume, with fades at the ends; <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the stroke; <kbd>Esc</kbd> clears the pen first)</td></tr>
-          <tr><td><kbd>P</kbd></td><td>Pitch. Single tab opens the <a href="#pitch-curve">Pitch Curve</a> window (selection or whole file). Multiple selected tabs use a batch semitone dialog. Dim overlay while running</td></tr>
+          <tr><td><kbd>P</kbd></td><td>Pitch. Single tab enters <a href="#pitch-curve">Pitch Curve</a> edit mode (editor only; trapezoid seed when a selection exists). Multiple selected tabs use a batch semitone dialog. Dim overlay while applying. In the player, previous track</td></tr>
           <tr><td><kbd>T</kbd></td><td>Time stretch (time and ratio stay linked; Space preview, Enter apply; a dim overlay while running)</td></tr>
           <tr><td><kbd>N</kbd></td><td>Normalize (peak −0.1 dB)</td></tr>
           <tr><td><kbd>R</kbd></td><td>Reverse (selection, or the whole file; audio only; markers / regions / loops stay put)</td></tr>
@@ -1534,8 +1531,8 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Enter</kbd></td><td>OK (bake and close)</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Cancel (discard and close)</td></tr>
+          <tr><td><kbd>Enter</kbd> / <kbd>Alt</kbd>+<kbd>O</kbd></td><td>OK (bake and close)</td></tr>
+          <tr><td>Cancel / <kbd>Alt</kbd>+<kbd>C</kbd></td><td>Discard and close (<kbd>Esc</kbd> does not close)</td></tr>
           <tr><td><kbd>S</kbd> / <kbd>E</kbd> / <kbd>X</kbd> / <kbd>F</kbd> / <kbd>P</kbd> / <kbd>T</kbd></td><td>Focus Start / End / Pre (<kbd>X</kbd> and <kbd>F</kbd> are the same) / Post (<kbd>P</kbd> and <kbd>T</kbd>) and jump the view there</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>S</kbd> / <kbd>E</kbd> / <kbd>P</kbd> / <kbd>T</kbd></td><td>Move to the Start / End / Pre / Post value box (works while editing a value)</td></tr>
           <tr><td>← / →</td><td>Nudge the focused value by 1 sample</td></tr>
@@ -1575,7 +1572,7 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>V</kbd> / Cancel / Esc</td><td>Leave (Esc clears point focus first; confirms if there are unapplied edits)</td></tr>
+          <tr><td><kbd>V</kbd> / Cancel / <kbd>Alt</kbd>+<kbd>C</kbd></td><td>Leave (confirms if there are unapplied edits). <kbd>Esc</kbd> only clears point focus and does not exit</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>O</kbd></td><td>OK (bake and exit)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Add Point at the playhead (switches to Points even from Brush)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>Focus the gain box</td></tr>
@@ -1587,22 +1584,22 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd></td><td>Undo / redo in-mode point edits (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> also redo)</td></tr>
         </tbody>
       </table>
-      <p>While the Pitch Curve window is open (see <a href="#pitch-curve">Pitch Curve</a>)</p>
+      <p>While Pitch Curve edit mode is on (see <a href="#pitch-curve">Pitch Curve</a>)</p>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Enter</kbd></td><td>OK (bake and close; if the pitch box is focused on a flat curve, apply that value first)</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Cancel (discard and close)</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>P</kbd> / <kbd>Space</kbd></td><td>Preview play / stop</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Add Point (Points mode)</td></tr>
+          <tr><td>Cancel / <kbd>Alt</kbd>+<kbd>C</kbd></td><td>Leave (confirms if there are unapplied edits). <kbd>P</kbd> does not exit. <kbd>Esc</kbd> only clears point focus</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>O</kbd></td><td>OK (bake and exit)</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Preview play / stop with the curve</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Add Point at the playhead (switches to Points even from Brush)</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>N</kbd></td><td>Focus the pitch value box</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>S</kbd> / <kbd>T</kbd> / <kbd>L</kbd></td><td>Toggle Snap to scale / Don’t time stretch / Lightweight mode</td></tr>
-          <tr><td><kbd>Alt</kbd>+<kbd>I</kbd> / <kbd>B</kbd></td><td>Points / Brush</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>S</kbd> / <kbd>H</kbd> / <kbd>L</kbd></td><td>Toggle Snap to scale / Don’t time stretch / Lightweight mode</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>I</kbd> / <kbd>B</kbd> / <kbd>F</kbd></td><td>Points / Brush / Seek Bar</td></tr>
           <tr><td>↑ / ↓ (selected point or value box)</td><td>±1 semitone (<kbd>Shift</kbd>+↑↓ for ±12)</td></tr>
-          <tr><td>← / → (selected point)</td><td>Move in time (<kbd>Shift</kbd> faster). <kbd>Alt</kbd>+←→ selects previous / next point</td></tr>
-          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Curve shape for the selected point</td></tr>
+          <tr><td>← / → (selected point)</td><td>Move in time (<kbd>Shift</kbd> faster). With no selection, seek. <kbd>Alt</kbd>+←→ selects previous / next point</td></tr>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Curve shape for the selected point (Points mode)</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>Delete the selected point</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd></td><td>Undo / redo point edits in the window (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> also redo)</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd></td><td>Undo / redo in-mode point edits (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> also redo)</td></tr>
         </tbody>
       </table>
       <p>While the batch pitch dialog is open (multiple tabs + <kbd>P</kbd>)</p>
@@ -1610,8 +1607,8 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td>↑ / ↓ / wheel</td><td>A semitone (<kbd>Shift</kbd> or <kbd>Ctrl</kbd> for an octave)</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>Apply</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
+          <tr><td><kbd>Enter</kbd> / <kbd>Alt</kbd>+<kbd>O</kbd></td><td>Apply</td></tr>
+          <tr><td>Cancel / <kbd>Alt</kbd>+<kbd>C</kbd></td><td>Close (<kbd>Esc</kbd> does not close)</td></tr>
         </tbody>
       </table>
       <p>While the time-stretch menu is open</p>
