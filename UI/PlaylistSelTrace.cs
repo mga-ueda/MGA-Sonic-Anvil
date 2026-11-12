@@ -1,20 +1,26 @@
+#if PLAYLIST_SEL_TRACE
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+#endif
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// プレイリスト選択が上へ戻る不具合の一時診断。
-/// %TEMP%\mga-sonic-anvil-playlist-sel.log へ追記。
-/// <see cref="Enabled"/> を true にすると有効（いまはマスク）。
+/// 有効化: プロジェクト／ファイルに <c>PLAYLIST_SEL_TRACE</c> を定義する。
+/// 出力: %TEMP%\mga-sonic-anvil-playlist-sel.log
 /// </summary>
 internal static class PlaylistSelTrace
 {
-    /// <summary>診断ログのオン／オフ。調査時だけ true。</summary>
+#if PLAYLIST_SEL_TRACE
+    public const bool Enabled = true;
+#else
     public const bool Enabled = false;
+#endif
 
+#if PLAYLIST_SEL_TRACE
     private static readonly object Gate = new();
     private static readonly string Path =
         System.IO.Path.Combine(
@@ -27,14 +33,13 @@ internal static class PlaylistSelTrace
     private static bool _started;
 
     public static string LogPath => Path;
+#else
+    public static string LogPath => string.Empty;
+#endif
 
     public static void Reset()
     {
-        if (!Enabled)
-        {
-            return;
-        }
-
+#if PLAYLIST_SEL_TRACE
         lock (Gate)
         {
             try
@@ -55,15 +60,12 @@ internal static class PlaylistSelTrace
         }
 
         Write("RESET", "log cleared");
+#endif
     }
 
     public static void Write(string tag, string detail)
     {
-        if (!Enabled)
-        {
-            return;
-        }
-
+#if PLAYLIST_SEL_TRACE
         EnsureStarted();
         var n = Interlocked.Increment(ref _seq);
         var line =
@@ -80,8 +82,13 @@ internal static class PlaylistSelTrace
         }
 
         Debug.WriteLine($"[PlaylistSel] {tag} {detail}");
+#else
+        _ = tag;
+        _ = detail;
+#endif
     }
 
+#if PLAYLIST_SEL_TRACE
     private static void EnsureStarted()
     {
         if (_started)
@@ -110,6 +117,7 @@ internal static class PlaylistSelTrace
             _started = true;
         }
     }
+#endif
 
     public static string NameOf(DocumentSession? session)
     {
@@ -124,11 +132,7 @@ internal static class PlaylistSelTrace
 
     public static void NoteCaret(int index, DocumentSession? session, string via)
     {
-        if (!Enabled)
-        {
-            return;
-        }
-
+#if PLAYLIST_SEL_TRACE
         var name = NameOf(session);
         if (_lastCaretIndex >= 0
             && index >= 0
@@ -143,5 +147,10 @@ internal static class PlaylistSelTrace
         _lastCaretIndex = index;
         _lastCaretName = name;
         Write("CARET", $"via={via} idx={index} name={name}");
+#else
+        _ = index;
+        _ = session;
+        _ = via;
+#endif
     }
 }
