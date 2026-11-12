@@ -2374,6 +2374,33 @@ internal static class LibraryPlayerMode
         scheduledGeneration == currentGeneration;
 
     /// <summary>
+    /// 本再生／ギャップレス確定のあと選択を追従してよいか。
+    /// 未選択・既に再生曲・開始時点の再生曲（自動送りで旧曲のまま）なら true。
+    /// 合流待ちのあいだに↓で先へ進んだ選択（now も started も先の曲）は false。
+    /// 「開始時点の選択のまま」だけ見ると、合流遅れの再生が先の選択へ追いついて
+    /// シアンを上へ戻す（実測: play=旧曲 / now=started=先の曲）。
+    /// </summary>
+    public static bool ShouldFollowPlaylistPlaySelection(
+        DocumentSession? selectedNow,
+        DocumentSession playing,
+        DocumentSession? activeWhenStarted) =>
+        selectedNow is null
+        || ReferenceEquals(selectedNow, playing)
+        || ReferenceEquals(selectedNow, activeWhenStarted);
+
+    /// <summary>
+    /// ロード完了時に選択が再生曲から外れているとき、旧曲の本再生を捨てて
+    /// 最新選択へ振り直すべきか。追従しないまま旧曲を鳴らすとカーソルと再生がずれる。
+    /// </summary>
+    public static bool ShouldRetargetPlaylistPlayToSelection(
+        DocumentSession? selectedNow,
+        DocumentSession playing,
+        DocumentSession? activeWhenStarted) =>
+        selectedNow is not null
+        && !ReferenceEquals(selectedNow, playing)
+        && !ShouldFollowPlaylistPlaySelection(selectedNow, playing, activeWhenStarted);
+
+    /// <summary>
     /// マーカー番号・Ctrl+←→ など捨てキュー操作を使うか。
     /// 音声波形／動画本再生／F8／イマーシブ一時停止（暗いプレビューは不可）。
     /// </summary>

@@ -248,6 +248,10 @@ public partial class MainWindow
         LibraryBrowser.IsEnabled = show;
         if (show)
         {
+            PlaylistSelTrace.Write(
+                "PLAYER_ON",
+                $"sel={PlaylistSelTrace.NameOf(LibraryBrowser.SelectedSession)} " +
+                $"active={PlaylistSelTrace.NameOf(_activeSession)}");
             LibraryBrowser.SetGlowExtendsWaveform(true);
             ApplyLibraryWashChrome(true);
         }
@@ -2482,6 +2486,11 @@ public partial class MainWindow
 
         _libraryPlayOnArrowRelease = false;
         var session = LibraryBrowser.SelectedSession ?? _activeSession;
+        PlaylistSelTrace.Write(
+            "ARROW_REL",
+            $"sel={PlaylistSelTrace.NameOf(LibraryBrowser.SelectedSession)} " +
+            $"active={PlaylistSelTrace.NameOf(_activeSession)} " +
+            $"play={ContinuesLibraryPlaylistPlayback()}");
         if (!ContinuesLibraryPlaylistPlayback())
         {
             if (session is not null)

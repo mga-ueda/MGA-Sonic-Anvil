@@ -3050,6 +3050,53 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void MoveSelection_RapidDown_KeepsSelectionFromJumpingUp()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            // 画面に収まりきらない件数にして ScrollIntoView／仮想化を必ず踏ませる。
+            var sessions = new DocumentSession[40];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                sessions[i] = Session($"track-{i:D2}.wav");
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 280,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+
+            // ↓連打相当。各移動のあとにレイアウトを挟み、古い EnsureRowVisible の
+            // Loaded コールバックと SelectedItem の寄りを誘発する。
+            for (var i = 0; i < 12; i++)
+            {
+                view.MoveSelection(1, wrap: false);
+                view.UpdateLayout();
+                Flush();
+            }
+
+            Assert.Same(sessions[12], view.SelectedSession);
+            var grid = Assert.IsAssignableFrom<DataGrid>(view.FileGrid);
+            Assert.Same(sessions[12], (grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession);
+            Assert.Same(sessions[12], (grid.CurrentItem as LibraryFileRow)?.Tag as DocumentSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void ShouldRestoreFolderPlaySelection_KeepsUserMovedRow()
     {
         var first = Session("first.wav");

@@ -1871,6 +1871,27 @@ public sealed class LibraryPlayerModeTests
     }
 
     [Fact]
+    public void ShouldFollowPlaylistPlaySelection_KeepsUserMovedRow()
+    {
+        var playing = Session("playing.wav");
+        var active = Session("active.wav");
+        var ahead = Session("ahead.wav");
+
+        // 未選択／既に再生曲／自動送りで旧再生曲のまま → 追従してよい。
+        Assert.True(LibraryPlayerMode.ShouldFollowPlaylistPlaySelection(null, playing, active));
+        Assert.True(LibraryPlayerMode.ShouldFollowPlaylistPlaySelection(playing, playing, active));
+        Assert.True(LibraryPlayerMode.ShouldFollowPlaylistPlaySelection(active, playing, active));
+        // 実測 JUMP_UP: play=旧曲 / now=先の曲 / active=さらに前の再生曲 → 戻さない。
+        Assert.False(LibraryPlayerMode.ShouldFollowPlaylistPlaySelection(ahead, playing, active));
+
+        // 追従しないまま旧曲を鳴らすとカーソルと再生がずれる → 最新選択へ振り直す。
+        Assert.True(LibraryPlayerMode.ShouldRetargetPlaylistPlayToSelection(ahead, playing, active));
+        Assert.False(LibraryPlayerMode.ShouldRetargetPlaylistPlayToSelection(playing, playing, active));
+        Assert.False(LibraryPlayerMode.ShouldRetargetPlaylistPlayToSelection(active, playing, active));
+        Assert.False(LibraryPlayerMode.ShouldRetargetPlaylistPlayToSelection(null, playing, active));
+    }
+
+    [Fact]
     public void RegionDigitJump_CtrlTopRow_TwoDigitsFromOne()
     {
         Assert.True(LibraryPlayerMode.TryResolveRegionDigitJump(0, 1, 12, out var p1, out var s1));

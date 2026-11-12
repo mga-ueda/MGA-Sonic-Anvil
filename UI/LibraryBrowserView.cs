@@ -322,6 +322,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     private bool _deferActivate;
     private bool _restoreListFocus;
     private int _restoreListFocusGeneration;
+    /// <summary>
+    /// <see cref="EnsureRowVisible"/> の遅延スクロール調整用。
+    /// 選択移動のたびに進め、古い Loaded コールバックが上方向へ巻き戻すのを捨てる。
+    /// </summary>
+    private int _playlistEnsureVisibleGeneration;
     private LibraryFileColumn? _sortColumn = LibraryFileColumn.Album;
 
     /// <summary>列見出しのソートが付いているときだけ true。</summary>
@@ -1786,33 +1791,46 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>再生追従で行を選ぶ。クリック再生は起こさない。複数選択は今の曲が含まれていれば残す。</summary>
     public void SelectSessionQuiet(DocumentSession session)
     {
+        var before = SelectedSession;
         var keep = SelectedSessions;
         if (keep.Length == 0 || Array.IndexOf(keep, session) < 0)
         {
             keep = [session];
         }
 
+        PlaylistSelTrace.Write(
+            "QUIET",
+            $"target={PlaylistSelTrace.NameOf(session)} before={PlaylistSelTrace.NameOf(before)} keep={keep.Length}");
+
         var keepFocus = _restoreListFocus || _grid.IsKeyboardFocusWithin;
+        // EnsureRowVisible まで _deferActivate を維持し、仮想化レイアウトが
+        // SelectedItem を先頭へ寄せても Grid_SelectionChanged にシアンを奪わせない。
         _deferActivate = true;
         try
         {
             ApplyRowSelectionCore(session, keep);
+            if (keepFocus)
+            {
+                EnsureListFocused();
+            }
+
+            if (_grid.SelectedItem is not null)
+            {
+                EnsureRowVisible(_grid.SelectedItem);
+            }
+
+            PinSelectionCurrent();
         }
         finally
         {
             _deferActivate = false;
         }
 
-        if (keepFocus)
-        {
-            EnsureListFocused();
-        }
-
-        if (_grid.SelectedItem is not null)
-        {
-            EnsureRowVisible(_grid.SelectedItem);
-        }
-
+        var files = SnapshotPlaylistFiles();
+        PlaylistSelTrace.NoteCaret(
+            PlaylistFileIndexOfSelected(files),
+            SelectedSession,
+            "SelectSessionQuiet");
         RefreshGroupJacketsForActiveRow();
     }
 
@@ -2641,7 +2659,8 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
-        var index = PlaylistFileIndexOfSelected(files);
+        var from = PlaylistFileIndexOfSelected(files);
+        var index = from;
         if (index < 0)
         {
             index = delta > 0 ? 0 : count - 1;
@@ -2662,7 +2681,23 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        var fromName = from >= 0 && from < files.Count
+            ? PlaylistSelTrace.NameOf(files[from].Tag as DocumentSession)
+            : "-";
+        var toName = PlaylistSelTrace.NameOf(files[index].Tag as DocumentSession);
+        var caretName = PlaylistSelTrace.NameOf(_playlistCaretRow?.Tag as DocumentSession);
+        var gridName = PlaylistSelTrace.NameOf(
+            (_grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession);
+        PlaylistSelTrace.Write(
+            "MOVE",
+            $"delta={delta} wrap={wrap} extend={extend} from={from}:{fromName} to={index}:{toName} " +
+            $"caretRow={caretName} gridSel={gridName} selCount={_playlistSelectedRows.Count}");
+
         ApplyMoveSelectionFile(index, extend, files);
+        PlaylistSelTrace.NoteCaret(
+            index,
+            files[index].Tag as DocumentSession,
+            "MoveSelection");
     }
 
     /// <summary>
@@ -2915,44 +2950,82 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         var row = files[index];
+        // ScrollIntoView／仮想化のあいだも _syncing と _deferActivate を維持する。
+        // 先に外すと、レイアウトが SelectedItem を先頭へ寄せた瞬間に
+        // Grid_SelectionChanged がシアンを上へ吸い戻し、↓連打で即再現する。
         _deferActivate = true;
+        _syncing = true;
+        SuspendPlaylistSelectionNotify();
         try
         {
             if (!extend)
             {
                 _anchorIndex = index;
                 _playlistRangeCaretIndex = -1;
-                _syncing = true;
-                SuspendPlaylistSelectionNotify();
-                try
-                {
-                    ClearPlaylistRowSelectionFlags();
-                    SetPlaylistRowSelected(row, true);
-                    SyncPlaylistCaretToGrid(row);
-                }
-                finally
-                {
-                    _syncing = false;
-                    ResumePlaylistSelectionNotify();
-                }
+                ClearPlaylistRowSelectionFlags();
+                SetPlaylistRowSelected(row, true);
+                SyncPlaylistCaretToGrid(row);
             }
             else
             {
-                SelectPlaylistFileRange(_anchorIndex, index, files);
+                // SelectPlaylistFileRange も _syncing を触るので、ネストではなく中身だけ使う。
+                ApplyPlaylistFileRangeCore(_anchorIndex, index, files);
             }
 
             // キー移動は SelectedItem だけ変えがちで、CurrentItem が先頭のまま残る。
             // 行波形の遅延描画でレイアウトが走ると、古い CurrentItem を手がかりに
             // シアン帯が1行目へ寄って見えることがある。
             PinSelectionCurrent();
+            EnsureListFocused(pinCurrent: false);
+            EnsureRowVisible(row);
+            // 仮想化スクロール後に SelectedItem／CurrentItem がずれたら意図した行へ戻す。
+            ReassertPlaylistMoveSelection(row, extend);
         }
         finally
         {
+            _syncing = false;
+            ResumePlaylistSelectionNotify();
             _deferActivate = false;
         }
+    }
 
-        EnsureListFocused(pinCurrent: false);
-        EnsureRowVisible(row);
+    /// <summary>
+    /// <see cref="EnsureRowVisible"/> 後に DataGrid が選択を先頭へ寄せていても、
+    /// キー移動で狙った行へシアンと CurrentItem を戻す。
+    /// </summary>
+    private void ReassertPlaylistMoveSelection(LibraryFileRow row, bool extend)
+    {
+        var want = row.Tag as DocumentSession;
+        var gridNow = (_grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession;
+        var drifted = !ReferenceEquals(_grid.SelectedItem, row)
+            || !ReferenceEquals(_playlistCaretRow, row)
+            || (!extend && (!row.IsPlaylistSelected || _playlistSelectedRows.Count != 1));
+        if (drifted)
+        {
+            PlaylistSelTrace.Write(
+                "REASSERT",
+                $"want={PlaylistSelTrace.NameOf(want)} grid={PlaylistSelTrace.NameOf(gridNow)} " +
+                $"caretMatch={ReferenceEquals(_playlistCaretRow, row)} " +
+                $"rowSelected={row.IsPlaylistSelected} selCount={_playlistSelectedRows.Count}");
+        }
+
+        if (!extend)
+        {
+            if (!row.IsPlaylistSelected || _playlistSelectedRows.Count != 1)
+            {
+                ClearPlaylistRowSelectionFlags();
+                SetPlaylistRowSelected(row, true);
+            }
+
+            SyncPlaylistCaretToGrid(row);
+        }
+        else if (!ReferenceEquals(_playlistCaretRow, row)
+            || !ReferenceEquals(_grid.SelectedItem, row))
+        {
+            SyncPlaylistCaretToGrid(row);
+        }
+
+        PinSelectionCurrent();
     }
 
     private LibraryFileRow? ResolvePlaylistCaretRow()
@@ -2981,6 +3054,32 @@ internal sealed partial class LibraryBrowserView : UserControl
         IReadOnlyList<LibraryFileRow>? files = null)
     {
         files ??= SnapshotPlaylistFiles();
+        if (files.Count <= 0)
+        {
+            return;
+        }
+
+        _syncing = true;
+        SuspendPlaylistSelectionNotify();
+        try
+        {
+            ApplyPlaylistFileRangeCore(from, to, files);
+        }
+        finally
+        {
+            _syncing = false;
+            ResumePlaylistSelectionNotify();
+        }
+    }
+
+    /// <summary>
+    /// 範囲選択の本体。<see cref="SelectPlaylistFileRange"/> とキー移動中（既に _syncing）の両方から使う。
+    /// </summary>
+    private void ApplyPlaylistFileRangeCore(
+        int from,
+        int to,
+        IReadOnlyList<LibraryFileRow> files)
+    {
         var count = files.Count;
         if (count <= 0)
         {
@@ -2991,24 +3090,14 @@ internal sealed partial class LibraryBrowserView : UserControl
         to = Math.Clamp(to, 0, count - 1);
         var lo = Math.Min(from, to);
         var hi = Math.Max(from, to);
-        _syncing = true;
-        SuspendPlaylistSelectionNotify();
-        try
+        if (_playlistRangeCaretIndex < 0
+            || !TryAdjustPlaylistFileRange(files, from, _playlistRangeCaretIndex, to))
         {
-            if (_playlistRangeCaretIndex < 0
-                || !TryAdjustPlaylistFileRange(files, from, _playlistRangeCaretIndex, to))
-            {
-                SyncPlaylistFileRangeFull(files, lo, hi);
-            }
+            SyncPlaylistFileRangeFull(files, lo, hi);
+        }
 
-            _playlistRangeCaretIndex = to;
-            SyncPlaylistCaretToGrid(files[to]);
-        }
-        finally
-        {
-            _syncing = false;
-            ResumePlaylistSelectionNotify();
-        }
+        _playlistRangeCaretIndex = to;
+        SyncPlaylistCaretToGrid(files[to]);
     }
 
     /// <summary>
@@ -3247,6 +3336,11 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     private void EnsureRowVisible(object item)
     {
+        // ↓連打で積み上がった古い Loaded コールバックが、通り過ぎた行のグループ見出しを
+        // 覗かせるために上方向へスクロールを巻き戻すのを防ぐ。
+        var ensureGeneration = ++_playlistEnsureVisibleGeneration;
+        var contentGeneration = _syncGeneration;
+
         if (_grid.ItemContainerGenerator.ContainerFromItem(item) is FrameworkElement element
             && _grid.ActualHeight > 0)
         {
@@ -3276,11 +3370,21 @@ internal sealed partial class LibraryBrowserView : UserControl
             RestorePlaylistHorizontalOffset(scroll, keepX);
         }
 
-        var generation = _syncGeneration;
+        // 仮想化で行が生成されると CurrentItem が先頭へ寄りやすい。直後に選び直す。
+        PinSelectionCurrent();
+
         Dispatcher.BeginInvoke(
             () =>
             {
-                if (generation != _syncGeneration)
+                if (ensureGeneration != _playlistEnsureVisibleGeneration
+                    || contentGeneration != _syncGeneration)
+                {
+                    return;
+                }
+
+                // もう別行へ進んでいれば、古い行のための上方向スクロール調整はしない。
+                if (!ReferenceEquals(item, _playlistCaretRow)
+                    && !ReferenceEquals(item, _grid.SelectedItem))
                 {
                     return;
                 }
@@ -3290,6 +3394,7 @@ internal sealed partial class LibraryBrowserView : UserControl
                     RestorePlaylistHorizontalOffset(later, keepX);
                 }
 
+                PinSelectionCurrent();
                 RevealGroupHeaderIfNearlyClipped(item);
             },
             DispatcherPriority.Loaded);
@@ -3626,6 +3731,11 @@ internal sealed partial class LibraryBrowserView : UserControl
             }
 
             var preserve = SelectedSessions;
+            PlaylistSelTrace.Write(
+                "UPD_ROW",
+                $"session={PlaylistSelTrace.NameOf(session)} " +
+                $"preserve={string.Join(',', preserve.Select(PlaylistSelTrace.NameOf))} " +
+                $"beforeSel={PlaylistSelTrace.NameOf(SelectedSession)}");
             var updated = new LibraryFileRow[_rows.Count];
             for (var r = 0; r < _rows.Count; r++)
             {
@@ -3644,6 +3754,11 @@ internal sealed partial class LibraryBrowserView : UserControl
             {
                 EndRowSync();
             }
+
+            PlaylistSelTrace.NoteCaret(
+                PlaylistFileIndexOfSelected(SnapshotPlaylistFiles()),
+                SelectedSession,
+                "UpdateSessionRow");
 
             if (keepFocus)
             {
@@ -4304,10 +4419,23 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     private void Grid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        var gridName = PlaylistSelTrace.NameOf(
+            (_grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession);
+        var caretName = PlaylistSelTrace.NameOf(_playlistCaretRow?.Tag as DocumentSession);
+        PlaylistSelTrace.Write(
+            "GRID_SEL",
+            $"sync={_syncing} defer={_deferActivate} grid={gridName} " +
+            $"added={e.AddedItems.Count} removed={e.RemovedItems.Count} caret={caretName}");
+
         // マウスや通常キーの選択にキャレットを追従。
-        // プログラム側の選択変更中（_syncing）は上書きしない。
-        if (!_syncing && _grid.SelectedItem is LibraryFileRow selected)
+        // プログラム側の選択変更中（_syncing）やキー移動の ScrollIntoView 中（_deferActivate）
+        // は上書きしない。仮想化レイアウトが SelectedItem を先頭へ寄せてもシアンを奪われない。
+        if (!_syncing && !_deferActivate && _grid.SelectedItem is LibraryFileRow selected)
         {
+            var adopt = selected.Tag as DocumentSession;
+            PlaylistSelTrace.Write(
+                "GRID_ADOPT",
+                $"name={PlaylistSelTrace.NameOf(adopt)} wasSelected={selected.IsPlaylistSelected}");
             _playlistCaretRow = selected;
             // Single モードの素クリックは DataGrid が SelectedItem だけ変える。
             // すでに帯選択内なら複数選択を崩さない（再生追従の Quiet など）。
@@ -4318,6 +4446,12 @@ internal sealed partial class LibraryBrowserView : UserControl
                 SetPlaylistRowSelected(selected, true);
                 _playlistRangeCaretIndex = -1;
             }
+
+            var files = SnapshotPlaylistFiles();
+            PlaylistSelTrace.NoteCaret(
+                PlaylistFileIndexOfSelected(files),
+                adopt,
+                "Grid_SelectionChanged");
         }
 
         NotePlaylistSelectionChanged();
@@ -4331,6 +4465,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             _anchorIndex = _grid.SelectedIndex;
         }
 
+        PlaylistSelTrace.Write("ACTIVATE", $"name={PlaylistSelTrace.NameOf(session)}");
         RefreshGroupJacketsForActiveRow();
         SessionActivated?.Invoke(this, session);
     }

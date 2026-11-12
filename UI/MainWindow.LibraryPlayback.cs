@@ -327,6 +327,8 @@ public partial class MainWindow
             return false;
         }
 
+        // 直前の再生曲を基準に。↓連打で先へ進んでいれば追従しない（シアンを奪わない）。
+        var previousActive = _activeSession;
         _gaplessTarget = null;
         _gaplessFailed = false;
         _activeSession = session;
@@ -338,7 +340,14 @@ public partial class MainWindow
         Waveform.PlayheadFrame = _player.CursorFrame;
         // Document の差し替えが軌跡の記録を止める。再生は続いているので付け直す。
         Waveform.SetTrailRecording(true);
-        LibraryBrowser.SelectSessionQuiet(session);
+        if (LibraryPlayerMode.ShouldFollowPlaylistPlaySelection(
+                LibraryBrowser.SelectedSession,
+                session,
+                previousActive))
+        {
+            LibraryBrowser.SelectSessionQuiet(session);
+        }
+
         LibraryBrowser.UpdateSessionRow(session);
         ShowLibraryArtwork(session);
         _ = FillLibraryPeaksAsync(session);
@@ -790,6 +799,9 @@ public partial class MainWindow
             BeginPlaylistVisualChromeBridge();
         }
 
+        // 合流待ち中に↓で先へ進んだ選択は、完了時の Quiet で上へ戻さない。
+        // 判定は「開始時点の選択」ではなく「開始時点の再生曲」（active）。
+        var activeWhenStarted = _activeSession;
         try
         {
             if (!keepAmbientGlow)
@@ -821,7 +833,38 @@ public partial class MainWindow
 
             if (IsLibraryMaximized)
             {
-                LibraryBrowser.SelectSessionQuiet(session);
+                var selectedNow = LibraryBrowser.SelectedSession;
+                var follow = LibraryPlayerMode.ShouldFollowPlaylistPlaySelection(
+                    selectedNow,
+                    session,
+                    activeWhenStarted);
+                PlaylistSelTrace.Write(
+                    "PLAY_FOLLOW",
+                    $"follow={follow} play={PlaylistSelTrace.NameOf(session)} " +
+                    $"now={PlaylistSelTrace.NameOf(selectedNow)} " +
+                    $"active={PlaylistSelTrace.NameOf(activeWhenStarted)}");
+                if (LibraryPlayerMode.ShouldRetargetPlaylistPlayToSelection(
+                        selectedNow,
+                        session,
+                        activeWhenStarted))
+                {
+                    // 選択は先へ進んだまま旧曲を鳴らさない。最新選択へ本再生を振り直す。
+                    PlaylistSelTrace.Write(
+                        "PLAY_RETARGET",
+                        $"from={PlaylistSelTrace.NameOf(session)} " +
+                        $"to={PlaylistSelTrace.NameOf(selectedNow)}");
+                    QueueInteractiveLibraryPlay(
+                        selectedNow,
+                        stopAfterTrack,
+                        keepAmbientGlow,
+                        fromStart);
+                    return;
+                }
+
+                if (follow)
+                {
+                    LibraryBrowser.SelectSessionQuiet(session);
+                }
             }
 
             if (IsPlaybackActive())
