@@ -57,11 +57,17 @@ internal static class LibraryHoverIdle
         typeof(LibraryHoverIdle));
 }
 
-/// <summary>プレイヤーのスクロールバー。普段は隠し、端に近いときだけ出す。</summary>
+/// <summary>プレイヤーのスクロールバー。普段は隠し、端に近いとき／ホバー時だけ出す。</summary>
 internal static class LibraryScrollReveal
 {
     public static readonly DependencyProperty RevealedProperty = DependencyProperty.RegisterAttached(
         "Revealed",
+        typeof(bool),
+        typeof(LibraryScrollReveal),
+        new PropertyMetadata(false));
+
+    private static readonly DependencyProperty HoverRevealProperty = DependencyProperty.RegisterAttached(
+        "HoverReveal",
         typeof(bool),
         typeof(LibraryScrollReveal),
         new PropertyMetadata(false));
@@ -72,8 +78,18 @@ internal static class LibraryScrollReveal
     public static bool GetRevealed(DependencyObject element) =>
         (bool)element.GetValue(RevealedProperty);
 
+    /// <summary>端付近に近いときだけ出す（ツリー／リストなど）。</summary>
     public static void Attach(FrameworkElement host)
     {
+        host.SetValue(HoverRevealProperty, false);
+        host.PreviewMouseMove += Host_PreviewMouseMove;
+        host.MouseLeave += Host_MouseLeave;
+    }
+
+    /// <summary>ホスト上にカーソルがあるあいだ出す（情報エリア）。</summary>
+    public static void AttachOnHover(FrameworkElement host)
+    {
+        host.SetValue(HoverRevealProperty, true);
         host.PreviewMouseMove += Host_PreviewMouseMove;
         host.MouseLeave += Host_MouseLeave;
     }
@@ -127,14 +143,25 @@ internal static class LibraryScrollReveal
             return;
         }
 
-        var pos = e.GetPosition(viewer);
-        var distance = DesignMetrics.LibraryScrollRevealDistance;
-        var slop = DesignMetrics.LibrarySplitterHitThickness;
-        Apply(
-            viewer,
-            IsOverVerticalBar(pos.X, pos.Y, viewer.ActualWidth, viewer.ActualHeight, distance, slop),
-            IsOverHorizontalBar(pos.X, pos.Y, viewer.ActualWidth, viewer.ActualHeight, distance, slop),
-            idle: false);
+        bool vertical;
+        bool horizontal;
+        if ((bool)host.GetValue(HoverRevealProperty))
+        {
+            vertical = true;
+            horizontal = true;
+        }
+        else
+        {
+            var pos = e.GetPosition(viewer);
+            var distance = DesignMetrics.LibraryScrollRevealDistance;
+            var slop = DesignMetrics.LibrarySplitterHitThickness;
+            vertical = IsOverVerticalBar(
+                pos.X, pos.Y, viewer.ActualWidth, viewer.ActualHeight, distance, slop);
+            horizontal = IsOverHorizontalBar(
+                pos.X, pos.Y, viewer.ActualWidth, viewer.ActualHeight, distance, slop);
+        }
+
+        Apply(viewer, vertical, horizontal, idle: false);
         LibraryHoverIdle.Arm(host, () => OnScrollIdle(host));
     }
 

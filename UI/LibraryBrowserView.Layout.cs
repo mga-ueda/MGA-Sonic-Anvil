@@ -288,7 +288,9 @@ internal sealed partial class LibraryBrowserView
         LibraryScrollReveal.Attach(_favoritesList);
         LibraryScrollReveal.Attach(_grid);
         LibraryScrollReveal.Attach(_structureTree);
-        // 情報／iXML は常時表示スタイル（ホバー reveal しない）。
+        // 情報／iXML はエリアに入ったら出す（端近接ではない）。
+        LibraryScrollReveal.AttachOnHover(_structureDetailBox);
+        LibraryScrollReveal.AttachOnHover(_structureXmlTree);
         LibrarySplitterReveal.Attach(
             _root,
             _explorerSplitter,

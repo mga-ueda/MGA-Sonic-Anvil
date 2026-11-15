@@ -77,7 +77,7 @@ internal sealed partial class LibraryBrowserView
         _structureDetailBox.Style = detailStyle;
         ApplyHeaderStructureDetailTypography(_structureDetailBox);
         ApplyStructureDetailLineHeight(_structureDetailBox, LibraryListFontSize);
-        ApplyStructureDetailAlwaysVisibleScrollBars(_structureDetailBox);
+        HookStructureDetailScrollFit(_structureDetailBox);
         _structureDetailBox.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _structureDetailBox.PreviewKeyDown += StructurePane_PreviewKeyDown;
         ScrollViewer.SetCanContentScroll(_structureDetailBox, true);
@@ -225,7 +225,7 @@ internal sealed partial class LibraryBrowserView
         _structureXmlTree.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
         // XML はパース済みを一括表示。仮想化すると Extent が不正確でツマミ精度が落ちる。
         VirtualizingPanel.SetIsVirtualizing(_structureXmlTree, false);
-        ApplyStructureDetailAlwaysVisibleScrollBars(_structureXmlTree);
+        HookStructureDetailScrollFit(_structureXmlTree);
         // 展開で深い行が出たとき幅を取り直す。
         _structureXmlTree.AddHandler(
             TreeViewItem.ExpandedEvent,
@@ -1468,16 +1468,10 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>
-    /// 情報／iXML のスクロールバーはホバー非表示にせず常時出す。
-    /// 内容は一括読み込みのため、ツマミ長は Extent 比例のままにする。
+    /// 情報／iXML の列幅 Fit。スクロールバー見た目はエリアホバー表示を使う。
     /// </summary>
-    private void ApplyStructureDetailAlwaysVisibleScrollBars(FrameworkElement host)
+    private void HookStructureDetailScrollFit(FrameworkElement host)
     {
-        if (TryFindResource("StructureDetailScrollBarStyle") is Style style)
-        {
-            host.Resources[typeof(ScrollBar)] = style;
-        }
-
         host.Loaded += StructureDetailScrollHost_Loaded;
         if (host is TextBox textBox)
         {
