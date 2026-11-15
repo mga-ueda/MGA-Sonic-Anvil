@@ -68,6 +68,50 @@ internal sealed class WaveStructureNode
 
     public string TreeCaption => FormatTreeCaption(depth: 0, nameFieldWidth: 4, sizeFieldWidth: FormatSize(Size).Length);
 
+    /// <summary>子を持たない同一内容の行。コンテナ根をツリー親にしない表示用。</summary>
+    public WaveStructureNode WithoutChildren() =>
+        Children.Count == 0
+            ? this
+            : new WaveStructureNode(
+                Id,
+                Label,
+                Offset,
+                Size,
+                Kind,
+                Content,
+                ContentTruncated,
+                IsInvalid,
+                Error,
+                children: null,
+                memberPaths: MemberPaths);
+
+    /// <summary>
+    /// UI ツリー用のトップレベル行。コンテナ根（RIFF/FORM 等）は子付きの親にせず
+    /// 1行だけ出し、その子をツリーのルートにする。
+    /// </summary>
+    internal static IReadOnlyList<WaveStructureNode> ForTreeDisplay(IReadOnlyList<WaveStructureNode> roots)
+    {
+        if (roots.Count == 0 || roots.All(static r => r.Children.Count == 0))
+        {
+            return roots;
+        }
+
+        var display = new List<WaveStructureNode>(roots.Count * 2);
+        foreach (var root in roots)
+        {
+            if (root.Children.Count == 0)
+            {
+                display.Add(root);
+                continue;
+            }
+
+            display.Add(root.WithoutChildren());
+            display.AddRange(root.Children);
+        }
+
+        return display;
+    }
+
     /// <summary>ファイルをまたいで同じチャンクを探すキー。LIST 等は種別込みの Label。</summary>
     public string SelectionKey =>
         Id is "LIST" or "list" or "RIFF" or "RF64" or "BW64" or "FORM" or "RIFX"

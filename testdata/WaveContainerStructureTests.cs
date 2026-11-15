@@ -421,6 +421,73 @@ public sealed class WaveContainerStructureTests
     }
 
     [Fact]
+    public void ForTreeDisplay_ContainerRootBecomesSingleLine()
+    {
+        var fmt = new WaveStructureNode(
+            "fmt ",
+            "fmt",
+            12,
+            16,
+            WaveStructureContentKind.Text,
+            "x",
+            false,
+            false,
+            null);
+        var listChild = new WaveStructureNode(
+            "INFO",
+            "INFO",
+            100,
+            8,
+            WaveStructureContentKind.Text,
+            "i",
+            false,
+            false,
+            null);
+        var list = new WaveStructureNode(
+            "LIST",
+            "LIST / INFO",
+            80,
+            32,
+            WaveStructureContentKind.Text,
+            "l",
+            false,
+            false,
+            null,
+            [listChild]);
+        var root = new WaveStructureNode(
+            "RIFF",
+            "RIFF / WAVE",
+            0,
+            1_234_567,
+            WaveStructureContentKind.Text,
+            "y",
+            false,
+            false,
+            null,
+            [fmt, list]);
+
+        var display = WaveStructureNode.ForTreeDisplay([root]);
+        Assert.Equal(3, display.Count);
+        Assert.Equal("RIFF", display[0].Id);
+        Assert.Empty(display[0].Children);
+        Assert.Equal("fmt ", display[1].Id);
+        Assert.Same(list, display[2]);
+        Assert.Single(display[2].Children);
+
+        var flat = new WaveStructureNode(
+            "bext",
+            "bext",
+            0,
+            10,
+            WaveStructureContentKind.Text,
+            "b",
+            false,
+            false,
+            null);
+        Assert.Same(flat, Assert.Single(WaveStructureNode.ForTreeDisplay([flat])));
+    }
+
+    [Fact]
     public void FormatTreeCaption_AlignsColumnsIncludingIndent()
     {
         var child = new WaveStructureNode(
