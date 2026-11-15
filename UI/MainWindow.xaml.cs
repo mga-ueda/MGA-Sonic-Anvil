@@ -216,6 +216,10 @@ public partial class MainWindow : Window
         LibraryBrowser.AutoPlayChanged += LibraryBrowser_AutoPlayChanged;
         LibraryBrowser.AutoPlayNextChanged += LibraryBrowser_AutoPlayNextChanged;
         LibraryBrowser.AutoLoopChanged += LibraryBrowser_AutoLoopChanged;
+        // 購読前に復元する。Changed が RebuildMainMenuBar → IsPlaybackActive を呼び、
+        // この時点ではまだ _playTimer が無い。
+        LibraryBrowser.HeaderStructureVisible = AppStorage.Settings.LibraryShowHeaderStructure;
+        LibraryBrowser.HeaderStructureVisibleChanged += LibraryBrowser_HeaderStructureVisibleChanged;
         LibraryBrowser.CheckSelectModeChanged += LibraryBrowser_CheckSelectModeChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;

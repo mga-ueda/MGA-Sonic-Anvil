@@ -244,6 +244,9 @@ public partial class MainWindow
             case TransportCommand.AutoLoop:
                 LibraryBrowser.ToggleAutoLoop();
                 break;
+            case TransportCommand.HeaderStructure:
+                ToggleHeaderStructureVisibility();
+                break;
             case TransportCommand.AlwaysOnTop:
                 ToggleAlwaysOnTopLatch();
                 break;
@@ -439,7 +442,7 @@ public partial class MainWindow
     private bool IsPlaybackActive() =>
         _player.IsPlaying
         || _player.IsScrubbing
-        || _playTimer.IsEnabled
+        || (_playTimer is { IsEnabled: true })
         || LibraryBrowser.PlaylistVisualPlaying;
 
     private void AttachPlaybackToActiveWaveform()
@@ -3575,6 +3578,7 @@ public partial class MainWindow
         LevelMeter.LayoutTransform = meterTransform;
         LoudnessMeter.LayoutTransform = meterTransform;
         HistoryStrip.LayoutTransform = meterTransform;
+        HeaderChunkStrip.LayoutTransform = meterTransform;
         VstInsertRack.LayoutTransform = meterTransform;
         VectorScope.LayoutTransform = meterTransform;
         Spectrum.LayoutTransform = meterTransform;

@@ -42,6 +42,7 @@ public partial class MainWindow
             or TransportCommand.RangeClick
             or TransportCommand.SilentSkip
             or TransportCommand.AutoLoop
+            or TransportCommand.HeaderStructure
             or TransportCommand.AlwaysOnTop
             or TransportCommand.CenterLock
             or TransportCommand.TimeZoomIn

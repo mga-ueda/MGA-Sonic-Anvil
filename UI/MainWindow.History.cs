@@ -3,6 +3,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.Editing;
 
@@ -262,7 +263,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// ビッグタイムコード／編集履歴／VST ラック。
+    /// ビッグタイムコード／ヘッダチャンク／編集履歴／VST ラック。
     /// エディタで波形があるときだけ。出し入れはメーターと同じ 1 秒フェード
     /// （再生中のインとプレイヤー復帰は即）。アウト後に Collapse して列幅を返す。
     /// </summary>
@@ -277,6 +278,7 @@ public partial class MainWindow
             && TransportChromeHost.Visibility == Visibility.Visible;
         var showTimecode = show && PlayerWaveformSlot.Visibility != Visibility.Visible;
         var showVst = show && IsVstInsertUiEnabled();
+        var showChunks = show && AppStorage.Settings.EditorShowHeaderStructure;
 
         if (!show)
         {
@@ -302,26 +304,29 @@ public partial class MainWindow
             }
 
             RefreshHistoryStripItems();
+            RefreshEditorHeaderChunks(showChunks);
             BindVstInsertRackSession(showVst);
 
-            if (wantInstant && EditorChromeNeedsOpaqueSnap(show, showTimecode, showVst))
+            if (wantInstant && EditorChromeNeedsOpaqueSnap(show, showTimecode, showVst, showChunks))
             {
-                ApplyEditorChromeFade(show, showTimecode, showVst, instant: true);
+                ApplyEditorChromeFade(show, showTimecode, showVst, showChunks, instant: true);
                 return;
             }
 
             // ドック切替や VST 有効化など、論理表示は同じで子だけ変わる場合。
+            // チャンク帯をオフにするときは即 Collapse し、タイムコード側に幅を返す。
             ApplyEditorChromeTarget(HistoryStrip, show, instant: false);
+            ApplyEditorChromeTarget(HeaderChunkStrip, showChunks, instant: !showChunks);
             ApplyEditorChromeTarget(EditorPositionTimecodeHost, showTimecode, instant: false);
             ApplyEditorChromeTarget(VstInsertRack, showVst, instant: false);
             return;
         }
 
-        ApplyEditorChromeFade(show, showTimecode, showVst, wantInstant);
+        ApplyEditorChromeFade(show, showTimecode, showVst, showChunks, wantInstant);
         _editorChromeShown = show;
     }
 
-    private bool EditorChromeNeedsOpaqueSnap(bool show, bool showTimecode, bool showVst)
+    private bool EditorChromeNeedsOpaqueSnap(bool show, bool showTimecode, bool showVst, bool showChunks)
     {
         if (!show)
         {
@@ -329,6 +334,11 @@ public partial class MainWindow
         }
 
         if (LibraryPlayerMode.NeedsInstantOpaqueSnap(HistoryStrip))
+        {
+            return true;
+        }
+
+        if (showChunks && LibraryPlayerMode.NeedsInstantOpaqueSnap(HeaderChunkStrip))
         {
             return true;
         }
@@ -341,15 +351,23 @@ public partial class MainWindow
         return showVst && LibraryPlayerMode.NeedsInstantOpaqueSnap(VstInsertRack);
     }
 
-    private void ApplyEditorChromeFade(bool show, bool showTimecode, bool showVst, bool instant)
+    private void ApplyEditorChromeFade(
+        bool show,
+        bool showTimecode,
+        bool showVst,
+        bool showChunks,
+        bool instant)
     {
         var ticket = ++_editorChromeFadeTicket;
         if (show)
         {
             RefreshHistoryStripItems();
+            RefreshEditorHeaderChunks(showChunks);
         }
 
         ApplyEditorChromeTarget(HistoryStrip, show, instant);
+        // オフ時は即 Collapse（フェード待ちだと Auto 列が幅を食い、タイムコードが広がらない）。
+        ApplyEditorChromeTarget(HeaderChunkStrip, showChunks, instant: instant || !showChunks);
         ApplyEditorChromeTarget(EditorPositionTimecodeHost, showTimecode, instant);
 
         if (IsVstInsertUiEnabled())
@@ -438,12 +456,24 @@ public partial class MainWindow
         }
 
         HistoryStrip.SetItems([], 0);
+        HeaderChunkStrip.Clear();
         EditorPositionTimecode.Clear();
         BindVstInsertRackSession(false);
     }
 
     private UIElement[] EditorChromeFadeTargets() =>
-        [HistoryStrip, EditorPositionTimecodeHost, VstInsertRack];
+        [HistoryStrip, HeaderChunkStrip, EditorPositionTimecodeHost, VstInsertRack];
+
+    private void RefreshEditorHeaderChunks(bool show)
+    {
+        if (!show)
+        {
+            HeaderChunkStrip.Clear();
+            return;
+        }
+
+        HeaderChunkStrip.LoadFromPath(_document?.SourcePath);
+    }
 
     private void HistoryStrip_OpenRequested(object sender, EventArgs e)
     {

@@ -1137,6 +1137,7 @@ public partial class MainWindow
             CenterLocked = !IsLibraryMaximized && Waveform.CenterLocked,
             SilentSkip = SilentSkipLatch.IsLatched,
             AutoLoop = LibraryBrowser.AutoLoopEnabled,
+            HeaderStructure = IsHeaderStructureVisibleForCurrentMode(),
             AlwaysOnTop = AlwaysOnTopLatch.IsLatched,
             WaapiVisible = _waapiPanelVisible,
             PlayExit = WaapiBar.PlayPostExitChecked,

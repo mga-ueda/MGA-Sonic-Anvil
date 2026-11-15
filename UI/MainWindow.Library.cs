@@ -199,6 +199,10 @@ public partial class MainWindow
     internal bool IsLibraryHeaderStructureFocused =>
         IsLibraryMaximized && LibraryBrowser.IsHeaderStructureFocused;
 
+    /// <summary>エディタのヘッダ情報（チャンクリスト）にキーボードフォーカスがある。</summary>
+    internal bool IsEditorHeaderStructureFocused =>
+        !IsLibraryMaximized && HeaderChunkStrip.IsKeyboardFocusWithin;
+
     /// <summary>
     /// 波形ホストまたはアクティブ波形にキーボードフォーカスがある。
     /// ライブラリ最大化中のツリー／お気に入り／プレイリストは波形ホスト配下にあり
@@ -209,6 +213,7 @@ public partial class MainWindow
         !IsLibraryExplorerFocused
         && !IsLibraryFavoritesFocused
         && !IsLibraryHeaderStructureFocused
+        && !IsEditorHeaderStructureFocused
         && !(IsLibraryMaximized && LibraryBrowser.IsListKeyboardFocused)
         && (WaveformHostBorder.IsKeyboardFocusWithin || Waveform.IsKeyboardFocusWithin);
 
@@ -1150,6 +1155,7 @@ public partial class MainWindow
         Transport.SetRangeClick(_rangeClickEnabled);
         Transport.SetSilentSkip(SilentSkipLatch.IsLatched);
         Transport.SetAutoLoop(LibraryBrowser.AutoLoopEnabled);
+        Transport.SetHeaderStructure(IsHeaderStructureVisibleForCurrentMode());
         Transport.SetAlwaysOnTop(AlwaysOnTopLatch.IsLatched);
         Transport.SetCenterLock(!IsLibraryMaximized && Waveform.CenterLocked);
         Transport.ApplyMenuEnabled(
@@ -2931,6 +2937,51 @@ public partial class MainWindow
         else if (LibraryBrowser.AutoPlayNextEnabled)
         {
             ScheduleLibraryGaplessPrefetch();
+        }
+    }
+
+    private void LibraryBrowser_HeaderStructureVisibleChanged(object? sender, EventArgs e)
+    {
+        // プレイヤー専用。エディタ側は EditorShowHeaderStructure。
+        AppStorage.Settings.LibraryShowHeaderStructure = LibraryBrowser.HeaderStructureVisible;
+        AppStorage.Save();
+        ShowOptionToggleToast(
+            UiStrings.LabelLibraryHeaderStructure,
+            LibraryBrowser.HeaderStructureVisible);
+        if (IsLibraryMaximized)
+        {
+            Transport.SetHeaderStructure(LibraryBrowser.HeaderStructureVisible);
+            RebuildMainMenuBar();
+        }
+    }
+
+    /// <summary>現モードのヘッダ情報オンオフ（プレイヤー／エディタは別記憶）。</summary>
+    private bool IsHeaderStructureVisibleForCurrentMode() =>
+        IsLibraryMaximized
+            ? LibraryBrowser.HeaderStructureVisible
+            : AppStorage.Settings.EditorShowHeaderStructure;
+
+    /// <summary>プレイヤーは構造＋情報、エディタはチャンクリスト。設定はモード別。</summary>
+    private void ToggleHeaderStructureVisibility()
+    {
+        if (IsLibraryMaximized)
+        {
+            LibraryBrowser.ToggleHeaderStructureVisible(focusWhenShown: true);
+            return;
+        }
+
+        var show = !AppStorage.Settings.EditorShowHeaderStructure;
+        AppStorage.Settings.EditorShowHeaderStructure = show;
+        AppStorage.Save();
+        ShowOptionToggleToast(UiStrings.LabelLibraryHeaderStructure, show);
+        Transport.SetHeaderStructure(show);
+        RebuildMainMenuBar();
+        SyncEditorChromeFade();
+        if (show)
+        {
+            Dispatcher.BeginInvoke(
+                HeaderChunkStrip.FocusTree,
+                System.Windows.Threading.DispatcherPriority.Input);
         }
     }
 

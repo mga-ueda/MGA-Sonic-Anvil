@@ -495,6 +495,12 @@ internal static class DesignMetrics
     /// <summary>ラウドネス左の履歴プレビュー幅。長い題は切る。</summary>
     public static double HistoryStripWidth => From96(264);
 
+    /// <summary>エディタのヘッダ情報（チャンク帯）。内容幅フィットの下限。</summary>
+    public static double EditorHeaderChunkStripMinWidth => From96(72);
+
+    /// <summary>エディタのヘッダ情報の上限（履歴帯と同じ）。</summary>
+    public static double EditorHeaderChunkStripMaxWidth => HistoryStripWidth;
+
     /// <summary>履歴プレビュー1行。</summary>
     public static double HistoryStripRowHeight => From96(14);
 

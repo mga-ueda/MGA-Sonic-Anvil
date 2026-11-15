@@ -464,6 +464,9 @@ public partial class MainWindow
             case WaveMenuCommand.AutoLoop:
                 LibraryBrowser.ToggleAutoLoop();
                 break;
+            case WaveMenuCommand.HeaderStructure:
+                ToggleHeaderStructureVisibility();
+                break;
             case WaveMenuCommand.AlwaysOnTop:
                 ToggleAlwaysOnTopLatch();
                 break;

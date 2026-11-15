@@ -1576,7 +1576,13 @@ public partial class MainWindow
             return true;
         }
 
-        // 情報エリアフォーカス中は Home／End／Page をシークに使わない。
+        // 情報エリア／エディタのヘッダ情報フォーカス中は Home／End／Page／矢印をシークに使わない。
+        if (IsEditorHeaderStructureFocused
+            && IsEditorHeaderStructureNavKey(key, modifiers))
+        {
+            return false;
+        }
+
         if (!LibraryBrowser.IsHeaderStructureDetailFocused
             && TryHandleWaveformTimelineNavKey(key, modifiers))
         {
@@ -2007,6 +2013,16 @@ public partial class MainWindow
             return true;
         }
 
+        // H はヘッダ情報の表示切替（プレイヤー＝構造＋情報、エディタ＝チャンクリスト）。
+        if (!IsLibraryGroupComboFocused
+            && !ImeComposition.IsComposing
+            && !isRepeat
+            && LibraryPlayerMode.IsHeaderStructureToggle(key, modifiers))
+        {
+            ToggleHeaderStructureVisibility();
+            return true;
+        }
+
         // Ctrl+Shift+P は動画プロキシの強制生成（設定の自動生成オフ／F8 抑止を無視）。
         if (IsLibraryMaximized
             && !IsLibraryGroupComboFocused
@@ -2141,11 +2157,12 @@ public partial class MainWindow
                     {
                         break;
                     }
-                    else if (LibraryBrowser.ActivePane == LibraryPane.List)
+                    else if (LibraryBrowser.ActivePane == LibraryPane.List
+                        && LibraryBrowser.HeaderStructureVisible)
                     {
                         LibraryBrowser.FocusHeaderStructure();
                     }
-                    else
+                    else if (LibraryBrowser.ActivePane != LibraryPane.List)
                     {
                         LibraryBrowser.FocusList();
                     }
@@ -2730,6 +2747,13 @@ public partial class MainWindow
             }
 
             LibraryBrowser.FocusPane(LibraryBrowser.ActivePane);
+            return true;
+        }
+
+        // ヘッダ情報アクティブ時は Esc で波形へフォーカスを戻す（表示は維持）。
+        if (IsEditorHeaderStructureFocused || IsLibraryHeaderStructureFocused)
+        {
+            Waveform.Focus();
             return true;
         }
 
@@ -3912,6 +3936,15 @@ public partial class MainWindow
 
         return false;
     }
+
+    /// <summary>
+    /// エディタのヘッダ情報ツリーへ譲るキー（上下左右・PgUp/Dn・Home/End）。
+    /// フォーカスが外れたら通常の波形ポジション系へ戻す。
+    /// </summary>
+    private static bool IsEditorHeaderStructureNavKey(Key key, ModifierKeys modifiers) =>
+        modifiers is ModifierKeys.None or ModifierKeys.Shift
+        && key is Key.Up or Key.Down or Key.Left or Key.Right
+            or Key.PageUp or Key.PageDown or Key.Home or Key.End;
 
     /// <summary>
     /// エディタと同じ Home／End／PageUp／PageDown（無修飾・Shift）の波形タイムライン操作。
