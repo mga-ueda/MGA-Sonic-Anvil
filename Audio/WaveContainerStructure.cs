@@ -66,8 +66,6 @@ internal sealed class WaveStructureNode
     /// <summary>階層インデント（等幅スペース）。テンプレート側の字下げは使わない。</summary>
     internal const int TreeIndentSpaces = 2;
 
-    public string TreeCaption => FormatTreeCaption(depth: 0, nameFieldWidth: 4, sizeFieldWidth: FormatSize(Size).Length);
-
     /// <summary>子を持たない同一内容の行。コンテナ根をツリー親にしない表示用。</summary>
     public WaveStructureNode WithoutChildren() =>
         Children.Count == 0
@@ -488,9 +486,6 @@ internal sealed class WaveStructureDocument
     public bool IsUnsupported => UnsupportedMessage is not null;
     /// <summary>複数ファイル選択時のチャンク FourCC 和集合（フラット一覧）。</summary>
     public bool IsChunkUnion => ContainerKind == ChunkUnionKind;
-
-    public static WaveStructureDocument Empty { get; } =
-        new(string.Empty, Array.Empty<WaveStructureNode>(), Array.Empty<string>());
 }
 
 /// <summary>RIFF / FORM を走査し、ツリーと表示用本文を作る。PCM は展開しない。</summary>

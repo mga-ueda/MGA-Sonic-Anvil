@@ -838,21 +838,12 @@ public partial class MainWindow
                     selectedNow,
                     session,
                     activeWhenStarted);
-                PlaylistSelTrace.Write(
-                    "PLAY_FOLLOW",
-                    $"follow={follow} play={PlaylistSelTrace.NameOf(session)} " +
-                    $"now={PlaylistSelTrace.NameOf(selectedNow)} " +
-                    $"active={PlaylistSelTrace.NameOf(activeWhenStarted)}");
                 if (LibraryPlayerMode.ShouldRetargetPlaylistPlayToSelection(
                         selectedNow,
                         session,
                         activeWhenStarted))
                 {
                     // 選択は先へ進んだまま旧曲を鳴らさない。最新選択へ本再生を振り直す。
-                    PlaylistSelTrace.Write(
-                        "PLAY_RETARGET",
-                        $"from={PlaylistSelTrace.NameOf(session)} " +
-                        $"to={PlaylistSelTrace.NameOf(selectedNow)}");
                     QueueInteractiveLibraryPlay(
                         selectedNow,
                         stopAfterTrack,

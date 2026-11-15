@@ -1817,16 +1817,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>再生追従で行を選ぶ。クリック再生は起こさない。複数選択は今の曲が含まれていれば残す。</summary>
     public void SelectSessionQuiet(DocumentSession session)
     {
-        var before = SelectedSession;
         var keep = SelectedSessions;
         if (keep.Length == 0 || Array.IndexOf(keep, session) < 0)
         {
             keep = [session];
         }
-
-        PlaylistSelTrace.Write(
-            "QUIET",
-            $"target={PlaylistSelTrace.NameOf(session)} before={PlaylistSelTrace.NameOf(before)} keep={keep.Length}");
 
         var keepFocus = _restoreListFocus || _grid.IsKeyboardFocusWithin;
         // EnsureRowVisible まで _deferActivate を維持し、仮想化レイアウトが
@@ -1852,11 +1847,6 @@ internal sealed partial class LibraryBrowserView : UserControl
             _deferActivate = false;
         }
 
-        var files = SnapshotPlaylistFiles();
-        PlaylistSelTrace.NoteCaret(
-            PlaylistFileIndexOfSelected(files),
-            SelectedSession,
-            "SelectSessionQuiet");
         RefreshGroupJacketsForActiveRow();
     }
 
@@ -2723,23 +2713,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
-        var fromName = from >= 0 && from < files.Count
-            ? PlaylistSelTrace.NameOf(files[from].Tag as DocumentSession)
-            : "-";
-        var toName = PlaylistSelTrace.NameOf(files[index].Tag as DocumentSession);
-        var caretName = PlaylistSelTrace.NameOf(_playlistCaretRow?.Tag as DocumentSession);
-        var gridName = PlaylistSelTrace.NameOf(
-            (_grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession);
-        PlaylistSelTrace.Write(
-            "MOVE",
-            $"delta={delta} wrap={wrap} extend={extend} from={from}:{fromName} to={index}:{toName} " +
-            $"caretRow={caretName} gridSel={gridName} selCount={_playlistSelectedRows.Count}");
-
         ApplyMoveSelectionFile(index, extend, files);
-        PlaylistSelTrace.NoteCaret(
-            index,
-            files[index].Tag as DocumentSession,
-            "MoveSelection");
     }
 
     /// <summary>
@@ -3037,20 +3011,6 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// </summary>
     private void ReassertPlaylistMoveSelection(LibraryFileRow row, bool extend)
     {
-        var want = row.Tag as DocumentSession;
-        var gridNow = (_grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession;
-        var drifted = !ReferenceEquals(_grid.SelectedItem, row)
-            || !ReferenceEquals(_playlistCaretRow, row)
-            || (!extend && (!row.IsPlaylistSelected || _playlistSelectedRows.Count != 1));
-        if (drifted)
-        {
-            PlaylistSelTrace.Write(
-                "REASSERT",
-                $"want={PlaylistSelTrace.NameOf(want)} grid={PlaylistSelTrace.NameOf(gridNow)} " +
-                $"caretMatch={ReferenceEquals(_playlistCaretRow, row)} " +
-                $"rowSelected={row.IsPlaylistSelected} selCount={_playlistSelectedRows.Count}");
-        }
-
         if (!extend)
         {
             if (!row.IsPlaylistSelected || _playlistSelectedRows.Count != 1)
@@ -3773,11 +3733,6 @@ internal sealed partial class LibraryBrowserView : UserControl
             }
 
             var preserve = SelectedSessions;
-            PlaylistSelTrace.Write(
-                "UPD_ROW",
-                $"session={PlaylistSelTrace.NameOf(session)} " +
-                $"preserve={string.Join(',', preserve.Select(PlaylistSelTrace.NameOf))} " +
-                $"beforeSel={PlaylistSelTrace.NameOf(SelectedSession)}");
             var updated = new LibraryFileRow[_rows.Count];
             for (var r = 0; r < _rows.Count; r++)
             {
@@ -3797,10 +3752,6 @@ internal sealed partial class LibraryBrowserView : UserControl
                 EndRowSync();
             }
 
-            PlaylistSelTrace.NoteCaret(
-                PlaylistFileIndexOfSelected(SnapshotPlaylistFiles()),
-                SelectedSession,
-                "UpdateSessionRow");
 
             if (keepFocus)
             {
@@ -4547,23 +4498,11 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     private void Grid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var gridName = PlaylistSelTrace.NameOf(
-            (_grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession);
-        var caretName = PlaylistSelTrace.NameOf(_playlistCaretRow?.Tag as DocumentSession);
-        PlaylistSelTrace.Write(
-            "GRID_SEL",
-            $"sync={_syncing} defer={_deferActivate} grid={gridName} " +
-            $"added={e.AddedItems.Count} removed={e.RemovedItems.Count} caret={caretName}");
-
         // マウスや通常キーの選択にキャレットを追従。
         // プログラム側の選択変更中（_syncing）やキー移動の ScrollIntoView 中（_deferActivate）
         // は上書きしない。仮想化レイアウトが SelectedItem を先頭へ寄せてもシアンを奪われない。
         if (!_syncing && !_deferActivate && _grid.SelectedItem is LibraryFileRow selected)
         {
-            var adopt = selected.Tag as DocumentSession;
-            PlaylistSelTrace.Write(
-                "GRID_ADOPT",
-                $"name={PlaylistSelTrace.NameOf(adopt)} wasSelected={selected.IsPlaylistSelected}");
             _playlistCaretRow = selected;
             // Single モードの素クリックは DataGrid が SelectedItem だけ変える。
             // すでに帯選択内なら複数選択を崩さない（再生追従の Quiet など）。
@@ -4574,12 +4513,6 @@ internal sealed partial class LibraryBrowserView : UserControl
                 SetPlaylistRowSelected(selected, true);
                 _playlistRangeCaretIndex = -1;
             }
-
-            var files = SnapshotPlaylistFiles();
-            PlaylistSelTrace.NoteCaret(
-                PlaylistFileIndexOfSelected(files),
-                adopt,
-                "Grid_SelectionChanged");
         }
 
         NotePlaylistSelectionChanged();
@@ -4593,7 +4526,6 @@ internal sealed partial class LibraryBrowserView : UserControl
             _anchorIndex = _grid.SelectedIndex;
         }
 
-        PlaylistSelTrace.Write("ACTIVATE", $"name={PlaylistSelTrace.NameOf(session)}");
         RefreshGroupJacketsForActiveRow();
         SessionActivated?.Invoke(this, session);
     }
