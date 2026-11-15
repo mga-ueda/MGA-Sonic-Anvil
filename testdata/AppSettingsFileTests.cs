@@ -99,6 +99,41 @@ public sealed class AppSettingsFileTests
     }
 
     [Fact]
+    public void LibraryShowHeaderStructure_DefaultsOffAndPersists()
+    {
+        Assert.False(new AppSettings().LibraryShowHeaderStructure);
+        Assert.False(AppSettings.CreateDefault().LibraryShowHeaderStructure);
+        var settings = AppSettings.CreateDefault();
+        settings.LibraryShowHeaderStructure = true;
+        var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
+        var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.NotNull(back);
+        Assert.True(back!.LibraryShowHeaderStructure);
+        var missing = JsonSerializer.Deserialize("{}", AppSettingsJsonContext.Default.AppSettings);
+        Assert.NotNull(missing);
+        Assert.False(missing!.LibraryShowHeaderStructure);
+    }
+
+    [Fact]
+    public void EditorShowHeaderStructure_DefaultsOnAndPersistsSeparately()
+    {
+        Assert.True(new AppSettings().EditorShowHeaderStructure);
+        Assert.True(AppSettings.CreateDefault().EditorShowHeaderStructure);
+        var settings = AppSettings.CreateDefault();
+        settings.EditorShowHeaderStructure = false;
+        settings.LibraryShowHeaderStructure = true;
+        var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
+        var back = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+        Assert.NotNull(back);
+        Assert.False(back!.EditorShowHeaderStructure);
+        Assert.True(back.LibraryShowHeaderStructure);
+        var missing = JsonSerializer.Deserialize("{}", AppSettingsJsonContext.Default.AppSettings);
+        Assert.NotNull(missing);
+        Assert.True(missing!.EditorShowHeaderStructure);
+        Assert.False(missing.LibraryShowHeaderStructure);
+    }
+
+    [Fact]
     public void LibraryListSort_EmptyIsAlbumAscending_NoneClears()
     {
         var settings = AppSettings.CreateDefault();

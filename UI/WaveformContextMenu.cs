@@ -127,6 +127,7 @@ internal enum WaveMenuCommand
     FocusTime,
     SilentSkip,
     AutoLoop,
+    HeaderStructure,
     AlwaysOnTop,
     NewDocument,
     Open,
@@ -223,6 +224,7 @@ internal sealed class WaveformContextMenuModel
     public bool CenterLocked { get; init; }
     public bool SilentSkip { get; init; }
     public bool AutoLoop { get; init; }
+    public bool HeaderStructure { get; init; }
     public bool AlwaysOnTop { get; init; }
     public bool WaapiVisible { get; init; }
     public bool PlayExit { get; init; }
@@ -327,6 +329,7 @@ internal sealed class WaveformContextMenuModel
         CenterLocked = true,
         SilentSkip = true,
         AutoLoop = true,
+        HeaderStructure = true,
         AlwaysOnTop = true,
         WaapiVisible = true,
         PlayExit = true,
@@ -1161,6 +1164,13 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuViewSpectrogram, WaveMenuCommand.ViewSpectrogram, "A", m.AnalysisView == WaveformAnalysisView.Spectrogram, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         Check(UiStrings.WaveMenuViewOverlay, WaveMenuCommand.ViewOverlay, "A", m.AnalysisView == WaveformAnalysisView.Overlay, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
         Check(UiStrings.WaveMenuViewLoudness, WaveMenuCommand.ViewLoudness, "Ctrl+L", m.AnalysisView == WaveformAnalysisView.Loudness, m.HasDocument && !m.IsBusy && !m.LibraryMaximized),
+        // プレイヤー＝構造＋情報／エディタ＝チャンクリスト。アクセスキーは解析内 W／S／Y／L と被らない I。
+        Check(
+            UiStrings.WaveMenuHeaderStructure,
+            WaveMenuCommand.HeaderStructure,
+            "H",
+            m.HeaderStructure,
+            !m.IsBusy && (m.LibraryMaximized || m.HasDocument)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> ZoomViewItems(WaveformContextMenuModel m) =>

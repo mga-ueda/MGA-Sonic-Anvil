@@ -65,6 +65,8 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.SilentSkip, () => UiStrings.LabelToolbarSilentSkip, () => UiStrings.TooltipSilentSkip),
         new(TransportCommand.AutoLoop, TransportIcon.AutoLoop,
             WaveMenuCommand.AutoLoop, () => UiStrings.LabelToolbarAutoLoop, () => UiStrings.TooltipAutoLoop),
+        new(TransportCommand.HeaderStructure, TransportIcon.HeaderStructure,
+            WaveMenuCommand.HeaderStructure, () => UiStrings.LabelToolbarHeaderStructure, () => UiStrings.TooltipHeaderStructure),
         new(TransportCommand.AlwaysOnTop, TransportIcon.AlwaysOnTop,
             WaveMenuCommand.AlwaysOnTop, () => UiStrings.LabelToolbarAlwaysOnTop, () => UiStrings.TooltipAlwaysOnTop),
         new(TransportCommand.CenterLock, TransportIcon.Lock,
@@ -361,6 +363,11 @@ internal static class TransportToolbarCatalog
             [
                 new(TransportIcon.AutoLoop, () => UiStrings.IconStateOptionOff),
                 new(TransportIcon.AutoLoop, () => UiStrings.IconStateOptionOn, Latched: true),
+            ],
+            TransportCommand.HeaderStructure =>
+            [
+                new(TransportIcon.HeaderStructure, () => UiStrings.IconStateOptionOff),
+                new(TransportIcon.HeaderStructure, () => UiStrings.IconStateOptionOn, Latched: true),
             ],
             TransportCommand.AlwaysOnTop =>
             [

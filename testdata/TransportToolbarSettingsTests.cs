@@ -317,6 +317,7 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains(TransportCommand.RangeClick, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.SilentSkip, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.AutoLoop, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.HeaderStructure, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.AlwaysOnTop, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.CenterLock, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.ExportByMarkers, TransportToolbarCatalog.AllCommands);
@@ -394,6 +395,7 @@ public sealed class TransportToolbarSettingsTests
     [InlineData(nameof(TransportCommand.RangeClick))]
     [InlineData(nameof(TransportCommand.SilentSkip))]
     [InlineData(nameof(TransportCommand.AutoLoop))]
+    [InlineData(nameof(TransportCommand.HeaderStructure))]
     [InlineData(nameof(TransportCommand.AlwaysOnTop))]
     [InlineData(nameof(TransportCommand.CenterLock))]
     public void IconVariants_ListEveryStateStartingWithCatalogIcon(string commandName)

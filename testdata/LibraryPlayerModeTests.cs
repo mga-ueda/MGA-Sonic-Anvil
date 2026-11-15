@@ -90,6 +90,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.MaximizeLibrary));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SilentSkip));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoLoop));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.HeaderStructure));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AlwaysOnTop));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Manual));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewWaveform));
@@ -601,6 +602,9 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Z, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Right, ModifierKeys.Alt | ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.G, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.H, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsHeaderStructureToggle(Key.H, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsHeaderStructureToggle(Key.H, ModifierKeys.Control));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Tab, ModifierKeys.Shift));
     }

@@ -102,6 +102,8 @@ internal enum TransportIcon
     SilentSkip,
     /// <summary>1 周ループ（Single Loop）。LoopPlay のカセットとは別。</summary>
     AutoLoop,
+    /// <summary>ヘッダ情報（0110 のバイナリ）。</summary>
+    HeaderStructure,
     /// <summary>常に最前面（ピン）。</summary>
     AlwaysOnTop,
 }
@@ -200,6 +202,7 @@ internal enum TransportCommand
     RangeClick,
     SilentSkip,
     AutoLoop,
+    HeaderStructure,
     AlwaysOnTop,
     CenterLock,
 }
@@ -355,6 +358,7 @@ internal sealed class TransportIconButton : Button
         CommandKind is TransportCommand.RangeClick
             or TransportCommand.SilentSkip
             or TransportCommand.AutoLoop
+            or TransportCommand.HeaderStructure
             or TransportCommand.AlwaysOnTop
             or TransportCommand.CenterLock
             or TransportCommand.ToggleSpectrogram
@@ -807,6 +811,9 @@ internal static class TransportIconDrawing
                 break;
             case TransportIcon.AutoLoop:
                 DrawSingleLoop(dc, pen, latched ? loopFill : null, cx, cy);
+                break;
+            case TransportIcon.HeaderStructure:
+                DrawHeaderStructure(dc, brush, cx, cy);
                 break;
             case TransportIcon.AlwaysOnTop:
                 DrawAlwaysOnTop(dc, pen, brush, cx, cy);
@@ -1936,6 +1943,36 @@ internal static class TransportIconDrawing
         dc.DrawLine(pen, new Point(cx + 5, cy - 4), new Point(cx + 9, cy - 1));
         dc.DrawLine(pen, new Point(cx + 5, cy + 1), new Point(cx + 9, cy - 1));
         dc.DrawLine(pen, new Point(cx + 5, cy - 4), new Point(cx + 5, cy + 1));
+    }
+
+    /// <summary>2×2 の 01／10。ヘッダ情報トグル。</summary>
+    private static void DrawHeaderStructure(DrawingContext dc, Brush brush, double cx, double cy)
+    {
+        var typeface = new Typeface(
+            new FontFamily("Consolas"),
+            FontStyles.Normal,
+            FontWeights.Bold,
+            FontStretches.Normal);
+
+        void DrawDigit(string digit, double x, double y)
+        {
+            var text = new FormattedText(
+                digit,
+                CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                10,
+                brush,
+                1.0);
+            dc.DrawText(text, new Point(x - text.Width * 0.5, y - text.Height * 0.5));
+        }
+
+        const double dx = 5.2;
+        const double dy = 5.4;
+        DrawDigit("0", cx - dx, cy - dy);
+        DrawDigit("1", cx + dx, cy - dy);
+        DrawDigit("1", cx - dx, cy + dy);
+        DrawDigit("0", cx + dx, cy + dy);
     }
 
     /// <summary>窓の上辺にピン。</summary>

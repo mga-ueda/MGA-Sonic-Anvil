@@ -96,6 +96,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.ViewWaveform
             or WaveMenuCommand.SilentSkip
             or WaveMenuCommand.AutoLoop
+            or WaveMenuCommand.HeaderStructure
             or WaveMenuCommand.AlwaysOnTop
             or WaveMenuCommand.Open
             or WaveMenuCommand.Settings
@@ -254,6 +255,8 @@ internal static class LibraryPlayerMode
                 or ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift)) => true,
             (Key.L, ModifierKeys.None) => true,
             (Key.L, ModifierKeys.Alt | ModifierKeys.Shift) => true,
+            // ヘッダ情報の表示切替（プレイヤー専用）。
+            (Key.H, ModifierKeys.None) => true,
             // N／P／R 素押しは曲送り・頭出し専用（AllowsKey より前で処理）。破壊編集ショートカットには通さない。
             (Key.N, ModifierKeys.Alt | ModifierKeys.Shift) => true,
             (Key.P, ModifierKeys.Alt | ModifierKeys.Shift) => true,
@@ -1574,6 +1577,10 @@ internal static class LibraryPlayerMode
         && hasAbPoint
         && key == Key.Escape
         && modifiers == ModifierKeys.None;
+
+    /// <summary>ヘッダ情報の表示切替。プレイヤーは構造＋情報、エディタはチャンクリスト。</summary>
+    public static bool IsHeaderStructureToggle(Key key, ModifierKeys modifiers) =>
+        key == Key.H && modifiers == ModifierKeys.None;
 
     /// <summary>波形・アナライザ・WAAPI 表記の表示切替。オフのとき簡易シークバーを使える（タイムコード・ファイル名は含まない）。</summary>
     public static bool IsVideoHudToggle(Key key, ModifierKeys modifiers) =>

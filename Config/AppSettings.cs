@@ -197,6 +197,15 @@ internal sealed class AppSettings
     /// <summary>プレイリストの Single Loop。既定オフ。モードを行き来しても設定に残す。Auto Next より優先。</summary>
     public bool LibraryAutoLoop { get; set; }
 
+    /// <summary>プレイヤーのヘッダ情報（構造＋情報）。既定オフ。</summary>
+    public bool LibraryShowHeaderStructure { get; set; }
+
+    /// <summary>
+    /// エディタのヘッダ情報（チャンクリスト。タイムコードと編集履歴のあいだ）。既定オン。
+    /// プレイヤー側 <see cref="LibraryShowHeaderStructure"/> とは別記憶。
+    /// </summary>
+    public bool EditorShowHeaderStructure { get; set; } = true;
+
     /// <summary>プレイリストに PDF を載せる。既定オン。プレイヤー専用。</summary>
     public bool LibraryShowPlaylistPdf { get; set; } = true;
 

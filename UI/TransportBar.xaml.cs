@@ -62,6 +62,8 @@ internal partial class TransportBar : UserControl
 
     public void SetAutoLoop(bool enabled) => SetLatched(TransportCommand.AutoLoop, enabled);
 
+    public void SetHeaderStructure(bool enabled) => SetLatched(TransportCommand.HeaderStructure, enabled);
+
     public void SetAlwaysOnTop(bool enabled) => SetLatched(TransportCommand.AlwaysOnTop, enabled);
 
     public void SetCenterLock(bool enabled) => SetLatched(TransportCommand.CenterLock, enabled);

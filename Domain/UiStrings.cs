@@ -505,6 +505,7 @@ internal static partial class UiStrings
     public static string LabelToolbarMarkerClick => WithoutAccessKey(WaveMenuRangeClick).Trim();
     public static string LabelToolbarSilentSkip => WithoutAccessKey(WaveMenuSilentSkip).Trim();
     public static string LabelToolbarAutoLoop => WithoutAccessKey(WaveMenuAutoLoop).Trim();
+    public static string LabelToolbarHeaderStructure => WithoutAccessKey(WaveMenuHeaderStructure).Trim();
     public static string LabelToolbarAlwaysOnTop => WithoutAccessKey(WaveMenuAlwaysOnTop).Trim();
     public static string LabelToolbarCenterLock => WithoutAccessKey(WaveMenuCenterLock).Trim();
     public static string LabelToolbarWaveformMaximize => LabelLayoutPresetF11;
@@ -1489,6 +1490,7 @@ internal static partial class UiStrings
     public static string TooltipMarkerClick => Get("マーカークリック (Q)", "Marker click (Q)");
     public static string TooltipSilentSkip => TipOptionSilentSkip;
     public static string TooltipAutoLoop => TipLibraryAutoLoop;
+    public static string TooltipHeaderStructure => TipOptionLibraryHeaderStructure;
     public static string TooltipAlwaysOnTop => TipOptionAlwaysOnTop;
     public static string TooltipCenterLock => TipOptionCenterLock;
     public static string TooltipWaveformMaximize => LabelLayoutPresetF11;
@@ -1703,6 +1705,8 @@ internal static partial class UiStrings
     public static string LabelLibraryAutoPlayNext => "Auto Next";
     /// <summary>ステータスバーの Single Loop。UI 言語に関わらず英語。Alt+Shift+L。</summary>
     public static string LabelLibraryAutoLoop => "Single Loop";
+    /// <summary>ヘッダ情報トグルのトースト用。UI 言語に関わらず英語。H。</summary>
+    public static string LabelLibraryHeaderStructure => "Header Info";
     /// <summary>Single Loop の動作説明（エディタ＝サンプルループ／プレイヤー＝全長、選択・A-B 優先）。</summary>
     public static string TipLibraryAutoLoop => Get(
         "オン時: エディタではサンプルループがあれば頭（または再生位置）から通し、ループ終端で始点へ無限ループ。プレイヤーではサンプルループを無視し曲末で先頭へ戻す。選択や A-B があるときはそちらを優先。（Alt+Shift+L）",
@@ -1731,6 +1735,9 @@ internal static partial class UiStrings
     public static string TipOptionLibraryCheckSelect => Get(
         "Check Box（Shift+Space）",
         "Check Box (Shift+Space)");
+    public static string TipOptionLibraryHeaderStructure => Get(
+        "ヘッダ情報（H）  プレイヤー＝構造＋情報／エディタ＝チャンクリスト",
+        "Header Info (H)  player: structure+info / editor: chunk list");
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");

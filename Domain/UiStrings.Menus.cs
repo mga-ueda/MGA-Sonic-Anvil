@@ -178,6 +178,8 @@ internal static partial class UiStrings
     public static string WaveMenuMaximizeLibrary => WithParenAccessKey(LabelLayoutPresetF10, 'B');
     public static string WaveMenuVideoMini => Get("動画ミニ(_M)", "Video _Mini");
     public static string WaveMenuMinimalChrome => WithParenAccessKey(LabelLayoutPresetF9, 'A');
+    /// <summary>解析。W／S／Y／L と被らない I。ジェスチャは H。</summary>
+    public static string WaveMenuHeaderStructure => Get("ヘッダ情報(_I)", "Header _Info");
     public static string WaveMenuVideoFullscreen => Get("映像を全画面(_Q)", "Full Screen Video (_Q)");
     public static string WaveMenuVideoMiniZoomIn => Get("ミニ窓を拡大(_U)", "Enlarge Mini Window (_U)");
     public static string WaveMenuVideoMiniZoomOut => Get("ミニ窓を縮小(_Z)", "Shrink Mini Window (_Z)");

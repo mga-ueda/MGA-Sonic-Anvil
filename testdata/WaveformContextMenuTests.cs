@@ -223,6 +223,13 @@ public sealed class WaveformContextMenuTests
             Assert.True(library?.Checkable);
             Assert.False(library?.Checked);
             Assert.Equal("F10", library?.Gesture);
+            Assert.Contains(WaveMenuCommand.HeaderStructure, commands);
+            var headerStructure = Find(tree, WaveMenuCommand.HeaderStructure);
+            Assert.True(headerStructure?.Checkable);
+            Assert.True(headerStructure?.Checked);
+            Assert.Equal("H", headerStructure?.Gesture);
+            // エディタでも文書ありなら有効（AllEnabledForTests は HasDocument）。
+            Assert.True(headerStructure?.Enabled);
             var tileGrid = Find(tree, WaveMenuCommand.TileGrid);
             Assert.True(tileGrid?.Checkable);
             Assert.True(tileGrid?.Checked);
@@ -308,6 +315,8 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(UiStrings.WaveMenuCatVideo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(UiStrings.WaveMenuCatSolo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(WaveMenuCommand.ViewSpectrogram, CommandsIn(view, UiStrings.WaveMenuCatAnalysis));
+            Assert.Contains(WaveMenuCommand.HeaderStructure, CommandsIn(view, UiStrings.WaveMenuCatAnalysis));
+            Assert.DoesNotContain(WaveMenuCommand.HeaderStructure, CommandsIn(view, UiStrings.WaveMenuCatScreen));
             Assert.Contains(WaveMenuCommand.VideoMini, CommandsIn(tree, UiStrings.WaveMenuCatView));
             Assert.Equal("F8", Find(tree, WaveMenuCommand.VideoMini)?.Gesture);
             Assert.Contains(WaveMenuCommand.MinimalChrome, CommandsIn(tree, UiStrings.WaveMenuCatView));
@@ -608,6 +617,8 @@ public sealed class WaveformContextMenuTests
         Assert.True(Find(tree, WaveMenuCommand.Save)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.MaximizeLibrary)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.SilentSkip)?.Enabled);
+        Assert.True(Find(tree, WaveMenuCommand.HeaderStructure)?.Enabled);
+        Assert.Equal("H", Find(tree, WaveMenuCommand.HeaderStructure)?.Gesture);
         Assert.True(Find(tree, WaveMenuCommand.GoStart)?.Enabled);
         Assert.True(Find(tree, WaveMenuCommand.ViewWaveform)?.Enabled);
         Assert.False(Find(tree, WaveMenuCommand.ViewSpectrogram)?.Enabled);
