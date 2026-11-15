@@ -405,6 +405,7 @@ internal sealed partial class LibraryBrowserView
             AutoPlay = AutoPlayEnabled,
             AutoPlayNext = AutoPlayNextEnabled,
             Shuffle = ShuffleEnabled,
+            HeaderStructure = HeaderStructureVisible,
             CanExportMp3 = LibraryPlayerMode.HasMp3ExportCandidate(selected),
             CanMergeTabs = selected.Length >= 2,
             CanNavigate = hasSelection,

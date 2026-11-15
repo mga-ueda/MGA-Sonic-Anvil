@@ -2837,6 +2837,65 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void HeaderStructureVisible_DefaultsOffAndToggles()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            try
+            {
+                window.Show();
+                Flush();
+                view.UpdateLayout();
+                Flush();
+                Assert.False(view.HeaderStructureVisible);
+                Assert.Equal(Visibility.Collapsed, view.StructureSplitter.Visibility);
+                view.ToggleHeaderStructureVisible();
+                Flush();
+                Assert.True(view.HeaderStructureVisible);
+                Assert.Equal(Visibility.Visible, view.StructureSplitter.Visibility);
+                Assert.True(view.StructureColumnWidth > 1);
+                Assert.True(view.IsHeaderStructureFocused);
+                view.ToggleHeaderStructureVisible();
+                Flush();
+                Assert.False(view.HeaderStructureVisible);
+                Assert.Equal(Visibility.Collapsed, view.StructureSplitter.Visibility);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LabelLibraryHeaderStructure_IsEnglishWithoutAccessKey()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Equal("Header Info", UiStrings.LabelLibraryHeaderStructure);
+            Assert.Null(MenuAccessKeys.Read(UiStrings.LabelLibraryHeaderStructure));
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Equal("Header Info", UiStrings.LabelLibraryHeaderStructure);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
     public void LabelLibraryAutoLoop_IsEnglishWithoutAccessKey()
     {
         var previous = UiStrings.Language;

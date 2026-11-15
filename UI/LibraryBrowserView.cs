@@ -144,6 +144,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly LibraryHoverSplitter _structureSplitter = new();
     private bool _sidePanesVisible = true;
     private double _sidePanesRememberedWidth;
+    /// <summary>ヘッダ情報（構造＋詳細）列の表示。既定オフ。設定に覚える。</summary>
+    private bool _headerStructureVisible;
+    private double _headerStructureRememberedWidth;
+    /// <summary>隠す直前の幅がスプリッター手動幅だったか。自動フィット幅をユーザー固定にしない。</summary>
+    private bool _headerStructureRememberedUserSized;
     private readonly TreeView _folderTree = new();
     private readonly TextBlock _explorerLabel = new();
     private readonly TextBlock _favoritesLabel = new();
@@ -827,6 +832,9 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     internal GridSplitter StructureSplitter => _structureSplitter;
 
+    internal double StructureColumnWidth =>
+        _structureColumn.ActualWidth > 0 ? _structureColumn.ActualWidth : _structureColumn.Width.Value;
+
     internal TreeViewItem? ExplorerFirstFolder =>
         _folderTree.Items.OfType<TreeViewItem>().FirstOrDefault();
 
@@ -1354,6 +1362,18 @@ internal sealed partial class LibraryBrowserView : UserControl
     public event EventHandler? AutoLoopChanged;
 
     public void ToggleAutoLoop() => AutoLoopEnabled = !AutoLoopEnabled;
+
+    /// <summary>プレイリスト右のヘッダ情報を表示するか。既定オフ。設定に覚える。</summary>
+    public bool HeaderStructureVisible
+    {
+        get => _headerStructureVisible;
+        set => SetHeaderStructureVisible(value, focusWhenShown: false);
+    }
+
+    public event EventHandler? HeaderStructureVisibleChanged;
+
+    public void ToggleHeaderStructureVisible(bool focusWhenShown = true) =>
+        SetHeaderStructureVisible(!_headerStructureVisible, focusWhenShown);
 
     /// <summary>Enter（クリアして追加）で先頭を再生するか。既定オン。設定に覚える。</summary>
     public bool AutoPlayEnabled
@@ -2195,7 +2215,15 @@ internal sealed partial class LibraryBrowserView : UserControl
                 FocusFavorites();
                 break;
             case LibraryPane.HeaderStructure:
-                FocusHeaderStructure();
+                if (HeaderStructureVisible)
+                {
+                    FocusHeaderStructure();
+                }
+                else
+                {
+                    FocusList();
+                }
+
                 break;
             default:
                 FocusList();
@@ -2242,7 +2270,15 @@ internal sealed partial class LibraryBrowserView : UserControl
                 FocusFavorites();
                 break;
             case LibraryPane.HeaderStructure:
-                FocusHeaderStructure();
+                if (HeaderStructureVisible)
+                {
+                    FocusHeaderStructure();
+                }
+                else
+                {
+                    FocusList();
+                }
+
                 break;
             default:
                 FocusList();

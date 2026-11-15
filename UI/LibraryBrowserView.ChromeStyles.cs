@@ -255,7 +255,7 @@ internal sealed partial class LibraryBrowserView
         return template;
     }
 
-    private static void ApplyNavSelectionResources(FrameworkElement host, Brush selected, Brush fore)
+    internal static void ApplyNavSelectionResources(FrameworkElement host, Brush selected, Brush fore)
     {
         host.Resources[SystemColors.HighlightBrushKey] = selected;
         host.Resources[SystemColors.HighlightTextBrushKey] = fore;
@@ -710,7 +710,7 @@ internal sealed partial class LibraryBrowserView
     /// ヘッダ構造用。childIndent=0 なら字下げはキャプション側、XML は画素インデントで階層を出す。
     /// stretchRow=false なら行幅を内容に合わせ、横スクロールで見切れを防ぐ。
     /// </summary>
-    private static ControlTemplate StructureTreeNavTemplate(
+    internal static ControlTemplate StructureTreeNavTemplate(
         Brush hover,
         Brush selected,
         double childIndent = 0,

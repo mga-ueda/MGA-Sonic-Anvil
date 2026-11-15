@@ -66,8 +66,8 @@ internal sealed partial class LibraryBrowserView
         _structureDetailBox.CaretBrush = Brushes.Transparent;
         _structureDetailBox.Padding = new Thickness(8, 6, 8, 8);
         _structureDetailBox.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-        // 幅が足りないときだけ横スクロール（見切れ防止）。通常は Fit で幅を広げる。
-        _structureDetailBox.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+        // 横スクロールは禁止。足りなければ Fit で列幅を広げる。
+        _structureDetailBox.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
         _structureDetailBox.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
         // Style で Regular を固定（テーマや継承の SemiBold/Bold を受けない）。
         var detailStyle = new Style(typeof(TextBox));
@@ -161,6 +161,24 @@ internal sealed partial class LibraryBrowserView
         _structurePaneHost = host;
         ApplyStructureContentFonts();
         SizeChanged += (_, _) => FitHeaderStructurePaneWidths();
+        if (!_headerStructureVisible)
+        {
+            ApplyHeaderStructureCollapsedChrome();
+        }
+    }
+
+    /// <summary>非表示時の列・スプリッター・ホスト。イベントは上げない。</summary>
+    private void ApplyHeaderStructureCollapsedChrome()
+    {
+        _structureColumn.MinWidth = 0;
+        _structureColumn.MaxWidth = 0;
+        _structureColumn.Width = new GridLength(0);
+        _structureSplitterColumn.Width = new GridLength(0);
+        _structureSplitter.Visibility = Visibility.Collapsed;
+        if (_structurePaneHost is { } host)
+        {
+            host.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void ApplyHeaderStructureTreeStyle()
@@ -201,8 +219,8 @@ internal sealed partial class LibraryBrowserView
         _structureXmlTree.Padding = new Thickness(4, 4, 4, 6);
         _structureXmlTree.FontFamily = StructureDetailMonoFont;
         ApplyHeaderStructureDetailTypography(_structureXmlTree);
-        // 幅が足りないときだけ横スクロール（見切れ防止）。通常は Fit で幅を広げる。
-        ScrollViewer.SetHorizontalScrollBarVisibility(_structureXmlTree, ScrollBarVisibility.Auto);
+        // 横スクロールは禁止。足りなければ Fit で列幅を広げる。
+        ScrollViewer.SetHorizontalScrollBarVisibility(_structureXmlTree, ScrollBarVisibility.Disabled);
         ScrollViewer.SetVerticalScrollBarVisibility(_structureXmlTree, ScrollBarVisibility.Auto);
         _structureXmlTree.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
         // XML はパース済みを一括表示。仮想化すると Extent が不正確でツマミ精度が落ちる。
@@ -251,6 +269,12 @@ internal sealed partial class LibraryBrowserView
 
     public void FocusHeaderStructure()
     {
+        if (!_headerStructureVisible)
+        {
+            FocusList();
+            return;
+        }
+
         ClearExplorerTypeahead();
         CancelPlaylistFocusRestore();
         ReleasePlaylistFocusHold();
@@ -276,6 +300,12 @@ internal sealed partial class LibraryBrowserView
 
     public void FocusHeaderStructureDetail()
     {
+        if (!_headerStructureVisible)
+        {
+            FocusList();
+            return;
+        }
+
         ClearExplorerTypeahead();
         CancelPlaylistFocusRestore();
         ReleasePlaylistFocusHold();
@@ -754,10 +784,12 @@ internal sealed partial class LibraryBrowserView
             _structureErrorText.Text = string.Empty;
         }
 
-        var sizeFieldWidth = WaveStructureNode.MaxSizeFieldWidth(document.Roots);
-        var nameFieldWidth = WaveStructureNode.NameFieldWidth(WaveStructureNode.MaxDepth(document.Roots));
+        // コンテナ根はツリー親にせず1行。子をトップレベルにする。
+        var displayRoots = WaveStructureNode.ForTreeDisplay(document.Roots);
+        var sizeFieldWidth = WaveStructureNode.MaxSizeFieldWidth(displayRoots);
+        var nameFieldWidth = WaveStructureNode.NameFieldWidth(WaveStructureNode.MaxDepth(displayRoots));
         TreeViewItem? first = null;
-        foreach (var root in document.Roots)
+        foreach (var root in displayRoots)
         {
             var item = CreateStructureTreeItem(root, depth: 0, nameFieldWidth, sizeFieldWidth);
             _structureTree.Items.Add(item);
@@ -766,7 +798,6 @@ internal sealed partial class LibraryBrowserView
 
         if (first is not null)
         {
-            first.IsExpanded = true;
             if (!TrySelectRememberedStructureChunk())
             {
                 // 記憶チャンクが無いときだけ1行目を見せる。記憶自体は消さない。
@@ -1571,7 +1602,7 @@ internal sealed partial class LibraryBrowserView
             _structureFitBusy = false;
         }
 
-        // プレイリスト下限などで広げられなかったら、以後は横スクロールに任せる。
+        // プレイリスト下限などで広げられなかったら、以後の自動拡幅は止める（横スクロールはしない）。
         if (_structureColumn.ActualWidth <= before + 0.5)
         {
             _structureDetailClipGrowBlocked = true;
@@ -1628,9 +1659,112 @@ internal sealed partial class LibraryBrowserView
         return Math.Max(DesignMetrics.From96(96), Math.Max(labelWidth, content + chrome));
     }
 
+    /// <summary>
+    /// ヘッダ情報列の表示切替。幅は覚える。フォーカス中ならプレイリストへ戻す。
+    /// 再表示時は MaxWidth を先に戻し、自動フィット幅をユーザー固定にしない（見切れ防止）。
+    /// </summary>
+    public void SetHeaderStructureVisible(bool show, bool focusWhenShown = true)
+    {
+        if (_headerStructureVisible == show)
+        {
+            return;
+        }
+
+        if (!show)
+        {
+            _headerStructureRememberedUserSized = _structureUserWidth is not null;
+            var current = _structureColumn.ActualWidth > 1
+                ? (_structureUserWidth ?? _structureColumn.ActualWidth)
+                : (_headerStructureRememberedWidth > 0
+                    ? _headerStructureRememberedWidth
+                    : DesignMetrics.LibraryHeaderStructureWidth);
+            _headerStructureRememberedWidth = DesignMetrics.ClampLibraryHeaderStructureWidth(current);
+            ApplyHeaderStructureCollapsedChrome();
+
+            _headerStructureVisible = false;
+            if (IsHeaderStructureFocused)
+            {
+                FocusList();
+            }
+
+            HeaderStructureVisibleChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        _headerStructureVisible = true;
+        _structureDetailClipGrowBlocked = false;
+        if (_structurePaneHost is { } shown)
+        {
+            shown.Visibility = Visibility.Visible;
+        }
+
+        _structureSplitter.Visibility = Visibility.Visible;
+        _structureSplitterColumn.Width = new GridLength(DesignMetrics.LibraryExplorerSplitterWidth);
+        // SetSidePanesVisible と同様、幅を入れる前に拘束を戻す（MaxWidth=0 のまま Fit すると見切れる）。
+        _structureColumn.MinWidth = DesignMetrics.LibraryHeaderStructureMinWidth;
+        _structureColumn.MaxWidth = DesignMetrics.LibraryHeaderStructureMaxWidth;
+        if (_headerStructureRememberedUserSized && _headerStructureRememberedWidth > 0)
+        {
+            _structureUserWidth = DesignMetrics.ClampLibraryHeaderStructureWidth(
+                _headerStructureRememberedWidth);
+        }
+        else
+        {
+            // 自動フィットのまま。記憶幅は高水位の種だけにし、拡幅ロックは掛けない。
+            _structureUserWidth = null;
+            if (_headerStructureRememberedWidth > 0)
+            {
+                _structureAutoHeldWidth = Math.Max(
+                    _structureAutoHeldWidth,
+                    _headerStructureRememberedWidth);
+            }
+        }
+
+        FitHeaderStructurePaneWidths();
+        ScheduleHeaderStructureFitAfterShow();
+        if (focusWhenShown)
+        {
+            FocusHeaderStructure();
+        }
+
+        HeaderStructureVisibleChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>再表示直後はレイアウト前に Fit することがあるので、Loaded 後にもう一度合わせて見切れを取る。</summary>
+    private void ScheduleHeaderStructureFitAfterShow()
+    {
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (!_headerStructureVisible || _structureBody is null)
+                {
+                    return;
+                }
+
+                FitHeaderStructurePaneWidths();
+                if (FindDescendantScrollViewer(_structureDetailBox) is { } detailScroll)
+                {
+                    GrowHeaderStructureDetailIfClipped(detailScroll);
+                }
+
+                if (_structureXmlTree.Visibility == Visibility.Visible)
+                {
+                    if (FindDescendantScrollViewer(_structureXmlTree) is { } xmlScroll)
+                    {
+                        GrowHeaderStructureDetailIfClipped(xmlScroll);
+                    }
+                    else
+                    {
+                        ScheduleXmlDetailWidthSync();
+                    }
+                }
+            },
+            DispatcherPriority.Loaded);
+    }
+
     private void FitHeaderStructurePaneWidths()
     {
-        if (_structureBody is null)
+        if (_structureBody is null || !_headerStructureVisible)
         {
             return;
         }
@@ -1895,7 +2029,7 @@ internal sealed partial class LibraryBrowserView
         }
     }
 
-    private static double MeasureStructureTreeWidth(
+    internal static double MeasureStructureTreeWidth(
         ItemCollection items,
         int depth,
         double childIndent,
