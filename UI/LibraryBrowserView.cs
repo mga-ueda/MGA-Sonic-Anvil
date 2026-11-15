@@ -320,6 +320,12 @@ internal sealed partial class LibraryBrowserView : UserControl
     private int _playlistSelectionNotifyDepth;
     private bool _playlistSelectionNotifyPending;
     private bool _deferActivate;
+    /// <summary>
+    /// 非選択の連続 Append で <see cref="_deferActivate"/> をネストしたときの深さ。
+    /// 各件が「追加前の値」へ戻すと、内側の Idle が true を残してクリック不能になる。
+    /// </summary>
+    private int _appendActivateDeferDepth;
+    private bool _appendActivateDeferRestore;
     private bool _restoreListFocus;
     private int _restoreListFocusGeneration;
     /// <summary>
@@ -3775,7 +3781,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// フォルダ読み込み用。1 件追加して現在の並べ替え位置へ挿入する。全件 SetSessions より軽い。
     /// </summary>
     public void AppendSession(DocumentSession session, bool select) =>
-        AppendSessionCore(session, select, refreshColumns: true);
+        AppendSessionCore(session, select, refreshColumns: true, manageActivateDefer: true);
 
     /// <summary>
     /// 複数曲を一度に挿入する。列があるときはその位置、無いときは末尾。列再計算は最後の1回だけ。
@@ -3787,11 +3793,42 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        // 非選択が1件でもあれば、バッチ全体で一度だけ activate を抑止する。
+        // 件ごとに抑止すると Idle 復元がネストし、_deferActivate が true のまま残る。
+        var deferActivate = false;
         for (var i = 0; i < sessions.Count; i++)
         {
-            var session = sessions[i];
-            var pick = select is not null && ReferenceEquals(select, session);
-            AppendSessionCore(session, pick, refreshColumns: i + 1 == sessions.Count);
+            if (select is null || !ReferenceEquals(select, sessions[i]))
+            {
+                deferActivate = true;
+                break;
+            }
+        }
+
+        if (deferActivate)
+        {
+            BeginAppendActivateDefer();
+        }
+
+        try
+        {
+            for (var i = 0; i < sessions.Count; i++)
+            {
+                var session = sessions[i];
+                var pick = select is not null && ReferenceEquals(select, session);
+                AppendSessionCore(
+                    session,
+                    pick,
+                    refreshColumns: i + 1 == sessions.Count,
+                    manageActivateDefer: false);
+            }
+        }
+        finally
+        {
+            if (deferActivate)
+            {
+                EndAppendActivateDefer();
+            }
         }
     }
 
@@ -3799,7 +3836,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// 現行の列ソート位置へ1件入れる。ソート見出しが無いときは末尾。入れた行の番号を返す。
     /// </summary>
     public int InsertSessionByCurrentSort(DocumentSession session, bool select) =>
-        AppendSessionCore(session, select, refreshColumns: false);
+        AppendSessionCore(session, select, refreshColumns: false, manageActivateDefer: true);
 
     /// <summary>表示から外す。内部の曲リストは触らない。</summary>
     public void RemovePlaylistSession(DocumentSession session)
@@ -3867,9 +3904,21 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         var indices = new int[sessions.Count];
-        for (var i = 0; i < sessions.Count; i++)
+        BeginAppendActivateDefer();
+        try
         {
-            indices[i] = AppendSessionCore(sessions[i], select: false, refreshColumns: false);
+            for (var i = 0; i < sessions.Count; i++)
+            {
+                indices[i] = AppendSessionCore(
+                    sessions[i],
+                    select: false,
+                    refreshColumns: false,
+                    manageActivateDefer: false);
+            }
+        }
+        finally
+        {
+            EndAppendActivateDefer();
         }
 
         if (selected.Length > 0)
@@ -3881,16 +3930,21 @@ internal sealed partial class LibraryBrowserView : UserControl
         return indices;
     }
 
-    private int AppendSessionCore(DocumentSession session, bool select, bool refreshColumns)
+    private int AppendSessionCore(
+        DocumentSession session,
+        bool select,
+        bool refreshColumns,
+        bool manageActivateDefer)
     {
         var row = CreateRowWithDefaults(session);
         row.GroupKey = LibraryFileList.GroupLabel(row, _group);
 
         // 非選択追加では DataGrid の自動選択→SessionActivated を Loaded まで抑止する。
-        var heldActivate = _deferActivate;
-        if (!select)
+        // 連続追加は呼び出し側で一度だけ抑止する（manageActivateDefer=false）。
+        var deferActivate = manageActivateDefer && !select;
+        if (deferActivate)
         {
-            _deferActivate = true;
+            BeginAppendActivateDefer();
         }
 
         try
@@ -3993,19 +4047,57 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
         finally
         {
-            if (!select)
+            if (deferActivate)
             {
                 // EndRowSync の _syncing 解除（Loaded）より後で戻し、自動選択の窓を閉じる。
-                var gen = _syncGeneration;
-                Dispatcher.BeginInvoke(
-                    () =>
-                    {
-                        if (gen == _syncGeneration)
-                        {
-                            _deferActivate = heldActivate;
-                        }
-                    },
-                    DispatcherPriority.ContextIdle);
+                EndAppendActivateDefer();
+            }
+        }
+    }
+
+    private void BeginAppendActivateDefer()
+    {
+        if (_appendActivateDeferDepth++ == 0)
+        {
+            _appendActivateDeferRestore = _deferActivate;
+            _deferActivate = true;
+        }
+    }
+
+    private void EndAppendActivateDefer()
+    {
+        // syncGeneration では破棄しない。連続追加の途中で世代が進んでも深さを落とす。
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (_appendActivateDeferDepth <= 0)
+                {
+                    return;
+                }
+
+                if (--_appendActivateDeferDepth > 0)
+                {
+                    return;
+                }
+
+                _appendActivateDeferDepth = 0;
+                _deferActivate = _appendActivateDeferRestore;
+            },
+            DispatcherPriority.ContextIdle);
+    }
+
+    /// <summary>テスト用。非選択追加のあとクリック不能になる _deferActivate 残留を検知する。</summary>
+    internal bool IsActivateDeferred => _deferActivate;
+
+    /// <summary>テスト用。DataGrid の素クリック相当で SelectedItem を変える。</summary>
+    internal void SimulatePlaylistGridSelectForTests(DocumentSession session)
+    {
+        for (var i = 0; i < _items.Count; i++)
+        {
+            if (_items[i].Tag is DocumentSession tagged && ReferenceEquals(tagged, session))
+            {
+                _grid.SelectedItem = _items[i];
+                return;
             }
         }
     }

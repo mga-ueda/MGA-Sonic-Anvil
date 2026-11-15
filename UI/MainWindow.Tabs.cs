@@ -43,6 +43,20 @@ public partial class MainWindow
     private bool HasMultipleTabSelection => _selectedTabs.Count >= 2;
 
     /// <summary>
+    /// ファイルの時間の対象。プレイヤーはプレイリスト複数選択、エディタはタブ複数選択。
+    /// </summary>
+    private DocumentSession[] ResolveTabTimeSources()
+    {
+        if (IsLibraryMaximized)
+        {
+            var selected = LibraryBrowser.SelectedSessions;
+            return selected.Length >= 2 ? selected : _sessions.ToArray();
+        }
+
+        return HasMultipleTabSelection ? SelectedTabsInOrder() : _sessions.ToArray();
+    }
+
+    /// <summary>
     /// タブ／タイルの帯のハイライト（色設定 DocumentTabSelected*）。
     /// 複数選択があるときは選択したものだけを光らせる
     /// （検索フィルター中の全選択などで、選択に入っていないアクティブタブが
@@ -680,45 +694,38 @@ public partial class MainWindow
     private void CopyAllTabTimes()
     {
         // 複数選択時だけ選択ファイルに絞り、単体選択・未選択はすべてのファイルを表示する。
-        var sources = HasMultipleTabSelection ? SelectedTabsInOrder() : _sessions.ToArray();
+        // プレイヤーではタブ選択ではなくプレイリスト選択を見る。
+        var sources = ResolveTabTimeSources();
         if (sources.Length == 0)
         {
             return;
         }
 
-        var tabs = new (string FileName, long FrameCount, int SampleRate)[sources.Length];
+        // プレイヤーの遅延読込は FrameCount=0 のままなので、プレイリストと同じ表示尺を使う。
+        var items = new (string FileName, double DurationSeconds)[sources.Length];
         for (var i = 0; i < sources.Length; i++)
         {
-            var document = sources[i].Document;
-            tabs[i] = (sources[i].DisplayName, document.FrameCount, document.SampleRate);
+            items[i] = (
+                sources[i].DisplayName,
+                LibraryPlaylistDocuments.ResolveDisplayDurationSeconds(sources[i].Document));
         }
 
-        var rows = TabTimeList.FromTabs(tabs);
-        if (_tabTimeTable is null)
+        var rows = TabTimeList.WithTotalRow(TabTimeList.FromDurations(items));
+        // ShowDialog で Owner（メイン）を操作不能にし、閉じると戻す。
+        _tabTimeTable = new TabTimeTableWindow
         {
-            _tabTimeTable = new TabTimeTableWindow
-            {
-                Owner = this,
-                Topmost = Topmost,
-            };
-            _tabTimeTable.Closed += (_, _) =>
-            {
-                _tabTimeTable = null;
-                RestoreDefaultContentFocusAfterOverlay();
-            };
-        }
-        else
-        {
-            _tabTimeTable.Topmost = Topmost;
-            if (_tabTimeTable.WindowState == WindowState.Minimized)
-            {
-                _tabTimeTable.WindowState = WindowState.Normal;
-            }
-        }
-
+            Owner = this,
+            Topmost = Topmost,
+        };
         _tabTimeTable.SetRows(rows);
-        AcrylicDialogChrome.Show(_tabTimeTable);
-        _tabTimeTable.Activate();
+        try
+        {
+            AcrylicDialogChrome.ShowDialog(_tabTimeTable);
+        }
+        finally
+        {
+            _tabTimeTable = null;
+        }
     }
 
     /// <summary>タブメニューに並べ方（タブのまま／左右／上下／上下左右）を直接並べる。</summary>

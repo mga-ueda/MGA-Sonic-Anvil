@@ -95,4 +95,66 @@ public sealed class TabTimeListTests
         Assert.Equal("\"a\"\"b\"", TabTimeList.CsvEscape("a\"b"));
         Assert.Equal("\"a\r\nb\"", TabTimeList.CsvEscape("a\r\nb"));
     }
+
+    [Fact]
+    public void FromDurations_FormatsSecondsLikePlaylist()
+    {
+        var rows = TabTimeList.FromDurations(
+        [
+            ("a.wav", 93.722),
+            ("b.wav", 3.048),
+            ("c.wav", 0),
+        ]);
+        Assert.Equal(3, rows.Count);
+        Assert.Equal("a.wav", rows[0].FileName);
+        Assert.Equal(UiStrings.FormatDuration(93.722), rows[0].Duration);
+        Assert.Equal(UiStrings.FormatDuration(3.048), rows[1].Duration);
+        Assert.Equal("00:00.000", rows[2].Duration);
+    }
+
+    [Fact]
+    public void SumDurationSeconds_AddsPositiveRows()
+    {
+        var rows = TabTimeList.FromDurations(
+        [
+            ("a.wav", 93.722),
+            ("b.wav", 3.048),
+            ("c.wav", 0),
+        ]);
+        Assert.Equal(96.77, TabTimeList.SumDurationSeconds(rows), 3);
+        Assert.Equal(UiStrings.FormatDuration(96.77), TabTimeList.FormatTotalDuration(rows));
+        Assert.Equal(0, TabTimeList.SumDurationSeconds([]));
+    }
+
+    [Fact]
+    public void WithTotalRow_AppendsTotalForCopyCsvPdf()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            var rows = TabTimeList.WithTotalRow(TabTimeList.FromDurations(
+            [
+                ("a.wav", 93.722),
+                ("b.wav", 3.048),
+            ]));
+            Assert.Equal(3, rows.Count);
+            Assert.False(rows[0].IsTotal);
+            Assert.Equal("a.wav", rows[0].FileName);
+            Assert.True(rows[2].IsTotal);
+            Assert.Equal(UiStrings.TabTimeTotalLabel, rows[2].FileName);
+            Assert.Equal(UiStrings.FormatDuration(96.77), rows[2].Duration);
+            Assert.Equal(96.77, TabTimeList.SumDurationSeconds(rows), 3);
+            Assert.EndsWith(
+                UiStrings.TabTimeTotalLabel + "\t" + UiStrings.FormatDuration(96.77),
+                TabTimeList.FormatTsv(rows, headers: false));
+            Assert.EndsWith(
+                TabTimeList.CsvEscape(UiStrings.TabTimeTotalLabel) + "," + TabTimeList.CsvEscape(UiStrings.FormatDuration(96.77)),
+                TabTimeList.FormatCsv(rows));
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
 }

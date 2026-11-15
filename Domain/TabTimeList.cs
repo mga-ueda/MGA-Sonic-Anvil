@@ -2,11 +2,32 @@ using System.Text;
 
 namespace MgaSonicAnvil.Domain;
 
-/// <summary>全タブのファイル名と長さ。</summary>
-internal readonly record struct TabTimeRow(int Index, string FileName, string Duration)
+/// <summary>全タブのファイル名と長さ。先頭の合計行は <see cref="IsTotal"/>。</summary>
+internal readonly record struct TabTimeRow(
+    int Index,
+    string FileName,
+    string Duration,
+    double DurationSeconds,
+    bool IsTotal = false)
 {
-    public static TabTimeRow Create(int index, string fileName, long frameCount, int sampleRate) =>
-        new(index, fileName ?? string.Empty, UiStrings.FormatTimecode(frameCount, sampleRate));
+    public static TabTimeRow Create(int index, string fileName, long frameCount, int sampleRate)
+    {
+        var rate = Math.Max(1, sampleRate);
+        var seconds = Math.Max(0, frameCount) / (double)rate;
+        return new(index, fileName ?? string.Empty, UiStrings.FormatTimecode(frameCount, sampleRate), seconds);
+    }
+
+    public static TabTimeRow Create(int index, string fileName, double durationSeconds)
+    {
+        var seconds = double.IsNaN(durationSeconds) || durationSeconds < 0 ? 0 : durationSeconds;
+        return new(index, fileName ?? string.Empty, UiStrings.FormatDuration(seconds), seconds);
+    }
+
+    public static TabTimeRow CreateTotal(int index, double durationSeconds)
+    {
+        var seconds = double.IsNaN(durationSeconds) || durationSeconds < 0 ? 0 : durationSeconds;
+        return new(index, UiStrings.TabTimeTotalLabel, UiStrings.FormatDuration(seconds), seconds, IsTotal: true);
+    }
 }
 
 /// <summary>表上のセル範囲（両端含む）。</summary>
@@ -38,8 +59,75 @@ internal static class TabTimeList
         return rows;
     }
 
+    /// <summary>秒数から表を作る。プレイヤーの遅延読込（タグ尺）向け。</summary>
+    public static IReadOnlyList<TabTimeRow> FromDurations(
+        IReadOnlyList<(string FileName, double DurationSeconds)> items)
+    {
+        if (items.Count == 0)
+        {
+            return [];
+        }
+
+        var rows = new TabTimeRow[items.Count];
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            rows[i] = TabTimeRow.Create(i, item.FileName, item.DurationSeconds);
+        }
+
+        return rows;
+    }
+
     public static string Cell(in TabTimeRow row, int column) =>
         column == 0 ? row.FileName : row.Duration;
+
+    public static double SumDurationSeconds(IReadOnlyList<TabTimeRow> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return 0;
+        }
+
+        var total = 0d;
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.IsTotal)
+            {
+                continue;
+            }
+
+            var seconds = row.DurationSeconds;
+            if (!double.IsNaN(seconds) && seconds > 0)
+            {
+                total += seconds;
+            }
+        }
+
+        return total;
+    }
+
+    public static string FormatTotalDuration(IReadOnlyList<TabTimeRow> rows) =>
+        UiStrings.FormatDuration(SumDurationSeconds(rows));
+
+    /// <summary>末尾に合計行を付ける。コピー／CSV／PDF に載せるため表データに含める。</summary>
+    public static IReadOnlyList<TabTimeRow> WithTotalRow(IReadOnlyList<TabTimeRow> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
+        var result = new TabTimeRow[rows.Count + 1];
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            result[i] = row with { Index = i, IsTotal = false };
+        }
+
+        result[rows.Count] = TabTimeRow.CreateTotal(rows.Count, SumDurationSeconds(rows));
+        return result;
+    }
 
     public static string Format(IReadOnlyList<(string FileName, long FrameCount, int SampleRate)> tabs) =>
         FormatTsv(FromTabs(tabs), headers: false);

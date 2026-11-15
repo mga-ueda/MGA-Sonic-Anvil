@@ -276,4 +276,42 @@ public sealed class LibraryPlaylistDocumentsTests
                 previousMpg);
         }
     }
+
+    [Fact]
+    public void ResolveDisplayDurationSeconds_Deferred_UsesTagDurationNotEmptyFrames()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".wav");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 3.048,
+            SampleRate = 48000,
+            Channels = 2,
+            BitsPerSample = 24,
+        });
+
+        Assert.True(document.IsDeferredLoad);
+        Assert.Equal(0, document.FrameCount);
+        Assert.Equal(3.048, LibraryPlaylistDocuments.ResolveDisplayDurationSeconds(document), 3);
+    }
+
+    [Fact]
+    public void ResolveDisplayDurationSeconds_LoadedMp3_KeepsTagOverStreamLength()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp3");
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            DurationSeconds = 10,
+            SampleRate = 44100,
+            Channels = 2,
+            BitsPerSample = 16,
+        });
+        document.ActivateStreamPlayback(44100, 2, 16, 441000 + 1152);
+
+        Assert.Equal(10, LibraryPlaylistDocuments.ResolveDisplayDurationSeconds(document), 3);
+        Assert.True(document.DurationSeconds > 10);
+    }
 }

@@ -46,20 +46,8 @@ internal sealed partial class LibraryBrowserView
         // ディスクキャッシュがあれば行生成時に載せる（非同期1件ずつ差し替えで選択を壊さない）。
         var tags = HydrateIntegratedLufsFromCache(document);
         var deferred = document.IsDeferredLoad;
-        // MP3 は Xing と Media Foundation／実デコードがエンコーダ遅延ぶん（数十 ms）ずれる。
-        // リストは最初に出したタグ尺のままにする（ホバーやピーク確定でミリ秒が跳ねない）。
-        // PDF のページ秒は時計用だけで、時間列には出さない。
-        // 読み込み済みの Wave / AIFF は編集後の尺。タグ尺のままだとエディタの結果が残る。
-        var livePcm = !deferred
-            && document.SourceKind is AudioFileKind.Wave or AudioFileKind.Aiff
-            && document.DurationSeconds > 0;
-        var duration = LibraryPlaylistDocuments.IsPdf(document)
-            ? 0
-            : livePcm
-                ? document.DurationSeconds
-                : tags.DurationSeconds > 0
-                    ? tags.DurationSeconds
-                    : deferred ? 0 : document.DurationSeconds;
+        // 時間列はプレイリスト表示尺と同じ（遅延読込はタグ、Wave/AIFF 読込済みは実 PCM）。
+        var duration = LibraryPlaylistDocuments.ResolveDisplayDurationSeconds(document);
         var tagRateOk = AudioCodec.IsPlausibleAudioSampleRate(tags.SampleRate);
         var hideAudioFormat = LibraryPlaylistDocuments.IsVisual(document) && !tagRateOk;
         // PDF と音声の無い動画の 48kHz/16bit は再生時計用ダミー。列には出さない。

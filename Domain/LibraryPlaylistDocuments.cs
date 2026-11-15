@@ -158,4 +158,35 @@ internal static class LibraryPlaylistDocuments
     public static bool IsVisual(AudioDocument document) => IsVisual(document.SourceKind);
 
     public static bool BlocksEditor(AudioDocument document) => IsVisual(document);
+
+    /// <summary>
+    /// プレイリスト時間列と同じ尺。遅延読込はタグ、読み込み済み Wave/AIFF は実 PCM。
+    /// PDF は時間列に出さない（0）。
+    /// </summary>
+    public static double ResolveDisplayDurationSeconds(AudioDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (IsPdf(document))
+        {
+            return 0;
+        }
+
+        var deferred = document.IsDeferredLoad;
+        // MP3 は Xing と実デコードがエンコーダ遅延ぶんずれるので、タグ尺を優先する。
+        var livePcm = !deferred
+            && document.SourceKind is AudioFileKind.Wave or AudioFileKind.Aiff
+            && document.DurationSeconds > 0;
+        if (livePcm)
+        {
+            return document.DurationSeconds;
+        }
+
+        var tagged = document.Tags.DurationSeconds;
+        if (tagged > 0)
+        {
+            return tagged;
+        }
+
+        return deferred ? 0 : document.DurationSeconds;
+    }
 }

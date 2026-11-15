@@ -74,7 +74,7 @@ internal sealed class TabTimeTableWindow : Window
         _pdfButton.Content = UiStrings.TabTimeSavePdf;
         _closeButton.Content = UiStrings.ButtonCloseMnemonic;
         _copyMenuItem.Header = UiStrings.MenuCopy;
-                                    }
+    }
 
     public void RefreshAppearance()
     {
@@ -109,6 +109,7 @@ internal sealed class TabTimeTableWindow : Window
         _grid.EnableColumnVirtualization = false;
         _grid.RowHeaderWidth = 0;
         _grid.MinRowHeight = 28;
+        _grid.VerticalContentAlignment = VerticalAlignment.Center;
         _grid.BorderThickness = new Thickness(1);
         _grid.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
         _grid.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
@@ -122,11 +123,13 @@ internal sealed class TabTimeTableWindow : Window
 
         var timeText = new Style(typeof(TextBlock));
         timeText.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+        timeText.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
         timeText.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(8, 0, 8, 0)));
         _timeColumn.ElementStyle = timeText;
 
         var fileText = new Style(typeof(TextBlock));
         fileText.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+        fileText.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
         fileText.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(8, 0, 8, 0)));
         _fileColumn.ElementStyle = fileText;
 
@@ -354,6 +357,7 @@ internal sealed class TabTimeTableWindow : Window
         cellStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
         cellStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
         cellStyle.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+        cellStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
         cellStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
         var selectedTrigger = new Trigger { Property = DataGridCell.IsSelectedProperty, Value = true };
         selectedTrigger.Setters.Add(new Setter(Control.BackgroundProperty, selected));
@@ -363,10 +367,18 @@ internal sealed class TabTimeTableWindow : Window
 
         var rowStyle = new Style(typeof(DataGridRow));
         rowStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        rowStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
         rowStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("PrimaryForeBrush")));
         var rowSelected = new Trigger { Property = DataGridRow.IsSelectedProperty, Value = true };
         rowSelected.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         rowStyle.Triggers.Add(rowSelected);
+        var totalTrigger = new DataTrigger
+        {
+            Binding = new Binding(nameof(TabTimeRow.IsTotal)),
+            Value = true,
+        };
+        totalTrigger.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+        rowStyle.Triggers.Add(totalTrigger);
         _grid.RowStyle = rowStyle;
         _grid.RowBackground = Brushes.Transparent;
         _grid.AlternatingRowBackground = Brushes.Transparent;

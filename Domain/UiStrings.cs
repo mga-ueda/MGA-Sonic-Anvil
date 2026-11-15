@@ -1584,6 +1584,7 @@ internal static partial class UiStrings
     public static string TabTimeWindowTitle => Get("ファイルの時間", "File times");
     public static string TabTimeColumnFile => Get("ファイル", "File");
     public static string TabTimeColumnTime => Get("時間", "Time");
+    public static string TabTimeTotalLabel => Get("合計", "Total");
     public static string LibraryColumnName => Get("ファイル", "File");
     public static string LibraryColumnTitle => Get("タイトル", "Title");
     public static string LibraryColumnArtist => Get("アーティスト", "Artist");

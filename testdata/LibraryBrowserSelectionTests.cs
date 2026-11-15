@@ -68,6 +68,48 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void AppendSessions_MultipleUnselected_ClearsDeferActivateSoGridClickWorks()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var third = Session("ccc.wav");
+            var fourth = Session("ddd.wav");
+            var extra = Session("eee.wav");
+            var view = new LibraryBrowserView();
+            DocumentSession? activated = null;
+            view.SessionActivated += (_, session) => activated = session;
+            view.SetSessions([first], first, [first]);
+            Flush();
+            Assert.False(view.IsActivateDeferred);
+
+            // 先頭だけ選択、残りは非選択追加（フォルダ／複数ドロップの flush と同じ形）。
+            view.AppendSessions([second, third, fourth], select: second);
+            Flush();
+            Assert.False(view.IsActivateDeferred);
+
+            activated = null;
+            view.SimulatePlaylistGridSelectForTests(fourth);
+            Flush();
+            Assert.Same(fourth, activated);
+            Assert.Same(fourth, view.SelectedSession);
+
+            // 全件非選択追加でも残留しない。
+            view.AppendSessions([extra], select: null);
+            Flush();
+            Assert.False(view.IsActivateDeferred);
+
+            // ソート位置への連続 Insert（placeByCurrentSort）も深さを落とす。
+            view.InsertSessionByCurrentSort(Session("fff.wav"), select: false);
+            view.InsertSessionByCurrentSort(Session("ggg.wav"), select: false);
+            Flush();
+            Assert.False(view.IsActivateDeferred);
+        });
+    }
+
+    [Fact]
     public void UpdateSessionRow_Artwork_KeepsSelectionAndItemsSource()
     {
         RunSta(() =>
