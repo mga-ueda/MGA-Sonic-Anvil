@@ -488,8 +488,8 @@
         </Style.Triggers>
     </Style>
 
-    <!-- 情報／iXML: ホバーで出さず常時表示。内容は一括読み込みなのでツマミ長は比例のまま。 -->
-    <Style x:Key="StructureDetailScrollBarThumbStyle" TargetType="Thumb" BasedOn="{StaticResource LibraryScrollBarThumbStyle}">
+    <!-- エディタのヘッダ情報チャンク帯。細さはライブラリと同じ、常時表示。 -->
+    <Style x:Key="EditorHeaderScrollBarThumbStyle" TargetType="Thumb" BasedOn="{StaticResource LibraryScrollBarThumbStyle}">
         <Setter Property="Opacity" Value="0.28" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
@@ -501,7 +501,7 @@
         </Style.Triggers>
     </Style>
 
-    <Style x:Key="StructureDetailScrollBarStyle" TargetType="ScrollBar">
+    <Style x:Key="EditorHeaderScrollBarStyle" TargetType="ScrollBar">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Opacity" Value="1" />
         <Setter Property="Width" Value="{x:Static ui:DesignMetrics.SettingsScrollBarWidth}" />
@@ -512,7 +512,7 @@
                     <Grid Background="{TemplateBinding Background}">
                         <Track x:Name="PART_Track" IsDirectionReversed="True">
                             <Track.Thumb>
-                                <Thumb Style="{StaticResource StructureDetailScrollBarThumbStyle}" />
+                                <Thumb Style="{StaticResource EditorHeaderScrollBarThumbStyle}" />
                             </Track.Thumb>
                         </Track>
                     </Grid>
@@ -534,7 +534,7 @@
                             <Grid Background="{TemplateBinding Background}">
                                 <Track x:Name="PART_Track" IsDirectionReversed="False">
                                     <Track.Thumb>
-                                        <Thumb Style="{StaticResource StructureDetailScrollBarThumbStyle}" />
+                                        <Thumb Style="{StaticResource EditorHeaderScrollBarThumbStyle}" />
                                     </Track.Thumb>
                                 </Track>
                             </Grid>

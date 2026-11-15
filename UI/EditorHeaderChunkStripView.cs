@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
 
@@ -9,6 +10,7 @@ namespace MgaSonicAnvil.UI;
 /// エディタ chrome のチャンクリスト。タイムコードと編集履歴のあいだ。
 /// 枠は <see cref="HistoryStripView"/> と同じ（角丸＋ VST 空きスロット色）。
 /// 選択帯はプレイヤーのヘッダ構造ツリーと同じ（シアン＋角丸）。
+/// スクロールバーはライブラリと同じ細さで常時表示。
 /// 幅は内容に合わせて可変（履歴帯幅を上限）。
 /// </summary>
 internal sealed class EditorHeaderChunkStripView : Border
@@ -41,6 +43,7 @@ internal sealed class EditorHeaderChunkStripView : Border
         ScrollViewer.SetHorizontalScrollBarVisibility(_tree, ScrollBarVisibility.Disabled);
         ScrollViewer.SetVerticalScrollBarVisibility(_tree, ScrollBarVisibility.Auto);
         _tree.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        ApplyAlwaysVisibleScrollBarStyle();
         ApplyTreeItemStyle();
         // 展開で深い行のキャプション幅が変わったとき取り直す。
         _tree.AddHandler(
@@ -52,6 +55,14 @@ internal sealed class EditorHeaderChunkStripView : Border
             new RoutedEventHandler((_, _) => FitContentWidth()),
             handledEventsToo: true);
         Child = _tree;
+    }
+
+    private void ApplyAlwaysVisibleScrollBarStyle()
+    {
+        if (TryFindResource("EditorHeaderScrollBarStyle") is Style style)
+        {
+            _tree.Resources[typeof(ScrollBar)] = style;
+        }
     }
 
     /// <summary>文書パスからチャンクツリーを読み込む。未対応／失敗時は空。</summary>
@@ -149,6 +160,7 @@ internal sealed class EditorHeaderChunkStripView : Border
             + Padding.Right
             + _tree.Padding.Left
             + _tree.Padding.Right
+            + DesignMetrics.SettingsScrollBarWidth
             + DesignMetrics.From96(4);
         var needed = content + chrome;
         Width = Math.Clamp(
