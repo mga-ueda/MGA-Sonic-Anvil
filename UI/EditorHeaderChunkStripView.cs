@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 
@@ -11,8 +12,8 @@ namespace MgaSonicAnvil.UI;
 
 /// <summary>
 /// エディタ chrome のヘッダ情報。タイムコードと編集履歴のあいだ。
-/// 左＝チャンクリスト、余裕があれば右＝情報。枠は <see cref="HistoryStripView"/> と同じ。
-/// 選択帯はプレイヤーのヘッダ構造ツリーと同じ（シアン＋角丸）。
+/// 左＝チャンクリスト、余裕があれば右＝情報。枠は別々（HistoryStrip と同色）。
+/// アクティブ側の枠は PrimaryFore（白系）。選択帯はプレイヤーと同じシアン＋角丸。
 /// スクロールバーはライブラリと同じ細さで常時表示。
 /// 幅はプレイヤー情報列と同じく、一度広げたら自動では戻さない（H トグル／エディタ退出で忘れる）。
 /// 帯に載らないときは MainWindow 側が波形とレベルメーターのあいだへ出す。
@@ -20,7 +21,11 @@ namespace MgaSonicAnvil.UI;
 internal sealed class EditorHeaderChunkStripView : Border
 {
     private static readonly FontFamily MonoFont = new("Consolas");
+    /// <summary>ツリー枠と情報枠のすき間（chrome 帯同士の Margin 6 に揃える）。</summary>
+    internal static double PaneGap => DesignMetrics.From96(6);
     private readonly Grid _body = new();
+    private readonly Border _treeFrame = new();
+    private readonly Border _detailFrame = new();
     private readonly TreeView _tree = new();
     private readonly TextBox _detail = new();
     private readonly ColumnDefinition _treeColumn = new();
@@ -46,17 +51,21 @@ internal sealed class EditorHeaderChunkStripView : Border
         ClipToBounds = true;
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
+        // 外形の枠は持たず、ツリー／情報それぞれが枠を持つ。
         Background = Brushes.Transparent;
-        BorderThickness = new Thickness(1);
-        SetResourceReference(BorderBrushProperty, "VstInsertSlotEmptyBackBrush");
-        DesignMetrics.BindCorner(this);
-        Padding = new Thickness(2, 2, 2, 2);
+        BorderThickness = new Thickness(0);
+        Padding = new Thickness(0);
 
         _treeColumn.Width = new GridLength(1, GridUnitType.Star);
         _detailColumn.Width = new GridLength(0);
         _detailColumn.MinWidth = 0;
         _body.ColumnDefinitions.Add(_treeColumn);
         _body.ColumnDefinitions.Add(_detailColumn);
+
+        ConfigurePaneFrame(_treeFrame);
+        ConfigurePaneFrame(_detailFrame);
+        _detailFrame.Margin = new Thickness(PaneGap, 0, 0, 0);
+        _detailFrame.Visibility = Visibility.Collapsed;
 
         _tree.BorderThickness = new Thickness(0);
         _tree.Background = Brushes.Transparent;
@@ -84,8 +93,10 @@ internal sealed class EditorHeaderChunkStripView : Border
             TreeViewItem.CollapsedEvent,
             new RoutedEventHandler((_, _) => FitContentWidth()),
             handledEventsToo: true);
-        Grid.SetColumn(_tree, 0);
-        _body.Children.Add(_tree);
+        _tree.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
+        _treeFrame.Child = _tree;
+        Grid.SetColumn(_treeFrame, 0);
+        _body.Children.Add(_treeFrame);
 
         _detail.IsReadOnly = true;
         _detail.AcceptsReturn = true;
@@ -100,14 +111,44 @@ internal sealed class EditorHeaderChunkStripView : Border
         // プレイヤー情報列と同じ。横スクロール禁止・幅 Fit で見切れを防ぐ。
         _detail.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
         _detail.Focusable = true;
-        _detail.Visibility = Visibility.Collapsed;
         _detail.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
         TextOptions.SetTextFormattingMode(_detail, TextFormattingMode.Display);
         ApplyAlwaysVisibleScrollBarStyle(_detail);
-        Grid.SetColumn(_detail, 1);
-        _body.Children.Add(_detail);
+        _detail.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
+        _detailFrame.Child = _detail;
+        Grid.SetColumn(_detailFrame, 1);
+        _body.Children.Add(_detailFrame);
 
         Child = _body;
+        SyncPaneFocusChrome();
+    }
+
+    private static void ConfigurePaneFrame(Border frame)
+    {
+        frame.Background = Brushes.Transparent;
+        frame.BorderThickness = new Thickness(1);
+        frame.SetResourceReference(BorderBrushProperty, "VstInsertSlotEmptyBackBrush");
+        DesignMetrics.BindCorner(frame);
+        frame.Padding = new Thickness(2, 2, 2, 2);
+        frame.SnapsToDevicePixels = true;
+        frame.UseLayoutRounding = true;
+        frame.ClipToBounds = true;
+    }
+
+    /// <summary>フォーカス中の枠だけ PrimaryFore（白系）。</summary>
+    private void SyncPaneFocusChrome()
+    {
+        SetPaneFrameActive(_treeFrame, _tree.IsKeyboardFocusWithin);
+        SetPaneFrameActive(
+            _detailFrame,
+            _detailFrame.Visibility == Visibility.Visible && _detail.IsKeyboardFocusWithin);
+    }
+
+    private static void SetPaneFrameActive(Border frame, bool active)
+    {
+        frame.SetResourceReference(
+            BorderBrushProperty,
+            active ? "PrimaryForeBrush" : "VstInsertSlotEmptyBackBrush");
     }
 
     /// <summary>選択中チャンクの情報本文。未選択／空なら空文字。</summary>
@@ -135,12 +176,6 @@ internal sealed class EditorHeaderChunkStripView : Border
             host.Resources[typeof(ScrollBar)] = style;
         }
     }
-
-    /// <summary>チャンク／詳細が載っているか。オフ時の再 Clear 判定に使う。</summary>
-    public bool HasContent =>
-        _loadedPath is not null
-        || _tree.Items.Count > 0
-        || !string.IsNullOrEmpty(_detailText);
 
     /// <summary>文書パスからチャンクツリーを読み込む。未対応／失敗時は空。</summary>
     public void LoadFromPath(string? path)
@@ -211,7 +246,7 @@ internal sealed class EditorHeaderChunkStripView : Border
     /// <summary>帯内インライン詳細へフォーカス。非表示なら false。</summary>
     public bool FocusInlineDetail()
     {
-        if (!_inlineDetail || _detail.Visibility != Visibility.Visible)
+        if (!_inlineDetail || _detailFrame.Visibility != Visibility.Visible)
         {
             return false;
         }
@@ -338,7 +373,7 @@ internal sealed class EditorHeaderChunkStripView : Border
     /// <summary>インライン詳細テキストのスクロール。XML ナビは呼び出し側。</summary>
     public bool TryScrollInlineDetail(Key key)
     {
-        if (!IsInlineDetailFocused || _detail.Visibility != Visibility.Visible)
+        if (!IsInlineDetailFocused || _detailFrame.Visibility != Visibility.Visible)
         {
             return false;
         }
@@ -386,15 +421,15 @@ internal sealed class EditorHeaderChunkStripView : Border
     private void ApplyInlineDetailLayout()
     {
         var show = _inlineDetail && !string.IsNullOrEmpty(_detailText);
-        _detail.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        _detailFrame.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         if (show)
         {
             var detailW = DetailFittedWidth;
             var treeW = TreeFittedWidth;
-            _detailColumn.MinWidth = DesignMetrics.EditorHeaderDetailMinWidth;
-            _detailColumn.Width = new GridLength(detailW);
-            // 本文幅（高水位）まで伸ばす。上限で切ると横スクロール／見切れになる。
-            MaxWidth = treeW + detailW;
+            _detailColumn.MinWidth = DesignMetrics.EditorHeaderDetailMinWidth + PaneGap;
+            _detailColumn.Width = new GridLength(detailW + PaneGap);
+            // 本文幅（高水位）＋すき間まで伸ばす。上限で切ると横スクロール／見切れになる。
+            MaxWidth = treeW + PaneGap + detailW;
         }
         else
         {
@@ -402,6 +437,8 @@ internal sealed class EditorHeaderChunkStripView : Border
             _detailColumn.Width = new GridLength(0);
             MaxWidth = DesignMetrics.EditorHeaderChunkStripMaxWidth;
         }
+
+        SyncPaneFocusChrome();
     }
 
     private void Populate(WaveStructureDocument document)
@@ -429,39 +466,82 @@ internal sealed class EditorHeaderChunkStripView : Border
 
         if (first is not null)
         {
-            first.IsSelected = true;
-        }
-        else
-        {
-            SetDetailText(string.Empty);
-        }
-
-        FitContentWidth();
-    }
-
-    private void RefreshSelectedDetail()
-    {
-        if (_tree.SelectedItem is TreeViewItem { Tag: WaveStructureNode node } item)
-        {
-            // ファイル読込時はヘッダのみ。本文はチャンク選択で読む。
-            if (node.ContentPending && !string.IsNullOrWhiteSpace(_loadedPath))
-            {
-                node = WaveContainerStructure.EnsureContent(_loadedPath, node);
-                item.Tag = node;
-            }
-
-            SelectedNode = node;
-            SetDetailText(WaveStructureNode.FormatNodeDetail(node), notify: false);
+            SelectFirstRowDetail();
         }
         else
         {
             SelectedNode = null;
-            SetDetailText(string.Empty, notify: false);
+            SetDetailText(string.Empty);
+            FitContentWidth();
+        }
+    }
+
+    /// <summary>
+    /// ツリー1行目を選び、その詳細を必ず載せる。
+    /// H 再表示／読込直後用。選択記憶は持たない。
+    /// </summary>
+    public void SelectFirstRowDetail()
+    {
+        if (_tree.Items.OfType<TreeViewItem>().FirstOrDefault() is not { } first)
+        {
+            SelectedNode = null;
+            SetDetailText(string.Empty);
+            ApplyInlineDetailLayout();
+            FitContentWidth();
+            return;
         }
 
+        // IsSelected だけだと SelectedItemChanged が飛ばず詳細が空のまま残ることがある。
+        first.IsSelected = true;
+        ApplyNodeDetail(first);
+    }
+
+    private void RefreshSelectedDetail()
+    {
+        if (_tree.SelectedItem is TreeViewItem item)
+        {
+            ApplyNodeDetail(item);
+            return;
+        }
+
+        SelectedNode = null;
+        SetDetailText(string.Empty, notify: false);
         ApplyInlineDetailLayout();
         FitContentWidth();
         DetailChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyNodeDetail(TreeViewItem item, bool notify = true)
+    {
+        if (item.Tag is not WaveStructureNode node)
+        {
+            SelectedNode = null;
+            SetDetailText(string.Empty, notify: false);
+            ApplyInlineDetailLayout();
+            FitContentWidth();
+            if (notify)
+            {
+                DetailChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            return;
+        }
+
+        // ファイル読込時はヘッダのみ。本文はチャンク選択で読む。
+        if (node.ContentPending && !string.IsNullOrWhiteSpace(_loadedPath))
+        {
+            node = WaveContainerStructure.EnsureContent(_loadedPath, node);
+            item.Tag = node;
+        }
+
+        SelectedNode = node;
+        SetDetailText(WaveStructureNode.FormatNodeDetail(node), notify: false);
+        ApplyInlineDetailLayout();
+        FitContentWidth();
+        if (notify)
+        {
+            DetailChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private void SetDetailText(string text, bool notify = true)
@@ -471,6 +551,12 @@ internal sealed class EditorHeaderChunkStripView : Border
             _detailText = text;
             _detail.Text = text;
             _detailFittedWidth = MeasureDetailWidth(text);
+            // バイナリ等は TextBox が VerticalOffset を残すので、チャンク切替では先頭へ。
+            // 高さ確定前だと戻し切れないことがあるので Loaded でもう一度。
+            _detail.ScrollToHome();
+            _detail.Dispatcher.BeginInvoke(
+                () => _detail.ScrollToHome(),
+                DispatcherPriority.Loaded);
         }
 
         if (notify)
@@ -503,11 +589,13 @@ internal sealed class EditorHeaderChunkStripView : Border
             var detailNatural = MeasureDetailWidth(_detailText);
             _detailHeldWidth = Math.Max(_detailHeldWidth, detailNatural);
             _detailFittedWidth = _detailHeldWidth;
-            _detailColumn.Width = new GridLength(_detailFittedWidth);
-            var total = _treeFittedWidth + _detailFittedWidth;
+            _detailColumn.Width = new GridLength(_detailFittedWidth + PaneGap);
+            var total = _treeFittedWidth + PaneGap + _detailFittedWidth;
             MaxWidth = total;
             Width = Math.Max(
-                DesignMetrics.EditorHeaderChunkStripMinWidth + DesignMetrics.EditorHeaderDetailMinWidth,
+                DesignMetrics.EditorHeaderChunkStripMinWidth
+                    + PaneGap
+                    + DesignMetrics.EditorHeaderDetailMinWidth,
                 total);
             return;
         }
@@ -540,10 +628,10 @@ internal sealed class EditorHeaderChunkStripView : Border
             fontSize: 11,
             dpi,
             expanderWidth: 16);
-        var chrome = BorderThickness.Left
-            + BorderThickness.Right
-            + Padding.Left
-            + Padding.Right
+        var chrome = _treeFrame.BorderThickness.Left
+            + _treeFrame.BorderThickness.Right
+            + _treeFrame.Padding.Left
+            + _treeFrame.Padding.Right
             + _tree.Padding.Left
             + _tree.Padding.Right
             + DesignMetrics.SettingsScrollBarWidth
@@ -590,7 +678,11 @@ internal sealed class EditorHeaderChunkStripView : Border
             maxLine = Math.Max(maxLine, ft.WidthIncludingTrailingWhitespace);
         }
 
-        var chrome = _detail.Padding.Left
+        var chrome = _detailFrame.BorderThickness.Left
+            + _detailFrame.BorderThickness.Right
+            + _detailFrame.Padding.Left
+            + _detailFrame.Padding.Right
+            + _detail.Padding.Left
             + _detail.Padding.Right
             + DesignMetrics.SettingsScrollBarWidth
             + DesignMetrics.From96(4);
