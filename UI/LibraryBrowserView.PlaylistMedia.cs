@@ -475,7 +475,6 @@ internal sealed partial class LibraryBrowserView
             ref _playlistBusyEnumerateFadeTicket,
             busy,
             UiStrings.PlaylistBusyEnumerate);
-        RaisePlaylistMediaBusyChanged();
     }
 
     private void SetPlaylistWaveBusy(bool busy)
@@ -492,7 +491,6 @@ internal sealed partial class LibraryBrowserView
             ref _playlistBusyWaveformFadeTicket,
             busy,
             UiStrings.PlaylistBusyWaveform);
-        RaisePlaylistMediaBusyChanged();
     }
 
     private void SetPlaylistLoudnessBusy(bool busy)
@@ -509,19 +507,6 @@ internal sealed partial class LibraryBrowserView
             ref _playlistBusyLoudnessFadeTicket,
             busy,
             UiStrings.PlaylistBusyLoudness);
-        RaisePlaylistMediaBusyChanged();
-    }
-
-    private void RaisePlaylistMediaBusyChanged()
-    {
-        var busy = IsPlaylistMediaBusy;
-        if (busy == _playlistMediaBusyNotified)
-        {
-            return;
-        }
-
-        _playlistMediaBusyNotified = busy;
-        PlaylistMediaBusyChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void SyncPlaylistBusyBadge(

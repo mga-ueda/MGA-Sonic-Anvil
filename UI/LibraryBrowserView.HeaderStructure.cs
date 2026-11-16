@@ -6,7 +6,6 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using System.Xml.Linq;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Domain;
 
@@ -622,7 +621,7 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
-        var items = FlattenVisibleTreeItems(_structureXmlTree.Items);
+        var items = EditorHeaderChunkStripView.FlattenVisibleTreeItems(_structureXmlTree.Items);
         if (items.Count == 0)
         {
             return;
@@ -1021,7 +1020,7 @@ internal sealed partial class LibraryBrowserView
     {
         if (item.Tag is not WaveStructureNode node)
         {
-            return SanitizeCopyText(item.Header switch
+            return EditorHeaderChunkStripView.SanitizeCopyText(item.Header switch
             {
                 TextBlock block => block.Text,
                 string text => text,
@@ -1048,22 +1047,6 @@ internal sealed partial class LibraryBrowserView
             ? new string(' ', depth * WaveStructureNode.TreeIndentSpaces)
             : string.Empty;
         return indent + name + "\t" + WaveStructureNode.FormatSize(node.Size);
-    }
-
-    /// <summary>クリップボードは埋め込み NUL を嫌うので除去する。</summary>
-    private static string? SanitizeCopyText(string? text)
-    {
-        if (string.IsNullOrEmpty(text))
-        {
-            return text;
-        }
-
-        if (text.IndexOf('\0') < 0)
-        {
-            return text;
-        }
-
-        return text.Replace('\0', '?');
     }
 
     private void ClearHeaderStructureTreeSelectAllMarks()
@@ -1278,31 +1261,7 @@ internal sealed partial class LibraryBrowserView
     }
 
     private List<TreeViewItem> FlattenVisibleStructureItems() =>
-        FlattenVisibleTreeItems(_structureTree.Items);
-
-    private static List<TreeViewItem> FlattenVisibleTreeItems(ItemCollection roots)
-    {
-        var list = new List<TreeViewItem>();
-        void Walk(ItemCollection items)
-        {
-            foreach (var raw in items)
-            {
-                if (raw is not TreeViewItem item)
-                {
-                    continue;
-                }
-
-                list.Add(item);
-                if (item.IsExpanded && item.Items.Count > 0)
-                {
-                    Walk(item.Items);
-                }
-            }
-        }
-
-        Walk(roots);
-        return list;
-    }
+        EditorHeaderChunkStripView.FlattenVisibleTreeItems(_structureTree.Items);
 
     private void RememberStructureChunkPath(TreeViewItem item)
     {

@@ -673,10 +673,9 @@ internal static class WaveContainerStructure
             }
 
             var size = (uint)Math.Min(node.Size, uint.MaxValue);
-            var errors = new List<string>();
             var loaded = fileKind == AudioFileKind.Aiff
                 ? ReadAiffChunk(reader, node.Id, node.Offset, dataStart, size)
-                : ReadWaveChunk(reader, node.Id, node.Offset, dataStart, size, errors);
+                : ReadWaveChunk(reader, node.Id, node.Offset, dataStart, size);
             var kind = loaded.Kind;
             var content = loaded.Content;
             // INFO 子は走査時に Label へフィールド名を付けている。本文も従来の表形式に揃える。
@@ -982,19 +981,12 @@ internal static class WaveContainerStructure
         string id,
         long chunkOffset,
         long dataStart,
-        uint size,
-        List<string> errors)
+        uint size)
     {
         var stream = reader.BaseStream;
         stream.Position = dataStart;
 
-        // LIST の本文は EnsureContent → LoadListSummaryContent。ここでは葉だけ。
-        if (id is "LIST" or "list")
-        {
-            return LoadListSummaryContent(
-                PendingChunk(id, id, chunkOffset, size));
-        }
-
+        // LIST 本文は EnsureContent → LoadListSummaryContent（ここへは来ない）。
         if (id == "fmt ")
         {
             return DecodeFmt(reader, chunkOffset, size);

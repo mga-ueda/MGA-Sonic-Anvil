@@ -510,9 +510,6 @@ internal static class DesignMetrics
     /// <summary>エディタのヘッダ情報・詳細列の下限。</summary>
     public static double EditorHeaderDetailMinWidth => From96(120);
 
-    /// <summary>エディタのヘッダ情報・詳細列の目安上限（履歴帯と同じ。サイド列は内容 Fit）。</summary>
-    public static double EditorHeaderDetailMaxWidth => HistoryStripWidth;
-
     /// <summary>
     /// インライン詳細を出しても大きなタイムコード側に残したい最小幅。
     /// これ未満なら詳細は波形とレベルメーターのあいだへ。

@@ -164,9 +164,6 @@ internal sealed class EditorHeaderChunkStripView : Border
     public double DetailFittedWidth =>
         string.IsNullOrEmpty(_detailText) ? 0 : Math.Max(_detailHeldWidth, _detailFittedWidth);
 
-    /// <summary>詳細を帯の右側に出すか。false のときは呼び出し側が波形へ出す。</summary>
-    public bool InlineDetailVisible => _inlineDetail;
-
     public event EventHandler? DetailChanged;
 
     private void ApplyAlwaysVisibleScrollBarStyle(Control host)
@@ -207,8 +204,8 @@ internal sealed class EditorHeaderChunkStripView : Border
         MaxWidth = DesignMetrics.EditorHeaderChunkStripMaxWidth;
     }
 
-    /// <summary>解析結果だけ捨てる。呼び出し側がオフ中の再解析を止めるために使う。</summary>
-    public void DiscardContent()
+    /// <summary>解析結果だけ捨てる（Clear から呼ばれる）。</summary>
+    private void DiscardContent()
     {
         ClearSelectAllMarks();
         _loadedPath = null;
@@ -839,7 +836,8 @@ internal sealed class EditorHeaderChunkStripView : Border
         return indent + name + "\t" + WaveStructureNode.FormatSize(node.Size);
     }
 
-    private static string? SanitizeCopyText(string? text)
+    /// <summary>クリップボードは埋め込み NUL を嫌うので除去する。</summary>
+    internal static string? SanitizeCopyText(string? text)
     {
         if (string.IsNullOrEmpty(text))
         {
