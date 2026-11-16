@@ -34,7 +34,7 @@ public partial class MainWindow
         var deferWash = IsLibraryMaximized;
         if (deferWash)
         {
-            _libraryFolderShowInProgress = true;
+            SetLibraryFolderShowInProgress(true);
         }
 
         try
@@ -138,7 +138,7 @@ public partial class MainWindow
                     batchGeneration,
                     _libraryFolderShowGeneration))
             {
-                _libraryFolderShowInProgress = false;
+                SetLibraryFolderShowInProgress(false);
                 await FlushPendingLibraryWashAsync().ConfigureAwait(true);
             }
         }
@@ -234,7 +234,7 @@ public partial class MainWindow
         LibraryPlaylistDocuments.ApplyFromSettings(AppStorage.Settings);
         var generation = ++_libraryFolderShowGeneration;
         _libraryFolderPlaySession = null;
-        _libraryFolderShowInProgress = true;
+        SetLibraryFolderShowInProgress(true);
         ClearPendingLibraryWash();
         // 前の追加が残した進捗表示を消す（世代不一致の finally では消さないため）。
         ClearOpenStatus();
@@ -252,7 +252,7 @@ public partial class MainWindow
         {
             if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration))
             {
-                _libraryFolderShowInProgress = false;
+                SetLibraryFolderShowInProgress(false);
                 await FlushPendingLibraryWashAsync().ConfigureAwait(true);
             }
 
@@ -581,7 +581,7 @@ public partial class MainWindow
             if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration))
             {
                 _libraryFolderPlaySession = null;
-                _libraryFolderShowInProgress = false;
+                SetLibraryFolderShowInProgress(false);
                 if (showProgress)
                 {
                     ClearOpenStatus();
@@ -781,9 +781,15 @@ public partial class MainWindow
         _libraryFolderShowGeneration++;
         _libraryArtworkShowGeneration++;
         _libraryFolderPlaySession = null;
-        _libraryFolderShowInProgress = false;
+        SetLibraryFolderShowInProgress(false);
         // 差し替え側のバッチが新しい保留を積む。旧バッチの Flush は世代不一致で走らない。
         ClearPendingLibraryWash();
         ClearOpenStatus();
+    }
+
+    private void SetLibraryFolderShowInProgress(bool inProgress)
+    {
+        _libraryFolderShowInProgress = inProgress;
+        LibraryBrowser.SetPlaylistEnumerateBusy(inProgress);
     }
 }

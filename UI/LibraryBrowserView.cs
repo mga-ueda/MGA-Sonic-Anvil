@@ -302,6 +302,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
     private CancellationTokenSource? _playlistWaveCts;
     private int _playlistWaveGeneration;
+    private bool _playlistEnumerateBusy;
     private bool _playlistWaveBusy;
     private CancellationTokenSource? _playlistLoudnessCts;
     private int _playlistLoudnessGeneration;
@@ -424,11 +425,12 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>プレイリストの選択集合が変わった。複数選択の平均ラウドネス用。</summary>
     public event EventHandler? PlaylistSelectionChanged;
 
-    /// <summary>波形描画・ラウドネス計測の待ち状態が変わった。</summary>
+    /// <summary>ファイル列挙・波形描画・ラウドネス計測の待ち状態が変わった。</summary>
     public event EventHandler? PlaylistMediaBusyChanged;
 
-    /// <summary>プレイリストの波形描画またはラウドネス取得が進行中。</summary>
-    public bool IsPlaylistMediaBusy => _playlistWaveBusy || _playlistLoudnessBusy;
+    /// <summary>プレイリストのファイル列挙・波形描画・ラウドネス取得が進行中。</summary>
+    public bool IsPlaylistMediaBusy =>
+        _playlistEnumerateBusy || _playlistWaveBusy || _playlistLoudnessBusy;
 
     /// <summary>ダブルクリック。停止中でも再生する。</summary>
     public event EventHandler<DocumentSession>? SessionPlayRequested;

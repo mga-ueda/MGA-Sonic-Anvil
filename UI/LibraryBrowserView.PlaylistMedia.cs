@@ -460,6 +460,18 @@ internal sealed partial class LibraryBrowserView
         SetPlaylistLoudnessBusy(false);
     }
 
+    /// <summary>フォルダ走査などファイル列挙の待ち表示。</summary>
+    public void SetPlaylistEnumerateBusy(bool busy)
+    {
+        if (_playlistEnumerateBusy == busy)
+        {
+            return;
+        }
+
+        _playlistEnumerateBusy = busy;
+        RaisePlaylistMediaBusyChanged();
+    }
+
     private void SetPlaylistWaveBusy(bool busy)
     {
         if (_playlistWaveBusy == busy)
@@ -605,18 +617,38 @@ internal sealed partial class LibraryBrowserView
     {
         if (_playlistBusyBadge.Child is TextBlock text)
         {
-            text.Text = FormatPlaylistBusyDetail(_playlistWaveBusy, _playlistLoudnessBusy);
+            text.Text = FormatPlaylistBusyDetail(
+                _playlistEnumerateBusy,
+                _playlistWaveBusy,
+                _playlistLoudnessBusy);
         }
     }
 
-    internal static string FormatPlaylistBusyDetail(bool waveBusy, bool loudnessBusy) =>
-        (waveBusy, loudnessBusy) switch
+    internal static string FormatPlaylistBusyDetail(
+        bool enumerateBusy,
+        bool waveBusy,
+        bool loudnessBusy)
+    {
+        var parts = new List<string>(3);
+        if (enumerateBusy)
         {
-            (true, true) => UiStrings.PlaylistBusyWaveformAndLoudness,
-            (true, false) => UiStrings.PlaylistBusyWaveform,
-            (false, true) => UiStrings.PlaylistBusyLoudness,
-            _ => string.Empty,
-        };
+            parts.Add(UiStrings.PlaylistBusyEnumerate);
+        }
+
+        if (waveBusy)
+        {
+            parts.Add(UiStrings.PlaylistBusyWaveform);
+        }
+
+        if (loudnessBusy)
+        {
+            parts.Add(UiStrings.PlaylistBusyLoudness);
+        }
+
+        return parts.Count == 0
+            ? string.Empty
+            : string.Join(UiStrings.PlaylistBusyDetailSeparator, parts);
+    }
 
     internal static Border CreatePlaylistBusyBadge()
     {
