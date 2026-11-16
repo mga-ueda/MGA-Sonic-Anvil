@@ -366,8 +366,8 @@ public partial class MainWindow
 
     /// <summary>
     /// レベルメーター／スペアナ／ラウドネス／ゴニオ／WAAPI 表記と、エディタの波形スクロール。
-    /// 波形が無いときは出さない。読み込みは 1 秒フェードイン、閉じたら 1 秒フェードアウト。
-    /// プレイヤーは音声で動き始めたら即表示。突入は消えた状態から。
+    /// 波形が無いときは出さない。同モード内の読み込みは 1 秒フェードイン、全部閉じは 1 秒フェードアウト。
+    /// エディタ↔プレイヤーのモード切替はスパッと。プレイヤーは音声で動き始めたら即表示。
     /// </summary>
     private void SyncPlayerMeterFade()
     {
@@ -382,15 +382,18 @@ public partial class MainWindow
 
         if (leaving)
         {
+            // プレイヤー→エディタ：即。
             ApplyPlayerMeterFade(visible: show, instant: true);
             _playerMetersShown = show;
             return;
         }
 
-        if (LibraryPlayerMode.SnapPlayerMetersHiddenOnEnter(entering, instantReveal))
+        if (entering)
         {
-            ApplyPlayerMeterFade(visible: false, instant: true);
-            _playerMetersShown = false;
+            // エディタ→プレイヤー：即。空リスト突入の「消してからフェードイン」はモード切替では使わない。
+            ApplyPlayerMeterFade(visible: show, instant: true);
+            _playerMetersShown = show;
+            return;
         }
 
         if (_playerMetersShown == show)
@@ -406,7 +409,7 @@ public partial class MainWindow
             return;
         }
 
-        // インは再生中即表示／停止中 1 秒。アウトは常に 1 秒（突入スナップは上で処理済み）。
+        // 同モード内：インは再生中即／停止中 1 秒。アウト（全部閉じた等）は 1 秒フェード。
         ApplyPlayerMeterFade(show, LibraryPlayerMode.InstantPlayerMeterFade(show, instantReveal));
         _playerMetersShown = show;
     }
@@ -2982,6 +2985,9 @@ public partial class MainWindow
         SyncEditorChromeFade();
         if (show)
         {
+            // H のたびに1行目詳細。Clear→再読込でも Collapse 中 Sync を避けるため Visible 後にもう一度。
+            HeaderChunkStrip.SelectFirstRowDetail();
+            SyncEditorHeaderDetailPlacement();
             // Load／Fit 後にフォーカス（プレイヤー側の Loaded 遅延と同じ）。
             Dispatcher.BeginInvoke(
                 HeaderChunkStrip.FocusTree,
