@@ -116,6 +116,7 @@ public partial class MainWindow
 
         _tabTimeTable?.RefreshAppearance();
         LibraryBrowser.RefreshAppearance();
+        ApplyEditorHeaderDetailSideFocusLineBrush();
         AcrylicBackdrop.RefreshTracked();
     }
 

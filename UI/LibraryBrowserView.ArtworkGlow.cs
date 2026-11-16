@@ -357,7 +357,7 @@ internal sealed partial class LibraryBrowserView
         waveTo.Opacity = to.Opacity;
     }
 
-    private static Border CreatePaneFocusLine()
+    internal static Border CreatePaneFocusLine()
     {
         var line = new Border
         {

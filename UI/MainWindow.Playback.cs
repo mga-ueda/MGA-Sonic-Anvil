@@ -2816,6 +2816,7 @@ public partial class MainWindow
             // 全画面オン同士: 枠を外さず維持（タイトルバーを出さない）。
             ApplyWaveformFullscreenFrame();
             SyncShellFullscreen();
+            SyncEditorHeaderDetailPlacement();
             return;
         }
 
@@ -2824,6 +2825,7 @@ public partial class MainWindow
             RememberWindowFrameBeforeFullscreen(fromLibrary: IsLibraryMaximized);
             ApplyWaveformFullscreenFrame();
             SyncShellFullscreen();
+            SyncEditorHeaderDetailPlacement();
             return;
         }
 
@@ -2834,6 +2836,7 @@ public partial class MainWindow
         }
 
         SyncShellFullscreen();
+        SyncEditorHeaderDetailPlacement();
     }
 
     internal bool IsWaveformMaximized =>
@@ -3030,6 +3033,9 @@ public partial class MainWindow
         {
             Dispatcher.BeginInvoke(AppStorage.Save, DispatcherPriority.Background);
         }
+
+        // 全画面オン／オフでヘッダ情報の置き場（帯右⇔波形右上）を切り替える。
+        SyncEditorHeaderDetailPlacement();
 
         if (mode == WaveformMaximizeMode.Library)
         {

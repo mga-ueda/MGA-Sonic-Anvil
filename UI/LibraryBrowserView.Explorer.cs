@@ -991,7 +991,7 @@ internal sealed partial class LibraryBrowserView
         _explorerTypeaheadToast.Placement = PlacementMode.Center;
     }
 
-    private static void ApplyPaneTitleStyle(TextBlock label, Thickness? margin = null)
+    internal static void ApplyPaneTitleStyle(TextBlock label, Thickness? margin = null)
     {
         label.Margin = margin ?? new Thickness(8, 6, 8, 2);
         label.FontSize = 11;

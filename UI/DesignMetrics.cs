@@ -498,8 +498,20 @@ internal static class DesignMetrics
     /// <summary>エディタのヘッダ情報（チャンク帯）。内容幅フィットの下限。</summary>
     public static double EditorHeaderChunkStripMinWidth => From96(72);
 
-    /// <summary>エディタのヘッダ情報の上限（履歴帯と同じ）。</summary>
+    /// <summary>エディタのヘッダ情報（チャンク列のみ）の上限（履歴帯と同じ）。</summary>
     public static double EditorHeaderChunkStripMaxWidth => HistoryStripWidth;
+
+    /// <summary>エディタのヘッダ情報・詳細列の下限。</summary>
+    public static double EditorHeaderDetailMinWidth => From96(120);
+
+    /// <summary>エディタのヘッダ情報・詳細列の目安上限（履歴帯と同じ。サイド列は内容 Fit）。</summary>
+    public static double EditorHeaderDetailMaxWidth => HistoryStripWidth;
+
+    /// <summary>
+    /// インライン詳細を出しても大きなタイムコード側に残したい最小幅。
+    /// これ未満なら詳細は波形とレベルメーターのあいだへ。
+    /// </summary>
+    public static double EditorPositionSlotMinWidthForHeaderDetail => From96(168);
 
     /// <summary>履歴プレビュー1行。</summary>
     public static double HistoryStripRowHeight => From96(14);

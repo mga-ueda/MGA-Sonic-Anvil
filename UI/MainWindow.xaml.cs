@@ -1004,6 +1004,7 @@ public partial class MainWindow : Window
         _colorDevPanel?.ApplyLocalizedText();
         _tabTimeTable?.ApplyLocalizedText();
         LibraryBrowser.ApplyLocalizedText();
+        ApplyEditorHeaderDetailSideLocalizedText();
         RebuildMainMenuBar();
     }
 

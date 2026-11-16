@@ -1,6 +1,9 @@
+using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
@@ -389,6 +392,12 @@ public partial class MainWindow
             BindVstInsertRackSession(false);
         }
 
+        // サイド情報も同じフェードで消す（全タブ閉じなど）。出しは SyncEditorHeaderDetailPlacement。
+        if (!show && EditorHeaderDetailSideHost.Visibility == Visibility.Visible)
+        {
+            ApplyEditorChromeTarget(EditorHeaderDetailSideHost, visible: false, instant);
+        }
+
         if (!show)
         {
             if (instant)
@@ -459,20 +468,629 @@ public partial class MainWindow
         HeaderChunkStrip.Clear();
         EditorPositionTimecode.Clear();
         BindVstInsertRackSession(false);
+        HideEditorHeaderDetailSide(forgetHeld: true);
     }
 
     private UIElement[] EditorChromeFadeTargets() =>
-        [HistoryStrip, HeaderChunkStrip, EditorPositionTimecodeHost, VstInsertRack];
+        [HistoryStrip, HeaderChunkStrip, EditorPositionTimecodeHost, VstInsertRack, EditorHeaderDetailSideHost];
 
+    /// <summary>
+    /// エディタヘッダのチャンク帯。オフ時は解析しない（プレイヤーのヘッダOFFと同じ）。
+    /// 既に空なら Clear／配置同期もスキップし、文書切替などが帯の重さに乗らないようにする。
+    /// </summary>
     private void RefreshEditorHeaderChunks(bool show)
     {
         if (!show)
         {
+            if (!HeaderChunkStrip.HasContent
+                && EditorHeaderDetailSideHost.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            // H オフ／chrome 非表示：中身と幅高水位を捨てる（帯コメント通り）。
             HeaderChunkStrip.Clear();
+            SyncEditorHeaderDetailPlacement();
             return;
         }
 
         HeaderChunkStrip.LoadFromPath(_document?.SourcePath);
+        SyncEditorHeaderDetailPlacement();
+    }
+
+    private void HeaderChunkStrip_DetailChanged(object sender, EventArgs e) =>
+        SyncEditorHeaderDetailPlacement();
+
+    private void TransportChromeHost_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        SyncEditorHeaderDetailPlacement();
+
+    /// <summary>サイド情報列の幅高水位。H トグル／エディタ退出で忘れる。</summary>
+    private double _editorHeaderDetailSideHeldWidth;
+    /// <summary>サイド情報のスクロールバー／見出し／フォーカス帯を一度だけ付ける。</summary>
+    private bool _editorHeaderDetailSideScrollStyled;
+    /// <summary>プレイヤー情報列と同じ上端フォーカスグラデ。</summary>
+    private Border? _editorHeaderDetailSideFocusLine;
+
+    /// <summary>
+    /// ヘッダ情報の詳細。帯右に載る余裕があればインライン、無ければ波形とレベルメーターのあいだ。
+    /// 全画面（F11／F12 のレイアウト全画面オン）は常にサイド列。
+    /// </summary>
+    private void SyncEditorHeaderDetailPlacement()
+    {
+        var showChunks = !IsLibraryMaximized
+            && HeaderChunkStrip.Visibility == Visibility.Visible
+            && AppStorage.Settings.EditorShowHeaderStructure;
+        var detail = showChunks ? HeaderChunkStrip.DetailText : string.Empty;
+        if (!showChunks || string.IsNullOrEmpty(detail))
+        {
+            HeaderChunkStrip.SetInlineDetailVisible(false);
+            HideEditorHeaderDetailSide(forgetHeld: !showChunks);
+            return;
+        }
+
+        // iXML 等は色分けツリーが必要。帯内平文ではなくサイドへ。
+        var preferSide = HeaderChunkStrip.SelectedNode is
+        {
+            Kind: WaveStructureContentKind.Xml,
+            IsInvalid: false,
+        };
+        var canInline = !preferSide
+            && !IsWaveformMaximized
+            && CanFitEditorHeaderDetailInline();
+        HeaderChunkStrip.SetInlineDetailVisible(canInline);
+        if (canInline)
+        {
+            HideEditorHeaderDetailSide(forgetHeld: false);
+        }
+        else
+        {
+            ShowEditorHeaderDetailSide(HeaderChunkStrip.SelectedNode, detail);
+        }
+    }
+
+    private bool CanFitEditorHeaderDetailInline()
+    {
+        var hostW = TransportChromeHost.ActualWidth;
+        if (hostW <= 1)
+        {
+            return false;
+        }
+
+        var treeW = HeaderChunkStrip.TreeFittedWidth;
+        var detailW = HeaderChunkStrip.DetailFittedWidth;
+        var headerMargin = HeaderChunkStrip.Margin.Left + HeaderChunkStrip.Margin.Right;
+        var leftIfInline = hostW - EditorChromeRightOccupiedWidth() - treeW - detailW - headerMargin;
+        return leftIfInline >= DesignMetrics.EditorPositionSlotMinWidthForHeaderDetail;
+    }
+
+    private double EditorChromeRightOccupiedWidth()
+    {
+        static double WidthOf(FrameworkElement el) =>
+            el.Visibility == Visibility.Visible
+                ? el.ActualWidth + el.Margin.Left + el.Margin.Right
+                : 0;
+
+        return WidthOf(HistoryStrip)
+            + WidthOf(VstInsertRack)
+            + WidthOf(LoudnessMeter)
+            + WidthOf(MonitorToggles)
+            + WidthOf(Spectrum);
+    }
+
+    private void ShowEditorHeaderDetailSide(WaveStructureNode? node, string text)
+    {
+        EnsureEditorHeaderDetailSideScrollReveal();
+        ApplyEditorHeaderDetailSideContent(node, text);
+        var need = Math.Max(
+            DesignMetrics.EditorHeaderDetailMinWidth,
+            HeaderChunkStrip.DetailFittedWidth);
+        _editorHeaderDetailSideHeldWidth = Math.Max(_editorHeaderDetailSideHeldWidth, need);
+        EditorHeaderDetailSideHost.MinWidth = DesignMetrics.EditorHeaderDetailMinWidth;
+        EditorHeaderDetailSideHost.Width = _editorHeaderDetailSideHeldWidth;
+
+        var revealing = EditorHeaderDetailSideHost.Visibility != Visibility.Visible
+            || EditorHeaderDetailSideHost.Opacity < 0.01;
+        if (revealing)
+        {
+            // 位置を決めてから見せる（上→中央のジャンプを見せない）。
+            EditorHeaderDetailSideHost.BeginAnimation(UIElement.OpacityProperty, null);
+            EditorHeaderDetailSideHost.Opacity = 0;
+            EditorHeaderDetailSideHost.Visibility = Visibility.Visible;
+            EditorHeaderDetailSideHost.IsHitTestVisible = false;
+            EditorHeaderDetailSideHost.UpdateLayout();
+            SyncEditorHeaderDetailSideVerticalAlign();
+            LibraryPlayerMode.FadeElementOpacity(
+                EditorHeaderDetailSideHost,
+                1,
+                instant: false,
+                hitTestVisible: true);
+            return;
+        }
+
+        SyncEditorHeaderDetailSideVerticalAlign();
+    }
+
+    private void ApplyEditorHeaderDetailSideContent(WaveStructureNode? node, string text)
+    {
+        if (node is { Kind: WaveStructureContentKind.Xml, IsInvalid: false })
+        {
+            var meta = WaveStructureNode.FormatKeyValueTable(
+            [
+                ("Offset", string.Create(CultureInfo.InvariantCulture, $"0x{node.Offset:X} ({node.Offset})")),
+                ("Size", WaveStructureNode.FormatSize(node.Size)),
+            ]);
+            WaveStructureXmlTree.EnsureTreeChrome(EditorHeaderDetailSideXml);
+            // EnsureTreeChrome 済みでもプレイヤー情報列と同じガターを維持。
+            EditorHeaderDetailSideXml.Padding = new Thickness(4, 4, 4, 6);
+            // 外側 ScrollViewer に任せる（内側バーだと塊の高さが足りず見切れる）。
+            ScrollViewer.SetVerticalScrollBarVisibility(
+                EditorHeaderDetailSideXml,
+                ScrollBarVisibility.Disabled);
+            if (WaveStructureXmlTree.TryPopulate(EditorHeaderDetailSideXml, node.Content))
+            {
+                EditorHeaderDetailSideMeta.Text = meta;
+                EditorHeaderDetailSideMeta.Visibility = Visibility.Visible;
+                EditorHeaderDetailSide.Text = string.Empty;
+                EditorHeaderDetailSide.ClearValue(FrameworkElement.HeightProperty);
+                EditorHeaderDetailSide.Visibility = Visibility.Collapsed;
+                EditorHeaderDetailSideXml.Visibility = Visibility.Visible;
+                return;
+            }
+        }
+
+        EditorHeaderDetailSideXml.Items.Clear();
+        EditorHeaderDetailSideXml.Visibility = Visibility.Collapsed;
+        EditorHeaderDetailSideMeta.Text = string.Empty;
+        EditorHeaderDetailSideMeta.Visibility = Visibility.Collapsed;
+        EditorHeaderDetailSide.Text = text;
+        EditorHeaderDetailSide.Height = MeasureEditorHeaderDetailSideTextHeight(text);
+        EditorHeaderDetailSide.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>StackPanel 内の TextBox は自動で全文高にならないので測って渡す。</summary>
+    private double MeasureEditorHeaderDetailSideTextHeight(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return LibraryBrowserView.LibraryListFontSize;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(EditorHeaderDetailSide).PixelsPerDip;
+        if (dpi <= 0)
+        {
+            dpi = 1;
+        }
+
+        var typeface = new Typeface(
+            new FontFamily("Consolas"),
+            FontStyles.Normal,
+            FontWeights.Normal,
+            FontStretches.Normal);
+        var fontSize = LibraryBrowserView.LibraryListFontSize;
+        double height = 0;
+        foreach (var line in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            var ft = new FormattedText(
+                line.Length == 0 ? " " : line,
+                CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                fontSize,
+                Brushes.Black,
+                dpi);
+            height += Math.Max(fontSize, ft.Height);
+        }
+
+        return Math.Max(fontSize, height + 2);
+    }
+
+    private void HideEditorHeaderDetailSide(bool forgetHeld)
+    {
+        if (forgetHeld)
+        {
+            _editorHeaderDetailSideHeldWidth = 0;
+        }
+
+        if (EditorHeaderDetailSideHost.Visibility == Visibility.Collapsed
+            && EditorHeaderDetailSide.Text.Length == 0
+            && EditorHeaderDetailSideHost.Width <= 0)
+        {
+            return;
+        }
+
+        EditorHeaderDetailSide.Text = string.Empty;
+        EditorHeaderDetailSideMeta.Text = string.Empty;
+        EditorHeaderDetailSideMeta.Visibility = Visibility.Collapsed;
+        EditorHeaderDetailSideXml.Items.Clear();
+        EditorHeaderDetailSideXml.Visibility = Visibility.Collapsed;
+        EditorHeaderDetailSide.Visibility = Visibility.Visible;
+        EditorHeaderDetailSideHost.BeginAnimation(UIElement.OpacityProperty, null);
+        EditorHeaderDetailSideHost.Opacity = 0;
+        EditorHeaderDetailSideHost.Visibility = Visibility.Collapsed;
+        EditorHeaderDetailSideHost.IsHitTestVisible = false;
+        EditorHeaderDetailSideHost.MinWidth = 0;
+        EditorHeaderDetailSideHost.Width = 0;
+    }
+
+    private void EditorHeaderDetailSideHost_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        SyncEditorHeaderDetailSideVerticalAlign();
+
+    /// <summary>
+    /// プレイヤー情報列と同じく上寄せ。溢れるときだけスクロール。
+    /// 高さは中身の自然高のみ使い、不足 Height で切らない。
+    /// </summary>
+    private void SyncEditorHeaderDetailSideVerticalAlign()
+    {
+        if (EditorHeaderDetailSideHost.Visibility != Visibility.Visible
+            || EditorHeaderDetailSideHost.ActualHeight <= 1)
+        {
+            return;
+        }
+
+        var titleH = EditorHeaderDetailSideTitle.Visibility == Visibility.Visible
+            ? EditorHeaderDetailSideTitle.DesiredSize.Height
+                + EditorHeaderDetailSideTitle.Margin.Top
+                + EditorHeaderDetailSideTitle.Margin.Bottom
+            : 0;
+        if (titleH <= 0)
+        {
+            EditorHeaderDetailSideTitle.Measure(
+                new Size(Math.Max(0, EditorHeaderDetailSideHost.ActualWidth), double.PositiveInfinity));
+            titleH = EditorHeaderDetailSideTitle.DesiredSize.Height
+                + EditorHeaderDetailSideTitle.Margin.Top
+                + EditorHeaderDetailSideTitle.Margin.Bottom;
+        }
+
+        var avail = Math.Max(0, EditorHeaderDetailSideHost.ActualHeight - titleH);
+        var width = Math.Max(0, EditorHeaderDetailSideHost.ActualWidth);
+
+        EditorHeaderDetailSideScroll.ClearValue(FrameworkElement.HeightProperty);
+        EditorHeaderDetailSideScroll.VerticalAlignment = VerticalAlignment.Stretch;
+        EditorHeaderDetailSideStack.Measure(new Size(width, double.PositiveInfinity));
+        var need = EditorHeaderDetailSideStack.DesiredSize.Height;
+
+        if (need <= avail + 0.5)
+        {
+            EditorHeaderDetailSideScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+            EditorHeaderDetailSideScroll.MaxHeight = double.PositiveInfinity;
+        }
+        else
+        {
+            EditorHeaderDetailSideScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            EditorHeaderDetailSideScroll.MaxHeight = avail;
+        }
+    }
+
+    private void EnsureEditorHeaderDetailSideScrollReveal()
+    {
+        if (_editorHeaderDetailSideScrollStyled)
+        {
+            ApplyEditorHeaderDetailSideFocusLineBrush();
+            SyncEditorHeaderDetailSideFocusChrome();
+            return;
+        }
+
+        // プレイヤー情報列と同じ見出し／余白／タイポ／フォーカスグラデ。
+        LibraryBrowserView.ApplyPaneTitleStyle(EditorHeaderDetailSideTitle, new Thickness(8, 6, 8, 8));
+        EditorHeaderDetailSideTitle.Text = UiStrings.LibraryHeaderStructureDetailLabel;
+
+        EditorHeaderDetailSideMeta.Margin = new Thickness(8, 6, 8, 2);
+        EditorHeaderDetailSideMeta.FontFamily = new FontFamily("Consolas");
+        LibraryBrowserView.ApplyHeaderStructureDetailTypography(EditorHeaderDetailSideMeta);
+        LibraryBrowserView.ApplyStructureDetailLineHeight(
+            EditorHeaderDetailSideMeta,
+            LibraryBrowserView.LibraryListFontSize);
+
+        EditorHeaderDetailSide.Padding = new Thickness(8, 6, 8, 8);
+        var detailStyle = new Style(typeof(TextBox));
+        detailStyle.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Normal));
+        detailStyle.Setters.Add(new Setter(Control.FontStyleProperty, FontStyles.Normal));
+        detailStyle.Setters.Add(new Setter(Control.FontStretchProperty, FontStretches.Normal));
+        EditorHeaderDetailSide.Style = detailStyle;
+        LibraryBrowserView.ApplyHeaderStructureDetailTypography(EditorHeaderDetailSide);
+        LibraryBrowserView.ApplyStructureDetailLineHeight(
+            EditorHeaderDetailSide,
+            LibraryBrowserView.LibraryListFontSize);
+
+        LibraryBrowserView.ApplyHeaderStructureDetailTypography(EditorHeaderDetailSideXml);
+
+        _editorHeaderDetailSideFocusLine = LibraryBrowserView.CreatePaneFocusLine();
+        EditorHeaderDetailSideRoot.Children.Add(_editorHeaderDetailSideFocusLine);
+        EditorHeaderDetailSideHost.IsKeyboardFocusWithinChanged += (_, _) =>
+            SyncEditorHeaderDetailSideFocusChrome();
+
+        // プレイヤー情報列と同じ：ホバー中だけスクロールバーをフェード表示。
+        if (TryFindResource("LibraryScrollBarStyle") is Style style)
+        {
+            EditorHeaderDetailSideScroll.Resources[typeof(System.Windows.Controls.Primitives.ScrollBar)] = style;
+        }
+
+        LibraryScrollReveal.AttachOnHover(EditorHeaderDetailSideScroll);
+        EditorHeaderDetailSideXml.AddHandler(
+            TreeViewItem.ExpandedEvent,
+            new RoutedEventHandler((_, _) => SyncEditorHeaderDetailSideVerticalAlign()),
+            handledEventsToo: true);
+        EditorHeaderDetailSideXml.AddHandler(
+            TreeViewItem.CollapsedEvent,
+            new RoutedEventHandler((_, _) => SyncEditorHeaderDetailSideVerticalAlign()),
+            handledEventsToo: true);
+        _editorHeaderDetailSideScrollStyled = true;
+        SyncEditorHeaderDetailSideFocusChrome();
+    }
+
+    private void SyncEditorHeaderDetailSideFocusChrome()
+    {
+        if (_editorHeaderDetailSideFocusLine is null)
+        {
+            return;
+        }
+
+        _editorHeaderDetailSideFocusLine.Visibility =
+            EditorHeaderDetailSideHost.IsKeyboardFocusWithin
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+    }
+
+    private void ApplyEditorHeaderDetailSideFocusLineBrush()
+    {
+        if (_editorHeaderDetailSideFocusLine is not null)
+        {
+            _editorHeaderDetailSideFocusLine.Background =
+                LibraryBrowserView.CreatePaneFocusLineBrush();
+        }
+    }
+
+    private void ApplyEditorHeaderDetailSideLocalizedText()
+    {
+        if (_editorHeaderDetailSideScrollStyled)
+        {
+            EditorHeaderDetailSideTitle.Text = UiStrings.LibraryHeaderStructureDetailLabel;
+        }
+    }
+
+    /// <summary>詳細（サイド XML／テキスト、なければ帯内インライン）へフォーカス。</summary>
+    private void FocusEditorHeaderDetail()
+    {
+        if (EditorHeaderDetailSideHost.Visibility == Visibility.Visible
+            && EditorHeaderDetailSideHost.Opacity > 0.01)
+        {
+            if (EditorHeaderDetailSideXml.Visibility == Visibility.Visible)
+            {
+                if (EditorHeaderDetailSideXml.SelectedItem is TreeViewItem selected)
+                {
+                    selected.Focus();
+                    return;
+                }
+
+                if (EditorHeaderDetailSideXml.Items.OfType<TreeViewItem>().FirstOrDefault() is { } first)
+                {
+                    first.IsSelected = true;
+                    first.Focus();
+                    return;
+                }
+
+                EditorHeaderDetailSideXml.Focus();
+                return;
+            }
+
+            if (EditorHeaderDetailSide.Visibility == Visibility.Visible)
+            {
+                EditorHeaderDetailSide.Focus();
+                return;
+            }
+        }
+
+        HeaderChunkStrip.FocusInlineDetail();
+    }
+
+    /// <summary>
+    /// 情報エリアの↑↓／PgUp／PgDn。
+    /// XML 表示中は行選択、テキストはスクロール（プレイヤー情報列と同じ）。
+    /// </summary>
+    private bool TryHandleEditorHeaderDetailNavKey(Key key)
+    {
+        if (!IsEditorHeaderStructureDetailFocused)
+        {
+            return false;
+        }
+
+        if (EditorHeaderDetailSideXml.Visibility == Visibility.Visible
+            && EditorHeaderDetailSideHost.IsKeyboardFocusWithin
+            && key is Key.Up or Key.Down or Key.PageUp or Key.PageDown)
+        {
+            var delta = key switch
+            {
+                Key.Up => -1,
+                Key.Down => 1,
+                Key.PageUp => -EditorHeaderXmlDetailPageStep(),
+                Key.PageDown => EditorHeaderXmlDetailPageStep(),
+                _ => 0,
+            };
+            MoveEditorHeaderXmlSelection(delta);
+            return true;
+        }
+
+        if (HeaderChunkStrip.IsInlineDetailFocused)
+        {
+            return HeaderChunkStrip.TryScrollInlineDetail(key);
+        }
+
+        if (EditorHeaderDetailSide.Visibility == Visibility.Visible
+            && EditorHeaderDetailSideHost.IsKeyboardFocusWithin)
+        {
+            switch (key)
+            {
+                case Key.Up:
+                    EditorHeaderDetailSideScroll.LineUp();
+                    return true;
+                case Key.Down:
+                    EditorHeaderDetailSideScroll.LineDown();
+                    return true;
+                case Key.PageUp:
+                    EditorHeaderDetailSideScroll.PageUp();
+                    return true;
+                case Key.PageDown:
+                    EditorHeaderDetailSideScroll.PageDown();
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int EditorHeaderXmlDetailPageStep()
+    {
+        var row = Math.Max(1d, LibraryBrowserView.LibraryListFontSize + 1);
+        var visible = EditorHeaderDetailSideScroll is { ViewportHeight: > 1 }
+            ? Math.Max(1, (int)Math.Floor(EditorHeaderDetailSideScroll.ViewportHeight / row))
+            : 10;
+        return LibraryPlayerMode.PageStep(visible);
+    }
+
+    private void MoveEditorHeaderXmlSelection(int delta)
+    {
+        if (delta == 0 || EditorHeaderDetailSideXml.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        var items = EditorHeaderChunkStripView.FlattenVisibleTreeItems(EditorHeaderDetailSideXml.Items);
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var current = EditorHeaderDetailSideXml.SelectedItem as TreeViewItem;
+        var index = current is null ? -1 : items.IndexOf(current);
+        if (index < 0)
+        {
+            index = delta > 0 ? -1 : items.Count;
+        }
+
+        var next = Math.Clamp(index + delta, 0, items.Count - 1);
+        var item = items[next];
+        item.IsSelected = true;
+        item.BringIntoView();
+        if (IsEditorHeaderStructureDetailFocused)
+        {
+            item.Focus();
+        }
+    }
+
+    /// <summary>サイド XML ツリーの展開／折りたたみ（*／/／Shift+/・←→）。</summary>
+    private bool TryHandleEditorHeaderSideXmlExpandKey(Key key, ModifierKeys modifiers)
+    {
+        if (EditorHeaderDetailSideXml.Visibility != Visibility.Visible
+            || !EditorHeaderDetailSideHost.IsKeyboardFocusWithin)
+        {
+            return false;
+        }
+
+        if (LibraryPlayerMode.IsExplorerExpandAll(key, modifiers))
+        {
+            if (EditorHeaderDetailSideXml.SelectedItem is TreeViewItem selected)
+            {
+                ExpandEditorHeaderXmlSubtree(selected);
+            }
+
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsExplorerCollapseSubtree(key, modifiers))
+        {
+            if (EditorHeaderDetailSideXml.SelectedItem is TreeViewItem selected)
+            {
+                CollapseEditorHeaderXmlSubtree(selected);
+            }
+
+            return true;
+        }
+
+        if (LibraryPlayerMode.IsExplorerCollapseAllRoots(key, modifiers))
+        {
+            foreach (var root in EditorHeaderDetailSideXml.Items.OfType<TreeViewItem>())
+            {
+                CollapseEditorHeaderXmlSubtree(root);
+            }
+
+            return true;
+        }
+
+        if (key is Key.Left or Key.Right && modifiers == ModifierKeys.None)
+        {
+            return TryArrowExpandCollapseEditorHeaderXml(key);
+        }
+
+        return false;
+    }
+
+    private bool TryArrowExpandCollapseEditorHeaderXml(Key key)
+    {
+        if (EditorHeaderDetailSideXml.SelectedItem is not TreeViewItem item || !item.HasItems)
+        {
+            return false;
+        }
+
+        if (key == Key.Right)
+        {
+            if (!item.IsExpanded)
+            {
+                item.IsExpanded = true;
+                return true;
+            }
+
+            if (item.Items.OfType<TreeViewItem>().FirstOrDefault() is { } firstChild)
+            {
+                firstChild.IsSelected = true;
+                firstChild.BringIntoView();
+                firstChild.Focus();
+            }
+
+            return true;
+        }
+
+        if (item.IsExpanded)
+        {
+            item.IsExpanded = false;
+            return true;
+        }
+
+        if (ItemsControl.ItemsControlFromItemContainer(item) is TreeViewItem parent)
+        {
+            parent.IsSelected = true;
+            parent.BringIntoView();
+            parent.Focus();
+            return true;
+        }
+
+        return true;
+    }
+
+    private static void ExpandEditorHeaderXmlSubtree(TreeViewItem item)
+    {
+        if (!item.HasItems)
+        {
+            return;
+        }
+
+        item.IsExpanded = true;
+        foreach (var child in item.Items.OfType<TreeViewItem>())
+        {
+            ExpandEditorHeaderXmlSubtree(child);
+        }
+    }
+
+    private static void CollapseEditorHeaderXmlSubtree(TreeViewItem item)
+    {
+        foreach (var child in item.Items.OfType<TreeViewItem>())
+        {
+            CollapseEditorHeaderXmlSubtree(child);
+        }
+
+        if (item.HasItems)
+        {
+            item.IsExpanded = false;
+        }
     }
 
     private void HistoryStrip_OpenRequested(object sender, EventArgs e)

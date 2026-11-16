@@ -124,6 +124,62 @@
       </Grid.RowDefinitions>
 
       <DockPanel x:Name="WaveformWorkHost" Grid.Row="0" Grid.Column="0">
+        <!-- エディタ：ヘッダ情報詳細。帯に載らないとき、波形とレベルメーターのあいだ。
+             プレイヤー情報列と同じ（見出し「情報」・フォーカスグラデ・余白／タイポ）。
+             スクロールバーはホバー時フェード。iXML 等は同じ色分けツリー。 -->
+        <Border x:Name="EditorHeaderDetailSideHost"
+                DockPanel.Dock="Right"
+                Width="0"
+                MinWidth="0"
+                Margin="6,0,0,0"
+                Padding="0"
+                Background="Transparent"
+                BorderThickness="0"
+                Visibility="Collapsed"
+                ClipToBounds="True"
+                SnapsToDevicePixels="True"
+                UseLayoutRounding="True"
+                SizeChanged="EditorHeaderDetailSideHost_SizeChanged">
+          <Grid x:Name="EditorHeaderDetailSideRoot">
+            <DockPanel Background="Transparent">
+              <TextBlock x:Name="EditorHeaderDetailSideTitle"
+                         DockPanel.Dock="Top" />
+              <!-- Offset／本体。高さは中身任せ（固定 Height で見切れない）。 -->
+              <ScrollViewer x:Name="EditorHeaderDetailSideScroll"
+                            VerticalAlignment="Stretch"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Disabled"
+                            Focusable="False"
+                            CanContentScroll="False">
+                <StackPanel x:Name="EditorHeaderDetailSideStack">
+                  <TextBlock x:Name="EditorHeaderDetailSideMeta"
+                             FontFamily="Consolas"
+                             TextWrapping="NoWrap"
+                             Visibility="Collapsed"
+                             Foreground="{DynamicResource MutedForeBrush}" />
+                  <TextBox x:Name="EditorHeaderDetailSide"
+                           IsReadOnly="True"
+                           AcceptsReturn="True"
+                           TextWrapping="NoWrap"
+                           BorderThickness="0"
+                           Background="Transparent"
+                           CaretBrush="Transparent"
+                           FontFamily="Consolas"
+                           VerticalScrollBarVisibility="Disabled"
+                           HorizontalScrollBarVisibility="Disabled"
+                           Foreground="{DynamicResource PrimaryForeBrush}" />
+                  <TreeView x:Name="EditorHeaderDetailSideXml"
+                            Visibility="Collapsed"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Focusable="True"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                            ScrollViewer.VerticalScrollBarVisibility="Disabled" />
+                </StackPanel>
+              </ScrollViewer>
+            </DockPanel>
+          </Grid>
+        </Border>
         <!-- タブは全体表示（Overview）の上。左は波形開始（dB 目盛り列）に揃える。 -->
         <Border x:Name="DocumentTabHost"
                 DockPanel.Dock="Top"
@@ -308,7 +364,8 @@
 
       <Grid x:Name="TransportChromeHost"
             Grid.Row="1" Grid.Column="0"
-            Background="Transparent">
+            Background="Transparent"
+            SizeChanged="TransportChromeHost_SizeChanged">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
@@ -344,14 +401,15 @@
             <ui:EditorPositionTimecodeView x:Name="EditorPositionTimecode" />
           </Viewbox>
         </Grid>
-        <!-- エディタ: ヘッダ情報（チャンクリストのみ）。タイムコードと編集履歴のあいだ。H でトグル。 -->
+        <!-- エディタ: ヘッダ情報（チャンク＋余裕があれば情報）。タイムコードと編集履歴のあいだ。H でトグル。 -->
         <ui:EditorHeaderChunkStripView x:Name="HeaderChunkStrip"
                                        Grid.Column="1"
                                        Margin="0,0,6,0"
                                        VerticalAlignment="Stretch"
                                        Opacity="0"
                                        Visibility="Collapsed"
-                                       IsHitTestVisible="False" />
+                                       IsHitTestVisible="False"
+                                       DetailChanged="HeaderChunkStrip_DetailChanged" />
         <ui:HistoryStripView x:Name="HistoryStrip"
                              Grid.Column="2"
                              Margin="0,0,6,0"

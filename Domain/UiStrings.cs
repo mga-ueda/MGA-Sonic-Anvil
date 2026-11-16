@@ -1736,8 +1736,8 @@ internal static partial class UiStrings
         "Check Box（Shift+Space）",
         "Check Box (Shift+Space)");
     public static string TipOptionLibraryHeaderStructure => Get(
-        "ヘッダ情報（H）  プレイヤー＝構造＋情報／エディタ＝チャンクリスト",
-        "Header Info (H)  player: structure+info / editor: chunk list");
+        "ヘッダ情報（H）  プレイヤー＝構造＋情報／エディタ＝チャンク＋情報",
+        "Header Info (H)  player: structure+info / editor: chunk+info");
     public static string LibraryExplorerDesktop => Get("デスクトップ", "Desktop");
     public static string LibraryExplorerDocuments => Get("ドキュメント", "Documents");
     public static string LibraryExplorerMusic => Get("ミュージック", "Music");
