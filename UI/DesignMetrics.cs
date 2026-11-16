@@ -292,6 +292,12 @@ internal static class DesignMetrics
     /// <summary>左空き領域のうちタイムコードが使う幅の割合（残りは余白）。</summary>
     public const double EditorPositionTimecodeWidthRatio = 0.75;
 
+    /// <summary>
+    /// タイムコード枠の下限。F12 全画面で右 Auto 列が LayoutTransform 拡大しても
+    /// Star が 0 にならない程度に抑える（高さ基準の必要幅までは取らない＝重なり防止）。
+    /// </summary>
+    public static double EditorPositionTimecodeMinSlotWidth => From96(240);
+
     /// <summary>動画再生中、上中央に出す時刻。2 行分の枠を先に確保し、選択行は下へ伸ばす。</summary>
     public static double PlaylistVideoTimecodeFontSize => From96(32);
 

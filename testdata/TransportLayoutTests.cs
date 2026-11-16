@@ -42,6 +42,7 @@ public sealed class TransportLayoutTests
         Assert.True(DesignMetrics.EditorPositionTimecodeFontSize > DesignMetrics.StatusTimecodeFontSize);
         Assert.True(DesignMetrics.EditorPositionTimecodeFontSize >= DesignMetrics.PlaylistVideoTimecodeFontSize);
         Assert.Equal(0.75, DesignMetrics.EditorPositionTimecodeWidthRatio);
+        Assert.True(DesignMetrics.EditorPositionTimecodeMinSlotWidth >= 240);
     }
 
     [Fact]
