@@ -158,6 +158,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly Border _listFocusLine = CreatePaneFocusLine();
     private readonly Border _structureFocusLine = CreatePaneFocusLine();
     private readonly Border _structureDetailFocusLine = CreatePaneFocusLine();
+    private readonly Border _playlistBusyBadge = CreatePlaylistBusyBadge();
+    private SolidColorBrush? _playlistBusyBadgeBack;
+    private int _playlistBusyFadeTicket;
+    private const double PlaylistBusyBlinkSeconds = 0.55;
+    private const double PlaylistBusyFadeOutSeconds = 0.4;
     private readonly TextBlock _structureLabel = new();
     private readonly TextBlock _structureDetailLabel = new();
     private readonly TreeView _structureTree = new();
@@ -297,8 +302,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
     private CancellationTokenSource? _playlistWaveCts;
     private int _playlistWaveGeneration;
+    private bool _playlistWaveBusy;
     private CancellationTokenSource? _playlistLoudnessCts;
     private int _playlistLoudnessGeneration;
+    private bool _playlistLoudnessBusy;
+    private bool _playlistMediaBusyNotified;
     private LibraryPlaylistWaveformSize _playlistWaveSizeWave = LibraryPlaylistWaveformSize.L;
     private LibraryPlaylistWaveformSize _playlistWaveSizeMp3 = LibraryPlaylistWaveformSize.L;
     private int _defaultSampleRate = DefaultAudioFormat.SampleRate;
@@ -414,6 +422,12 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     /// <summary>プレイリストの選択集合が変わった。複数選択の平均ラウドネス用。</summary>
     public event EventHandler? PlaylistSelectionChanged;
+
+    /// <summary>波形描画・ラウドネス計測の待ち状態が変わった。</summary>
+    public event EventHandler? PlaylistMediaBusyChanged;
+
+    /// <summary>プレイリストの波形描画またはラウドネス取得が進行中。</summary>
+    public bool IsPlaylistMediaBusy => _playlistWaveBusy || _playlistLoudnessBusy;
 
     /// <summary>ダブルクリック。停止中でも再生する。</summary>
     public event EventHandler<DocumentSession>? SessionPlayRequested;
@@ -3589,6 +3603,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
+        RefreshPlaylistBusyDetail();
         _structureLabel.Text = UiStrings.LibraryHeaderStructureLabel;
         _structureDetailLabel.Text = UiStrings.LibraryHeaderStructureDetailLabel;
         _structureLoadedPath = null;
@@ -3636,6 +3651,10 @@ internal sealed partial class LibraryBrowserView : UserControl
         _autoPlayLatch.RefreshAppearance();
         _autoPlayNextLatch.RefreshAppearance();
         _checkSelectLatch.RefreshAppearance();
+        if (IsPlaylistMediaBusy && _playlistBusyBadgeBack is not null)
+        {
+            _playlistBusyBadgeBack.Color = Theme.Get("PlaylistBusyBadgeBackBrush");
+        }
     }
 
     internal void SetOptionLatchWashThrough(bool wash)

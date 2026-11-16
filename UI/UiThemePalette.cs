@@ -163,6 +163,7 @@ internal static class UiThemePalette
         "LatchToggleOnHoverBackBrush",
         "StatusBarConnectedBadgeBackBrush",
         "StatusBarDisconnectedBadgeBackBrush",
+        "PlaylistBusyBadgeBackBrush",
         "StatusBarErrorDetailForeBrush",
         "RegionWaveFillAnacrusisBrush",
         "RegionWaveFillLoopBrush",

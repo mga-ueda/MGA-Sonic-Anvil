@@ -203,6 +203,7 @@
     <SolidColorBrush x:Key="StatusBarErrorDetailForeBrush" Color="#FFFF6E6E" />
     <SolidColorBrush x:Key="StatusBarConnectedBadgeBackBrush" Color="#FF006BD7" />
     <SolidColorBrush x:Key="StatusBarDisconnectedBadgeBackBrush" Color="#FFBE3232" />
+    <SolidColorBrush x:Key="PlaylistBusyBadgeBackBrush" Color="#FFBE3232" />
     <SolidColorBrush x:Key="KeepTargetLockForeBrush" Color="#FFFFDC30" />
     <SolidColorBrush x:Key="KeepTargetLockHoverForeBrush" Color="#FFFFF08C" />
     <SolidColorBrush x:Key="KeepTargetUnlockForeBrush" Color="#FFEBEBEB" />

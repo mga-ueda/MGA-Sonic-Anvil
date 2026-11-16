@@ -206,7 +206,15 @@ internal sealed partial class LibraryBrowserView
 
         _playlistLabel.VerticalAlignment = VerticalAlignment.Center;
         _playlistLabel.TextTrimming = TextTrimming.CharacterEllipsis;
-        bar.Children.Add(_playlistLabel);
+        var playlistTitle = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        playlistTitle.Children.Add(_playlistLabel);
+        playlistTitle.Children.Add(_playlistBusyBadge);
+        bar.Children.Add(playlistTitle);
 
         var list = new DockPanel();
         DockPanel.SetDock(bar, Dock.Top);

@@ -231,6 +231,7 @@ internal static class ColorDevCatalog
             ("StatusBarErrorDetailForeBrush", ColorDevGroup.StatusBar),
             ("StatusBarConnectedBadgeBackBrush", ColorDevGroup.StatusBar),
             ("StatusBarDisconnectedBadgeBackBrush", ColorDevGroup.StatusBar),
+            ("PlaylistBusyBadgeBackBrush", ColorDevGroup.Player),
             ("KeepTargetLockForeBrush", ColorDevGroup.StatusBar),
             ("KeepTargetLockHoverForeBrush", ColorDevGroup.StatusBar),
             ("KeepTargetUnlockForeBrush", ColorDevGroup.StatusBar),

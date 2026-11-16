@@ -249,6 +249,7 @@ internal static partial class UiStrings
             "StatusBarErrorDetailFore" => Get("エラー文字", "Error text"),
             "StatusBarConnectedBadgeBack" => Get("CONNECT", "CONNECT"),
             "StatusBarDisconnectedBadgeBack" => Get("DISCONNECT", "DISCONNECT"),
+            "PlaylistBusyBadgeBack" => Get("BUSY", "BUSY"),
             "KeepTargetLockFore" => Get("Keep Target・施錠", "Keep Target · locked"),
             "KeepTargetLockHoverFore" => Get("Keep Target・施錠ホバー", "Keep Target · locked hover"),
             "KeepTargetUnlockFore" => Get("Keep Target・開錠", "Keep Target · unlocked"),
