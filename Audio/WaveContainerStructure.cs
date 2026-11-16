@@ -29,7 +29,8 @@ internal sealed class WaveStructureNode
         bool isInvalid,
         string? error,
         IReadOnlyList<WaveStructureNode>? children = null,
-        IReadOnlyList<string>? memberPaths = null)
+        IReadOnlyList<string>? memberPaths = null,
+        bool contentPending = false)
     {
         Id = id;
         Label = label;
@@ -42,6 +43,7 @@ internal sealed class WaveStructureNode
         Error = error;
         Children = children ?? Array.Empty<WaveStructureNode>();
         MemberPaths = memberPaths ?? Array.Empty<string>();
+        ContentPending = contentPending;
         IsCustom = !IsWellKnownChunkId(id);
         IsSpecialized = IsSpecializedChunkId(id);
     }
@@ -55,6 +57,8 @@ internal sealed class WaveStructureNode
     public bool ContentTruncated { get; }
     public bool IsInvalid { get; }
     public string? Error { get; }
+    /// <summary>true のとき Content 未読。チャンク選択時に <see cref="WaveContainerStructure.EnsureContent"/>。</summary>
+    public bool ContentPending { get; }
     /// <summary>RIFF/AIFF で一般に定義されていない独自 FourCC。</summary>
     public bool IsCustom { get; }
     /// <summary>標準コアではないがゴミではない専門メタ（iXML / bext 等）。</summary>
@@ -81,7 +85,29 @@ internal sealed class WaveStructureNode
                 IsInvalid,
                 Error,
                 children: null,
-                memberPaths: MemberPaths);
+                memberPaths: MemberPaths,
+                contentPending: ContentPending);
+
+    /// <summary>遅延読込後の本文を載せた同一チャンク行。子・Label は維持。</summary>
+    public WaveStructureNode WithLoadedContent(
+        WaveStructureContentKind kind,
+        string content,
+        bool contentTruncated,
+        bool isInvalid,
+        string? error) =>
+        new(
+            Id,
+            Label,
+            Offset,
+            Size,
+            kind,
+            content,
+            contentTruncated,
+            isInvalid,
+            error,
+            Children,
+            MemberPaths,
+            contentPending: false);
 
     /// <summary>
     /// UI ツリー用のトップレベル行。コンテナ根（RIFF/FORM 等）は子付きの親にせず
@@ -118,18 +144,56 @@ internal sealed class WaveStructureNode
 
     /// <summary>
     /// FourCC を4文字に整形。足りなければ末尾に空白を足す（左寄せ）。
-    /// 例: "fmt" → "fmt ", "data" → "data"
+    /// NUL 等の非印字は '?'。空名のツリー表示は <see cref="FormatDisplayFourCc"/>。
+    /// 例: "fmt" → "fmt ", "data" → "data", "\0\0\0\0" → "????"
     /// </summary>
     internal static string FormatFourCc(string id)
     {
-        if (string.IsNullOrEmpty(id))
+        Span<char> chars = stackalloc char[4];
+        for (var i = 0; i < 4; i++)
         {
-            return "    ";
+            var c = id is { Length: > 0 } && i < id.Length ? id[i] : ' ';
+            // ASCII 印字可能のみ通す。それ以外は '?'（空に見える／コピー不能を防ぐ）。
+            chars[i] = c is >= (char)0x20 and <= (char)0x7E ? c : '?';
         }
 
-        var raw = id.Length > 4 ? id[..4] : id;
-        return raw.Length >= 4 ? raw : raw.PadRight(4, ' ');
+        return new string(chars);
     }
+
+    /// <summary>
+    /// FourCC に印字可能な非空白が無い（NUL×4・空白のみなど）。
+    /// 正規の WAVE チャンク名ではない。
+    /// </summary>
+    internal static bool IsBlankFourCc(string? id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return true;
+        }
+
+        var hasVisible = false;
+        for (var i = 0; i < 4; i++)
+        {
+            var c = i < id.Length ? id[i] : ' ';
+            if (c is >= (char)0x21 and <= (char)0x7E)
+            {
+                hasVisible = true;
+            }
+            else if (c is < (char)0x20 or > (char)0x7E)
+            {
+                return true;
+            }
+        }
+
+        return !hasVisible;
+    }
+
+    /// <summary>リスト用の空 FourCC 表示（4文字幅に揃える）。情報欄の本文は "(empty)" のまま。</summary>
+    internal const string BlankFourCcListLabel = "----";
+
+    /// <summary>ツリー／コピー用。空 FourCC は <see cref="BlankFourCcListLabel"/>。</summary>
+    internal string FormatDisplayFourCc() =>
+        IsBlankFourCc(Id) ? BlankFourCcListLabel : FormatFourCc(Id);
 
     /// <summary>
     /// インデント込みで名前欄を固定幅にし、区切りとサイズを縦揃えする。
@@ -137,7 +201,7 @@ internal sealed class WaveStructureNode
     /// </summary>
     internal string FormatTreeCaption(int depth, int nameFieldWidth, int sizeFieldWidth)
     {
-        var name = (new string(' ', Math.Max(0, depth) * TreeIndentSpaces) + FormatFourCc(Id))
+        var name = (new string(' ', Math.Max(0, depth) * TreeIndentSpaces) + FormatDisplayFourCc())
             .PadRight(Math.Max(nameFieldWidth, 4));
         if (Size <= 0)
         {
@@ -154,7 +218,7 @@ internal sealed class WaveStructureNode
     /// </summary>
     internal string FormatUnionTreeCaption(int nameFieldWidth, int countFieldWidth)
     {
-        var name = FormatFourCc(Id).PadRight(Math.Max(nameFieldWidth, 4));
+        var name = FormatDisplayFourCc().PadRight(Math.Max(nameFieldWidth, 4));
         var count = Size.ToString("#,0", CultureInfo.InvariantCulture);
         var width = Math.Max(countFieldWidth, count.Length);
         return $"{name} - {count.PadLeft(width)}";
@@ -263,6 +327,30 @@ internal sealed class WaveStructureNode
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// 選択チャンクの情報本文。Offset／Size と Content（不正時は Error も）。
+    /// プレイヤー情報列・エディタ詳細と共通。
+    /// </summary>
+    internal static string FormatNodeDetail(WaveStructureNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        var metaRows = new (string Key, string Value)[]
+        {
+            ("Offset", string.Create(CultureInfo.InvariantCulture, $"0x{node.Offset:X} ({node.Offset})")),
+            ("Size", FormatSize(node.Size)),
+        };
+
+        var body = node.Content ?? string.Empty;
+        if (node.IsInvalid
+            && !string.IsNullOrWhiteSpace(node.Error)
+            && !body.Contains(node.Error, StringComparison.Ordinal))
+        {
+            body = node.Error + Environment.NewLine + Environment.NewLine + body;
+        }
+
+        return FormatDetailWithMeta(metaRows, body);
     }
 
     /// <summary>メタ行と本文を結合し、段が分かれても │ 列を揃える。</summary>
@@ -488,7 +576,10 @@ internal sealed class WaveStructureDocument
     public bool IsChunkUnion => ContainerKind == ChunkUnionKind;
 }
 
-/// <summary>RIFF / FORM を走査し、ツリーと表示用本文を作る。PCM は展開しない。</summary>
+/// <summary>
+/// RIFF / FORM を走査しチャンクツリーを作る。PCM は展開しない。
+/// 走査時は ID／Offset／Size（と LIST 階層）のみ。本文は <see cref="EnsureContent"/>。
+/// </summary>
 internal static class WaveContainerStructure
 {
     /// <summary>data / SSND / wavl のプレビュー長（1 ページ分）。続きは読まない。</summary>
@@ -526,6 +617,171 @@ internal static class WaveContainerStructure
                 [UiStrings.WaveStructureReadFailed(ex.Message)]);
         }
     }
+
+    /// <summary>
+    /// チャンク選択時に本文を読む。既に読込済みならそのまま返す。
+    /// LIST は Label／子数から要約のみ（子ペイロードは読まない）。
+    /// </summary>
+    public static WaveStructureNode EnsureContent(string path, WaveStructureNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        if (!node.ContentPending)
+        {
+            return node;
+        }
+
+        if (node.Id is "LIST" or "list")
+        {
+            return LoadListSummaryContent(node);
+        }
+
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return node.WithLoadedContent(
+                WaveStructureContentKind.Text,
+                UiStrings.WaveStructureFileMissing,
+                contentTruncated: false,
+                isInvalid: true,
+                error: UiStrings.WaveStructureFileMissing);
+        }
+
+        try
+        {
+            var fileKind = AudioCodec.DetectKind(path);
+            if (fileKind is not (AudioFileKind.Wave or AudioFileKind.Aiff))
+            {
+                return node.WithLoadedContent(
+                    WaveStructureContentKind.Text,
+                    UiStrings.WaveStructureUnsupported(fileKind.ToString().ToUpperInvariant()),
+                    contentTruncated: false,
+                    isInvalid: true,
+                    error: UiStrings.WaveStructureUnsupported(fileKind.ToString().ToUpperInvariant()));
+            }
+
+            using var stream = File.OpenRead(path);
+            using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
+            var dataStart = node.Offset + 8;
+            if (node.Offset < 0 || dataStart > stream.Length)
+            {
+                var err = UiStrings.WaveStructureChunkTruncated(node.Id, node.Size, 0);
+                return node.WithLoadedContent(
+                    WaveStructureContentKind.Text,
+                    err,
+                    contentTruncated: false,
+                    isInvalid: true,
+                    error: err);
+            }
+
+            var size = (uint)Math.Min(node.Size, uint.MaxValue);
+            var errors = new List<string>();
+            var loaded = fileKind == AudioFileKind.Aiff
+                ? ReadAiffChunk(reader, node.Id, node.Offset, dataStart, size)
+                : ReadWaveChunk(reader, node.Id, node.Offset, dataStart, size, errors);
+            var kind = loaded.Kind;
+            var content = loaded.Content;
+            // INFO 子は走査時に Label へフィールド名を付けている。本文も従来の表形式に揃える。
+            if (!loaded.IsInvalid
+                && !string.Equals(node.Label, node.Id, StringComparison.Ordinal)
+                && node.Label.StartsWith(node.Id, StringComparison.Ordinal))
+            {
+                var text = string.IsNullOrWhiteSpace(loaded.Content)
+                    ? UiStrings.WaveStructureEmptyPayload
+                    : loaded.Content;
+                content = WaveStructureNode.FormatKeyValueTable(
+                [
+                    ("Field", InfoFieldName(node.Id)),
+                    ("FourCC", WaveStructureNode.FormatFourCc(node.Id)),
+                    ("Text", text),
+                ]);
+                kind = WaveStructureContentKind.Text;
+            }
+
+            return node.WithLoadedContent(
+                kind,
+                content,
+                loaded.ContentTruncated,
+                loaded.IsInvalid,
+                loaded.Error);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            var err = UiStrings.WaveStructureReadFailed(ex.Message);
+            return node.WithLoadedContent(
+                WaveStructureContentKind.Text,
+                err,
+                contentTruncated: false,
+                isInvalid: true,
+                error: err);
+        }
+    }
+
+    private static WaveStructureNode LoadListSummaryContent(WaveStructureNode node)
+    {
+        var listType = "????";
+        var sep = node.Label.IndexOf(" / ", StringComparison.Ordinal);
+        if (sep >= 0 && sep + 3 < node.Label.Length)
+        {
+            listType = node.Label[(sep + 3)..];
+        }
+
+        var content = WaveStructureNode.FormatKeyValueTable(
+        [
+            ("List type", listType),
+            ("Children", node.Children.Count.ToString(CultureInfo.InvariantCulture)),
+            ("Summary", UiStrings.WaveStructureListSummary(listType, node.Children.Count)),
+        ]);
+        return node.WithLoadedContent(
+            WaveStructureContentKind.Text,
+            content,
+            contentTruncated: false,
+            isInvalid: false,
+            error: null);
+    }
+
+    private static WaveStructureNode PendingChunk(
+        string id,
+        string label,
+        long offset,
+        long size,
+        IReadOnlyList<WaveStructureNode>? children = null)
+    {
+        // NUL×4 等はチャンク名として無効。説明文は出さず、(empty)＋不正色のみ。
+        if (WaveStructureNode.IsBlankFourCc(id))
+        {
+            return new WaveStructureNode(
+                id,
+                UiStrings.WaveStructureEmptyPayload,
+                offset,
+                size,
+                WaveStructureContentKind.Text,
+                UiStrings.WaveStructureEmptyPayload,
+                contentTruncated: false,
+                isInvalid: true,
+                error: null,
+                children,
+                contentPending: false);
+        }
+
+        return new WaveStructureNode(
+            id,
+            label,
+            offset,
+            size,
+            GuessContentKind(id),
+            content: string.Empty,
+            contentTruncated: false,
+            isInvalid: false,
+            error: null,
+            children,
+            contentPending: true);
+    }
+
+    private static WaveStructureContentKind GuessContentKind(string id) =>
+        id is "iXML" or "axml" or "AXML" or "_PMX"
+            ? WaveStructureContentKind.Xml
+            : id is "data" or "wavl" or "SSND"
+                ? WaveStructureContentKind.Binary
+                : WaveStructureContentKind.Text;
 
     /// <summary>
     /// 複数ファイルのチャンク FourCC 和集合をフラット一覧にする。
@@ -689,7 +945,10 @@ internal static class WaveContainerStructure
                 break;
             }
 
-            chunks.Add(ReadWaveChunk(reader, id, chunkOffset, dataStart, size, errors));
+            chunks.Add(
+                id is "LIST" or "list"
+                    ? ScanListChunk(reader, id, chunkOffset, dataStart, size, littleEndian: true, errors)
+                    : PendingChunk(id, id, chunkOffset, size));
             var next = dataStart + size + (size & 1);
             if (next < stream.Position || next > end)
             {
@@ -729,9 +988,11 @@ internal static class WaveContainerStructure
         var stream = reader.BaseStream;
         stream.Position = dataStart;
 
+        // LIST の本文は EnsureContent → LoadListSummaryContent。ここでは葉だけ。
         if (id is "LIST" or "list")
         {
-            return ReadListChunk(reader, id, chunkOffset, dataStart, size, littleEndian: true, errors);
+            return LoadListSummaryContent(
+                PendingChunk(id, id, chunkOffset, size));
         }
 
         if (id == "fmt ")
@@ -796,7 +1057,8 @@ internal static class WaveContainerStructure
         return DecodeBinaryPreview(reader, id, chunkOffset, size, label: id);
     }
 
-    private static WaveStructureNode ReadListChunk(
+    /// <summary>LIST 階層だけ辿る。子ペイロードは読まず Pending。</summary>
+    private static WaveStructureNode ScanListChunk(
         BinaryReader reader,
         string id,
         long chunkOffset,
@@ -848,39 +1110,9 @@ internal static class WaveContainerStructure
                 break;
             }
 
-            if (listType is "INFO" or "info")
+            if (childId is "LIST" or "list")
             {
-                var text = ReadCString(reader, (int)childSize);
-                var shown = string.IsNullOrWhiteSpace(text)
-                    ? UiStrings.WaveStructureEmptyPayload
-                    : WaveStructureNode.FormatVisibleNewlines(text);
-                children.Add(new WaveStructureNode(
-                    childId,
-                    $"{childId}  ({InfoFieldName(childId)})",
-                    childOffset,
-                    childSize,
-                    WaveStructureContentKind.Text,
-                    WaveStructureNode.FormatKeyValueTable(
-                    [
-                        ("Field", InfoFieldName(childId)),
-                        ("FourCC", WaveStructureNode.FormatFourCc(childId)),
-                        ("Text", shown),
-                    ]),
-                    contentTruncated: false,
-                    isInvalid: false,
-                    error: null));
-            }
-            else if (childId is "labl" or "note" or "ltxt")
-            {
-                children.Add(DecodeAdtlText(reader, childId, childOffset, childSize));
-            }
-            else if (childId is "iXML" or "axml" or "AXML" or "_PMX")
-            {
-                children.Add(DecodeXmlChunk(reader, childId, childOffset, childSize));
-            }
-            else if (childId is "LIST" or "list")
-            {
-                children.Add(ReadListChunk(
+                children.Add(ScanListChunk(
                     reader,
                     childId,
                     childOffset,
@@ -889,53 +1121,19 @@ internal static class WaveContainerStructure
                     littleEndian,
                     errors));
             }
-            else if (IsLikelyTextChunk(childId) && childSize <= 64 * 1024)
-            {
-                var text = ReadCString(reader, (int)childSize);
-                var shown = string.IsNullOrWhiteSpace(text)
-                    ? UiStrings.WaveStructureEmptyPayload
-                    : WaveStructureNode.FormatVisibleNewlines(text);
-                children.Add(new WaveStructureNode(
-                    childId,
-                    childId,
-                    childOffset,
-                    childSize,
-                    WaveStructureContentKind.Text,
-                    shown,
-                    contentTruncated: false,
-                    isInvalid: false,
-                    error: null));
-            }
             else
             {
-                children.Add(DecodeBinaryPreview(
-                    reader,
-                    childId,
-                    childOffset,
-                    childSize,
-                    label: childId));
+                var label = listType is "INFO" or "info"
+                    ? $"{childId}  ({InfoFieldName(childId)})"
+                    : childId;
+                children.Add(PendingChunk(childId, label, childOffset, childSize));
             }
 
             stream.Position = childData + childSize + (childSize & 1);
         }
 
         stream.Position = end;
-        return new WaveStructureNode(
-            id,
-            $"{id} / {listType}",
-            chunkOffset,
-            size,
-            WaveStructureContentKind.Text,
-            WaveStructureNode.FormatKeyValueTable(
-            [
-                ("List type", listType),
-                ("Children", children.Count.ToString(CultureInfo.InvariantCulture)),
-                ("Summary", UiStrings.WaveStructureListSummary(listType, children.Count)),
-            ]),
-            contentTruncated: false,
-            isInvalid: false,
-            error: null,
-            children);
+        return PendingChunk(id, $"{id} / {listType}", chunkOffset, size, children);
     }
 
     private static WaveStructureDocument ReadAiff(Stream stream)
@@ -993,7 +1191,10 @@ internal static class WaveContainerStructure
                 break;
             }
 
-            chunks.Add(ReadAiffChunk(reader, id, chunkOffset, dataStart, size));
+            chunks.Add(
+                id is "LIST" or "list"
+                    ? ScanListChunk(reader, id, chunkOffset, dataStart, size, littleEndian: false, errors)
+                    : PendingChunk(id, id, chunkOffset, size));
             stream.Position = dataStart + size + (size & 1);
         }
 

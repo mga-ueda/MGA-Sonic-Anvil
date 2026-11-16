@@ -29,10 +29,33 @@ public sealed class WaveContainerStructureTests
             Assert.Contains(root.Children, c => c.Id == "fmt ");
             var data = Assert.Single(root.Children, c => c.Id == "data");
             Assert.Equal(WaveStructureContentKind.Binary, data.Kind);
-            Assert.True(data.ContentTruncated);
+            Assert.True(data.ContentPending);
             Assert.Equal(2048, data.Size);
-            Assert.Contains(UiStrings.WaveStructureDataTruncated(2048, WaveContainerStructure.DataPreviewPageBytes), data.Content);
-            Assert.Contains("00000000", data.Content);
+            var loaded = WaveContainerStructure.EnsureContent(path, data);
+            Assert.False(loaded.ContentPending);
+            Assert.True(loaded.ContentTruncated);
+            Assert.Contains(UiStrings.WaveStructureDataTruncated(2048, WaveContainerStructure.DataPreviewPageBytes), loaded.Content);
+            Assert.Contains("00000000", loaded.Content);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryRead_Wave_LeavesChunkPayloadPendingUntilEnsureContent()
+    {
+        var path = WriteTemp("struct-pending.wav", BuildPcmWave(new byte[32], sampleRate: 44100, channels: 1, bits: 16));
+        try
+        {
+            var doc = WaveContainerStructure.TryRead(path);
+            var root = Assert.Single(doc.Roots);
+            Assert.False(root.ContentPending);
+            Assert.All(
+                root.Children,
+                static c => Assert.True(c.ContentPending || c.IsInvalid));
+            Assert.All(root.Children, static c => Assert.True(string.IsNullOrEmpty(c.Content) || c.IsInvalid));
         }
         finally
         {
@@ -96,11 +119,17 @@ public sealed class WaveContainerStructureTests
             Assert.False(doc.HasErrors);
             var root = Assert.Single(doc.Roots);
             var list = Assert.Single(root.Children, c => c.Id == "LIST");
-            Assert.Contains(list.Children, c => c.Id == "INAM" && c.Content.Contains("Title"));
+            Assert.True(list.ContentPending);
+            var inam = Assert.Single(list.Children, c => c.Id == "INAM");
+            Assert.True(inam.ContentPending);
+            var inamLoaded = WaveContainerStructure.EnsureContent(path, inam);
+            Assert.Contains("Title", inamLoaded.Content);
             var ixml = Assert.Single(root.Children, c => c.Id == "iXML");
             Assert.Equal(WaveStructureContentKind.Xml, ixml.Kind);
-            Assert.Contains("SPEED_AUDIO", ixml.Content);
-            Assert.Contains("    <SPEED_AUDIO>", ixml.Content);
+            Assert.True(ixml.ContentPending);
+            var ixmlLoaded = WaveContainerStructure.EnsureContent(path, ixml);
+            Assert.Contains("SPEED_AUDIO", ixmlLoaded.Content);
+            Assert.Contains("    <SPEED_AUDIO>", ixmlLoaded.Content);
         }
         finally
         {
@@ -196,6 +225,50 @@ public sealed class WaveContainerStructureTests
         Assert.Equal("data", WaveStructureNode.FormatFourCc("data"));
         Assert.Equal("iXML", WaveStructureNode.FormatFourCc("iXML"));
         Assert.Equal("x   ", WaveStructureNode.FormatFourCc("x"));
+        Assert.Equal("????", WaveStructureNode.FormatFourCc("\0\0\0\0"));
+        Assert.Equal("a?c ", WaveStructureNode.FormatFourCc("a\0c"));
+        Assert.Equal("    ", WaveStructureNode.FormatFourCc(string.Empty));
+    }
+
+    [Fact]
+    public void TryRead_Wave_NullFourCcChunk_IsMarkedInvalidEmpty()
+    {
+        // data のあとに 00 00 00 00 / size 0（実ファイル 12_15_05.WAV と同型）。
+        var body = Concat(
+            Encoding.ASCII.GetBytes("WAVE"),
+            RiffChunk("fmt ", FmtBody()),
+            RiffChunk("data", new byte[32]),
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 });
+        var file = Concat(
+            Encoding.ASCII.GetBytes("RIFF"),
+            BitConverter.GetBytes((uint)body.Length),
+            body);
+        var path = WriteTemp("struct-nul-fourcc.wav", file);
+        try
+        {
+            var doc = WaveContainerStructure.TryRead(path);
+            Assert.DoesNotContain(
+                doc.Errors,
+                e => e.Contains("FourCC", StringComparison.OrdinalIgnoreCase)
+                    || e.Contains("チャンク名", StringComparison.Ordinal));
+            var root = Assert.Single(doc.Roots);
+            var nul = Assert.Single(root.Children, c => c.Id == "\0\0\0\0");
+            Assert.Equal(0, nul.Size);
+            Assert.True(nul.IsInvalid);
+            Assert.False(nul.ContentPending);
+            Assert.Null(nul.Error);
+            Assert.Equal(UiStrings.WaveStructureEmptyPayload, nul.Content);
+            Assert.True(WaveStructureNode.IsBlankFourCc(nul.Id));
+            Assert.Equal(WaveStructureNode.BlankFourCcListLabel, nul.FormatDisplayFourCc());
+            Assert.Contains(
+                WaveStructureNode.BlankFourCcListLabel,
+                nul.FormatTreeCaption(0, 4, 4),
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -258,6 +331,27 @@ public sealed class WaveContainerStructureTests
         Assert.StartsWith("LongKey  │", lines[1]);
         Assert.EndsWith("│ 1", lines[0]);
         Assert.EndsWith("│ 2048", lines[1]);
+    }
+
+    [Fact]
+    public void FormatNodeDetail_IncludesOffsetSizeAndBody()
+    {
+        var node = new WaveStructureNode(
+            "fmt ",
+            "Format",
+            offset: 12,
+            size: 16,
+            WaveStructureContentKind.Text,
+            content: "Audio format  │ 1",
+            contentTruncated: false,
+            isInvalid: false,
+            error: null);
+        var text = WaveStructureNode.FormatNodeDetail(node);
+        var lines = text.Replace("\r\n", "\n").Split('\n');
+        Assert.Contains(lines, static l => l.Contains("Offset", StringComparison.Ordinal));
+        Assert.Contains(lines, static l => l.Contains("Size", StringComparison.Ordinal));
+        Assert.Contains(lines, static l => l.Contains("Audio format", StringComparison.Ordinal));
+        Assert.Contains("0xC (12)", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -337,11 +431,15 @@ public sealed class WaveContainerStructureTests
         {
             var doc = WaveContainerStructure.TryRead(path);
             var root = Assert.Single(doc.Roots);
-            var cue = Assert.Single(root.Children, c => c.Id == "cue ");
+            var cue = WaveContainerStructure.EnsureContent(
+                path,
+                Assert.Single(root.Children, c => c.Id == "cue "));
             Assert.Contains("CueId", cue.Content);
             Assert.Contains("7", cue.Content);
             var list = Assert.Single(root.Children, c => c.Id == "LIST");
-            var labl = Assert.Single(list.Children, c => c.Id == "labl");
+            var labl = WaveContainerStructure.EnsureContent(
+                path,
+                Assert.Single(list.Children, c => c.Id == "labl"));
             Assert.Contains("Cue ID", labl.Content);
             Assert.Contains("7", labl.Content);
             Assert.Contains("Mark", labl.Content);
@@ -407,7 +505,9 @@ public sealed class WaveContainerStructureTests
         {
             var doc = WaveContainerStructure.TryRead(path);
             var root = Assert.Single(doc.Roots);
-            var custom = Assert.Single(root.Children, c => c.Id == "resu");
+            var custom = WaveContainerStructure.EnsureContent(
+                path,
+                Assert.Single(root.Children, c => c.Id == "resu"));
             Assert.False(custom.ContentTruncated);
             Assert.DoesNotContain(
                 UiStrings.WaveStructureDataTruncated(600, WaveContainerStructure.DataPreviewPageBytes),
