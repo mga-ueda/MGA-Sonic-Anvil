@@ -29,6 +29,8 @@ internal sealed partial class LibraryBrowserView
     private bool _structureFitBusy;
     /// <summary>上限到達後は Extent 補正で幅を積み増さない。</summary>
     private bool _structureDetailClipGrowBlocked;
+    /// <summary>チャンク切替などのプログラムスクロールではバーを出さない。</summary>
+    private bool _structureDetailScrollRevealSuppress;
 
     private void BuildHeaderStructurePane()
     {
@@ -723,7 +725,7 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>
-    /// 選択なし／プレイリスト空。情報は出さず、幅の高水位も見出し最小へ戻す。
+    /// 選択なし／プレイリスト空／H で隠すとき。情報は出さず、幅の高水位も忘れる。
     /// </summary>
     private void ClearHeaderStructure()
     {
@@ -735,7 +737,7 @@ internal sealed partial class LibraryBrowserView
         _structureDetailHeldWidth = 0;
     }
 
-    /// <summary>ツリー／本文だけ空ける。列幅の記憶は触らない。</summary>
+    /// <summary>ツリー／本文だけ空ける。列幅の記憶は触らない（表示中の再解析抑止用）。</summary>
     private void DiscardHeaderStructureContent()
     {
         _structureTreeSelectAll = false;
@@ -1177,9 +1179,37 @@ internal sealed partial class LibraryBrowserView
         _structureDetailMeta.Visibility = Visibility.Visible;
         _structureDetailBox.Visibility = Visibility.Collapsed;
         _structureXmlTree.Visibility = Visibility.Visible;
+        ResetStructureDetailScroll(_structureXmlTree);
         FitHeaderStructurePaneWidths();
         ScheduleXmlDetailWidthSync();
         return true;
+    }
+
+    /// <summary>情報／XML のスクロール位置を先頭へ。レイアウト後にもう一度。Reveal は抑止する。</summary>
+    private void ResetStructureDetailScroll(FrameworkElement host)
+    {
+        _structureDetailScrollRevealSuppress = true;
+        ScrollStructureDetailHostToHome(host);
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                ScrollStructureDetailHostToHome(host);
+                _structureDetailScrollRevealSuppress = false;
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    private static void ScrollStructureDetailHostToHome(FrameworkElement host)
+    {
+        if (host is TextBoxBase textBox)
+        {
+            textBox.ScrollToHome();
+        }
+
+        if (FindDescendantScrollViewer(host) is { } viewer)
+        {
+            viewer.ScrollToHome();
+        }
     }
 
     public void MoveHeaderStructureSelection(int delta)
@@ -1430,6 +1460,8 @@ internal sealed partial class LibraryBrowserView
         _structureDetailBox.FontFamily = StructureDetailMonoFont;
         ApplyHeaderStructureDetailTypography(_structureDetailBox);
         _structureDetailBox.Text = text;
+        // バイナリ等は TextBox が VerticalOffset を残すので、チャンク切替では先頭へ。
+        ResetStructureDetailScroll(_structureDetailBox);
         FitHeaderStructurePaneWidths();
     }
 
@@ -1466,7 +1498,7 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>
-    /// 情報／iXML の列幅 Fit。スクロールバー見た目はエリアホバー表示を使う。
+    /// 情報／iXML の列幅 Fit。スクロールバーはホバーに加え、実スクロールでも既定時間出す。
     /// </summary>
     private void HookStructureDetailScrollFit(FrameworkElement host)
     {
@@ -1500,6 +1532,56 @@ internal sealed partial class LibraryBrowserView
         {
             GrowHeaderStructureDetailIfClipped(root);
         }
+
+        // カーソルがエリア外／ホバー切れでも、実スクロールしたら既定時間（約3秒）出す。
+        if (_structureDetailScrollRevealSuppress
+            || (e.VerticalChange == 0 && e.HorizontalChange == 0))
+        {
+            return;
+        }
+
+        if (TryResolveStructureDetailScrollRevealHost(sender) is { } host)
+        {
+            LibraryScrollReveal.RevealTemporarily(host);
+        }
+    }
+
+    private FrameworkElement? TryResolveStructureDetailScrollRevealHost(object sender)
+    {
+        if (IsStructureDetailScrollSender(sender, _structureDetailBox))
+        {
+            return _structureDetailBox;
+        }
+
+        if (IsStructureDetailScrollSender(sender, _structureXmlTree))
+        {
+            return _structureXmlTree;
+        }
+
+        return null;
+    }
+
+    private static bool IsStructureDetailScrollSender(object sender, FrameworkElement host)
+    {
+        if (ReferenceEquals(sender, host))
+        {
+            return true;
+        }
+
+        if (sender is not DependencyObject node)
+        {
+            return false;
+        }
+
+        for (var current = node; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, host))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -1652,8 +1734,8 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>
-    /// ヘッダ情報列の表示切替。幅は覚える。フォーカス中ならプレイリストへ戻す。
-    /// 再表示時は MaxWidth を先に戻し、自動フィット幅をユーザー固定にしない（見切れ防止）。
+    /// ヘッダ情報列の表示切替。隠すとき幅の高水位とツリー選択記憶も忘れる（再表示は1行目）。
+    /// フォーカス中ならプレイリストへ戻す。再表示は内容に合わせて自動フィット。
     /// </summary>
     public void SetHeaderStructureVisible(bool show, bool focusWhenShown = true)
     {
@@ -1664,16 +1746,10 @@ internal sealed partial class LibraryBrowserView
 
         if (!show)
         {
-            _headerStructureRememberedUserSized = _structureUserWidth is not null;
-            var current = _structureColumn.ActualWidth > 1
-                ? (_structureUserWidth ?? _structureColumn.ActualWidth)
-                : (_headerStructureRememberedWidth > 0
-                    ? _headerStructureRememberedWidth
-                    : DesignMetrics.LibraryHeaderStructureWidth);
-            _headerStructureRememberedWidth = DesignMetrics.ClampLibraryHeaderStructureWidth(current);
+            // 中身・幅・選択行記憶を捨てる。オフ中の選択追従コストも切る。
+            ClearHeaderStructure();
+            _structureRememberedChunkPath = null;
             ApplyHeaderStructureCollapsedChrome();
-            // 解析結果だけ捨てる（幅の高水位は再表示用に残す）。オフ中の選択追従コストを切る。
-            DiscardHeaderStructureContent();
 
             _headerStructureVisible = false;
             if (IsHeaderStructureFocused)
@@ -1697,22 +1773,7 @@ internal sealed partial class LibraryBrowserView
         // SetSidePanesVisible と同様、幅を入れる前に拘束を戻す（MaxWidth=0 のまま Fit すると見切れる）。
         _structureColumn.MinWidth = DesignMetrics.LibraryHeaderStructureMinWidth;
         _structureColumn.MaxWidth = DesignMetrics.LibraryHeaderStructureMaxWidth;
-        if (_headerStructureRememberedUserSized && _headerStructureRememberedWidth > 0)
-        {
-            _structureUserWidth = DesignMetrics.ClampLibraryHeaderStructureWidth(
-                _headerStructureRememberedWidth);
-        }
-        else
-        {
-            // 自動フィットのまま。記憶幅は高水位の種だけにし、拡幅ロックは掛けない。
-            _structureUserWidth = null;
-            if (_headerStructureRememberedWidth > 0)
-            {
-                _structureAutoHeldWidth = Math.Max(
-                    _structureAutoHeldWidth,
-                    _headerStructureRememberedWidth);
-            }
-        }
+        _structureUserWidth = null;
 
         RefreshHeaderStructure();
         FitHeaderStructurePaneWidths();
@@ -2184,7 +2245,7 @@ internal sealed partial class LibraryBrowserView
         FitHeaderStructurePaneWidths();
     }
 
-    /// <summary>プレイヤーモード退出時にスプリッター位置の記憶を捨てる。</summary>
+    /// <summary>プレイヤーモード退出時にスプリッター／高水位の記憶を捨てる（H 隠しも ClearHeaderStructure）。</summary>
     internal void ClearHeaderStructureUserLayout()
     {
         if (_structureUserWidth is null

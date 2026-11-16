@@ -146,9 +146,6 @@ internal sealed partial class LibraryBrowserView : UserControl
     private double _sidePanesRememberedWidth;
     /// <summary>ヘッダ情報（構造＋詳細）列の表示。既定オフ。設定に覚える。</summary>
     private bool _headerStructureVisible;
-    private double _headerStructureRememberedWidth;
-    /// <summary>隠す直前の幅がスプリッター手動幅だったか。自動フィット幅をユーザー固定にしない。</summary>
-    private bool _headerStructureRememberedUserSized;
     private readonly TreeView _folderTree = new();
     private readonly TextBlock _explorerLabel = new();
     private readonly TextBlock _favoritesLabel = new();
@@ -180,24 +177,25 @@ internal sealed partial class LibraryBrowserView : UserControl
     private FrameworkElement? _structurePaneHost;
     private string? _structureLoadedPath;
     private WaveStructureDocument? _structureDocument;
-    /// <summary>直近に選んだチャンク経路（SelectionKey）。別ファイルでも同チャンクを開く。</summary>
+    /// <summary>直近に選んだチャンク経路（SelectionKey）。別ファイルでも同チャンクを開く。H で隠すと忘れる。</summary>
     private string[]? _structureRememberedChunkPath;
     /// <summary>見つからず1行目へ退避するとき、記憶を上書きしない。</summary>
     private bool _structureSuppressRemember;
     /// <summary>
     /// プレイリスト↔ヘッダ構造スプリッターのユーザー幅。
-    /// プレイヤーモード中だけ覚え、退出で捨てる。
+    /// 表示中だけ覚え、H で隠す／プレイヤー退出で捨てる。
     /// </summary>
     private double? _structureUserWidth;
     /// <summary>
     /// 自動レイアウトで達した構造ペイン幅の高水位。内容が狭くなっても勝手には下げない。
+    /// H トグル／プレイヤー退出で忘れる。
     /// </summary>
     private double _structureAutoHeldWidth;
     /// <summary>和集合チャンク→プレイリスト選択のとき、ヘッダ構造の再構築を抑止する。</summary>
     private bool _suppressHeaderStructureRefresh;
-    /// <summary>情報表示に必要な幅の高水位。ノード切替で狭くなっても勝手には下げない。</summary>
+    /// <summary>情報表示に必要な幅の高水位。ノード切替で狭くなっても勝手には下げない。H トグルで忘れる。</summary>
     private double _structureDetailHeldWidth;
-    /// <summary>ヘッダ構造ツリー列に必要な幅の高水位。展開が戻っても勝手には下げない。</summary>
+    /// <summary>ヘッダ構造ツリー列に必要な幅の高水位。展開が戻っても勝手には下げない。H トグルで忘れる。</summary>
     private double _structureTreeHeldWidth;
     /// <summary>ヘッダ構造ツリーの全選択（コピー用マーク）。通常の1行選択で解除。</summary>
     private bool _structureTreeSelectAll;
