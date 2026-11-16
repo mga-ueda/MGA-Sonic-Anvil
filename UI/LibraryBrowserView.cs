@@ -188,6 +188,8 @@ internal sealed partial class LibraryBrowserView : UserControl
     private double _structureDetailHeldWidth;
     /// <summary>ヘッダ構造ツリー列に必要な幅の高水位。展開が戻っても勝手には下げない。</summary>
     private double _structureTreeHeldWidth;
+    /// <summary>ヘッダ構造ツリーの全選択（コピー用マーク）。通常の1行選択で解除。</summary>
+    private bool _structureTreeSelectAll;
     /// <summary>フォルダツリー＋見出し。ルート登録ドロップの当たり判定用。</summary>
     private FrameworkElement? _explorerDropHost;
     private readonly ObservableCollection<LibraryFavoriteRow> _favorites = [];

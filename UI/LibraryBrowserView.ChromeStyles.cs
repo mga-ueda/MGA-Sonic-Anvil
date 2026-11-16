@@ -549,7 +549,7 @@ internal sealed partial class LibraryBrowserView
     private static Brush ResolveThemeBrush(string key) =>
         WpfControlHelpers.FrozenBrush(Theme.Get(key));
 
-    private static readonly DependencyProperty TreeMarkedProperty = DependencyProperty.RegisterAttached(
+    internal static readonly DependencyProperty TreeMarkedProperty = DependencyProperty.RegisterAttached(
         "TreeMarked",
         typeof(bool),
         typeof(LibraryBrowserView),
@@ -815,6 +815,13 @@ internal sealed partial class LibraryBrowserView
         template.Triggers.Add(new Trigger
         {
             Property = TreeViewItem.IsSelectedProperty,
+            Value = true,
+            Setters = { new Setter(Border.BackgroundProperty, selected, "Bd") },
+        });
+        // 全選択（Ctrl+A）用。エクスプローラの複数マークと同じ帯。
+        template.Triggers.Add(new Trigger
+        {
+            Property = TreeMarkedProperty,
             Value = true,
             Setters = { new Setter(Border.BackgroundProperty, selected, "Bd") },
         });

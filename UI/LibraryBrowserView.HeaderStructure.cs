@@ -57,6 +57,7 @@ internal sealed partial class LibraryBrowserView
         _structureTree.SelectedItemChanged += StructureTree_SelectedItemChanged;
         _structureTree.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _structureTree.PreviewKeyDown += StructurePane_PreviewKeyDown;
+        RebuildHeaderStructureTreeContextMenu();
 
         _structureDetailBox.IsReadOnly = true;
         _structureDetailBox.AcceptsReturn = true;
@@ -644,6 +645,13 @@ internal sealed partial class LibraryBrowserView
 
     private void RefreshHeaderStructure()
     {
+        // 非表示時は読まない。選択変更・追加（Append/SetSessions）もここ経由なので、
+        // オフ中のプレイリスト操作の重さにヘッダ解析が乗らない。
+        if (!_headerStructureVisible)
+        {
+            return;
+        }
+
         if (SnapshotPlaylistFiles().Count == 0)
         {
             ClearHeaderStructure();
@@ -719,13 +727,20 @@ internal sealed partial class LibraryBrowserView
     /// </summary>
     private void ClearHeaderStructure()
     {
-        _structureLoadedPath = null;
-        _structureDocument = null;
+        DiscardHeaderStructureContent();
         _structureDetailClipGrowBlocked = false;
         _structureUserWidth = null;
         _structureAutoHeldWidth = 0;
         _structureTreeHeldWidth = 0;
         _structureDetailHeldWidth = 0;
+    }
+
+    /// <summary>ツリー／本文だけ空ける。列幅の記憶は触らない。</summary>
+    private void DiscardHeaderStructureContent()
+    {
+        _structureTreeSelectAll = false;
+        _structureLoadedPath = null;
+        _structureDocument = null;
         _structureTree.Items.Clear();
         _structureErrorBanner.Visibility = Visibility.Collapsed;
         _structureErrorText.Text = string.Empty;
@@ -832,8 +847,9 @@ internal sealed partial class LibraryBrowserView
             item.ItemContainerStyle = style;
         }
 
-        // 不正=赤、独自=オレンジ、専門メタ=シアン、コア=通常。
-        var brushKey = node.IsInvalid
+        // 不正／空 FourCC=赤、独自=オレンジ、専門メタ=シアン、コア=通常。
+        // 空 FourCC は IsCustom にも当たるが、不正色を優先して情報欄と揃える。
+        var brushKey = node.IsInvalid || WaveStructureNode.IsBlankFourCc(node.Id)
             ? MissingRegisteredPathForeBrushKey
             : node.IsCustom
                 ? WaveStructureCustomChunkForeBrushKey
@@ -871,6 +887,9 @@ internal sealed partial class LibraryBrowserView
 
     private void StructureTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
+        // 通常クリック／矢印移動では全選択マークを外す。
+        ClearHeaderStructureTreeSelectAllMarks();
+
         if (_structureDocument is { IsChunkUnion: true })
         {
             ShowStructureDetail(string.Empty);
@@ -890,6 +909,173 @@ internal sealed partial class LibraryBrowserView
             }
 
             ShowStructureNode(node);
+        }
+    }
+
+    private void RebuildHeaderStructureTreeContextMenu()
+    {
+        var menu = new ContextMenu();
+        menu.Opened += (_, _) =>
+        {
+            menu.Items.Clear();
+            var hasRows = FlattenVisibleStructureItems().Count > 0;
+            var selectAll = new MenuItem
+            {
+                Header = UiStrings.WaveMenuSelectAll,
+                InputGestureText = "Ctrl+A",
+                IsEnabled = hasRows,
+            };
+            selectAll.Click += (_, _) => SelectAllHeaderStructureItems();
+            var copy = new MenuItem
+            {
+                Header = UiStrings.WaveMenuCopy,
+                InputGestureText = "Ctrl+C",
+                IsEnabled = hasRows,
+            };
+            copy.Click += (_, _) => CopyHeaderStructureSelection();
+            menu.Items.Add(selectAll);
+            menu.Items.Add(copy);
+        };
+        ArmContextMenuDismissGuard(menu);
+        _structureTree.ContextMenu = menu;
+    }
+
+    /// <summary>表示中のチャンク行をすべてマーク（コピー用）。</summary>
+    public void SelectAllHeaderStructureItems()
+    {
+        if (!_headerStructureVisible)
+        {
+            return;
+        }
+
+        var items = FlattenVisibleStructureItems();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        _structureTreeSelectAll = true;
+        // プレイリストと同じ連続帯：先頭／末尾だけ角丸、中間は直角。
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            item.SetValue(TreeMarkedProperty, true);
+            item.SetValue(
+                SelectionBandEdgeProperty,
+                SelectionBandCorners.EdgeAt(i, items.Count));
+        }
+
+        if (!_structureTree.IsKeyboardFocusWithin)
+        {
+            FocusHeaderStructure();
+        }
+    }
+
+    /// <summary>
+    /// 全選択中なら全行、そうでなければ選択行をタブ区切りでクリップボードへ。
+    /// </summary>
+    public void CopyHeaderStructureSelection()
+    {
+        if (!_headerStructureVisible)
+        {
+            return;
+        }
+
+        var text = BuildHeaderStructureCopyText();
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        SystemClipboard.TrySetText(text, Window.GetWindow(this));
+    }
+
+    private string BuildHeaderStructureCopyText()
+    {
+        if (_structureTreeSelectAll)
+        {
+            var lines = new List<string>();
+            foreach (var item in FlattenVisibleStructureItems())
+            {
+                if (StructureTreeItemCopyLine(item) is { Length: > 0 } line)
+                {
+                    lines.Add(line);
+                }
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        if (_structureTree.SelectedItem is TreeViewItem selected)
+        {
+            return StructureTreeItemCopyLine(selected) ?? string.Empty;
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>コピー用。表示の " - " ではなくタブ区切り（FourCC〈TAB〉値）。</summary>
+    private string? StructureTreeItemCopyLine(TreeViewItem item)
+    {
+        if (item.Tag is not WaveStructureNode node)
+        {
+            return SanitizeCopyText(item.Header switch
+            {
+                TextBlock block => block.Text,
+                string text => text,
+                _ => item.Header?.ToString(),
+            });
+        }
+
+        // 空 FourCC は ----。通常は FourCC（末尾空白は表貼り付け用に落とす）。
+        var name = node.FormatDisplayFourCc().TrimEnd();
+        if (name.Length == 0)
+        {
+            name = WaveStructureNode.BlankFourCcListLabel;
+        }
+
+        if (_structureDocument is { IsChunkUnion: true })
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{name}\t{node.Size:#,0}");
+        }
+
+        var depth = MeasureTreeIndentDepth(item);
+        var indent = depth > 0
+            ? new string(' ', depth * WaveStructureNode.TreeIndentSpaces)
+            : string.Empty;
+        return indent + name + "\t" + WaveStructureNode.FormatSize(node.Size);
+    }
+
+    /// <summary>クリップボードは埋め込み NUL を嫌うので除去する。</summary>
+    private static string? SanitizeCopyText(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        if (text.IndexOf('\0') < 0)
+        {
+            return text;
+        }
+
+        return text.Replace('\0', '?');
+    }
+
+    private void ClearHeaderStructureTreeSelectAllMarks()
+    {
+        if (!_structureTreeSelectAll)
+        {
+            return;
+        }
+
+        _structureTreeSelectAll = false;
+        foreach (var item in FlattenVisibleStructureItems())
+        {
+            item.SetValue(TreeMarkedProperty, false);
+            item.SetValue(SelectionBandEdgeProperty, SelectionBandEdge.None);
         }
     }
 
@@ -954,234 +1140,46 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
-        var metaRows = new (string Key, string Value)[]
+        // ファイル選択時はヘッダのみ。本文はチャンク選択で読む。
+        if (node.ContentPending
+            && !string.IsNullOrWhiteSpace(_structureLoadedPath)
+            && _structureTree.SelectedItem is TreeViewItem selected)
         {
-            ("Offset", string.Create(CultureInfo.InvariantCulture, $"0x{node.Offset:X} ({node.Offset})")),
-            ("Size", WaveStructureNode.FormatSize(node.Size)),
-        };
-
-        if (node.Kind == WaveStructureContentKind.Xml && !node.IsInvalid
-            && TryShowStructureXml(node.Content, WaveStructureNode.FormatKeyValueTable(metaRows)))
-        {
-            return;
+            node = WaveContainerStructure.EnsureContent(_structureLoadedPath, node);
+            selected.Tag = node;
         }
 
-        var body = node.Content;
-        if (node.IsInvalid && !string.IsNullOrWhiteSpace(node.Error)
-            && !body.Contains(node.Error, StringComparison.Ordinal))
+        if (node.Kind == WaveStructureContentKind.Xml && !node.IsInvalid)
         {
-            body = node.Error + Environment.NewLine + Environment.NewLine + body;
+            var meta = WaveStructureNode.FormatKeyValueTable(
+            [
+                ("Offset", string.Create(CultureInfo.InvariantCulture, $"0x{node.Offset:X} ({node.Offset})")),
+                ("Size", WaveStructureNode.FormatSize(node.Size)),
+            ]);
+            if (TryShowStructureXml(node.Content, meta))
+            {
+                return;
+            }
         }
 
-        ShowStructureDetail(WaveStructureNode.FormatDetailWithMeta(metaRows, body));
+        ShowStructureDetail(WaveStructureNode.FormatNodeDetail(node));
     }
 
     private bool TryShowStructureXml(string xml, string meta)
     {
-        try
-        {
-            var document = XDocument.Parse(xml, LoadOptions.None);
-            _structureDetailClipGrowBlocked = false;
-            _structureDetailMeta.Text = meta;
-            _structureDetailMeta.Visibility = Visibility.Visible;
-            _structureDetailBox.Visibility = Visibility.Collapsed;
-            _structureXmlTree.Visibility = Visibility.Visible;
-            _structureXmlTree.Items.Clear();
-
-            if (document.Declaration is not null)
-            {
-                var declData = $"version=\"{document.Declaration.Version}\""
-                    + (document.Declaration.Encoding is { Length: > 0 } enc
-                        ? $" encoding=\"{enc}\""
-                        : string.Empty);
-                _structureXmlTree.Items.Add(CreateXmlPiLeafItem("xml", declData, depth: 0));
-            }
-
-            foreach (var node in document.Nodes())
-            {
-                if (CreateXmlTreeItem(node, depth: 0) is { } item)
-                {
-                    _structureXmlTree.Items.Add(item);
-                }
-            }
-
-            FitHeaderStructurePaneWidths();
-            ScheduleXmlDetailWidthSync();
-            return true;
-        }
-        catch (Exception)
+        if (!WaveStructureXmlTree.TryPopulate(_structureXmlTree, xml))
         {
             return false;
         }
-    }
 
-    // XML 色分け（一般的なエディタ寄りの対応）。
-    private const string XmlTagBrushKey = "AccentCyanBrush";
-    private const string XmlPunctBrushKey = "MutedForeBrush";
-    private const string XmlAttrNameBrushKey = "LoudnessCautionBrush";
-    private const string XmlAttrValueBrushKey = "PlayerAbInBrush";
-    private const string XmlTextBrushKey = "PrimaryForeBrush";
-    private const string XmlCommentBrushKey = "CrossfadePreBrush";
-    private const string XmlPiBrushKey = "SampleLoopTimelineBrush";
-
-    private TreeViewItem? CreateXmlTreeItem(XNode node, int depth)
-    {
-        switch (node)
-        {
-            case XElement element:
-                return CreateXmlElementItem(element, depth);
-            case XText text:
-            {
-                var value = text.Value.Trim();
-                return value.Length == 0 ? null : CreateXmlTextLeafItem(value, depth);
-            }
-            case XComment comment:
-                return CreateXmlCommentLeafItem(comment.Value.Trim(), depth);
-            case XProcessingInstruction pi:
-                return CreateXmlPiLeafItem(pi.Target, pi.Data, depth);
-            default:
-                return null;
-        }
-    }
-
-    private TreeViewItem CreateXmlElementItem(XElement element, int depth)
-    {
-        var name = element.Name.LocalName;
-
-        // 子要素も属性も無い単純要素は1行にまとめ、テキストを二重表示しない。
-        if (!element.HasElements && !element.HasAttributes)
-        {
-            var text = element.Value.Trim();
-            return text.Length == 0
-                ? CreateXmlTreeViewItem(BuildXmlEmptyElementInlines(name), depth)
-                : CreateXmlTreeViewItem(BuildXmlInlineElementInlines(name, text), depth);
-        }
-
-        var item = CreateXmlTreeViewItem(BuildXmlOpenTagInlines(name), depth);
-        var childDepth = depth + 1;
-        foreach (var attr in element.Attributes())
-        {
-            item.Items.Add(
-                CreateXmlTreeViewItem(BuildXmlAttributeInlines(attr.Name.LocalName, attr.Value), childDepth));
-        }
-
-        foreach (var child in element.Nodes())
-        {
-            // 子要素があるときの空白テキストは捨てる。要素だけの階層を保つ。
-            if (child is XText && element.HasElements)
-            {
-                var value = ((XText)child).Value.Trim();
-                if (value.Length == 0)
-                {
-                    continue;
-                }
-            }
-
-            if (CreateXmlTreeItem(child, childDepth) is { } childItem)
-            {
-                item.Items.Add(childItem);
-            }
-        }
-
-        // 畳み状態はファイル切替で捨てる。初期は展開。
-        item.IsExpanded = true;
-        return item;
-    }
-
-    private TreeViewItem CreateXmlTextLeafItem(string text, int depth) =>
-        CreateXmlTreeViewItem([XmlRun(text, XmlTextBrushKey)], depth);
-
-    private TreeViewItem CreateXmlCommentLeafItem(string text, int depth) =>
-        CreateXmlTreeViewItem([XmlRun($"<!-- {text} -->", XmlCommentBrushKey)], depth);
-
-    private TreeViewItem CreateXmlPiLeafItem(string target, string data, int depth) =>
-        CreateXmlTreeViewItem(
-        [
-            XmlRun("<?", XmlPunctBrushKey),
-            XmlRun(target, XmlPiBrushKey),
-            XmlRun(string.IsNullOrEmpty(data) ? string.Empty : " " + data, XmlPiBrushKey),
-            XmlRun("?>", XmlPunctBrushKey),
-        ],
-        depth);
-
-    private static Inline[] BuildXmlOpenTagInlines(string name) =>
-    [
-        XmlRun("<", XmlPunctBrushKey),
-        XmlRun(name, XmlTagBrushKey),
-        XmlRun(">", XmlPunctBrushKey),
-    ];
-
-    private static Inline[] BuildXmlEmptyElementInlines(string name) =>
-    [
-        XmlRun("<", XmlPunctBrushKey),
-        XmlRun(name, XmlTagBrushKey),
-        XmlRun("/>", XmlPunctBrushKey),
-    ];
-
-    private static Inline[] BuildXmlInlineElementInlines(string name, string text) =>
-    [
-        XmlRun("<", XmlPunctBrushKey),
-        XmlRun(name, XmlTagBrushKey),
-        XmlRun(">", XmlPunctBrushKey),
-        XmlRun(text, XmlTextBrushKey),
-        XmlRun("</", XmlPunctBrushKey),
-        XmlRun(name, XmlTagBrushKey),
-        XmlRun(">", XmlPunctBrushKey),
-    ];
-
-    private static Inline[] BuildXmlAttributeInlines(string name, string value) =>
-    [
-        XmlRun(name, XmlAttrNameBrushKey),
-        XmlRun("=", XmlPunctBrushKey),
-        XmlRun("\"", XmlPunctBrushKey),
-        XmlRun(value, XmlAttrValueBrushKey),
-        XmlRun("\"", XmlPunctBrushKey),
-    ];
-
-    private static Run XmlRun(string text, string brushKey)
-    {
-        var run = new Run(text);
-        run.SetResourceReference(TextElement.ForegroundProperty, brushKey);
-        return run;
-    }
-
-    private TreeViewItem CreateXmlTreeViewItem(IEnumerable<Inline> inlines, int depth)
-    {
-        var item = new TreeViewItem();
-        if (_structureXmlTree.ItemContainerStyle is { } style)
-        {
-            item.Style = style;
-            item.ItemContainerStyle = style;
-        }
-
-        var header = new TextBlock
-        {
-            FontFamily = StructureDetailMonoFont,
-            FontSize = LibraryListFontSize,
-            FontWeight = FontWeights.Normal,
-            FontStyle = FontStyles.Normal,
-            FontStretch = FontStretches.Normal,
-            TextWrapping = TextWrapping.NoWrap,
-            TextTrimming = TextTrimming.None,
-            Margin = new Thickness(0),
-            Padding = new Thickness(0),
-        };
-        foreach (var inline in inlines)
-        {
-            header.Inlines.Add(inline);
-        }
-
-        ApplyHeaderStructureDetailTypography(header);
-        header.FontFamily = StructureDetailMonoFont;
-        // キー／値表の │ 用行送りはツリー行には載せない（広くなる）。
-        TextBlock.SetLineStackingStrategy(header, LineStackingStrategy.BlockLineHeight);
-        TextBlock.SetLineHeight(header, LibraryListFontSize);
-        item.Header = header;
-        item.FontWeight = FontWeights.Normal;
-        item.IsExpanded = false;
-        // 階層字下げは選択帯の内側だけ。コンテナ自体は全幅のまま。
-        item.Padding = new Thickness(2 + (depth * StructureXmlChildIndent), 0, 4, 0);
-        return item;
+        _structureDetailClipGrowBlocked = false;
+        _structureDetailMeta.Text = meta;
+        _structureDetailMeta.Visibility = Visibility.Visible;
+        _structureDetailBox.Visibility = Visibility.Collapsed;
+        _structureXmlTree.Visibility = Visibility.Visible;
+        FitHeaderStructurePaneWidths();
+        ScheduleXmlDetailWidthSync();
+        return true;
     }
 
     public void MoveHeaderStructureSelection(int delta)
@@ -1436,7 +1434,7 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>情報表示／構造ツリーは常に Regular。Display で細くシャープに描く。</summary>
-    private static void ApplyHeaderStructureDetailTypography(Control control)
+    internal static void ApplyHeaderStructureDetailTypography(Control control)
     {
         control.FontSize = LibraryListFontSize;
         control.FontWeight = FontWeights.Normal;
@@ -1449,7 +1447,7 @@ internal sealed partial class LibraryBrowserView
         TextElement.SetFontStyle(control, FontStyles.Normal);
     }
 
-    private static void ApplyHeaderStructureDetailTypography(TextBlock block)
+    internal static void ApplyHeaderStructureDetailTypography(TextBlock block)
     {
         block.FontSize = LibraryListFontSize;
         block.FontWeight = FontWeights.Normal;
@@ -1461,7 +1459,7 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>情報テキストの行送り。│ が上下で密着しないようにする。</summary>
-    private static void ApplyStructureDetailLineHeight(DependencyObject target, double fontSize)
+    internal static void ApplyStructureDetailLineHeight(DependencyObject target, double fontSize)
     {
         TextBlock.SetLineStackingStrategy(target, LineStackingStrategy.BlockLineHeight);
         TextBlock.SetLineHeight(target, Math.Max(1, fontSize * StructureDetailLineHeightFactor));
@@ -1674,6 +1672,8 @@ internal sealed partial class LibraryBrowserView
                     : DesignMetrics.LibraryHeaderStructureWidth);
             _headerStructureRememberedWidth = DesignMetrics.ClampLibraryHeaderStructureWidth(current);
             ApplyHeaderStructureCollapsedChrome();
+            // 解析結果だけ捨てる（幅の高水位は再表示用に残す）。オフ中の選択追従コストを切る。
+            DiscardHeaderStructureContent();
 
             _headerStructureVisible = false;
             if (IsHeaderStructureFocused)
@@ -1714,18 +1714,16 @@ internal sealed partial class LibraryBrowserView
             }
         }
 
+        RefreshHeaderStructure();
         FitHeaderStructurePaneWidths();
-        ScheduleHeaderStructureFitAfterShow();
-        if (focusWhenShown)
-        {
-            FocusHeaderStructure();
-        }
+        // Refresh 後のフォーカスは Loaded 以降（ツリー行がフォーカス可能になってから）。
+        ScheduleHeaderStructureFitAfterShow(focusWhenShown);
 
         HeaderStructureVisibleChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>再表示直後はレイアウト前に Fit することがあるので、Loaded 後にもう一度合わせて見切れを取る。</summary>
-    private void ScheduleHeaderStructureFitAfterShow()
+    private void ScheduleHeaderStructureFitAfterShow(bool focusWhenShown = false)
     {
         Dispatcher.BeginInvoke(
             () =>
@@ -1751,6 +1749,11 @@ internal sealed partial class LibraryBrowserView
                     {
                         ScheduleXmlDetailWidthSync();
                     }
+                }
+
+                if (focusWhenShown)
+                {
+                    FocusHeaderStructure();
                 }
             },
             DispatcherPriority.Loaded);

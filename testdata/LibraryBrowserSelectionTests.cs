@@ -2842,6 +2842,30 @@ public sealed class LibraryBrowserSelectionTests
         RunSta(() =>
         {
             EnsureTheme();
+            var path = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-off-" + Guid.NewGuid().ToString("N") + ".wav");
+            var pcm = new byte[4];
+            var fmt = new byte[]
+            {
+                1, 0, 1, 0, 0x44, 0xAC, 0, 0, 0x88, 0x58, 0x01, 0, 2, 0, 16, 0,
+            };
+            using (var ms = new MemoryStream())
+            using (var w = new BinaryWriter(ms))
+            {
+                w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                w.Write(36 + pcm.Length);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                w.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                w.Write(fmt.Length);
+                w.Write(fmt);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                w.Write(pcm.Length);
+                w.Write(pcm);
+                File.WriteAllBytes(path, ms.ToArray());
+            }
+
+            var session = new DocumentSession(AudioDocument.CreateDeferred(path));
             var view = new LibraryBrowserView();
             var window = new Window
             {
@@ -2859,20 +2883,82 @@ public sealed class LibraryBrowserSelectionTests
                 Flush();
                 Assert.False(view.HeaderStructureVisible);
                 Assert.Equal(Visibility.Collapsed, view.StructureSplitter.Visibility);
-                view.ToggleHeaderStructureVisible();
+
+                // オフ中は選択してもヘッダ解析しない。
+                view.SetSessions([session], session, [session]);
                 Flush();
-                Assert.True(view.HeaderStructureVisible);
-                Assert.Equal(Visibility.Visible, view.StructureSplitter.Visibility);
-                Assert.True(view.StructureColumnWidth > 1);
-                Assert.True(view.IsHeaderStructureFocused);
-                view.ToggleHeaderStructureVisible();
-                Flush();
-                Assert.False(view.HeaderStructureVisible);
-                Assert.Equal(Visibility.Collapsed, view.StructureSplitter.Visibility);
+                Assert.Empty(view.HeaderStructureTree.Items);
+
+                // オフのまま追加（選択あり／なし）しても解析しない。
+                var path2 = Path.Combine(
+                    Path.GetTempPath(),
+                    "mga-header-off-add-" + Guid.NewGuid().ToString("N") + ".wav");
+                var path3 = Path.Combine(
+                    Path.GetTempPath(),
+                    "mga-header-off-add2-" + Guid.NewGuid().ToString("N") + ".wav");
+                File.Copy(path, path2, overwrite: true);
+                File.Copy(path, path3, overwrite: true);
+                try
+                {
+                    view.AppendSession(
+                        new DocumentSession(AudioDocument.CreateDeferred(path2)),
+                        select: false);
+                    Flush();
+                    Assert.Empty(view.HeaderStructureTree.Items);
+
+                    view.AppendSession(
+                        new DocumentSession(AudioDocument.CreateDeferred(path2)),
+                        select: true);
+                    Flush();
+                    Assert.Empty(view.HeaderStructureTree.Items);
+
+                    view.ToggleHeaderStructureVisible();
+                    Flush();
+                    Assert.True(view.HeaderStructureVisible);
+                    Assert.Equal(Visibility.Visible, view.StructureSplitter.Visibility);
+                    Assert.True(view.StructureColumnWidth > 1);
+                    Assert.NotEmpty(view.HeaderStructureTree.Items);
+                    Assert.True(view.IsHeaderStructureFocused);
+
+                    view.ToggleHeaderStructureVisible();
+                    Flush();
+                    Assert.False(view.HeaderStructureVisible);
+                    Assert.Equal(Visibility.Collapsed, view.StructureSplitter.Visibility);
+                    Assert.Empty(view.HeaderStructureTree.Items);
+
+                    // 一度オン→オフのあと、さらに追加しても解析しない。
+                    view.AppendSession(
+                        new DocumentSession(AudioDocument.CreateDeferred(path3)),
+                        select: true);
+                    Flush();
+                    Assert.Empty(view.HeaderStructureTree.Items);
+                }
+                finally
+                {
+                    foreach (var p in new[] { path2, path3 })
+                    {
+                        try
+                        {
+                            File.Delete(p);
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+                    }
+                }
             }
             finally
             {
                 window.Close();
+                try
+                {
+                    File.Delete(path);
+                }
+                catch
+                {
+                    // ignore
+                }
             }
         });
     }
