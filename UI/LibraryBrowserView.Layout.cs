@@ -213,7 +213,9 @@ internal sealed partial class LibraryBrowserView
             HorizontalAlignment = HorizontalAlignment.Left,
         };
         playlistTitle.Children.Add(_playlistLabel);
-        playlistTitle.Children.Add(_playlistBusyBadge);
+        playlistTitle.Children.Add(_playlistBusyEnumerateBadge);
+        playlistTitle.Children.Add(_playlistBusyWaveformBadge);
+        playlistTitle.Children.Add(_playlistBusyLoudnessBadge);
         bar.Children.Add(playlistTitle);
 
         var list = new DockPanel();

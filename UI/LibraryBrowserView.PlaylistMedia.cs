@@ -469,6 +469,12 @@ internal sealed partial class LibraryBrowserView
         }
 
         _playlistEnumerateBusy = busy;
+        SyncPlaylistBusyBadge(
+            _playlistBusyEnumerateBadge,
+            ref _playlistBusyEnumerateBack,
+            ref _playlistBusyEnumerateFadeTicket,
+            busy,
+            UiStrings.PlaylistBusyEnumerate);
         RaisePlaylistMediaBusyChanged();
     }
 
@@ -480,6 +486,12 @@ internal sealed partial class LibraryBrowserView
         }
 
         _playlistWaveBusy = busy;
+        SyncPlaylistBusyBadge(
+            _playlistBusyWaveformBadge,
+            ref _playlistBusyWaveformBack,
+            ref _playlistBusyWaveformFadeTicket,
+            busy,
+            UiStrings.PlaylistBusyWaveform);
         RaisePlaylistMediaBusyChanged();
     }
 
@@ -491,60 +503,71 @@ internal sealed partial class LibraryBrowserView
         }
 
         _playlistLoudnessBusy = busy;
+        SyncPlaylistBusyBadge(
+            _playlistBusyLoudnessBadge,
+            ref _playlistBusyLoudnessBack,
+            ref _playlistBusyLoudnessFadeTicket,
+            busy,
+            UiStrings.PlaylistBusyLoudness);
         RaisePlaylistMediaBusyChanged();
     }
 
     private void RaisePlaylistMediaBusyChanged()
     {
         var busy = IsPlaylistMediaBusy;
-        // フェードアウト中は直前の文言を残す（空文字＋赤枠だけが見えるのを防ぐ）。
-        if (busy)
-        {
-            RefreshPlaylistBusyDetail();
-        }
-
         if (busy == _playlistMediaBusyNotified)
         {
             return;
         }
 
         _playlistMediaBusyNotified = busy;
-        SyncPlaylistBusyChrome(busy);
         PlaylistMediaBusyChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void SyncPlaylistBusyChrome(bool busy)
+    private void SyncPlaylistBusyBadge(
+        Border badge,
+        ref SolidColorBrush? back,
+        ref int fadeTicket,
+        bool busy,
+        string label)
     {
-        StopPlaylistBusyAnimations();
+        StopPlaylistBusyBadgeAnimations(badge, ref back, ref fadeTicket);
         if (busy)
         {
-            ShowPlaylistBusyChrome();
+            ShowPlaylistBusyBadge(badge, ref back, label);
             return;
         }
 
-        BeginPlaylistBusyFadeOut();
+        BeginPlaylistBusyBadgeFadeOut(badge, ref back, ref fadeTicket);
     }
 
-    private void StopPlaylistBusyAnimations()
+    private static void StopPlaylistBusyBadgeAnimations(
+        Border badge,
+        ref SolidColorBrush? back,
+        ref int fadeTicket)
     {
-        _playlistBusyFadeTicket++;
-        _playlistBusyBadge.BeginAnimation(UIElement.OpacityProperty, null);
-        if (_playlistBusyBadgeBack is not null)
+        fadeTicket++;
+        badge.BeginAnimation(UIElement.OpacityProperty, null);
+        if (back is not null)
         {
-            _playlistBusyBadgeBack.BeginAnimation(Brush.OpacityProperty, null);
+            back.BeginAnimation(Brush.OpacityProperty, null);
         }
     }
 
-    private void ShowPlaylistBusyChrome()
+    private void ShowPlaylistBusyBadge(Border badge, ref SolidColorBrush? back, string label)
     {
-        RefreshPlaylistBusyDetail();
-        _playlistBusyBadge.Visibility = Visibility.Visible;
-        _playlistBusyBadge.Opacity = 1;
+        if (badge.Child is TextBlock text)
+        {
+            text.Text = label;
+        }
 
-        var back = new SolidColorBrush(Theme.Get("PlaylistBusyBadgeBackBrush"));
-        _playlistBusyBadgeBack = back;
-        _playlistBusyBadge.Background = back;
-        back.BeginAnimation(
+        badge.Visibility = Visibility.Visible;
+        badge.Opacity = 1;
+
+        var brush = new SolidColorBrush(Theme.Get("PlaylistBusyBadgeBackBrush"));
+        back = brush;
+        badge.Background = brush;
+        brush.BeginAnimation(
             Brush.OpacityProperty,
             new DoubleAnimation
             {
@@ -557,31 +580,64 @@ internal sealed partial class LibraryBrowserView
             });
     }
 
-    private void BeginPlaylistBusyFadeOut()
+    private void BeginPlaylistBusyBadgeFadeOut(
+        Border badge,
+        ref SolidColorBrush? back,
+        ref int fadeTicket)
     {
-        if (_playlistBusyBadge.Visibility != Visibility.Visible)
+        if (badge.Visibility != Visibility.Visible)
         {
-            HidePlaylistBusyChrome();
+            HidePlaylistBusyBadge(badge, ref back);
             return;
         }
 
-        if (_playlistBusyBadgeBack is not null)
+        if (back is not null)
         {
-            _playlistBusyBadgeBack.Opacity = 1;
+            back.Opacity = 1;
         }
 
-        var ticket = _playlistBusyFadeTicket;
-        var fade = CreatePlaylistBusyFadeOut(_playlistBusyBadge.Opacity);
+        var ticket = fadeTicket;
+        var fade = CreatePlaylistBusyFadeOut(badge.Opacity);
         fade.Completed += (_, _) =>
         {
-            if (ticket != _playlistBusyFadeTicket || IsPlaylistMediaBusy)
+            if (ticket != PlaylistBusyFadeTicketOf(badge) || PlaylistBusyWanted(badge))
             {
                 return;
             }
 
-            HidePlaylistBusyChrome();
+            HidePlaylistBusyBadge(badge);
         };
-        _playlistBusyBadge.BeginAnimation(UIElement.OpacityProperty, fade);
+        badge.BeginAnimation(UIElement.OpacityProperty, fade);
+    }
+
+    private int PlaylistBusyFadeTicketOf(Border badge)
+    {
+        if (ReferenceEquals(badge, _playlistBusyEnumerateBadge))
+        {
+            return _playlistBusyEnumerateFadeTicket;
+        }
+
+        if (ReferenceEquals(badge, _playlistBusyWaveformBadge))
+        {
+            return _playlistBusyWaveformFadeTicket;
+        }
+
+        return _playlistBusyLoudnessFadeTicket;
+    }
+
+    private bool PlaylistBusyWanted(Border badge)
+    {
+        if (ReferenceEquals(badge, _playlistBusyEnumerateBadge))
+        {
+            return _playlistEnumerateBusy;
+        }
+
+        if (ReferenceEquals(badge, _playlistBusyWaveformBadge))
+        {
+            return _playlistWaveBusy;
+        }
+
+        return _playlistLoudnessBusy;
     }
 
     private static DoubleAnimation CreatePlaylistBusyFadeOut(double from) =>
@@ -594,60 +650,50 @@ internal sealed partial class LibraryBrowserView
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn },
         };
 
-    private void HidePlaylistBusyChrome()
+    private void HidePlaylistBusyBadge(Border badge)
     {
-        _playlistBusyBadge.BeginAnimation(UIElement.OpacityProperty, null);
-        if (_playlistBusyBadgeBack is not null)
+        if (ReferenceEquals(badge, _playlistBusyEnumerateBadge))
         {
-            _playlistBusyBadgeBack.BeginAnimation(Brush.OpacityProperty, null);
-            _playlistBusyBadgeBack = null;
+            HidePlaylistBusyBadge(badge, ref _playlistBusyEnumerateBack);
+            return;
         }
 
-        if (_playlistBusyBadge.Child is TextBlock text)
+        if (ReferenceEquals(badge, _playlistBusyWaveformBadge))
         {
-            text.Text = string.Empty;
+            HidePlaylistBusyBadge(badge, ref _playlistBusyWaveformBack);
+            return;
         }
 
-        _playlistBusyBadge.Visibility = Visibility.Collapsed;
-        _playlistBusyBadge.Opacity = 1;
-        _playlistBusyBadge.SetResourceReference(Border.BackgroundProperty, "PlaylistBusyBadgeBackBrush");
+        HidePlaylistBusyBadge(badge, ref _playlistBusyLoudnessBack);
     }
 
-    private void RefreshPlaylistBusyDetail()
+    private static void HidePlaylistBusyBadge(Border badge, ref SolidColorBrush? back)
     {
-        if (_playlistBusyBadge.Child is TextBlock text)
+        badge.BeginAnimation(UIElement.OpacityProperty, null);
+        if (back is not null)
         {
-            text.Text = FormatPlaylistBusyDetail(
-                _playlistEnumerateBusy,
-                _playlistWaveBusy,
-                _playlistLoudnessBusy);
+            back.BeginAnimation(Brush.OpacityProperty, null);
+            back = null;
         }
+
+        badge.Visibility = Visibility.Collapsed;
+        badge.Opacity = 1;
+        badge.SetResourceReference(Border.BackgroundProperty, "PlaylistBusyBadgeBackBrush");
     }
 
-    internal static string FormatPlaylistBusyDetail(
-        bool enumerateBusy,
-        bool waveBusy,
-        bool loudnessBusy)
+    private void ApplyPlaylistBusyBadgeLabels()
     {
-        var parts = new List<string>(3);
-        if (enumerateBusy)
-        {
-            parts.Add(UiStrings.PlaylistBusyEnumerate);
-        }
+        SetPlaylistBusyBadgeLabel(_playlistBusyEnumerateBadge, UiStrings.PlaylistBusyEnumerate);
+        SetPlaylistBusyBadgeLabel(_playlistBusyWaveformBadge, UiStrings.PlaylistBusyWaveform);
+        SetPlaylistBusyBadgeLabel(_playlistBusyLoudnessBadge, UiStrings.PlaylistBusyLoudness);
+    }
 
-        if (waveBusy)
+    private static void SetPlaylistBusyBadgeLabel(Border badge, string label)
+    {
+        if (badge.Child is TextBlock text && badge.Visibility == Visibility.Visible)
         {
-            parts.Add(UiStrings.PlaylistBusyWaveform);
+            text.Text = label;
         }
-
-        if (loudnessBusy)
-        {
-            parts.Add(UiStrings.PlaylistBusyLoudness);
-        }
-
-        return parts.Count == 0
-            ? string.Empty
-            : string.Join(UiStrings.PlaylistBusyDetailSeparator, parts);
     }
 
     internal static Border CreatePlaylistBusyBadge()

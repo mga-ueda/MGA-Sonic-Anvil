@@ -158,9 +158,15 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly Border _listFocusLine = CreatePaneFocusLine();
     private readonly Border _structureFocusLine = CreatePaneFocusLine();
     private readonly Border _structureDetailFocusLine = CreatePaneFocusLine();
-    private readonly Border _playlistBusyBadge = CreatePlaylistBusyBadge();
-    private SolidColorBrush? _playlistBusyBadgeBack;
-    private int _playlistBusyFadeTicket;
+    private readonly Border _playlistBusyEnumerateBadge = CreatePlaylistBusyBadge();
+    private readonly Border _playlistBusyWaveformBadge = CreatePlaylistBusyBadge();
+    private readonly Border _playlistBusyLoudnessBadge = CreatePlaylistBusyBadge();
+    private SolidColorBrush? _playlistBusyEnumerateBack;
+    private SolidColorBrush? _playlistBusyWaveformBack;
+    private SolidColorBrush? _playlistBusyLoudnessBack;
+    private int _playlistBusyEnumerateFadeTicket;
+    private int _playlistBusyWaveformFadeTicket;
+    private int _playlistBusyLoudnessFadeTicket;
     private const double PlaylistBusyBlinkSeconds = 0.55;
     private const double PlaylistBusyFadeOutSeconds = 0.4;
     private readonly TextBlock _structureLabel = new();
@@ -3606,7 +3612,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         _explorerLabel.Text = UiStrings.LibraryExplorerLabel;
         _favoritesLabel.Text = UiStrings.LibraryFavoritesLabel;
         _playlistLabel.Text = UiStrings.LibraryPlaylistLabel;
-        RefreshPlaylistBusyDetail();
+        ApplyPlaylistBusyBadgeLabels();
         _structureLabel.Text = UiStrings.LibraryHeaderStructureLabel;
         _structureDetailLabel.Text = UiStrings.LibraryHeaderStructureDetailLabel;
         _structureLoadedPath = null;
@@ -3654,9 +3660,20 @@ internal sealed partial class LibraryBrowserView : UserControl
         _autoPlayLatch.RefreshAppearance();
         _autoPlayNextLatch.RefreshAppearance();
         _checkSelectLatch.RefreshAppearance();
-        if (IsPlaylistMediaBusy && _playlistBusyBadgeBack is not null)
+        var color = Theme.Get("PlaylistBusyBadgeBackBrush");
+        if (_playlistBusyEnumerateBack is not null)
         {
-            _playlistBusyBadgeBack.Color = Theme.Get("PlaylistBusyBadgeBackBrush");
+            _playlistBusyEnumerateBack.Color = color;
+        }
+
+        if (_playlistBusyWaveformBack is not null)
+        {
+            _playlistBusyWaveformBack.Color = color;
+        }
+
+        if (_playlistBusyLoudnessBack is not null)
+        {
+            _playlistBusyLoudnessBack.Color = color;
         }
     }
 

@@ -8,7 +8,6 @@ internal static partial class UiStrings
     public static string PlaylistBusyEnumerate => Get("ファイルリスト取得中", "Listing files");
     public static string PlaylistBusyWaveform => Get("波形描画中", "Drawing waveforms");
     public static string PlaylistBusyLoudness => Get("ラウドネス取得中", "Measuring loudness");
-    public static string PlaylistBusyDetailSeparator => Get("・", " · ");
     public static string LabelWwise => Get("Wwise", "Wwise");
     public static string LabelWwisePrefetchLength => Get("Prefetch Length", "Prefetch Length");
     public static string LabelWwiseLookAheadTime => Get("Look-ahead Time", "Look-ahead Time");
