@@ -334,6 +334,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     private int _syncGeneration;
     private int _playlistSelectionNotifyDepth;
     private bool _playlistSelectionNotifyPending;
+    private int _playlistScrollRevealSelectionStamp = int.MinValue;
     private bool _deferActivate;
     /// <summary>
     /// 非選択の連続 Append で <see cref="_deferActivate"/> をネストしたときの深さ。
@@ -4888,6 +4889,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         _playlistSelectionNotifyPending = false;
+        RevealPlaylistScrollIfSelectionChanged();
         PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
         if (!_suppressHeaderStructureRefresh)
         {
@@ -4904,11 +4906,45 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         RefreshPlaylistSelectionBandEdges();
+        RevealPlaylistScrollIfSelectionChanged();
         PlaylistSelectionChanged?.Invoke(this, EventArgs.Empty);
         if (!_suppressHeaderStructureRefresh)
         {
             RefreshHeaderStructure();
         }
+    }
+
+    private void RevealPlaylistScrollIfSelectionChanged()
+    {
+        var stamp = ComputePlaylistSelectionStamp();
+        if (stamp == _playlistScrollRevealSelectionStamp)
+        {
+            return;
+        }
+
+        _playlistScrollRevealSelectionStamp = stamp;
+        LibraryScrollReveal.RevealTemporarily(_grid);
+    }
+
+    private int ComputePlaylistSelectionStamp()
+    {
+        var hash = new HashCode();
+        foreach (var row in BoundRows)
+        {
+            if (!row.IsPlaylistSelected || row.Tag is not DocumentSession session)
+            {
+                continue;
+            }
+
+            hash.Add(session);
+        }
+
+        if (_playlistCaretRow?.Tag is DocumentSession caret)
+        {
+            hash.Add(caret);
+        }
+
+        return hash.ToHashCode();
     }
 
     /// <summary>

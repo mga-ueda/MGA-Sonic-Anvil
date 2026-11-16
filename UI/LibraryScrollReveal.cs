@@ -57,7 +57,7 @@ internal static class LibraryHoverIdle
         typeof(LibraryHoverIdle));
 }
 
-/// <summary>プレイヤーのスクロールバー。普段は隠し、端に近いとき／ホバー時だけ出す。</summary>
+/// <summary>プレイヤーのスクロールバー。普段は隠し、端付近／ホバー／選択時だけ出す。</summary>
 internal static class LibraryScrollReveal
 {
     public static readonly DependencyProperty RevealedProperty = DependencyProperty.RegisterAttached(
@@ -92,6 +92,19 @@ internal static class LibraryScrollReveal
         host.SetValue(HoverRevealProperty, true);
         host.PreviewMouseMove += Host_PreviewMouseMove;
         host.MouseLeave += Host_MouseLeave;
+    }
+
+    /// <summary>選択などで一時的に出す。端付近でなくてもよい。動かなければ約 3 秒で消える。</summary>
+    public static void RevealTemporarily(FrameworkElement host)
+    {
+        var viewer = FindScrollViewer(host);
+        if (viewer is null)
+        {
+            return;
+        }
+
+        Apply(viewer, vertical: true, horizontal: true, idle: false);
+        LibraryHoverIdle.Arm(host, () => OnScrollIdle(host));
     }
 
     public static bool IsNearEdge(double position, double length, double distance) =>
