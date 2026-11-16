@@ -199,9 +199,21 @@ public partial class MainWindow
     internal bool IsLibraryHeaderStructureFocused =>
         IsLibraryMaximized && LibraryBrowser.IsHeaderStructureFocused;
 
-    /// <summary>エディタのヘッダ情報（チャンクリスト）にキーボードフォーカスがある。</summary>
+    /// <summary>エディタのヘッダ情報（チャンクリスト／詳細）にキーボードフォーカスがある。</summary>
     internal bool IsEditorHeaderStructureFocused =>
-        !IsLibraryMaximized && HeaderChunkStrip.IsKeyboardFocusWithin;
+        !IsLibraryMaximized
+        && (HeaderChunkStrip.IsKeyboardFocusWithin
+            || EditorHeaderDetailSideHost.IsKeyboardFocusWithin);
+
+    /// <summary>エディタのヘッダチャンクツリーにフォーカスがある。</summary>
+    internal bool IsEditorHeaderStructureTreeFocused =>
+        !IsLibraryMaximized && HeaderChunkStrip.IsTreeFocused;
+
+    /// <summary>エディタのヘッダ詳細（帯内／サイド）にフォーカスがある。</summary>
+    internal bool IsEditorHeaderStructureDetailFocused =>
+        !IsLibraryMaximized
+        && (HeaderChunkStrip.IsInlineDetailFocused
+            || EditorHeaderDetailSideHost.IsKeyboardFocusWithin);
 
     /// <summary>
     /// 波形ホストまたはアクティブ波形にキーボードフォーカスがある。
@@ -2952,7 +2964,7 @@ public partial class MainWindow
             ? LibraryBrowser.HeaderStructureVisible
             : AppStorage.Settings.EditorShowHeaderStructure;
 
-    /// <summary>プレイヤーは構造＋情報、エディタはチャンクリスト。設定はモード別。</summary>
+    /// <summary>プレイヤーは構造＋情報、エディタはチャンク＋情報。設定はモード別。</summary>
     private void ToggleHeaderStructureVisibility()
     {
         if (IsLibraryMaximized)
@@ -2970,9 +2982,10 @@ public partial class MainWindow
         SyncEditorChromeFade();
         if (show)
         {
+            // Load／Fit 後にフォーカス（プレイヤー側の Loaded 遅延と同じ）。
             Dispatcher.BeginInvoke(
                 HeaderChunkStrip.FocusTree,
-                System.Windows.Threading.DispatcherPriority.Input);
+                System.Windows.Threading.DispatcherPriority.Loaded);
         }
     }
 

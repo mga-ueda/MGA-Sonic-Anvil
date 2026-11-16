@@ -1022,6 +1022,11 @@ public partial class MainWindow
             return true;
         }
 
+        if (TryProcessEditorHeaderStructureShortcut(key, modifiers))
+        {
+            return true;
+        }
+
         if (TryProcessHistoryShortcut(key, modifiers))
         {
             return true;
@@ -1136,6 +1141,12 @@ public partial class MainWindow
 
         if (key == Key.A && modifiers == ModifierKeys.Control)
         {
+            // ヘッダ情報フォーカス時は上で処理／ネイティブへ委譲済み。
+            if (IsLibraryHeaderStructureFocused || IsEditorHeaderStructureFocused)
+            {
+                return false;
+            }
+
             // タブバー、またはタイルの帯の上ではタブの全選択。
             if (DocumentTabHost.Visibility == System.Windows.Visibility.Visible && DocumentTabHost.IsMouseOver
                 || IsPointerOverTileHeader())
@@ -1163,6 +1174,12 @@ public partial class MainWindow
 
         if (key == Key.C && modifiers == ModifierKeys.Control)
         {
+            // ヘッダ情報フォーカス時は上で処理／ネイティブへ委譲済み。波形コピーへ落とさない。
+            if (IsLibraryHeaderStructureFocused || IsEditorHeaderStructureFocused)
+            {
+                return false;
+            }
+
             ApplyCopy();
             return true;
         }
@@ -1576,14 +1593,15 @@ public partial class MainWindow
             return true;
         }
 
-        // 情報エリア／エディタのヘッダ情報フォーカス中は Home／End／Page／矢印をシークに使わない。
+        // エディタのヘッダ情報フォーカス中は Home／End／Page／矢印をシーク／ズームに使わない。
         if (IsEditorHeaderStructureFocused
             && IsEditorHeaderStructureNavKey(key, modifiers))
         {
-            return false;
+            return true;
         }
 
         if (!LibraryBrowser.IsHeaderStructureDetailFocused
+            && !IsEditorHeaderStructureFocused
             && TryHandleWaveformTimelineNavKey(key, modifiers))
         {
             return true;
@@ -2398,6 +2416,128 @@ public partial class MainWindow
         return null;
     }
 
+    /// <summary>
+    /// エディタのヘッダ情報。全選択／コピー、ツリー↔詳細、Ctrl+↑で波形、
+    /// フォーカス中は波形ポジション系を奪わない。
+    /// </summary>
+    private bool TryProcessEditorHeaderStructureShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (!IsEditorHeaderStructureFocused)
+        {
+            return false;
+        }
+
+        // Ctrl+← 詳細→ツリー、Ctrl+→ ツリー→詳細、Ctrl+↑ 波形。
+        if (modifiers == ModifierKeys.Control)
+        {
+            if (key == Key.Left)
+            {
+                if (IsEditorHeaderStructureDetailFocused)
+                {
+                    HeaderChunkStrip.FocusTree();
+                }
+
+                return true;
+            }
+
+            if (key == Key.Right)
+            {
+                if (IsEditorHeaderStructureTreeFocused)
+                {
+                    FocusEditorHeaderDetail();
+                }
+
+                return true;
+            }
+
+            if (key == Key.Up)
+            {
+                Waveform.Focus();
+                return true;
+            }
+
+            // Ctrl+↓ はプレイヤーではお気に入り。エディタでは波形拡縮へ落とさない。
+            if (key == Key.Down)
+            {
+                return true;
+            }
+        }
+
+        if (HeaderChunkStrip.IsTreeFocused && HeaderChunkStrip.TryHandleExpandKey(key, modifiers))
+        {
+            return true;
+        }
+
+        if (TryHandleEditorHeaderSideXmlExpandKey(key, modifiers))
+        {
+            return true;
+        }
+
+        if (IsEditorHeaderStructureDetailFocused)
+        {
+            if ((key is Key.Up or Key.Down or Key.PageUp or Key.PageDown)
+                && modifiers == ModifierKeys.None)
+            {
+                return TryHandleEditorHeaderDetailNavKey(key);
+            }
+
+            // Ctrl+A／C は TextBox／XML のネイティブへ。
+            if ((key == Key.A || key == Key.C) && modifiers == ModifierKeys.Control)
+            {
+                return false;
+            }
+
+            // 詳細フォーカス中は波形ポジション系を握る。
+            if (IsEditorHeaderStructureNavKey(key, modifiers))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        if (key == Key.A && modifiers == ModifierKeys.Control)
+        {
+            HeaderChunkStrip.SelectAllItems();
+            return true;
+        }
+
+        if (key == Key.C && modifiers == ModifierKeys.Control)
+        {
+            HeaderChunkStrip.CopySelection();
+            return true;
+        }
+
+        if (key is Key.Up or Key.Down
+            && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            HeaderChunkStrip.MoveSelection(key == Key.Up ? -1 : 1);
+            return true;
+        }
+
+        if (key is Key.Home or Key.End
+            && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            HeaderChunkStrip.MoveSelectionToEdge(key == Key.Home ? -1 : 1);
+            return true;
+        }
+
+        if (key is Key.PageUp or Key.PageDown
+            && modifiers is ModifierKeys.None or ModifierKeys.Shift)
+        {
+            HeaderChunkStrip.MoveSelection(key == Key.PageUp ? -8 : 8);
+            return true;
+        }
+
+        // ←→（展開済み）やその他ナビキーは波形移動へ落とさない。
+        if (IsEditorHeaderStructureNavKey(key, modifiers))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     /// <summary>プレイリスト上の移動／選択／捨てキュー Undo など。</summary>
     private bool TryProcessLibraryPlaylistShortcut(Key key, ModifierKeys modifiers, bool isRepeat)
     {
@@ -2421,7 +2561,25 @@ public partial class MainWindow
                         return LibraryBrowser.TryHandleHeaderStructureDetailNavKey(key);
                     }
 
+                    // Ctrl+A／C は TextBox／XML のネイティブへ（下の ApplyCopy 等へ落とさない）。
+                    if ((key == Key.A || key == Key.C) && modifiers == ModifierKeys.Control)
+                    {
+                        return false;
+                    }
+
                     return false;
+                }
+
+                if (key == Key.A && modifiers == ModifierKeys.Control)
+                {
+                    LibraryBrowser.SelectAllHeaderStructureItems();
+                    return true;
+                }
+
+                if (key == Key.C && modifiers == ModifierKeys.Control)
+                {
+                    LibraryBrowser.CopyHeaderStructureSelection();
+                    return true;
                 }
 
                 if (key is Key.Up or Key.Down
