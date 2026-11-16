@@ -267,8 +267,8 @@ public partial class MainWindow
 
     /// <summary>
     /// ビッグタイムコード／ヘッダチャンク／編集履歴／VST ラック。
-    /// エディタで波形があるときだけ。出し入れはメーターと同じ 1 秒フェード
-    /// （再生中のインとプレイヤー復帰は即）。アウト後に Collapse して列幅を返す。
+    /// エディタで波形があるときだけ。出すときは即（停止中も。信号待ちしない）。
+    /// 消すときだけメーターと同じ 1 秒フェード。アウト後に Collapse して列幅を返す。
     /// </summary>
     private void SyncHistoryStripVisibility() => SyncEditorChromeFade();
 
@@ -288,14 +288,16 @@ public partial class MainWindow
             CloseEditHistory(commit: true);
         }
 
+        var enteringPlayer = player && !_editorChromeWasPlayer;
         var leavingPlayer = !player && _editorChromeWasPlayer;
         _editorChromeWasPlayer = player;
 
-        var first = _editorChromeShown is null;
-        var instantReveal = LibraryPlayerMode.InstantPlayerMeterReveal(show, IsPlaybackActive());
-        var wantInstant = first
+        // 表示は常に即。エディタ↔プレイヤー切替の非表示も即（全部タブ閉じの 1 秒フェードと分ける）。
+        // 同モード内で文書が消えたときだけフェードアウト。
+        var wantInstant = show
+            || enteringPlayer
             || leavingPlayer
-            || LibraryPlayerMode.InstantPlayerMeterFade(show, instantReveal);
+            || _editorChromeShown is null;
 
         if (_editorChromeShown == show)
         {
@@ -310,23 +312,46 @@ public partial class MainWindow
             RefreshEditorHeaderChunks(showChunks);
             BindVstInsertRackSession(showVst);
 
-            if (wantInstant && EditorChromeNeedsOpaqueSnap(show, showTimecode, showVst, showChunks))
+            if (EditorChromeNeedsOpaqueSnap(show, showTimecode, showVst, showChunks))
             {
                 ApplyEditorChromeFade(show, showTimecode, showVst, showChunks, instant: true);
+                RefreshEditorPositionTimecodeText(showTimecode);
                 return;
             }
 
-            // ドック切替や VST 有効化など、論理表示は同じで子だけ変わる場合。
+            // ドック切替や VST 有効化など、子の出し分けだけ。既に不透明なら触らない。
             // チャンク帯をオフにするときは即 Collapse し、タイムコード側に幅を返す。
-            ApplyEditorChromeTarget(HistoryStrip, show, instant: false);
-            ApplyEditorChromeTarget(HeaderChunkStrip, showChunks, instant: !showChunks);
-            ApplyEditorChromeTarget(EditorPositionTimecodeHost, showTimecode, instant: false);
-            ApplyEditorChromeTarget(VstInsertRack, showVst, instant: false);
+            ApplyEditorChromeTarget(HistoryStrip, show, instant: true);
+            ApplyEditorChromeTarget(HeaderChunkStrip, showChunks, instant: true);
+            ApplyEditorChromeTarget(EditorPositionTimecodeHost, showTimecode, instant: true);
+            SyncEditorPositionSlotMinWidth(showTimecode);
+            ApplyEditorChromeTarget(VstInsertRack, showVst, instant: true);
+            // H 再表示は帯を Visible にしたあとで詳細配置。Collapse 中の Sync だと詳細が消える。
+            if (showChunks)
+            {
+                SyncEditorHeaderDetailPlacement();
+            }
+
+            RefreshEditorPositionTimecodeText(showTimecode);
             return;
         }
 
         ApplyEditorChromeFade(show, showTimecode, showVst, showChunks, wantInstant);
         _editorChromeShown = show;
+        RefreshEditorPositionTimecodeText(showTimecode);
+    }
+
+    /// <summary>
+    /// Collapse で Clear したあと、停止中の F12 最大化などでもステータスと同じ現在位置（0 秒含む）を載せる。
+    /// </summary>
+    private void RefreshEditorPositionTimecodeText(bool showTimecode)
+    {
+        if (!showTimecode)
+        {
+            return;
+        }
+
+        SyncTransportPosition();
     }
 
     private bool EditorChromeNeedsOpaqueSnap(bool show, bool showTimecode, bool showVst, bool showChunks)
@@ -372,6 +397,7 @@ public partial class MainWindow
         // オフ時は即 Collapse（フェード待ちだと Auto 列が幅を食い、タイムコードが広がらない）。
         ApplyEditorChromeTarget(HeaderChunkStrip, showChunks, instant: instant || !showChunks);
         ApplyEditorChromeTarget(EditorPositionTimecodeHost, showTimecode, instant);
+        SyncEditorPositionSlotMinWidth(showTimecode);
 
         if (IsVstInsertUiEnabled())
         {
@@ -390,6 +416,12 @@ public partial class MainWindow
         {
             ApplyEditorChromeTarget(VstInsertRack, visible: false, instant: true);
             BindVstInsertRackSession(false);
+        }
+
+        // 帯を出してから詳細配置（Refresh 時点ではまだ Collapsed のことがある）。
+        if (show && showChunks)
+        {
+            SyncEditorHeaderDetailPlacement();
         }
 
         // サイド情報も同じフェードで消す（全タブ閉じなど）。出しは SyncEditorHeaderDetailPlacement。
@@ -476,26 +508,20 @@ public partial class MainWindow
 
     /// <summary>
     /// エディタヘッダのチャンク帯。オフ時は解析しない（プレイヤーのヘッダOFFと同じ）。
-    /// 既に空なら Clear／配置同期もスキップし、文書切替などが帯の重さに乗らないようにする。
+    /// H オフでは幅高水位・選択も捨て、再表示は1行目＋内容フィットから。
     /// </summary>
     private void RefreshEditorHeaderChunks(bool show)
     {
         if (!show)
         {
-            if (!HeaderChunkStrip.HasContent
-                && EditorHeaderDetailSideHost.Visibility != Visibility.Visible)
-            {
-                return;
-            }
-
-            // H オフ／chrome 非表示：中身と幅高水位を捨てる（帯コメント通り）。
+            // 空でも高水位だけ残っていることがあるので、常に忘れる。
             HeaderChunkStrip.Clear();
-            SyncEditorHeaderDetailPlacement();
+            HideEditorHeaderDetailSide(forgetHeld: true);
             return;
         }
 
+        // Clear 後の再読込は Populate が1行目を選ぶ。配置 Sync は帯 Visible 後。
         HeaderChunkStrip.LoadFromPath(_document?.SourcePath);
-        SyncEditorHeaderDetailPlacement();
     }
 
     private void HeaderChunkStrip_DetailChanged(object sender, EventArgs e) =>
@@ -504,10 +530,22 @@ public partial class MainWindow
     private void TransportChromeHost_SizeChanged(object sender, SizeChangedEventArgs e) =>
         SyncEditorHeaderDetailPlacement();
 
+    /// <summary>
+    /// ビッグタイムコード用の左枠 MinWidth（控えめな下限のみ）。
+    /// F12 全画面で右 Auto 列が LayoutTransform 拡大しても Star が 0 にならないようにする。
+    /// 高さ基準で必要幅を取りに行くと枠が膨らみすぎてヘッダ帯と重なるのでやらない。
+    /// </summary>
+    private void SyncEditorPositionSlotMinWidth(bool showTimecode) =>
+        EditorPositionSlot.MinWidth = showTimecode
+            ? DesignMetrics.EditorPositionTimecodeMinSlotWidth
+            : 0;
+
     /// <summary>サイド情報列の幅高水位。H トグル／エディタ退出で忘れる。</summary>
     private double _editorHeaderDetailSideHeldWidth;
     /// <summary>サイド情報のスクロールバー／見出し／フォーカス帯を一度だけ付ける。</summary>
     private bool _editorHeaderDetailSideScrollStyled;
+    /// <summary>チャンク切替などのプログラムスクロールではバーを出さない。</summary>
+    private bool _editorHeaderDetailSideScrollRevealSuppress;
     /// <summary>プレイヤー情報列と同じ上端フォーカスグラデ。</summary>
     private Border? _editorHeaderDetailSideFocusLine;
 
@@ -517,8 +555,14 @@ public partial class MainWindow
     /// </summary>
     private void SyncEditorHeaderDetailPlacement()
     {
+        // H 再表示は Refresh（Collapsed）→ Visible の順。Collapse 中に DetailChanged で
+        // 詳細を消すと、Visible 後まで空のままになるので触らない。
+        if (HeaderChunkStrip.Visibility == Visibility.Collapsed)
+        {
+            return;
+        }
+
         var showChunks = !IsLibraryMaximized
-            && HeaderChunkStrip.Visibility == Visibility.Visible
             && AppStorage.Settings.EditorShowHeaderStructure;
         var detail = showChunks ? HeaderChunkStrip.DetailText : string.Empty;
         if (!showChunks || string.IsNullOrEmpty(detail))
@@ -559,7 +603,12 @@ public partial class MainWindow
         var treeW = HeaderChunkStrip.TreeFittedWidth;
         var detailW = HeaderChunkStrip.DetailFittedWidth;
         var headerMargin = HeaderChunkStrip.Margin.Left + HeaderChunkStrip.Margin.Right;
-        var leftIfInline = hostW - EditorChromeRightOccupiedWidth() - treeW - detailW - headerMargin;
+        var leftIfInline = hostW
+            - EditorChromeRightOccupiedWidth()
+            - treeW
+            - EditorHeaderChunkStripView.PaneGap
+            - detailW
+            - headerMargin;
         return leftIfInline >= DesignMetrics.EditorPositionSlotMinWidthForHeaderDetail;
     }
 
@@ -634,6 +683,7 @@ public partial class MainWindow
                 EditorHeaderDetailSide.ClearValue(FrameworkElement.HeightProperty);
                 EditorHeaderDetailSide.Visibility = Visibility.Collapsed;
                 EditorHeaderDetailSideXml.Visibility = Visibility.Visible;
+                ResetEditorHeaderDetailSideScroll();
                 return;
             }
         }
@@ -645,43 +695,50 @@ public partial class MainWindow
         EditorHeaderDetailSide.Text = text;
         EditorHeaderDetailSide.Height = MeasureEditorHeaderDetailSideTextHeight(text);
         EditorHeaderDetailSide.Visibility = Visibility.Visible;
+        // バイナリ等は外側 ScrollViewer の位置が残るので、チャンク切替では先頭へ。
+        ResetEditorHeaderDetailSideScroll();
     }
 
-    /// <summary>StackPanel 内の TextBox は自動で全文高にならないので測って渡す。</summary>
+    /// <summary>サイド情報のスクロール位置を先頭へ。レイアウト後にもう一度。Reveal は抑止する。</summary>
+    private void ResetEditorHeaderDetailSideScroll()
+    {
+        _editorHeaderDetailSideScrollRevealSuppress = true;
+        EditorHeaderDetailSideScroll.ScrollToHome();
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                EditorHeaderDetailSideScroll.ScrollToHome();
+                _editorHeaderDetailSideScrollRevealSuppress = false;
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
+    /// StackPanel 内の TextBox は自動で全文高にならないので測って渡す。
+    /// 行送りは <see cref="LibraryBrowserView.ApplyStructureDetailLineHeight"/> と同じ BlockLineHeight、
+    /// Padding も足す（足りないと最終行が縦に見切れる）。
+    /// </summary>
     private double MeasureEditorHeaderDetailSideTextHeight(string text)
     {
+        var pad = EditorHeaderDetailSide.Padding;
+        var fontSize = LibraryBrowserView.LibraryListFontSize;
+        var lineHeight = TextBlock.GetLineHeight(EditorHeaderDetailSide);
+        if (double.IsNaN(lineHeight) || lineHeight <= 0)
+        {
+            lineHeight = Math.Max(1, fontSize);
+        }
+
         if (string.IsNullOrEmpty(text))
         {
-            return LibraryBrowserView.LibraryListFontSize;
+            return lineHeight + pad.Top + pad.Bottom;
         }
 
-        var dpi = VisualTreeHelper.GetDpi(EditorHeaderDetailSide).PixelsPerDip;
-        if (dpi <= 0)
-        {
-            dpi = 1;
-        }
-
-        var typeface = new Typeface(
-            new FontFamily("Consolas"),
-            FontStyles.Normal,
-            FontWeights.Normal,
-            FontStretches.Normal);
-        var fontSize = LibraryBrowserView.LibraryListFontSize;
-        double height = 0;
-        foreach (var line in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
-        {
-            var ft = new FormattedText(
-                line.Length == 0 ? " " : line,
-                CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight,
-                typeface,
-                fontSize,
-                Brushes.Black,
-                dpi);
-            height += Math.Max(fontSize, ft.Height);
-        }
-
-        return Math.Max(fontSize, height + 2);
+        // \n 終端の空行も TextBox は1行分取る。
+        var lineCount = text.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n')
+            .Length;
+        // UseLayoutRounding で 1px 削れることがあるので余裕を見る。
+        return (lineCount * lineHeight) + pad.Top + pad.Bottom + 1;
     }
 
     private void HideEditorHeaderDetailSide(bool forgetHeld)
@@ -799,13 +856,14 @@ public partial class MainWindow
         EditorHeaderDetailSideHost.IsKeyboardFocusWithinChanged += (_, _) =>
             SyncEditorHeaderDetailSideFocusChrome();
 
-        // プレイヤー情報列と同じ：ホバー中だけスクロールバーをフェード表示。
+        // プレイヤー情報列と同じ：ホバーに加え、実スクロールでも既定時間出す。
         if (TryFindResource("LibraryScrollBarStyle") is Style style)
         {
             EditorHeaderDetailSideScroll.Resources[typeof(System.Windows.Controls.Primitives.ScrollBar)] = style;
         }
 
         LibraryScrollReveal.AttachOnHover(EditorHeaderDetailSideScroll);
+        EditorHeaderDetailSideScroll.ScrollChanged += EditorHeaderDetailSideScroll_ScrollChanged;
         EditorHeaderDetailSideXml.AddHandler(
             TreeViewItem.ExpandedEvent,
             new RoutedEventHandler((_, _) => SyncEditorHeaderDetailSideVerticalAlign()),
@@ -816,6 +874,18 @@ public partial class MainWindow
             handledEventsToo: true);
         _editorHeaderDetailSideScrollStyled = true;
         SyncEditorHeaderDetailSideFocusChrome();
+    }
+
+    private void EditorHeaderDetailSideScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        // カーソルがエリア外／ホバー切れでも、実スクロールしたら既定時間（約3秒）出す。
+        if (_editorHeaderDetailSideScrollRevealSuppress
+            || (e.VerticalChange == 0 && e.HorizontalChange == 0))
+        {
+            return;
+        }
+
+        LibraryScrollReveal.RevealTemporarily(EditorHeaderDetailSideScroll);
     }
 
     private void SyncEditorHeaderDetailSideFocusChrome()
@@ -922,15 +992,19 @@ public partial class MainWindow
             {
                 case Key.Up:
                     EditorHeaderDetailSideScroll.LineUp();
+                    LibraryScrollReveal.RevealTemporarily(EditorHeaderDetailSideScroll);
                     return true;
                 case Key.Down:
                     EditorHeaderDetailSideScroll.LineDown();
+                    LibraryScrollReveal.RevealTemporarily(EditorHeaderDetailSideScroll);
                     return true;
                 case Key.PageUp:
                     EditorHeaderDetailSideScroll.PageUp();
+                    LibraryScrollReveal.RevealTemporarily(EditorHeaderDetailSideScroll);
                     return true;
                 case Key.PageDown:
                     EditorHeaderDetailSideScroll.PageDown();
+                    LibraryScrollReveal.RevealTemporarily(EditorHeaderDetailSideScroll);
                     return true;
             }
         }
