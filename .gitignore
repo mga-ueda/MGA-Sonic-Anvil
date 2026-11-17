@@ -17,6 +17,12 @@ testdata/gapless/
 testrun-loudness-v/
 tmp-video-frames/
 
+# Xcode / macOS（apps/macos）
+**/xcuserdata/
+**/DerivedData/
+*.xcuserstate
+.DS_Store
+
 # Office 一時ロック（本体の docs/*.xlsx は残す）
 ~$*
 

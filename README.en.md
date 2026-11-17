@@ -20,6 +20,11 @@ Fade, normalize, ripple-delete, copy / paste, markers / regions / sample loop, a
 
 **The UI is Japanese / English.** The Japanese locale keeps the current wording, including English labels as they are. The English locale translates the Japanese. Switch it in Settings (the gear). The default is **Auto** (Japanese if the OS is Japanese, otherwise English).
 
+## Development notes
+
+- **Windows** (.NET 8 + WPF) is the mainline; keep it working first
+- macOS (Swift / AppKit) is parallel and behind: [docs/mac/README.md](docs/mac/README.md)
+
 ## Manual & download
 
 - Manual: [Japanese](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.ja.html) · [English](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.en.html) · [Hub](https://mga-ueda.github.io/MGA-Sonic-Anvil/)

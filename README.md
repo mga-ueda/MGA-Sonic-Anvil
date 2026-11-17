@@ -20,6 +20,11 @@
 
 **表示言語は日本語／英語です。** 日本語版の画面文言は、英語のままのラベルも含め現状どおりです。英語版では日本語だけを訳します。切替は左上の歯車（設定）。既定は **Auto**（OS が日本語なら Japanese、それ以外は English）。
 
+## 開発メモ
+
+- 本線は **Windows 版**（.NET 8 + WPF）。動作保証を優先する
+- Mac 版（Swift / AppKit）は並行・後追い: [docs/mac/README.md](docs/mac/README.md)
+
 ## マニュアル・ダウンロード
 
 - マニュアル: [日本語](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.ja.html) · [English](https://mga-ueda.github.io/MGA-Sonic-Anvil/manual.en.html) · [一覧](https://mga-ueda.github.io/MGA-Sonic-Anvil/)
