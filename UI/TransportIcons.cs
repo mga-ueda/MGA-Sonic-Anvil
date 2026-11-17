@@ -911,7 +911,7 @@ internal static class TransportIconDrawing
                 dc.DrawRectangle(null, pen, new Rect(cx + 3, cy - 6, 7, 12));
                 break;
             case TransportIcon.Bounce:
-                // 選択ファイルを波形へ焼き込む（並んだタブ＋下矢印）。
+                // 選択ファイルのインサートを波形へバウンス（並んだタブ＋下矢印）。
                 dc.DrawRectangle(null, pen, new Rect(cx - 10, cy - 9, 7, 8));
                 dc.DrawRectangle(null, pen, new Rect(cx - 3.5, cy - 9, 7, 8));
                 dc.DrawRectangle(null, pen, new Rect(cx + 3, cy - 9, 7, 8));

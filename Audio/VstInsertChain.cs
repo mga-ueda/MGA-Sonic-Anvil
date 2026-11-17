@@ -78,7 +78,7 @@ internal sealed class VstInsertChain
         }
     }
 
-    /// <summary>焼き込み対象があるか（空き・バイパス・fault 以外が 1 つでもあれば true）。</summary>
+    /// <summary>バウンス対象があるか（空き・バイパス・fault 以外が 1 つでもあれば true）。</summary>
     public bool HasProcessableSlot
     {
         get

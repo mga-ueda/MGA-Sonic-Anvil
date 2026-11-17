@@ -3077,7 +3077,7 @@ public partial class MainWindow
 
         if (key == Key.B && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            _ = BakeVstInsertsAsync();
+            _ = BounceVstInsertsAsync();
             return true;
         }
 

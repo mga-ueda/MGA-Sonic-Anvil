@@ -510,7 +510,7 @@ public partial class MainWindow
                 MergeSelectedTabs();
                 break;
             case WaveMenuCommand.Bounce:
-                _ = BakeVstInsertsAsync();
+                _ = BounceVstInsertsAsync();
                 break;
             case WaveMenuCommand.DeleteFile:
                 if (HasTabSelection)

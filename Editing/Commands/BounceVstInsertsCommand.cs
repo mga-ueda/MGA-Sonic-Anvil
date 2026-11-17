@@ -7,7 +7,7 @@ namespace MgaSonicAnvil.Editing;
 /// 波形置換に加え、バイパス副作用を Apply／Revert に載せる（アンドゥで自動バイパスだけ戻す）。
 /// Include Tail で after が長いときは文書末尾を伸ばす。
 /// </summary>
-internal sealed class BakeVstInsertsCommand : IEditCommand
+internal sealed class BounceVstInsertsCommand : IEditCommand
 {
     private readonly long _startFrame;
     private readonly float[] _before;
@@ -20,7 +20,7 @@ internal sealed class BakeVstInsertsCommand : IEditCommand
     private readonly Action _revertBypass;
     private readonly bool _samplesChanged;
 
-    public BakeVstInsertsCommand(
+    public BounceVstInsertsCommand(
         float[] before,
         float[] after,
         WaveSelection selectionBefore,

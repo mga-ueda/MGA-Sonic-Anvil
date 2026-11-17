@@ -9,7 +9,7 @@ internal static partial class ProcessEdits
     /// VST インサート通過後のサンプルで文書全体を置き換え、バイパス副作用も履歴に載せる。
     /// <paramref name="after"/> は interleaved。元と同じ長さ、または Include Tail で長くなったもの。
     /// </summary>
-    public static IEditCommand? BakeVstInserts(
+    public static IEditCommand? BounceVstInserts(
         AudioDocument document,
         float[] after,
         Action applyBypass,
@@ -38,7 +38,7 @@ internal static partial class ProcessEdits
         var before = document.CopyRange(0, document.FrameCount);
         var afterCopy = (float[])after.Clone();
         var endFrame = afterFrames;
-        var command = new BakeVstInsertsCommand(
+        var command = new BounceVstInsertsCommand(
             before,
             afterCopy,
             document.Selection,
@@ -66,7 +66,7 @@ internal static partial class ProcessEdits
                 return null;
             }
 
-            return BakeVstInserts(target, afterCopy, static () => { }, static () => { });
+            return BounceVstInserts(target, afterCopy, static () => { }, static () => { });
         };
         command.Persist = HistoryRecipes.FromRecord(document.SampleRate, 0, afterCopy, channels);
         return command;

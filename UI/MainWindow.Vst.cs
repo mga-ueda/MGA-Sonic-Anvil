@@ -891,11 +891,11 @@ public partial class MainWindow
         IEnumerable<DocumentSession> candidates = HasTabSelection
             ? SelectedTabsInOrder()
             : _activeSession is not null ? [_activeSession] : [];
-        return candidates.Where(VstInsertRackView.SessionCanBake).ToArray();
+        return candidates.Where(VstInsertRackView.SessionCanBounce).ToArray();
     }
 
     /// <summary>
-    /// バウンス操作を受け付けるか。焼けないときもメニューとツールバーは押せるようにし、
+    /// バウンス操作を受け付けるか。対象が無いときもメニューとツールバーは押せるようにし、
     /// 実行時に理由のダイアログを出す。録音中・処理中・プレイヤー・VST 無効は押せない。
     /// </summary>
     private bool CanBounceSelectedVstInserts() =>
@@ -968,7 +968,7 @@ public partial class MainWindow
         return MissingBounceTargetMessage();
     }
 
-    /// <summary>焼けないタブの理由。有効スロットが無い・バイパス・読み込み失敗・空波形。</summary>
+    /// <summary>バウンスできないタブの理由。有効スロットが無い・バイパス・読み込み失敗・空波形。</summary>
     private string MissingBounceTargetMessage()
     {
         IEnumerable<DocumentSession> candidates = HasTabSelection
@@ -1042,14 +1042,14 @@ public partial class MainWindow
         && !IsRecording
         && (HasTabSelection || IsLibraryMaximized || _activeSession is not null);
 
-    private async Task BakeVstInsertsAsync()
+    private async Task BounceVstInsertsAsync()
     {
         if (AbortBounceWithDialog())
         {
             return;
         }
 
-        // 共有インサートエンジンのため、必ず 1 ファイルずつ順に焼く。
+        // 共有インサートエンジンのため、必ず 1 ファイルずつ順にバウンスする。
         var targets = ResolveBounceTargets();
         if (targets.Length == 0)
         {
@@ -1088,15 +1088,15 @@ public partial class MainWindow
         StopPlaybackForEdit();
         _player.VstInserts.CaptureAppliedStates();
 
-        _vstBakeBusy = true;
+        _vstBounceBusy = true;
         RefreshTransportCommandsEnabled();
         Exception? error = null;
-        var bakedActive = false;
+        var bouncedActive = false;
         var jobProgress = new double[targets.Length];
         try
         {
-            ShowBusyGlass(UiStrings.OverlayVstInsertBake);
-            ReportBakeGlassProgress(targets, jobProgress, currentIndex: 0, fileProgress: 0);
+            ShowBusyGlass(UiStrings.OverlayVstInsertBounce);
+            ReportBounceGlassProgress(targets, jobProgress, currentIndex: 0, fileProgress: 0);
 
             for (var t = 0; t < targets.Length; t++)
             {
@@ -1107,36 +1107,36 @@ public partial class MainWindow
                 }
 
                 // すりガラスを先に更新してから重い処理へ。
-                ReportBakeGlassProgress(targets, jobProgress, t, fileProgress: 0);
+                ReportBounceGlassProgress(targets, jobProgress, t, fileProgress: 0);
                 await Dispatcher.Yield(DispatcherPriority.Render);
 
                 var index = t;
                 var progress = new Progress<double>(p =>
                 {
                     jobProgress[index] = Math.Clamp(p, 0, 1);
-                    ReportBakeGlassProgress(targets, jobProgress, index, jobProgress[index]);
+                    ReportBounceGlassProgress(targets, jobProgress, index, jobProgress[index]);
                 });
 
-                if (!await BakeOneSessionAsync(session, progress, includeTail).ConfigureAwait(true))
+                if (!await BounceOneSessionAsync(session, progress, includeTail).ConfigureAwait(true))
                 {
                     return;
                 }
 
                 jobProgress[t] = 1;
-                ReportBakeGlassProgress(targets, jobProgress, t, fileProgress: 1);
+                ReportBounceGlassProgress(targets, jobProgress, t, fileProgress: 1);
 
                 if (ReferenceEquals(session, activeBefore))
                 {
-                    bakedActive = true;
+                    bouncedActive = true;
                 }
 
                 // 次ファイルへ切り替える前に UI／エンジンを一息入れる（共有インサートの付け替え）。
                 await Dispatcher.Yield(DispatcherPriority.Background);
             }
 
-            // 全ターゲット焼き終わり後に、永続スロットのバイパスを記憶へ載せて全タブへ揃える。
-            // 途中で載せると未焼成タブまでバイパスされ、オフラインが dry になる。
-            SyncBakeBypassIntoPersistedDefaults(targets);
+            // 全ターゲットのバウンス後に、永続スロットのバイパスを記憶へ載せて全タブへ揃える。
+            // 途中で載せると未バウンスのタブまでバイパスされ、オフラインが dry になる。
+            SyncBounceBypassIntoPersistedDefaults(targets);
 
             if (activeBefore is not null && ReferenceEquals(_activeSession, activeBefore))
             {
@@ -1145,7 +1145,7 @@ public partial class MainWindow
                 VstInsertRack.Refresh();
             }
 
-            if (bakedActive && ReferenceEquals(_activeSession, activeBefore))
+            if (bouncedActive && ReferenceEquals(_activeSession, activeBefore))
             {
                 AfterTransform();
             }
@@ -1162,7 +1162,7 @@ public partial class MainWindow
         }
         finally
         {
-            _vstBakeBusy = false;
+            _vstBounceBusy = false;
             RefreshTransportCommandsEnabled();
             if (error is not null)
             {
@@ -1194,7 +1194,7 @@ public partial class MainWindow
     /// <summary>
     /// すりガラスへ全体％と、各ファイル行（書き出しと同様）を出す。
     /// </summary>
-    private void ReportBakeGlassProgress(
+    private void ReportBounceGlassProgress(
         IReadOnlyList<DocumentSession> targets,
         double[] jobProgress,
         int currentIndex,
@@ -1246,16 +1246,16 @@ public partial class MainWindow
         }
 
         var status = total == 1
-            ? UiStrings.OverlayVstInsertBakeFile(targets[0].DisplayName)
+            ? UiStrings.OverlayVstInsertBounceFile(targets[0].DisplayName)
             : UiStrings.OverlayExportCount(finished, total);
-        _busyGlass.SetMessage(UiStrings.OverlayVstInsertBake);
+        _busyGlass.SetMessage(UiStrings.OverlayVstInsertBounce);
         _busyGlass.SetExportView(overall, status, running);
     }
 
     /// <summary>
     /// 1 ファイルだけオフライン処理して履歴へ載せる。共有エンジンのため呼び出し側で直列化する。
     /// </summary>
-    private async Task<bool> BakeOneSessionAsync(
+    private async Task<bool> BounceOneSessionAsync(
         DocumentSession session,
         IProgress<double> progress,
         bool includeTail)
@@ -1295,7 +1295,7 @@ public partial class MainWindow
                 }
             }
 
-            SyncVstBypassAfterBake(session);
+            SyncVstBypassAfterBounce(session);
         }
 
         void RevertBypass()
@@ -1308,10 +1308,10 @@ public partial class MainWindow
                 }
             }
 
-            SyncVstBypassAfterBake(session);
+            SyncVstBypassAfterBounce(session);
         }
 
-        var command = ProcessEdits.BakeVstInserts(document, after, ApplyBypass, RevertBypass);
+        var command = ProcessEdits.BounceVstInserts(document, after, ApplyBypass, RevertBypass);
         if (command is null)
         {
             // 波形変化なしでもバイパスは適用する
@@ -1323,7 +1323,7 @@ public partial class MainWindow
         return true;
     }
 
-    private void SyncVstBypassAfterBake(DocumentSession session)
+    private void SyncVstBypassAfterBounce(DocumentSession session)
     {
         // オフライン後のライブをバイパスのまま残すと、タブ閉じの Capture／Dispose で
         // 落ちることがある。破棄ではなく owner へ park し、Undo のバイパス解除で復帰する
@@ -1341,10 +1341,10 @@ public partial class MainWindow
     /// バウンスで付けたバイパスを永続スロットへ書き、開いている全タブへ揃える。
     /// 手動バイパス（SyncPersistedBypass）と同じ「永続＝全タブ共通」に合わせる。
     /// </summary>
-    private void SyncBakeBypassIntoPersistedDefaults(IReadOnlyList<DocumentSession> baked)
+    private void SyncBounceBypassIntoPersistedDefaults(IReadOnlyList<DocumentSession> bounced)
     {
         var settings = AppStorage.Settings;
-        if (!DocumentSessionStore.SnapshotHasAnyPlugin(settings.DefaultVstInserts) || baked.Count == 0)
+        if (!DocumentSessionStore.SnapshotHasAnyPlugin(settings.DefaultVstInserts) || bounced.Count == 0)
         {
             return;
         }
@@ -1358,9 +1358,9 @@ public partial class MainWindow
             }
 
             var anyBypassed = false;
-            for (var t = 0; t < baked.Count; t++)
+            for (var t = 0; t < bounced.Count; t++)
             {
-                var slot = baked[t].VstInserts.Slots[i];
+                var slot = bounced[t].VstInserts.Slots[i];
                 if (!slot.IsEmpty && slot.Bypassed)
                 {
                     anyBypassed = true;

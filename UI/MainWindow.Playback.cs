@@ -49,7 +49,7 @@ public partial class MainWindow
             // フェード調整中はボタンが押せるままなので、無反応にせず理由を出す。
             if (command == TransportCommand.Bounce)
             {
-                _ = BakeVstInsertsAsync();
+                _ = BounceVstInsertsAsync();
                 return;
             }
 
@@ -351,7 +351,7 @@ public partial class MainWindow
                 MergeSelectedTabs();
                 break;
             case TransportCommand.Bounce:
-                _ = BakeVstInsertsAsync();
+                _ = BounceVstInsertsAsync();
                 break;
             case TransportCommand.CopyFileName:
                 CopySessionPathTexts(fullPath: false);

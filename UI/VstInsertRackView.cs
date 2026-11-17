@@ -455,8 +455,8 @@ internal sealed class VstInsertRackView : Grid
         ApplySlotButtonLook(button, empty: false, persisted);
     }
 
-    /// <summary>このタブをオフラインで焼けるか（有効スロットがあり、波形が空でない）。</summary>
-    internal static bool SessionCanBake(DocumentSession? session) =>
+    /// <summary>このタブをオフラインでバウンスできるか（有効スロットがあり、波形が空でない）。</summary>
+    internal static bool SessionCanBounce(DocumentSession? session) =>
         session is not null
         && session.VstInserts.HasProcessableSlot
         && session.Document.FrameCount > 0;

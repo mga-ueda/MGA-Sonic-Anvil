@@ -14,7 +14,7 @@ public partial class MainWindow
     private bool _formatConvertBusy;
     private bool _pitchShiftBusy;
     private bool _timeStretchBusy;
-    private bool _vstBakeBusy;
+    private bool _vstBounceBusy;
     private bool _vstAssignBusy;
     private bool _vstEditorEnterBusy;
     private bool _tabExportBusy;
@@ -31,7 +31,7 @@ public partial class MainWindow
         _formatConvertBusy
         || _pitchShiftBusy
         || _timeStretchBusy
-        || _vstBakeBusy
+        || _vstBounceBusy
         || _vstAssignBusy
         || _vstEditorEnterBusy
         || _tabExportBusy

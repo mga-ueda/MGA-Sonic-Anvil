@@ -198,7 +198,7 @@ internal static partial class UiStrings
     public static string LabelSettingsTabExport => Get("書き出し・パス", "Export · Paths");
     public static string LabelSettingsTabWwise => Get("Wwise", "Wwise");
     public static string LabelSettingsTabVst => Get("VST", "VST");
-    public static string TooltipVstInsertBake => Get(
+    public static string TooltipVstInsertBounce => Get(
         "選択タブ（無ければアクティブ）のインサートを波形へバウンスし、スロットをバイパスします (Ctrl+Shift+B)",
         "Bounce inserts on the selected tabs (or the active tab if none), then bypass those slots (Ctrl+Shift+B)");
     /// <summary>バウンス直前の Include Tail 確認。</summary>
@@ -246,8 +246,8 @@ internal static partial class UiStrings
     public static string ErrorVstBouncePlayer => Get(
         "プレイヤー表示中はバウンスできません。",
         "Cannot bounce in the player.");
-    public static string OverlayVstInsertBake => Get("インサートをバウンス中", "Bouncing inserts");
-    public static string OverlayVstInsertBakeFile(string name) => Format(
+    public static string OverlayVstInsertBounce => Get("インサートをバウンス中", "Bouncing inserts");
+    public static string OverlayVstInsertBounceFile(string name) => Format(
         "バウンス中: {0}",
         "Bouncing: {0}",
         name);
@@ -260,7 +260,7 @@ internal static partial class UiStrings
         "プラグイン読み込み中",
         "Loading plug-ins");
     public static string LabelToolbarBounce => WithoutAccessKey(WaveMenuBounce);
-    public static string TooltipBounce => TooltipVstInsertBake;
+    public static string TooltipBounce => TooltipVstInsertBounce;
     public static string LabelVstInsert => Get("インサート(_I)", "_Insert");
     public static string LabelVstInsertAllTabs => Get("全てのタブにインサート(_A)", "Insert to _All Tabs");
     public static string LabelVstInsertBypass => Get("バイパス(_B)", "_Bypass");
@@ -1273,8 +1273,8 @@ internal static partial class UiStrings
 
     /// <summary>ミックスダウン時、選択に有効な VST インサートがある注意（OK＝続行／Cancel＝中止）。</summary>
     public static string WarnMergeActiveVstInserts(string list) => Format(
-        "選択中に有効な VST インサートがあります。ミックスダウンでは各タブのインサートは通りません。波形へ焼くには先にバウンスしてください。\n\n対象:\n{0}\n\nOK: このままミックスダウンする\nCancel: ミックスダウンを中止する",
-        "Some selected tabs have active VST inserts. Mixdown does not apply per-tab inserts. Bounce first to bake them into the waveform.\n\nAffected:\n{0}\n\nOK: continue the mixdown\nCancel: cancel the mixdown",
+        "選択中に有効な VST インサートがあります。ミックスダウンでは各タブのインサートは通りません。波形へ載せるには先にバウンスしてください。\n\n対象:\n{0}\n\nOK: このままミックスダウンする\nCancel: ミックスダウンを中止する",
+        "Some selected tabs have active VST inserts. Mixdown does not apply per-tab inserts. Bounce first to render them into the waveform.\n\nAffected:\n{0}\n\nOK: continue the mixdown\nCancel: cancel the mixdown",
         list);
 
     /// <summary>ミックスダウンの保存ダイアログのタイトル。</summary>
