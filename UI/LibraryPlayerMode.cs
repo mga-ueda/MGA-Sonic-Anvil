@@ -369,6 +369,13 @@ internal static class LibraryPlayerMode
         !explorerFocused && !favoritesFocused;
 
     /// <summary>
+    /// Space／ツールバー再生のあと曲末で止めるか。
+    /// Auto Next または Single Loop がオンなら止めず、それぞれの曲末処理へ渡す。
+    /// </summary>
+    public static bool StopsLibraryPlayAfterTrack(bool autoPlayNextEnabled, bool autoLoopEnabled) =>
+        !autoPlayNextEnabled && !autoLoopEnabled;
+
+    /// <summary>
     /// Escape で本再生／フレーム一時停止から暗いバックグラウンドへ戻す状態。
     /// 動画本再生中の Space は一時停止／再開（開始位置へは戻さない。暗いプレビューへも落とさない）。
     /// </summary>
@@ -934,6 +941,41 @@ internal static class LibraryPlayerMode
     public static bool NeedsEditorPcmUpgrade(AudioDocument document) =>
         !LibraryPlaylistDocuments.BlocksEditor(document)
         && (document.IsDeferredLoad || document.IsStreamPlayback);
+
+    /// <summary>
+    /// 未ロード WAVE／AIFF をギャップレス用に先温めてよい最大バイト。
+    /// これ超は通常の曲切替に任せ、長い曲の二重常駐を避ける。
+    /// </summary>
+    public const long GaplessPcmWarmMaxFileBytes = 16L * 1024 * 1024;
+
+    /// <summary>メモリギャップレス向けに、すでに PCM が載っているか。</summary>
+    public static bool HasGaplessMemoryPcm(AudioDocument document) =>
+        !document.IsDeferredLoad
+        && !document.IsStreamPlayback
+        && document.Interleaved.Length > 0
+        && document.SampleCount > 0
+        && document.FrameCount > 0;
+
+    /// <summary>遅延 WAVE／AIFF をギャップレス用にフルロードしてよいか（短尺のみ）。</summary>
+    public static bool ShouldWarmGaplessPcm(AudioDocument document)
+    {
+        if (!AudioCodec.IsUncompressedPcm(document.SourceKind))
+        {
+            return false;
+        }
+
+        if (HasGaplessMemoryPcm(document))
+        {
+            return true;
+        }
+
+        if (!document.IsDeferredLoad)
+        {
+            return false;
+        }
+
+        return document.FileBytes > 0 && document.FileBytes <= GaplessPcmWarmMaxFileBytes;
+    }
 
     /// <summary>
     /// プレイヤーの完成ピークをそのまま出してよいか。エディタではチャンネル数と粒度が要る。

@@ -451,6 +451,18 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.IsAutoPlayNextToggle(Key.N, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsAutoPlayNextToggle(Key.N, ModifierKeys.Control));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.AutoPlayNext));
+        Assert.True(LibraryPlayerMode.StopsLibraryPlayAfterTrack(
+            autoPlayNextEnabled: false,
+            autoLoopEnabled: false));
+        Assert.False(LibraryPlayerMode.StopsLibraryPlayAfterTrack(
+            autoPlayNextEnabled: true,
+            autoLoopEnabled: false));
+        Assert.False(LibraryPlayerMode.StopsLibraryPlayAfterTrack(
+            autoPlayNextEnabled: false,
+            autoLoopEnabled: true));
+        Assert.False(LibraryPlayerMode.StopsLibraryPlayAfterTrack(
+            autoPlayNextEnabled: true,
+            autoLoopEnabled: true));
         Assert.True(LibraryPlayerMode.IsAutoLoopToggle(Key.L, LibraryPlayerMode.AltShift));
         Assert.False(LibraryPlayerMode.IsAutoLoopToggle(Key.L, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsAutoLoopToggle(Key.L, ModifierKeys.Control));
@@ -848,6 +860,39 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.NeedsEditorPeakUpgrade(pcm));
         Assert.False(LibraryPlayerMode.CanReusePeaks(playerMode: false, pcm));
         Assert.False(LibraryPlayerMode.CanReusePeaks(playerMode: true, pcm));
+    }
+
+    [Fact]
+    public void ShouldWarmGaplessPcm_AllowsLoadedWaveAndShortDeferred()
+    {
+        var loaded = new AudioDocument(new float[64], 48000, 2, 16, AudioFileKind.Wave, "a.wav");
+        Assert.True(LibraryPlayerMode.HasGaplessMemoryPcm(loaded));
+        Assert.True(LibraryPlayerMode.ShouldWarmGaplessPcm(loaded));
+
+        var shortPath = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "mga-gapless-warm-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            System.IO.File.WriteAllBytes(shortPath, new byte[1024]);
+            var deferred = AudioDocument.CreateDeferred(shortPath);
+            Assert.False(LibraryPlayerMode.HasGaplessMemoryPcm(deferred));
+            Assert.True(LibraryPlayerMode.ShouldWarmGaplessPcm(deferred));
+        }
+        finally
+        {
+            try
+            {
+                System.IO.File.Delete(shortPath);
+            }
+            catch (System.IO.IOException)
+            {
+            }
+        }
+
+        var mp3 = AudioDocument.CreateDeferred(
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid() + ".mp3"));
+        Assert.False(LibraryPlayerMode.ShouldWarmGaplessPcm(mp3));
     }
 
     [Fact]

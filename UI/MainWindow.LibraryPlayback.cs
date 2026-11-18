@@ -217,6 +217,12 @@ public partial class MainWindow
         AudioStreamSource? source = null;
         try
         {
+            if (AudioCodec.IsUncompressedPcm(next.Document.SourceKind))
+            {
+                await PrefetchLibraryGaplessMemoryAsync(next, token).ConfigureAwait(true);
+                return;
+            }
+
             source = await Task.Run(() => OpenLibraryGaplessSource(next)).ConfigureAwait(true);
             if (token != _gaplessToken || source is null)
             {
@@ -266,6 +272,55 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// WAVE／AIFF はメモリ再生のまま次曲を予約する。未ロードの短尺だけ先温め、長い曲は通常切替に任せる。
+    /// </summary>
+    private async Task PrefetchLibraryGaplessMemoryAsync(DocumentSession next, int token)
+    {
+        if (!LibraryPlayerMode.ShouldWarmGaplessPcm(next.Document))
+        {
+            if (token == _gaplessToken)
+            {
+                _gaplessFailed = true;
+            }
+
+            return;
+        }
+
+        if (!LibraryPlayerMode.HasGaplessMemoryPcm(next.Document))
+        {
+            var warmed = await EnsureSessionPcmForEditAsync(next).ConfigureAwait(true);
+            if (token != _gaplessToken)
+            {
+                return;
+            }
+
+            if (!warmed || !LibraryPlayerMode.HasGaplessMemoryPcm(next.Document))
+            {
+                _gaplessFailed = true;
+                return;
+            }
+        }
+
+        if (!IsLibraryMaximized
+            || !IsPlaybackActive()
+            || !ReferenceEquals(next, LibraryBrowser.NextPlaylistSession(_activeSession)))
+        {
+            if (token == _gaplessToken)
+            {
+                _gaplessFailed = true;
+            }
+
+            return;
+        }
+
+        ScanLibraryArtwork(next);
+        if (!_player.TryArmGaplessMemory(next.Document) && token == _gaplessToken)
+        {
+            _gaplessFailed = true;
+        }
+    }
+
     private static AudioStreamSource? OpenLibraryGaplessSource(DocumentSession next)
     {
         var document = next.Document;
@@ -275,7 +330,7 @@ public partial class MainWindow
             return null;
         }
 
-        // 非圧縮はメモリ再生。ギャップレス先読みストリームには載せない。
+        // 非圧縮は PrefetchLibraryGaplessMemoryAsync（メモリ同士のハンドオフ）。
         if (AudioCodec.IsUncompressedPcm(document.SourceKind)
             || (document.SourcePath is { Length: > 0 } nextPath && AudioCodec.IsUncompressedPcm(nextPath)))
         {
@@ -298,12 +353,19 @@ public partial class MainWindow
 
     private bool AdoptLibraryGaplessAdvance()
     {
+        if (!_player.HasGaplessAdvancePending)
+        {
+            return false;
+        }
+
+        // 単独再生・Single Loop・Auto Next オフでは次曲へ進まない。
+        // 先に音声だけハンドオフ済みなら破棄してカレントへ戻す。
         if (!IsLibraryMaximized
             || _libraryStopAfterTrack
             || LibraryBrowser.AutoLoopEnabled
-            || !LibraryBrowser.AutoPlayNextEnabled
-            || !_player.HasGaplessAdvancePending)
+            || !LibraryBrowser.AutoPlayNextEnabled)
         {
+            DiscardBlockedGaplessAdvance();
             return false;
         }
 
@@ -358,6 +420,38 @@ public partial class MainWindow
         SyncVstInsertEngine();
         ScheduleLibraryGaplessPrefetch();
         return true;
+    }
+
+    /// <summary>
+    /// 単独再生などでは次曲採用しない。音声スレッドが先に進んでいたらカレント末尾へ戻し、EOF に落とす。
+    /// </summary>
+    private void DiscardBlockedGaplessAdvance()
+    {
+        _ = _player.TryTakeGaplessAdvance(out var advanced);
+        CancelLibraryGapless();
+        if (advanced is null
+            || _activeSession is null
+            || ReferenceEquals(_activeSession.Document, advanced)
+            || !_player.IsBoundTo(advanced))
+        {
+            return;
+        }
+
+        // 次曲の PCM が流れている。カレントを末尾でバインドし直し、通常の曲末処理へ渡す。
+        var current = _activeSession.Document;
+        try
+        {
+            _player.Prepare(
+                current,
+                Math.Max(0, current.FrameCount),
+                playRange: null,
+                loop: false,
+                preferStream: IsLibraryMaximized);
+        }
+        catch
+        {
+            // バインド失敗でも予約破棄済み。次の明示再生で復旧する。
+        }
     }
 
     private bool TryAdvanceLibraryPlaylist()
@@ -941,7 +1035,8 @@ public partial class MainWindow
     /// <summary>
     /// Space／トランスポート再生。エディタの TogglePlayback 相当。
     /// 再生中は HaltPlaybackToStart（動画本再生中だけその場一時停止）。
-    /// 停止中はシーク位置（CursorFrame）から単独再生／再開（曲末で次へ進まない）。
+    /// 停止中はシーク位置（CursorFrame）から再生／再開。
+    /// Auto Next オフかつ Single Loop オフなら曲末で停止。オンならそれぞれの曲末処理へ。
     /// 別曲へ切り替えるときだけ PlayLibrarySessionAsync（その曲は先頭から）。
     /// </summary>
     /// <param name="fromStart">
@@ -978,20 +1073,34 @@ public partial class MainWindow
             return;
         }
 
+        var stopAfterTrack = LibraryPlayerMode.StopsLibraryPlayAfterTrack(
+            LibraryBrowser.AutoPlayNextEnabled,
+            LibraryBrowser.AutoLoopEnabled);
+
         // 同じ曲が既に載っているとき：Space はシークバー位置から、Enter は先頭から。
         if (ReferenceEquals(session, _activeSession) && _document is not null)
         {
-            _libraryStopAfterTrack = true;
+            // 古い先読みを捨ててから、必要なら Auto Next 用に組み直す。
+            CancelLibraryGapless();
+            _libraryStopAfterTrack = stopAfterTrack;
             if (LibraryPlaylistDocuments.IsPdf(session.Document))
             {
-                await PlayLibrarySessionAsync(session, stopAfterTrack: true, fromStart: fromStart)
+                await PlayLibrarySessionAsync(session, stopAfterTrack, fromStart: fromStart)
                     .ConfigureAwait(true);
                 return;
             }
 
             // 選択／ホバープレビューはプロキシを待たない。Space 本再生ではここで作る。
             // Enter（fromStart）は先頭固定。Space は暗いプレビュー中の位置を引き継ぐ。
+            // 短尺は曲末にヘッドが残ると無音のまま即停止するので、末尾からは先頭へ戻す。
             var startFrame = fromStart ? 0L : _document.CursorFrame;
+            if (!fromStart
+                && _document.FrameCount > 0
+                && startFrame >= _document.FrameCount - 1)
+            {
+                startFrame = 0;
+            }
+
             if (!await EnsureVideoProxyBeforePlaybackAsync(session).ConfigureAwait(true))
             {
                 return;
@@ -1002,10 +1111,10 @@ public partial class MainWindow
                 return;
             }
 
-            if (fromStart)
+            if (fromStart || startFrame == 0)
             {
-                session.Document.CursorFrame = 0;
-                Waveform.PlayheadFrame = 0;
+                session.Document.CursorFrame = startFrame;
+                Waveform.PlayheadFrame = startFrame;
             }
             else if (LibraryBrowser.PlaylistVisualShown
                 && LibraryBrowser.PlaylistVisualIsVideo
@@ -1025,10 +1134,15 @@ public partial class MainWindow
             }
 
             StartPlayback(startFrame, prerollSeconds: 0);
+            if (!stopAfterTrack)
+            {
+                ScheduleLibraryGaplessPrefetch();
+            }
+
             return;
         }
 
-        await PlayLibrarySessionAsync(session, stopAfterTrack: true, fromStart: fromStart)
+        await PlayLibrarySessionAsync(session, stopAfterTrack, fromStart: fromStart)
             .ConfigureAwait(true);
     }
 

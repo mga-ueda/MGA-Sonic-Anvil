@@ -37,11 +37,50 @@ internal sealed partial class PlaybackSampleProvider
         }
     }
 
+    /// <summary>
+    /// メモリ上の次曲 PCM を予約する。WAVE／AIFF など非圧縮のギャップレス用。
+    /// 文書の Interleaved は呼び出し側が保持する（所有権は移さない）。
+    /// </summary>
+    public bool TryArmGaplessMemory(AudioDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        lock (_gate)
+        {
+            if (!CanArmGaplessMemoryNoLock(document))
+            {
+                return false;
+            }
+
+            ClearGaplessNoLock();
+            _gaplessStream = null;
+            _gaplessDocument = document;
+            _gaplessArmed = true;
+            return true;
+        }
+    }
+
+    private bool CanArmGaplessMemoryNoLock(AudioDocument document)
+    {
+        if (document.IsDeferredLoad
+            || document.IsStreamPlayback
+            || document.Interleaved.Length == 0
+            || document.SampleCount <= 0
+            || document.FrameCount <= 0)
+        {
+            return false;
+        }
+
+        // 再生中のカレントが無いと終端ハンドオフできない。
+        return _stream is not null || (_boundDocument is not null && _usedSamples > 0);
+    }
+
     public void ClearGaplessNext()
     {
         lock (_gate)
         {
             ClearGaplessNoLock();
+            // 予約だけでなく、既にハンドオフ済みの「進む待ち」も捨てる。
+            NoteGaplessAdvancedNoLock(null);
         }
     }
 
@@ -88,20 +127,31 @@ internal sealed partial class PlaybackSampleProvider
         _gaplessArmed = false;
     }
 
-    /// <summary>現在のストリーム終端で、先読みした次の曲へデバイスを止めずに切り替える。</summary>
+    private bool GaplessGuardsAllowNoLock() =>
+        !_loop
+        && !_scrubbing
+        && _seekFadePhase == 0
+        && Math.Abs(_playbackSpeed - 1d) <= 1e-6;
+
+    /// <summary>現在の終端で、先読みした次の曲へデバイスを止めずに切り替える。</summary>
     private bool TryConsumeGaplessNoLock()
     {
-        if (_gaplessStream is null || _gaplessDocument is null || _loop || _scrubbing)
+        if (_gaplessDocument is null || !GaplessGuardsAllowNoLock())
         {
             return false;
         }
 
-        if (_seekFadePhase != 0)
+        if (_gaplessStream is not null)
         {
-            return false;
+            return TryConsumeGaplessStreamNoLock();
         }
 
-        if (Math.Abs(_playbackSpeed - 1d) > 1e-6)
+        return TryConsumeGaplessMemoryNoLock();
+    }
+
+    private bool TryConsumeGaplessStreamNoLock()
+    {
+        if (_gaplessStream is null || _gaplessDocument is null)
         {
             return false;
         }
@@ -144,6 +194,55 @@ internal sealed partial class PlaybackSampleProvider
             next.SeekFrame(start, prebufferTimeoutMs: 0);
         }
 
+        return FinishGaplessConsumeNoLock(document, start, outChannels, waveChannels, waveRate);
+    }
+
+    private bool TryConsumeGaplessMemoryNoLock()
+    {
+        if (_gaplessDocument is null)
+        {
+            return false;
+        }
+
+        var document = _gaplessDocument;
+        if (document.IsDeferredLoad
+            || document.IsStreamPlayback
+            || document.Interleaved.Length == 0
+            || document.SampleCount <= 0)
+        {
+            return false;
+        }
+
+        _gaplessStream = null;
+        _gaplessDocument = null;
+        _gaplessArmed = false;
+        var outChannels = _outputChannels;
+        var waveChannels = WaveFormat.Channels;
+        var waveRate = WaveFormat.SampleRate;
+
+        DisposeStreamNoLock(synchronous: false);
+        _stream = null;
+        _boundDocument = document;
+        _samples = document.Interleaved;
+        _channels = Math.Max(1, document.Channels);
+        _sourceRate = Math.Max(1, document.SampleRate);
+        _usedSamples = Math.Clamp(document.SampleCount, 0, _samples.Length);
+        InvalidateStreamCursorCacheNoLock();
+        InvalidateStreamRecentNoLock();
+        ClearStreamReverseBuf();
+        var frames = document.FrameCount;
+        var window = Mp3Gapless.ResolveWindow(document, frames, playRange: null);
+        var start = Mp3Gapless.ClampStart(0, window, frames);
+        return FinishGaplessConsumeNoLock(document, start, outChannels, waveChannels, waveRate);
+    }
+
+    private bool FinishGaplessConsumeNoLock(
+        AudioDocument document,
+        long start,
+        int outChannels,
+        int waveChannels,
+        int waveRate)
+    {
         _sourceFrame = start;
         _cursor = checked((int)start * Math.Max(1, _channels));
         _frameGain = null;
@@ -164,6 +263,7 @@ internal sealed partial class PlaybackSampleProvider
             return false;
         }
 
+        var window = Mp3Gapless.ResolveWindow(document, document.FrameCount, playRange: null);
         ApplyPlayWindowNoLock(window, loop: false);
         Ended = false;
         ResetMeterBuffers();

@@ -22,9 +22,13 @@ public sealed class LibraryGaplessSourceTests
             var opened = Open(session);
             opened?.Dispose();
 
+            // WAVE はストリーム先読みせず、メモリギャップレスへ回す。
+            Assert.Null(opened);
             Assert.False(loaded.IsStreamPlayback);
             Assert.Equal(samples, loaded.Interleaved.Length);
             Assert.False(loaded.Peaks.IsEmpty);
+            Assert.True(LibraryPlayerMode.HasGaplessMemoryPcm(loaded));
+            Assert.True(LibraryPlayerMode.ShouldWarmGaplessPcm(loaded));
         }
         finally
         {

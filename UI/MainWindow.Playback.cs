@@ -958,6 +958,7 @@ public partial class MainWindow
     {
         // 明示の一時停止は合流待ち中の曲送り／再生し直し予約より優先する。
         CancelInteractiveLibraryPlay();
+        CancelLibraryGapless();
         if (_document is null || !IsPlaybackActive())
         {
             return false;
@@ -1028,6 +1029,8 @@ public partial class MainWindow
     {
         // 明示の停止は合流待ち中の曲送り／再生し直し予約より優先する。
         CancelInteractiveLibraryPlay();
+        // ギャップレス先読み／進む待ちを残すと、次の Space 単独再生が次曲へ食い込む。
+        CancelLibraryGapless();
         _editorPlayAfterPcmTicket++;
         // 開始位置へ戻す停止。動画／PDF 本再生中にクロームを隠したままにするときは keepVideoChromeHidden。
         // 動画本再生の Space 一時停止は PausePlaybackHere 側。暗いプレビューへ落とすのは Escape。

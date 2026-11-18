@@ -49,6 +49,86 @@ public sealed class GaplessPlaybackTests
     }
 
     [Fact]
+    public void Read_SpansIntoPrefetchedMemoryNext_WithoutEnding()
+    {
+        const int rate = 48000;
+        const int firstFrames = 64;
+        const int secondFrames = 64;
+        var firstSamples = new float[firstFrames * 2];
+        var secondSamples = new float[secondFrames * 2];
+        for (var i = 0; i < secondFrames; i++)
+        {
+            secondSamples[i * 2] = 0.5f;
+            secondSamples[i * 2 + 1] = 0.5f;
+        }
+
+        var firstDoc = new AudioDocument(firstSamples, rate, 2, 16, AudioFileKind.Wave, null, buildPeaks: false);
+        var secondDoc = new AudioDocument(secondSamples, rate, 2, 16, AudioFileKind.Wave, null, buildPeaks: false);
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(rate);
+        provider.Bind(firstDoc, 0, null, loop: false);
+        Assert.True(provider.TryArmGaplessMemory(secondDoc));
+        Assert.True(provider.HasGaplessArmed);
+
+        var frames = firstFrames + 24;
+        var buffer = new float[frames * 2];
+        var written = provider.Read(buffer, 0, buffer.Length);
+        Assert.Equal(buffer.Length, written);
+        Assert.False(provider.Ended);
+        Assert.True(provider.TryTakeGaplessAdvance(out var advanced));
+        Assert.Same(secondDoc, advanced);
+        Assert.True(buffer[firstFrames * 2] > 0.4f);
+        Assert.True(Math.Abs(buffer[0]) < 0.05f);
+        Assert.True(provider.IsBoundTo(secondDoc));
+    }
+
+    [Fact]
+    public void TryArmGaplessMemory_RejectsEmptyOrDeferred()
+    {
+        const int rate = 48000;
+        var current = new AudioDocument(new float[128], rate, 2, 16, AudioFileKind.Wave, null, buildPeaks: false);
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(rate);
+        provider.Bind(current, 0, null, loop: false);
+
+        var deferred = AudioDocument.CreateDeferred(
+            Path.Combine(Path.GetTempPath(), "mga-gapless-deferred.wav"));
+        Assert.False(provider.TryArmGaplessMemory(deferred));
+
+        var empty = new AudioDocument([], rate, 2, 16, AudioFileKind.Wave, null, buildPeaks: false);
+        Assert.False(provider.TryArmGaplessMemory(empty));
+    }
+
+    [Fact]
+    public void ClearGaplessNext_DiscardsAdvancePendingAfterMemoryHandoff()
+    {
+        const int rate = 48000;
+        const int firstFrames = 32;
+        const int secondFrames = 32;
+        var firstDoc = new AudioDocument(new float[firstFrames * 2], rate, 2, 16, AudioFileKind.Wave, null, buildPeaks: false);
+        var secondSamples = new float[secondFrames * 2];
+        for (var i = 0; i < secondSamples.Length; i++)
+        {
+            secondSamples[i] = 0.25f;
+        }
+
+        var secondDoc = new AudioDocument(secondSamples, rate, 2, 16, AudioFileKind.Wave, null, buildPeaks: false);
+        var provider = new PlaybackSampleProvider();
+        provider.SetDeviceSampleRate(rate);
+        provider.Bind(firstDoc, 0, null, loop: false);
+        Assert.True(provider.TryArmGaplessMemory(secondDoc));
+
+        var buffer = new float[(firstFrames + 8) * 2];
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+        Assert.True(provider.HasGaplessAdvancePending);
+
+        provider.ClearGaplessNext();
+        Assert.False(provider.HasGaplessArmed);
+        Assert.False(provider.HasGaplessAdvancePending);
+        Assert.False(provider.TryTakeGaplessAdvance(out _));
+    }
+
+    [Fact]
     public void Stream_IsDrainedOnlyAfterRealSamplesAreGone()
     {
         var dir = Path.Combine(Path.GetTempPath(), "mga-gapless-drain-" + Guid.NewGuid().ToString("N"));

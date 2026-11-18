@@ -1552,6 +1552,14 @@ internal sealed partial class PlaybackSampleProvider
                     continue;
                 }
 
+                if (TryConsumeGaplessNoLock())
+                {
+                    srcCh = Math.Max(1, _channels);
+                    outCh = Math.Max(1, _outputChannels);
+                    _cursor = checked((int)_sourceFrame * srcCh);
+                    continue;
+                }
+
                 Ended = true;
                 break;
             }
@@ -1639,6 +1647,17 @@ internal sealed partial class PlaybackSampleProvider
                     exitMixedFrames = writtenFrames;
                     _sourceFrame = loopStartFrame;
                     BeginExitOnLoopWrapNoLock();
+                    continue;
+                }
+
+                if (TryConsumeGaplessNoLock())
+                {
+                    srcCh = Math.Max(1, _channels);
+                    outCh = Math.Max(1, _outputChannels);
+                    playEndFrame = srcCh <= 0 ? 0 : _playEnd / (double)srcCh;
+                    loopStartFrame = srcCh <= 0 ? 0 : _loopStart / (double)srcCh;
+                    frameCount = UsedFrameCountNoLock(srcCh);
+                    step = PlaybackStep(resampled: true);
                     continue;
                 }
 

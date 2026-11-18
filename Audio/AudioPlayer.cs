@@ -406,6 +406,13 @@ internal sealed class AudioPlayer : IDisposable
         return _provider.TryArmGapless(source, document);
     }
 
+    /// <summary>次曲のメモリ PCM を再生中のデバイスへ予約する。Interleaved の所有権は移さない。</summary>
+    public bool TryArmGaplessMemory(AudioDocument document)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _provider.TryArmGaplessMemory(document);
+    }
+
     public void ClearGaplessNext()
     {
         if (_disposed)
