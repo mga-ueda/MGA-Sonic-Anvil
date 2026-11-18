@@ -2381,6 +2381,57 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void MoveSelection_FolderGroup_FollowsParentFolderName_EvenIfAppendedOutOfOrder()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            // 走査順が Zebra → Alpha でも、親フォルダグループ＋名前ソートなら Alpha が先。
+            var zebraA = Session(@"D:\music\Zebra\aaa.wav");
+            var alphaZ = Session(@"D:\music\Alpha\zzz.wav");
+            var alphaM = Session(@"D:\music\Alpha\mmm.wav");
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSort(new LibraryPlaylistSort(LibraryFileColumn.Name, LibrarySortDirection.Ascending));
+            view.SetGroup(LibraryFileGroup.Folder);
+            view.AppendSessionsRaw([zebraA, alphaZ, alphaM], zebraA);
+            Flush();
+
+            // ロック前でも行送りは見出し名順（Alpha → Zebra）。グループ内は追加順のまま。
+            Assert.Same(alphaZ, view.FirstPlaylistSession);
+            Assert.Same(alphaM, view.NextPlaylistSession(alphaZ));
+            Assert.Same(zebraA, view.NextPlaylistSession(alphaM));
+
+            view.LockPlaylistOrder(alphaM, [alphaM]);
+            view.UpdateSessionRows([zebraA, alphaZ, alphaM]);
+            Flush();
+
+            // ロック後は Alpha 内も名前順（mmm → zzz → aaa）。
+            Assert.Same(alphaM, view.FirstPlaylistSession);
+            view.MoveSelection(1, extend: true);
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            Assert.Contains(alphaM, view.SelectedSessions);
+            Assert.Contains(alphaZ, view.SelectedSessions);
+            Assert.DoesNotContain(zebraA, view.SelectedSessions);
+
+            view.MoveSelection(1);
+            Flush();
+            Assert.Same(zebraA, view.SelectedSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void MoveSelectionByGroup_JumpsToNextGroupAndExtends()
     {
         RunSta(() =>

@@ -773,6 +773,7 @@ internal sealed partial class LibraryBrowserView
             if (changed)
             {
                 _rows = nextRows;
+                RefreshGroupedPlaylistView();
             }
 
             if (preserve.Length > 0)

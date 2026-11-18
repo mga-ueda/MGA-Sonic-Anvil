@@ -365,6 +365,13 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     /// <summary>列見出しのソートが付いているときだけ true。</summary>
     public bool PlaylistSortActive => _sortColumn is not null;
+
+    /// <summary>現行の列ソート（大量追加の早期再生判定用）。</summary>
+    public LibraryFileColumn? CurrentSortColumn => _sortColumn;
+
+    /// <summary>現行のグループ（大量追加の早期再生判定用）。</summary>
+    public LibraryFileGroup CurrentGroup => _group;
+
     private LibrarySortDirection _sortDirection = LibrarySortDirection.Ascending;
     private LibraryFileGroup _group = LibraryFileGroup.Folder;
     private IReadOnlyList<LibraryFileRow> _rows = [];
@@ -1082,7 +1089,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             var caret = checkedRows[^1];
             SyncPlaylistCaretToGrid(caret);
             _playlistRangeCaretIndex = -1;
-            _anchorIndex = _grid.Items.IndexOf(caret);
+            SetPlaylistAnchorToRow(caret);
             PinSelectionCurrent();
         }
         finally
@@ -1636,8 +1643,9 @@ internal sealed partial class LibraryBrowserView : UserControl
     }
 
     /// <summary>
-    /// 画面上の再生・選択移動順。グループ化時は ListCollectionView.Groups の並び
-    /// （DataGrid と同じ）を使い、ソースの _items 順には戻さない。
+    /// 画面上の再生・選択移動順。
+    /// グループ化時は見出し名順（<see cref="GroupRowsInDisplayOrder"/>）を使い、
+    /// WPF の Groups 初出順や UpdateSessionRow の Replace で崩れた順に引きずられない。
     /// </summary>
     private IReadOnlyList<LibraryFileRow> PlaylistRows()
     {
@@ -1646,22 +1654,12 @@ internal sealed partial class LibraryBrowserView : UserControl
             return _rows;
         }
 
-        if (_group == LibraryFileGroup.None
-            || _grid.ItemsSource is not ListCollectionView { Groups.Count: > 0 } view)
+        if (_group == LibraryFileGroup.None)
         {
             return _items;
         }
 
-        var ordered = new List<LibraryFileRow>(_items.Count);
-        foreach (var entry in view.Groups)
-        {
-            if (entry is CollectionViewGroup group)
-            {
-                AppendGroupedPlaylistRows(group, ordered);
-            }
-        }
-
-        return ordered.Count == _items.Count ? ordered : _items;
+        return GroupRowsInDisplayOrder(_items);
     }
 
     /// <summary>
@@ -1826,21 +1824,6 @@ internal sealed partial class LibraryBrowserView : UserControl
                 path,
                 barCount,
                 PeakPyramid.BuildPlaylistBarsFromPeaks(session.Document.Peaks, barCount));
-        }
-    }
-
-    private static void AppendGroupedPlaylistRows(CollectionViewGroup group, List<LibraryFileRow> dest)
-    {
-        foreach (var item in group.Items)
-        {
-            if (item is CollectionViewGroup child)
-            {
-                AppendGroupedPlaylistRows(child, dest);
-            }
-            else if (item is LibraryFileRow row)
-            {
-                dest.Add(row);
-            }
         }
     }
 
@@ -3791,6 +3774,8 @@ internal sealed partial class LibraryBrowserView : UserControl
             try
             {
                 _items[i] = next;
+                // Replace はグループ内の末尾へ付け替える。表示を _items 順へ戻す。
+                RefreshGroupedPlaylistView();
                 ApplyRowSelectionCore(session, preserve.Length > 0 ? preserve : [session]);
             }
             finally
@@ -3808,6 +3793,103 @@ internal sealed partial class LibraryBrowserView : UserControl
             InvalidateGroupJackets();
             return;
         }
+    }
+
+    /// <summary>
+    /// 複数行をまとめて差し替え、グループ表示は最後に一度だけ _items 順へ戻す。
+    /// </summary>
+    public void UpdateSessionRows(IReadOnlyList<DocumentSession> sessions)
+    {
+        if (sessions.Count == 0)
+        {
+            return;
+        }
+
+        if (sessions.Count == 1)
+        {
+            UpdateSessionRow(sessions[0]);
+            return;
+        }
+
+        var touch = new HashSet<DocumentSession>(sessions);
+        var preserve = SelectedSessions;
+        var active = SelectedSession;
+        var keepFocus = _restoreListFocus || _grid.IsKeyboardFocusWithin;
+        var changed = false;
+        var nextRows = _rows.ToArray();
+        BeginRowSync();
+        try
+        {
+            for (var i = 0; i < _items.Count; i++)
+            {
+                if (_items[i].Tag is not DocumentSession session || !touch.Contains(session))
+                {
+                    continue;
+                }
+
+                var next = CreateRowWithDefaults(session);
+                next.GroupKey = LibraryFileList.GroupLabel(next, _group);
+                if (LibraryFileList.SameContent(_items[i], next))
+                {
+                    continue;
+                }
+
+                for (var r = 0; r < nextRows.Length; r++)
+                {
+                    if (ReferenceEquals(nextRows[r].Tag, session))
+                    {
+                        nextRows[r] = next;
+                        break;
+                    }
+                }
+
+                _items[i] = next;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                _rows = nextRows;
+                RefreshGroupedPlaylistView();
+            }
+
+            if (preserve.Length > 0)
+            {
+                ApplyRowSelectionCore(active ?? preserve[0], preserve);
+            }
+        }
+        finally
+        {
+            EndRowSync();
+        }
+
+        if (keepFocus)
+        {
+            EnsureListFocused();
+        }
+
+        if (changed)
+        {
+            RefreshEffectiveColumns();
+            InvalidateGroupJackets();
+        }
+    }
+
+    /// <summary>
+    /// グループ化ビューをソース（並べ済み _items）の順で作り直す。
+    /// Replace でグループ内順が末尾落ちしたあと、画面と行送りを一致させる。
+    /// </summary>
+    private void RefreshGroupedPlaylistView()
+    {
+        if (_group == LibraryFileGroup.None
+            || _grid.ItemsSource is not ListCollectionView view
+            || view.GroupDescriptions.Count == 0)
+        {
+            return;
+        }
+
+        view.IsDataInGroupOrder = true;
+        view.Refresh();
     }
 
     /// <summary>
@@ -3888,14 +3970,12 @@ internal sealed partial class LibraryBrowserView : UserControl
     {
         get
         {
-            if (_items.Count > 0 && _items[0].Tag is DocumentSession visible)
+            foreach (var row in PlaylistRows())
             {
-                return visible;
-            }
-
-            if (_rows.Count > 0 && _rows[0].Tag is DocumentSession row)
-            {
-                return row;
+                if (row.Tag is DocumentSession session)
+                {
+                    return session;
+                }
             }
 
             return null;
@@ -3905,7 +3985,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>表示順のセッション一覧。</summary>
     public DocumentSession[] PlaylistSessionsInDisplayOrder()
     {
-        var source = _items.Count > 0 ? _items : _rows;
+        var source = PlaylistRows();
         var list = new DocumentSession[source.Count];
         var n = 0;
         for (var i = 0; i < source.Count; i++)
@@ -4292,6 +4372,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         var view = new ListCollectionView(_items);
         if (_group != LibraryFileGroup.None)
         {
+            // SortRows 済みの _items をグループ初出順のまま使う（見出し＝名前順）。
+            view.IsDataInGroupOrder = true;
             view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(LibraryFileRow.GroupKey)));
         }
 
@@ -4425,7 +4507,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         if (current is not null)
         {
             SyncPlaylistCaretToGrid(current);
-            _anchorIndex = _grid.SelectedIndex;
+            SetPlaylistAnchorToRow(current);
             PinSelectionCurrent();
             EnsureRowVisible(current);
         }
@@ -4435,6 +4517,34 @@ internal sealed partial class LibraryBrowserView : UserControl
             _anchorIndex = -1;
             PinSelectionCurrent();
         }
+    }
+
+    /// <summary>
+    /// Shift 範囲のアンカーをプレイリスト表示順のファイル番号へ載せる。
+    /// DataGrid.SelectedIndex はグループ化や Replace 後に表示順とずれることがある。
+    /// </summary>
+    private void SetPlaylistAnchorToRow(LibraryFileRow? row)
+    {
+        _anchorIndex = PlaylistFileIndexOfRow(row);
+    }
+
+    private int PlaylistFileIndexOfRow(LibraryFileRow? row)
+    {
+        if (row is null)
+        {
+            return -1;
+        }
+
+        var files = SnapshotPlaylistFiles();
+        for (var i = 0; i < files.Count; i++)
+        {
+            if (ReferenceEquals(files[i], row))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     /// <summary>
@@ -4496,52 +4606,6 @@ internal sealed partial class LibraryBrowserView : UserControl
             view.MoveCurrentTo(current);
         }
     }
-
-    private void SelectRange(int from, int to)
-    {
-        if (_grid.Items.Count == 0)
-        {
-            return;
-        }
-
-        from = Math.Clamp(from, 0, _grid.Items.Count - 1);
-        to = Math.Clamp(to, 0, _grid.Items.Count - 1);
-        var lo = Math.Min(from, to);
-        var hi = Math.Max(from, to);
-        // グリッド行インデックス経路。ファイル行の差分キャッシュは使えない。
-        _playlistRangeCaretIndex = -1;
-        _syncing = true;
-        SuspendPlaylistSelectionNotify();
-        try
-        {
-            ClearPlaylistRowSelectionFlags();
-            LibraryFileRow? caret = null;
-            for (var i = lo; i <= hi; i++)
-            {
-                if (_grid.Items[i] is not LibraryFileRow row || row.Tag is not DocumentSession)
-                {
-                    continue;
-                }
-
-                SetPlaylistRowSelected(row, true);
-                if (i == to)
-                {
-                    caret = row;
-                }
-
-                caret ??= row;
-            }
-
-            SyncPlaylistCaretToGrid(caret);
-            PinSelectionCurrent();
-        }
-        finally
-        {
-            _syncing = false;
-            ResumePlaylistSelectionNotify();
-        }
-    }
-
 
     private void SyncGroupChrome()
     {
@@ -4684,9 +4748,10 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
-        if ((Keyboard.Modifiers & ModifierKeys.Shift) == 0)
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) == 0
+            && _grid.SelectedItem is LibraryFileRow selectedRow)
         {
-            _anchorIndex = _grid.SelectedIndex;
+            SetPlaylistAnchorToRow(selectedRow);
         }
 
         RefreshGroupJacketsForActiveRow();
@@ -4766,7 +4831,7 @@ internal sealed partial class LibraryBrowserView : UserControl
 
         ClearPlaylistDrag();
 
-        var index = _grid.Items.IndexOf(row);
+        var index = PlaylistFileIndexOfRow(row);
         if (index < 0)
         {
             return;
@@ -4937,14 +5002,20 @@ internal sealed partial class LibraryBrowserView : UserControl
         _deferActivate = true;
         try
         {
+            var files = SnapshotPlaylistFiles();
+            if ((uint)index >= (uint)files.Count)
+            {
+                return;
+            }
+
             if (shift)
             {
-                var from = _anchorIndex >= 0 ? _anchorIndex : Math.Max(0, _grid.SelectedIndex);
-                SelectRange(from, index);
+                var from = _anchorIndex >= 0 ? _anchorIndex : Math.Max(0, PlaylistFileIndexOfSelected(files));
+                SelectPlaylistFileRange(from, index, files);
             }
             else if (control)
             {
-                ToggleSelectionAt(index);
+                ToggleSelectionAt(index, files);
             }
         }
         finally
@@ -4955,14 +5026,16 @@ internal sealed partial class LibraryBrowserView : UserControl
         RefreshGroupJacketsForActiveRow();
     }
 
-    private void ToggleSelectionAt(int index)
+    private void ToggleSelectionAt(int index, IReadOnlyList<LibraryFileRow>? files = null)
     {
-        if (index < 0 || index >= _grid.Items.Count)
+        files ??= SnapshotPlaylistFiles();
+        if ((uint)index >= (uint)files.Count)
         {
             return;
         }
 
-        if (_grid.Items[index] is not LibraryFileRow fileRow || fileRow.Tag is not DocumentSession)
+        var fileRow = files[index];
+        if (fileRow.Tag is not DocumentSession)
         {
             return;
         }
@@ -4972,7 +5045,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         try
         {
             SetPlaylistRowSelected(fileRow, !fileRow.IsPlaylistSelected);
-            _anchorIndex = index;
+            SetPlaylistAnchorToRow(fileRow);
             _playlistRangeCaretIndex = -1;
             if (fileRow.IsPlaylistSelected)
             {
