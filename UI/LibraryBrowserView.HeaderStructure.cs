@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -645,7 +646,9 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>
-    /// 選択変更からのヘッダ再読込。ナビキー押し中は解析せず、離したときに読む。
+    /// 選択変更からのヘッダ再読込。
+    /// ナビキー押し中は解析せず、離したときに読む。
+    /// 複数選択の和集合は選択ハイライト確定後に少し待ってから読む。
     /// </summary>
     private void RequestHeaderStructureRefresh()
     {
@@ -657,6 +660,13 @@ internal sealed partial class LibraryBrowserView
         if (IsPlaylistNavigationKeyHeld())
         {
             ScheduleDeferredHeaderStructureRefresh();
+            return;
+        }
+
+        // 全選択など。和集合のディスク走査を選択 UI の後ろへ回す。
+        if (SelectedSessions.Length > 1)
+        {
+            ScheduleSettledHeaderStructureRefresh();
             return;
         }
 
@@ -708,7 +718,34 @@ internal sealed partial class LibraryBrowserView
             DispatcherPriority.Background);
     }
 
-    /// <summary>↑↓／Page／テンキー 4・6 を離したあとに溜めたヘッダ解析を実行する。</summary>
+    /// <summary>
+    /// 複数選択確定後、短く待ってから和集合を読む。連続操作はチケットでまとめる。
+    /// </summary>
+    private void ScheduleSettledHeaderStructureRefresh()
+    {
+        _headerStructureRefreshDeferred = true;
+        var ticket = ++_headerStructureRefreshDeferTicket;
+        var timer = new DispatcherTimer { Interval = HeaderStructureSettleDelay };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (ticket != _headerStructureRefreshDeferTicket
+                || !_headerStructureRefreshDeferred)
+            {
+                return;
+            }
+
+            if (IsPlaylistNavigationKeyHeld())
+            {
+                return;
+            }
+
+            FlushDeferredHeaderStructureRefresh();
+        };
+        timer.Start();
+    }
+
+    /// <summary>↑↓／Page／テンキー 4・6 を離したあと、または複数選択の待ち後に溜めたヘッダ解析を実行する。</summary>
     internal void FlushDeferredHeaderStructureRefresh()
     {
         if (!_headerStructureRefreshDeferred)
@@ -753,40 +790,13 @@ internal sealed partial class LibraryBrowserView
 
         if (sessions.Length > 1)
         {
-            var paths = new List<string>(sessions.Length);
-            foreach (var session in sessions)
-            {
-                var p = session.Document.SourcePath;
-                if (!string.IsNullOrWhiteSpace(p))
-                {
-                    paths.Add(p);
-                }
-            }
-
-            if (paths.Count == 0)
-            {
-                ClearHeaderStructure();
-                return;
-            }
-
-            var cacheParts = new string[paths.Count];
-            for (var i = 0; i < paths.Count; i++)
-            {
-                cacheParts[i] = paths[i].ToUpperInvariant();
-            }
-
-            var cacheKey = "\u0001union\u0001" + string.Join('\u0001', cacheParts);
-            if (string.Equals(cacheKey, _structureLoadedPath, StringComparison.Ordinal)
-                && _structureDocument is { IsChunkUnion: true })
-            {
-                return;
-            }
-
-            _structureLoadedPath = cacheKey;
-            _structureDocument = WaveContainerStructure.BuildChunkUnion(paths);
-            PopulateHeaderStructure(_structureDocument);
+            BeginHeaderStructureUnion(sessions);
             return;
         }
+
+        // 単一選択は即時。進行中の和集合は破棄する。
+        _structureUnionBuildTicket++;
+        _structureUnionPendingKey = null;
 
         var path = sessions[0].Document.SourcePath;
         if (string.IsNullOrWhiteSpace(path))
@@ -809,6 +819,75 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>
+    /// 複数選択のチャンク和集合。ディスク走査は裏スレッド、TreeView 更新だけ UI。
+    /// </summary>
+    private void BeginHeaderStructureUnion(IReadOnlyList<DocumentSession> sessions)
+    {
+        var paths = new List<string>(sessions.Count);
+        foreach (var session in sessions)
+        {
+            var p = session.Document.SourcePath;
+            if (!string.IsNullOrWhiteSpace(p))
+            {
+                paths.Add(p);
+            }
+        }
+
+        if (paths.Count == 0)
+        {
+            ClearHeaderStructure();
+            return;
+        }
+
+        var cacheParts = new string[paths.Count];
+        for (var i = 0; i < paths.Count; i++)
+        {
+            cacheParts[i] = paths[i].ToUpperInvariant();
+        }
+
+        var cacheKey = "\u0001union\u0001" + string.Join('\u0001', cacheParts);
+        if (string.Equals(cacheKey, _structureLoadedPath, StringComparison.Ordinal)
+            && _structureDocument is { IsChunkUnion: true })
+        {
+            _structureUnionPendingKey = null;
+            return;
+        }
+
+        if (string.Equals(cacheKey, _structureUnionPendingKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _structureUnionPendingKey = cacheKey;
+        var ticket = ++_structureUnionBuildTicket;
+        _ = Task.Run(() => WaveContainerStructure.BuildChunkUnion(paths))
+            .ContinueWith(task =>
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (ticket != _structureUnionBuildTicket
+                        || !string.Equals(cacheKey, _structureUnionPendingKey, StringComparison.Ordinal)
+                        || !_headerStructureVisible
+                        || _suppressHeaderStructureRefresh)
+                    {
+                        return;
+                    }
+
+                    if (task.IsFaulted || task.IsCanceled)
+                    {
+                        return;
+                    }
+
+                    var document = task.Result;
+                    _structureUnionPendingKey = null;
+                    _structureLoadedPath = cacheKey;
+                    _structureDocument = document;
+                    PopulateHeaderStructure(document);
+                });
+            });
+    }
+
+    /// <summary>
     /// 選択なし／プレイリスト空／H で隠すとき。情報は出さず、幅の高水位も忘れる。
     /// </summary>
     private void ClearHeaderStructure()
@@ -825,6 +904,8 @@ internal sealed partial class LibraryBrowserView
     private void DiscardHeaderStructureContent()
     {
         _structureTreeSelectAll = false;
+        _structureUnionBuildTicket++;
+        _structureUnionPendingKey = null;
         _structureLoadedPath = null;
         _structureDocument = null;
         _structureTree.Items.Clear();

@@ -193,9 +193,14 @@ internal sealed partial class LibraryBrowserView : UserControl
     private double _structureAutoHeldWidth;
     /// <summary>和集合チャンク→プレイリスト選択のとき、ヘッダ構造の再構築を抑止する。</summary>
     private bool _suppressHeaderStructureRefresh;
-    /// <summary>↑↓ 等の押し込み中はヘッダ解析を保留し、キーを離してから読む。</summary>
+    /// <summary>↑↓ 等の押し込み中／複数選択の和集合はヘッダ解析を保留し、落ち着いてから読む。</summary>
     private bool _headerStructureRefreshDeferred;
     private int _headerStructureRefreshDeferTicket;
+    /// <summary>和集合の裏スレッド構築。世代が進んだら結果を捨てる。</summary>
+    private int _structureUnionBuildTicket;
+    private string? _structureUnionPendingKey;
+    /// <summary>全選択など複数選択後、和集合解析まで待つ時間。</summary>
+    private static readonly TimeSpan HeaderStructureSettleDelay = TimeSpan.FromMilliseconds(150);
     /// <summary>情報表示に必要な幅の高水位。ノード切替で狭くなっても勝手には下げない。H トグルで忘れる。</summary>
     private double _structureDetailHeldWidth;
     /// <summary>ヘッダ構造ツリー列に必要な幅の高水位。展開が戻っても勝手には下げない。H トグルで忘れる。</summary>

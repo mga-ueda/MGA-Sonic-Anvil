@@ -2839,6 +2839,73 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void SelectAllRows_DefersHeaderStructureUnionUntilSettled()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var path1 = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-selall-1-" + Guid.NewGuid().ToString("N") + ".wav");
+            var path2 = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-selall-2-" + Guid.NewGuid().ToString("N") + ".wav");
+            WriteMinimalWav(path1);
+            File.Copy(path1, path2, overwrite: true);
+            try
+            {
+                var first = new DocumentSession(AudioDocument.CreateDeferred(path1));
+                var second = new DocumentSession(AudioDocument.CreateDeferred(path2));
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.SetSessions([first, second], first, [first]);
+                view.ToggleHeaderStructureVisible(focusWhenShown: false);
+                Flush();
+                Assert.True(view.HeaderStructureVisible);
+                Assert.False(view.IsHeaderStructureRefreshDeferred);
+
+                // 全選択のハイライトは即時。和集合解析だけ保留する。
+                view.SelectAllRows();
+                Assert.Equal(2, view.SelectedSessions.Length);
+                Assert.True(view.IsHeaderStructureRefreshDeferred);
+
+                view.FlushDeferredHeaderStructureRefresh();
+                Assert.False(view.IsHeaderStructureRefreshDeferred);
+                PumpUntil(
+                    () => view.HeaderStructureLoadedPath is { } loaded
+                        && loaded.Contains("\u0001union\u0001", StringComparison.Ordinal),
+                    TimeSpan.FromSeconds(3));
+                Assert.Contains("\u0001union\u0001", view.HeaderStructureLoadedPath, StringComparison.Ordinal);
+                Assert.NotEmpty(view.HeaderStructureTree.Items);
+                window.Close();
+            }
+            finally
+            {
+                foreach (var path in new[] { path1, path2 })
+                {
+                    try
+                    {
+                        File.Delete(path);
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void HeaderStructureVisible_DefaultsOffAndToggles()
     {
         RunSta(() =>
