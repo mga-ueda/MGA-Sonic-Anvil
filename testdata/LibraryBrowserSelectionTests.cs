@@ -68,6 +68,156 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void SetSessions_RemoveSome_GroupedFolder_KeepsSelectionAndSelectAll()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var keepA = Session(Path.Combine("Alpha", "01.wav"));
+            var dropB = Session(Path.Combine("Alpha", "02.wav"));
+            var keepC = Session(Path.Combine("Beta", "03.wav"));
+            var dropD = Session(Path.Combine("Beta", "04.wav"));
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 420,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.Folder);
+            view.SetSessions([keepA, dropB, keepC, dropD], dropB, [dropB, dropD]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+
+            // RemoveLibrarySelectedFromList と同じ順：SetSessions の直後に FocusList
+            //（Flush 前。FocusList が ensure 世代を進めてもキャレットが残ること）。
+            view.SetSessions([keepA, keepC], keepC, [keepC]);
+            view.FocusList();
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            Assert.Same(keepC, view.SelectedSession);
+            Assert.Equal([keepC], view.SelectedSessions);
+            Assert.True(view.IsListKeyboardFocused);
+            var grid = Assert.IsAssignableFrom<DataGrid>(view.FileGrid);
+            Assert.NotNull(grid.SelectedItem);
+            Assert.Same(keepC, (grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession);
+            Assert.Same(keepC, (grid.CurrentItem as LibraryFileRow)?.Tag as DocumentSession);
+
+            view.SelectAllRows();
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            Assert.Contains(keepA, view.SelectedSessions);
+            Assert.Contains(keepC, view.SelectedSessions);
+
+            view.SetSessions([keepA, keepC], keepA, [keepA]);
+            Flush();
+            view.FocusList();
+            Flush();
+            view.MoveSelectionToEdge(1, extend: true);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            Assert.Contains(keepA, view.SelectedSessions);
+            Assert.Contains(keepC, view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void SetSessions_ClearLatterHalf_MoveSelectionStaysOnBoundRows()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[24];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var folder = i < 12 ? "Alpha" : "Beta";
+                sessions[i] = Session(Path.Combine(folder, $"{i:00}.wav"));
+            }
+
+            var keep = sessions.Take(12).ToArray();
+            var drop = sessions.Skip(12).ToArray();
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 360,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.Folder);
+            view.SetSessions(sessions, drop[0], drop);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+
+            // 後半クリア直後に FocusList → ↑↓（実機の Delete 後操作）。
+            view.SetSessions(keep, keep[^1], [keep[^1]]);
+            view.FocusList();
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            var grid = Assert.IsAssignableFrom<DataGrid>(view.FileGrid);
+            AssertBoundSelection(view, grid, keep[^1]);
+
+            view.MoveSelection(-1);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            AssertBoundSelection(view, grid, keep[^2]);
+
+            view.MoveSelection(1);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            AssertBoundSelection(view, grid, keep[^1]);
+
+            view.MoveSelection(1, wrap: false);
+            Flush();
+            AssertBoundSelection(view, grid, keep[^1]);
+
+            view.MoveSelection(-3);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            AssertBoundSelection(view, grid, keep[^4]);
+            window.Close();
+        });
+    }
+
+    private static void AssertBoundSelection(
+        LibraryBrowserView view,
+        DataGrid grid,
+        DocumentSession expected)
+    {
+        Assert.Same(expected, view.SelectedSession);
+        Assert.Equal([expected], view.SelectedSessions);
+        var selected = Assert.IsType<LibraryFileRow>(grid.SelectedItem);
+        Assert.Same(expected, selected.Tag as DocumentSession);
+        Assert.True(selected.IsPlaylistSelected);
+        Assert.True(grid.Items.Contains(selected));
+        var current = Assert.IsType<LibraryFileRow>(grid.CurrentItem);
+        Assert.Same(expected, current.Tag as DocumentSession);
+        Assert.Same(selected, current);
+    }
+
+    [Fact]
     public void AppendSessions_MultipleUnselected_ClearsDeferActivateSoGridClickWorks()
     {
         RunSta(() =>
@@ -2086,6 +2236,60 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void Playlist_ShiftEndAndPage_ExtendsSelection()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[12];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                sessions[i] = Session($"{i:00}.mp3");
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 360,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions(sessions, sessions[2], [sessions[2]]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+
+            view.MoveSelectionToEdge(1, extend: true);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Assert.Equal(10, view.SelectedSessions.Length);
+            Assert.Same(sessions[^1], view.SelectedSession);
+            Assert.Contains(sessions[2], view.SelectedSessions);
+            Assert.Contains(sessions[^1], view.SelectedSessions);
+            Assert.DoesNotContain(sessions[0], view.SelectedSessions);
+
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.FocusList();
+            Flush();
+            view.MoveSelectionPage(1, extend: true);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Assert.True(view.SelectedSessions.Length > 1);
+            Assert.Contains(sessions[0], view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void Playlist_ShiftAndCtrlSelect_KeepsMultipleRows()
     {
         RunSta(() =>
@@ -2228,13 +2432,10 @@ public sealed class LibraryBrowserSelectionTests
             view.ToggleCheckSelectMode();
             Flush();
             Assert.True(view.CheckSelectMode);
-
-            // Space でカーソル行をチェック。操作対象（SelectedSessions）はチェック行。
-            view.ApplyPlaylistSpaceCheck();
-            Flush();
+            // オン時、既に選んでいた first へチェックが載る。
             Assert.Equal([first], view.SelectedSessions);
 
-            // もう一度 Space でチェックを外す（トグル）。
+            // Space でカーソル行のチェックを外す（トグル）。
             view.ApplyPlaylistSpaceCheck();
             Flush();
             Assert.Empty(view.SelectedSessions);
@@ -2271,12 +2472,116 @@ public sealed class LibraryBrowserSelectionTests
             Assert.Contains(second, view.SelectedSessions);
             Assert.Contains(third, view.SelectedSessions);
 
-            // オンに戻すとチェックは空（操作対象も空）。選択のシアンは残るがチェックモード対象外。
+            // オンに戻すと、残っていた選択へチェックが載る（操作対象＝その3件）。
             view.ToggleCheckSelectMode();
             Flush();
             Assert.True(view.CheckSelectMode);
-            Assert.Empty(view.SelectedSessions);
+            Assert.Equal(3, view.SelectedSessions.Length);
+            Assert.Contains(first, view.SelectedSessions);
+            Assert.Contains(second, view.SelectedSessions);
+            Assert.Contains(third, view.SelectedSessions);
+            Assert.Equal(3, view.PlaylistBandSessions().Length);
 
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void CheckSelectMode_On_SeedsChecksFromCurrentBandSelection()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.wav");
+            var second = Session("02 b.wav");
+            var third = Session("03 c.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second, third], first, [first, second]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Assert.False(view.CheckSelectMode);
+            Assert.Equal([first, second], view.SelectedSessions);
+
+            view.ToggleCheckSelectMode();
+            Flush();
+            Assert.True(view.CheckSelectMode);
+            Assert.Equal([first, second], view.SelectedSessions);
+            Assert.Equal([first, second], view.PlaylistBandSessions());
+            Assert.DoesNotContain(third, view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void CheckSelectMode_MoveSelection_DoesNotSelectAllCheckedAsBand()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.wav");
+            var second = Session("02 b.wav");
+            var third = Session("03 c.wav");
+            var fourth = Session("04 d.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second, third, fourth], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.ToggleCheckSelectMode();
+            Flush();
+            // オン時に帯選択だった first へチェックが載る。
+            Assert.Equal([first], view.SelectedSessions);
+
+            // third もチェック。キャレットは未チェックの fourth。
+            view.MoveSelection(2);
+            Flush();
+            view.ApplyPlaylistSpaceCheck();
+            Flush();
+            view.MoveSelection(1);
+            Flush();
+            Assert.Equal([first, third], view.SelectedSessions);
+            Assert.Equal([fourth], view.PlaylistBandSessions());
+
+            // ↑ でチェック済み third へ。再生追従／行更新相当も挟む。
+            view.MoveSelection(-1);
+            Flush();
+            view.SelectSessionQuiet(third);
+            Flush();
+            view.UpdateSessionRow(third);
+            Flush();
+
+            Assert.Equal([first, third], view.SelectedSessions);
+            Assert.Equal([third], view.PlaylistBandSessions());
+            Assert.Equal(1, view.PlaylistSelectedCount);
+            Assert.Same(third, view.SelectedSession);
+
+            view.MoveSelection(-1);
+            Flush();
+            view.SelectSessionQuiet(second);
+            Flush();
+            Assert.Equal([first, third], view.SelectedSessions);
+            Assert.Equal([second], view.PlaylistBandSessions());
             window.Close();
         });
     }

@@ -361,6 +361,13 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// 選択移動のたびに進め、古い Loaded コールバックが上方向へ巻き戻すのを捨てる。
     /// </summary>
     private int _playlistEnsureVisibleGeneration;
+
+    /// <summary>
+    /// ItemsSource 再構築直後は仮想化コンテナの座標が信用できないので、
+    /// 次の <see cref="EnsureRowVisible"/> は必ず ScrollIntoView する。
+    /// </summary>
+    private bool _playlistForceEnsureVisible;
+
     private LibraryFileColumn? _sortColumn = LibraryFileColumn.Album;
 
     /// <summary>列見出しのソートが付いているときだけ true。</summary>
@@ -897,22 +904,27 @@ internal sealed partial class LibraryBrowserView : UserControl
         get
         {
             if (_playlistCaretRow is { Tag: DocumentSession caret }
-                && _playlistCaretRow.IsPlaylistSelected)
+                && _playlistCaretRow.IsPlaylistSelected
+                && IsBoundPlaylistRow(_playlistCaretRow))
             {
                 return caret;
             }
 
             foreach (var row in _playlistSelectedRows)
             {
-                if (row.Tag is DocumentSession selected)
+                if (row.Tag is DocumentSession selected && IsBoundPlaylistRow(row))
                 {
                     return selected;
                 }
             }
 
-            return _grid.SelectedItem is LibraryFileRow { Tag: DocumentSession fromGrid }
-                ? fromGrid
-                : null;
+            if (_grid.SelectedItem is LibraryFileRow { Tag: DocumentSession fromGrid } gridRow
+                && IsBoundPlaylistRow(gridRow))
+            {
+                return fromGrid;
+            }
+
+            return null;
         }
     }
 
@@ -931,23 +943,33 @@ internal sealed partial class LibraryBrowserView : UserControl
                 return CheckedPlaylistSessions();
             }
 
-            if (_playlistSelectedRows.Count == 0)
-            {
-                return [];
-            }
-
-            // 表示順で返す。
-            var result = new List<DocumentSession>(_playlistSelectedRows.Count);
-            foreach (var row in PlaylistRows())
-            {
-                if (row.IsPlaylistSelected && row.Tag is DocumentSession session)
-                {
-                    result.Add(session);
-                }
-            }
-
-            return [.. result];
+            return PlaylistBandSessions();
         }
+    }
+
+    /// <summary>
+    /// シアン帯の選択（表示順）。チェックモード中もチェック行ではなく帯だけを返す。
+    /// 行差し替え／再生追従の preserve に使い、チェックを帯へ吸い上げない。
+    /// </summary>
+    public DocumentSession[] PlaylistBandSessions()
+    {
+        if (_playlistSelectedRows.Count == 0)
+        {
+            return [];
+        }
+
+        var result = new List<DocumentSession>(_playlistSelectedRows.Count);
+        foreach (var row in PlaylistRows())
+        {
+            if (row.IsPlaylistSelected
+                && row.Tag is DocumentSession session
+                && IsBoundPlaylistRow(row))
+            {
+                result.Add(session);
+            }
+        }
+
+        return [.. result];
     }
 
     /// <summary>プレイリスト帯選択の件数（チェック専用モードの件数ではない）。</summary>
@@ -984,6 +1006,9 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>帯用フラグを揃え、DataGrid にはキャレット1件だけ載せる。</summary>
     private void SyncPlaylistCaretToGrid(LibraryFileRow? caret)
     {
+        // ItemsSource 再構築後の古い行オブジェクトを SelectedItem に載せると、
+        // 画面上は空なのに見えない行を掴んだまま ↑↓ だけ動く。
+        caret = AsBoundPlaylistRow(caret);
         _playlistCaretRow = caret;
         if (caret is null)
         {
@@ -999,6 +1024,56 @@ internal sealed partial class LibraryBrowserView : UserControl
         {
             _grid.SelectedItem = caret;
         }
+    }
+
+    /// <summary>今の ItemsSource／_items に載っている行か。</summary>
+    private bool IsBoundPlaylistRow(LibraryFileRow? row)
+    {
+        if (row is null || _items.Count == 0)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < _items.Count; i++)
+        {
+            if (ReferenceEquals(_items[i], row))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>古い行なら同じセッションの束縛行へ付け替える。</summary>
+    private LibraryFileRow? AsBoundPlaylistRow(LibraryFileRow? row)
+    {
+        if (row is null)
+        {
+            return null;
+        }
+
+        if (IsBoundPlaylistRow(row))
+        {
+            return row;
+        }
+
+        return row.Tag is DocumentSession session
+            ? FindBoundPlaylistRow(session)
+            : null;
+    }
+
+    private LibraryFileRow? FindBoundPlaylistRow(DocumentSession session)
+    {
+        for (var i = 0; i < _items.Count; i++)
+        {
+            if (ReferenceEquals(_items[i].Tag, session))
+            {
+                return _items[i];
+            }
+        }
+
+        return null;
     }
 
     /// <summary>チェック選択モードのトグル（Shift+Space／Check Box）。</summary>
@@ -1027,10 +1102,14 @@ internal sealed partial class LibraryBrowserView : UserControl
 
         SyncCheckSelectCheck();
 
-        if (!on)
+        if (on)
         {
-            // チェック行を選択として残してから、チェック状態は忘れる。
-            // オンに戻したときは空のチェックから始まる。ツリーは対象外。
+            // オフ時に選んでいたシアン帯へチェックを載せる（何も選んでいなければ空）。
+            ApplyPlaylistChecksFromSelection();
+        }
+        else
+        {
+            // チェック行を選択として残してから、チェック状態は忘れる。ツリーは対象外。
             ApplyPlaylistSelectionFromChecks();
             ClearAllPlaylistChecks();
         }
@@ -1059,7 +1138,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
     }
 
-    /// <summary>チェック済みプレイリスト行を DataGrid 選択へ載せる（F4 オフ時）。</summary>
+    /// <summary>チェック済みプレイリスト行を DataGrid 選択へ載せる（モードオフ時）。</summary>
     private void ApplyPlaylistSelectionFromChecks()
     {
         var checkedRows = new List<LibraryFileRow>();
@@ -1096,6 +1175,19 @@ internal sealed partial class LibraryBrowserView : UserControl
         {
             _syncing = false;
             ResumePlaylistSelectionNotify();
+        }
+    }
+
+    /// <summary>現在のシアン帯をチェックへ載せる（モードオン時）。帯が無ければ全部オフ。</summary>
+    private void ApplyPlaylistChecksFromSelection()
+    {
+        ClearAllPlaylistChecks();
+        foreach (var row in PlaylistRows())
+        {
+            if (row.IsPlaylistSelected && IsBoundPlaylistRow(row))
+            {
+                row.IsChecked = true;
+            }
         }
     }
 
@@ -1830,7 +1922,9 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>再生追従で行を選ぶ。クリック再生は起こさない。複数選択は今の曲が含まれていれば残す。</summary>
     public void SelectSessionQuiet(DocumentSession session)
     {
-        var keep = SelectedSessions;
+        // チェックモードの SelectedSessions はチェック行。それを preserve にすると
+        // ↑↓ でチェック済みが全部シアン帯になる。
+        var keep = PlaylistBandSessions();
         if (keep.Length == 0 || Array.IndexOf(keep, session) < 0)
         {
             keep = [session];
@@ -1866,6 +1960,16 @@ internal sealed partial class LibraryBrowserView : UserControl
     public void FocusList()
     {
         ClearExplorerTypeahead();
+        // ItemsSource 再構築直後は SelectedItem が落ちていても _playlistCaretRow は残る。
+        // 先に揃えてからフォーカス／スクロールしないとカーソルが見えない。
+        var caret = ResolvePlaylistCaretRow();
+        if (caret is not null
+            && (!ReferenceEquals(_grid.SelectedItem, caret)
+                || !ReferenceEquals(_grid.CurrentItem, caret)))
+        {
+            ReassertPlaylistCaretOnly(caret);
+        }
+
         EnsureListFocused();
         if (_grid.SelectedItem is not null)
         {
@@ -2823,6 +2927,22 @@ internal sealed partial class LibraryBrowserView : UserControl
                     return i;
                 }
             }
+
+            // クリア後の古い行オブジェクト。同じセッションの束縛行があればそこに付け替える。
+            if (_playlistCaretRow.Tag is DocumentSession caretSession)
+            {
+                for (var i = 0; i < files.Count; i++)
+                {
+                    if (files[i].Tag is DocumentSession session
+                        && ReferenceEquals(session, caretSession))
+                    {
+                        _playlistCaretRow = files[i];
+                        return i;
+                    }
+                }
+            }
+
+            _playlistCaretRow = null;
         }
 
         var selected = SelectedSession;
@@ -2997,6 +3117,13 @@ internal sealed partial class LibraryBrowserView : UserControl
             }
             else
             {
+                // アンカーが無い／表示順とずれたあとは、今のキャレットを起点にする。
+                if (_anchorIndex < 0 || _anchorIndex >= files.Count)
+                {
+                    var caret = PlaylistFileIndexOfSelected(files);
+                    _anchorIndex = caret >= 0 ? caret : index;
+                }
+
                 // SelectPlaylistFileRange も _syncing を触るので、ネストではなく中身だけ使う。
                 ApplyPlaylistFileRangeCore(_anchorIndex, index, files);
             }
@@ -3034,7 +3161,33 @@ internal sealed partial class LibraryBrowserView : UserControl
 
             SyncPlaylistCaretToGrid(row);
         }
-        else if (!ReferenceEquals(_playlistCaretRow, row)
+        else
+        {
+            ReassertPlaylistCaretOnly(row);
+            return;
+        }
+
+        PinSelectionCurrent();
+    }
+
+    /// <summary>
+    /// 範囲選択の帯は触らず、キャレット／SelectedItem／CurrentItem だけ揃える。
+    /// クリア後の ItemsSource 張り直しや ScrollIntoView でカーソルだけ消えたときに使う。
+    /// </summary>
+    private void ReassertPlaylistCaretOnly(LibraryFileRow row)
+    {
+        row = AsBoundPlaylistRow(row) ?? row;
+        if (!IsBoundPlaylistRow(row))
+        {
+            return;
+        }
+
+        if (!row.IsPlaylistSelected)
+        {
+            SetPlaylistRowSelected(row, true);
+        }
+
+        if (!ReferenceEquals(_playlistCaretRow, row)
             || !ReferenceEquals(_grid.SelectedItem, row))
         {
             SyncPlaylistCaretToGrid(row);
@@ -3047,20 +3200,37 @@ internal sealed partial class LibraryBrowserView : UserControl
     {
         if (_playlistCaretRow is { Tag: DocumentSession })
         {
-            if (_playlistRangeCaretIndex >= 0
-                || _playlistCaretRow.IsPlaylistSelected
-                || ReferenceEquals(_grid.SelectedItem, _playlistCaretRow))
+            var boundCaret = AsBoundPlaylistRow(_playlistCaretRow);
+            if (boundCaret is null)
             {
-                return _playlistCaretRow;
+                _playlistCaretRow = null;
+            }
+            else
+            {
+                if (!ReferenceEquals(_playlistCaretRow, boundCaret))
+                {
+                    _playlistCaretRow = boundCaret;
+                }
+
+                if (_playlistRangeCaretIndex >= 0
+                    || boundCaret.IsPlaylistSelected
+                    || ReferenceEquals(_grid.SelectedItem, boundCaret))
+                {
+                    return boundCaret;
+                }
             }
         }
 
-        if (_grid.CurrentItem is LibraryFileRow { Tag: DocumentSession } current)
+        if (_grid.CurrentItem is LibraryFileRow current)
         {
-            return current;
+            var boundCurrent = AsBoundPlaylistRow(current);
+            if (boundCurrent is not null)
+            {
+                return boundCurrent;
+            }
         }
 
-        return _grid.SelectedItem as LibraryFileRow;
+        return AsBoundPlaylistRow(_grid.SelectedItem as LibraryFileRow);
     }
 
     private void SelectPlaylistFileRange(
@@ -3355,8 +3525,24 @@ internal sealed partial class LibraryBrowserView : UserControl
         // 覗かせるために上方向へスクロールを巻き戻すのを防ぐ。
         var ensureGeneration = ++_playlistEnsureVisibleGeneration;
         var contentGeneration = _syncGeneration;
+        if (item is LibraryFileRow fileRow)
+        {
+            item = AsBoundPlaylistRow(fileRow) ?? item;
+            if (item is LibraryFileRow bound && !IsBoundPlaylistRow(bound))
+            {
+                return;
+            }
+        }
 
-        if (_grid.ItemContainerGenerator.ContainerFromItem(item) is FrameworkElement element
+        // ItemsSource 再構築直後はコンテナ再利用で「もう見えている」と誤判定しやすい。
+        var forceScroll = _playlistForceEnsureVisible;
+        if (forceScroll)
+        {
+            _playlistForceEnsureVisible = false;
+        }
+
+        if (!forceScroll
+            && _grid.ItemContainerGenerator.ContainerFromItem(item) is FrameworkElement element
             && _grid.ActualHeight > 0)
         {
             try
@@ -3409,7 +3595,17 @@ internal sealed partial class LibraryBrowserView : UserControl
                     RestorePlaylistHorizontalOffset(later, keepX);
                 }
 
-                PinSelectionCurrent();
+                // SelectedItem／CurrentItem だけ戻す。Clear して1行化する再選択はしない
+                // （Shift+End／Page の範囲を潰さない）。
+                if (item is LibraryFileRow row)
+                {
+                    ReassertPlaylistCaretOnly(row);
+                }
+                else
+                {
+                    PinSelectionCurrent();
+                }
+
                 RevealGroupHeaderIfNearlyClipped(item);
             },
             DispatcherPriority.Loaded);
@@ -3496,7 +3692,7 @@ internal sealed partial class LibraryBrowserView : UserControl
 
             _playlistRangeCaretIndex = -1;
             SyncPlaylistCaretToGrid(files[^1]);
-            _anchorIndex = 0;
+            SetPlaylistAnchorToRow(files[0]);
             PinSelectionCurrent();
         }
         finally
@@ -3683,7 +3879,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         IReadOnlyList<DocumentSession>? selected = null,
         bool rebuild = false)
     {
-        var preserve = selected ?? SelectedSessions;
+        var preserve = selected ?? PlaylistBandSessions();
         var rows = new LibraryFileRow[sessions.Count];
         for (var i = 0; i < sessions.Count; i++)
         {
@@ -3761,7 +3957,7 @@ internal sealed partial class LibraryBrowserView : UserControl
                 return;
             }
 
-            var preserve = SelectedSessions;
+            var preserve = PlaylistBandSessions();
             var updated = new LibraryFileRow[_rows.Count];
             for (var r = 0; r < _rows.Count; r++)
             {
@@ -3812,7 +4008,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         var touch = new HashSet<DocumentSession>(sessions);
-        var preserve = SelectedSessions;
+        var preserve = PlaylistBandSessions();
         var active = SelectedSession;
         var keepFocus = _restoreListFocus || _grid.IsKeyboardFocusWithin;
         var changed = false;
@@ -4113,7 +4309,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             return [];
         }
 
-        var selected = SelectedSessions;
+        var selected = PlaylistBandSessions();
         var active = SelectedSession;
         foreach (var session in sessions)
         {
@@ -4359,6 +4555,8 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     private void BindRowsCore(DocumentSession? active, IReadOnlyList<DocumentSession>? selected)
     {
+        // ItemsSource を外すとキーボードフォーカスがグリッドから落ちる。先に覚えて復元する。
+        var keepFocus = _restoreListFocus || _grid.IsKeyboardFocusWithin;
         DetachBoundRows();
         _items.Clear();
         foreach (var row in _rows)
@@ -4381,6 +4579,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         // WPF が先頭行へ IsSelected を寄せる足がかりを与えない。
         view.MoveCurrentToPosition(-1);
         _grid.ItemsSource = view;
+        _playlistFilesSnapshot = null;
+        _playlistForceEnsureVisible = true;
         ApplyRowSelectionCore(active, selected);
         if (_grid.SelectedItem is null && _items.Count > 0 && _playlistSearchGroups.Count > 0)
         {
@@ -4388,6 +4588,11 @@ internal sealed partial class LibraryBrowserView : UserControl
             {
                 ApplyRowSelectionCore(first, [first]);
             }
+        }
+
+        if (keepFocus)
+        {
+            EnsureListFocused();
         }
 
         RefreshSortChrome();
@@ -4506,10 +4711,31 @@ internal sealed partial class LibraryBrowserView : UserControl
         _playlistRangeCaretIndex = -1;
         if (current is not null)
         {
-            SyncPlaylistCaretToGrid(current);
-            SetPlaylistAnchorToRow(current);
-            PinSelectionCurrent();
-            EnsureRowVisible(current);
+            // MoveSelection と同じく、ScrollIntoView 中は SelectionChanged にシアンを奪わせない。
+            var heldDefer = _deferActivate;
+            _deferActivate = true;
+            try
+            {
+                SyncPlaylistCaretToGrid(current);
+                SetPlaylistAnchorToRow(current);
+                PinSelectionCurrent();
+                EnsureRowVisible(current);
+                // 単一選択のクリア後再構築では帯も戻す。複数選択はキャレットだけ。
+                if (_playlistSelectedRows.Count <= 1)
+                {
+                    ReassertPlaylistMoveSelection(current, extend: false);
+                }
+                else
+                {
+                    ReassertPlaylistCaretOnly(current);
+                }
+            }
+            finally
+            {
+                _deferActivate = heldDefer;
+            }
+
+            SchedulePlaylistCaretReassert(current);
         }
         else
         {
@@ -4517,6 +4743,47 @@ internal sealed partial class LibraryBrowserView : UserControl
             _anchorIndex = -1;
             PinSelectionCurrent();
         }
+    }
+
+    /// <summary>
+    /// ItemsSource 張り直し直後の Loaded／レイアウトで SelectedItem が落ちても、
+    /// 次のアイドルでキャレットを戻す（範囲選択は潰さない）。
+    /// FocusList の EnsureRowVisible が進める ensure 世代では打ち消さない
+    /// （既表示行の early-return だと再 assert が無く、カーソルが消えたままになる）。
+    /// </summary>
+    private void SchedulePlaylistCaretReassert(LibraryFileRow row)
+    {
+        var gen = _syncGeneration;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (gen != _syncGeneration)
+                {
+                    return;
+                }
+
+                var bound = AsBoundPlaylistRow(row);
+                if (bound is null)
+                {
+                    return;
+                }
+
+                // 既に別行へキャレットが移っていれば触らない。
+                if (_playlistCaretRow is not null
+                    && IsBoundPlaylistRow(_playlistCaretRow)
+                    && !ReferenceEquals(_playlistCaretRow, bound)
+                    && !ReferenceEquals(_playlistCaretRow.Tag, bound.Tag))
+                {
+                    return;
+                }
+
+                ReassertPlaylistCaretOnly(bound);
+                if (!_grid.IsKeyboardFocusWithin)
+                {
+                    EnsureListFocused();
+                }
+            },
+            DispatcherPriority.ContextIdle);
     }
 
     /// <summary>
@@ -5301,7 +5568,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         var active = SelectedSession;
-        var selected = SelectedSessions;
+        var selected = PlaylistBandSessions();
         var rows = new LibraryFileRow[_rows.Count];
         for (var i = 0; i < _rows.Count; i++)
         {

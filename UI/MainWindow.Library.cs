@@ -2053,6 +2053,8 @@ public partial class MainWindow
 
         next ??= _sessions[0];
         LibraryBrowser.SetSessions(_sessions, next, [next]);
+        // ItemsSource 再構築でフォーカスが落ちると、キャレット消失や Ctrl+A が波形へ流れる。
+        LibraryBrowser.FocusList();
         RefreshStatus();
         SyncPlayerMeterFade();
         if (resumePlayback)
@@ -2248,6 +2250,7 @@ public partial class MainWindow
 
         next ??= _sessions[0];
         LibraryBrowser.SetSessions(_sessions, next, [next]);
+        LibraryBrowser.FocusList();
         SyncPlayerMeterFade();
         if (resumePlayback)
         {
@@ -3113,7 +3116,7 @@ public partial class MainWindow
         LibraryBrowser.SetSessions(
             _sessions,
             _activeSession,
-            LibraryBrowser.SelectedSessions,
+            LibraryBrowser.PlaylistBandSessions(),
             rebuild: true);
         RefreshDisplayedPlaylistPosition();
     }
@@ -3552,7 +3555,7 @@ public partial class MainWindow
         DropLibrarySessionsFast(drop);
         if (IsLibraryMaximized)
         {
-            LibraryBrowser.SetSessions(_sessions, _activeSession, LibraryBrowser.SelectedSessions);
+            LibraryBrowser.SetSessions(_sessions, _activeSession, LibraryBrowser.PlaylistBandSessions());
         }
 
         SyncPlayerMeterFade();
