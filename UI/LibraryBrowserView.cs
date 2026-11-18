@@ -3098,6 +3098,9 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        // 実スクロール前でも、溢れていればナビキーでバーを出す。
+        LibraryScrollReveal.RevealTemporarilyIfScrollable(_grid);
+
         var row = files[index];
         // ScrollIntoView／仮想化のあいだも _syncing と _deferActivate を維持する。
         // 先に外すと、レイアウトが SelectedItem を先頭へ寄せた瞬間に
@@ -3398,6 +3401,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         scroll.ScrollToVerticalOffset(next);
+        LibraryScrollReveal.RevealTemporarily(_grid);
     }
 
     private double RowHeightHint()

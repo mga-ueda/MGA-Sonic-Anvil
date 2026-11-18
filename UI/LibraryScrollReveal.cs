@@ -72,11 +72,72 @@ internal static class LibraryScrollReveal
         typeof(LibraryScrollReveal),
         new PropertyMetadata(false));
 
+    /// <summary>ホイール／キー等で出したあいだ、端から外れても消さない。</summary>
+    private static readonly DependencyProperty TemporaryRevealProperty = DependencyProperty.RegisterAttached(
+        "TemporaryReveal",
+        typeof(bool),
+        typeof(LibraryScrollReveal),
+        new PropertyMetadata(false));
+
+    private static readonly DependencyProperty ScrollRevealHookedProperty = DependencyProperty.RegisterAttached(
+        "ScrollRevealHooked",
+        typeof(bool),
+        typeof(LibraryScrollReveal),
+        new PropertyMetadata(false));
+
     public static void SetRevealed(DependencyObject element, bool value) =>
         element.SetValue(RevealedProperty, value);
 
     public static bool GetRevealed(DependencyObject element) =>
         (bool)element.GetValue(RevealedProperty);
+
+    /// <summary>
+    /// 一時表示中／ホバー常時表示なら両軸。それ以外は端判定どおり。
+    /// 連続ホイールで内容が動いても点滅しないようにする。
+    /// </summary>
+    public static void ResolveRevealAxes(
+        bool temporary,
+        bool hoverReveal,
+        bool nearVertical,
+        bool nearHorizontal,
+        out bool vertical,
+        out bool horizontal)
+    {
+        if (temporary || hoverReveal)
+        {
+            vertical = true;
+            horizontal = true;
+            return;
+        }
+
+        vertical = nearVertical;
+        horizontal = nearHorizontal;
+    }
+
+    /// <summary>実スクロール（キー／ホイール）のとき一時表示する。</summary>
+    public static bool ShouldRevealOnScrollChange(double verticalChange, double horizontalChange) =>
+        verticalChange != 0 || horizontalChange != 0;
+
+    /// <summary>
+    /// ↑↓／Page／Home／End／←→。スクロールが始まっていなくても、溢れていればバーを出す。
+    /// Alt 付きはルート並び替え等の別用途（実スクロールは ScrollChanged 側）。
+    /// </summary>
+    public static bool IsScrollRevealNavigationKey(Key key, ModifierKeys modifiers) =>
+        (modifiers & ModifierKeys.Alt) == 0
+        && key is Key.Up or Key.Down or Key.PageUp or Key.PageDown
+            or Key.Home or Key.End or Key.Left or Key.Right;
+
+    /// <summary>縦または横に溢れているときだけスクロールバーを出す。</summary>
+    public static bool NeedsScrollBars(double scrollableHeight, double scrollableWidth) =>
+        scrollableHeight > 0.5 || scrollableWidth > 0.5;
+
+    /// <summary>Scrollable／Extent／Computed のいずれかで溢れを判定する。</summary>
+    public static bool NeedsScrollBars(ScrollViewer viewer) =>
+        NeedsScrollBars(viewer.ScrollableHeight, viewer.ScrollableWidth)
+        || viewer.ExtentHeight > viewer.ViewportHeight + 0.5
+        || viewer.ExtentWidth > viewer.ViewportWidth + 0.5
+        || viewer.ComputedVerticalScrollBarVisibility == Visibility.Visible
+        || viewer.ComputedHorizontalScrollBarVisibility == Visibility.Visible;
 
     /// <summary>端付近に近いときだけ出す（ツリー／リストなど）。</summary>
     public static void Attach(FrameworkElement host)
@@ -84,6 +145,7 @@ internal static class LibraryScrollReveal
         host.SetValue(HoverRevealProperty, false);
         host.PreviewMouseMove += Host_PreviewMouseMove;
         host.MouseLeave += Host_MouseLeave;
+        AttachScrollReveal(host);
     }
 
     /// <summary>ホスト上にカーソルがあるあいだ出す（情報エリア）。</summary>
@@ -92,17 +154,83 @@ internal static class LibraryScrollReveal
         host.SetValue(HoverRevealProperty, true);
         host.PreviewMouseMove += Host_PreviewMouseMove;
         host.MouseLeave += Host_MouseLeave;
+        AttachScrollReveal(host);
+    }
+
+    /// <summary>
+    /// 子孫 ScrollViewer の実スクロールと、ナビキーでも一時表示（ツリー／お気に入り／リスト）。
+    /// 端にマウスが無く、まだスクロールしていなくても、溢れていればバーを出す。
+    /// </summary>
+    private static void AttachScrollReveal(FrameworkElement host)
+    {
+        if ((bool)host.GetValue(ScrollRevealHookedProperty))
+        {
+            return;
+        }
+
+        host.SetValue(ScrollRevealHookedProperty, true);
+        host.AddHandler(
+            ScrollViewer.ScrollChangedEvent,
+            new ScrollChangedEventHandler(Host_ScrollChanged),
+            handledEventsToo: true);
+        // MainWindow／ツリー側が先に Handled しても届くようにする。
+        host.AddHandler(
+            UIElement.PreviewKeyDownEvent,
+            new KeyEventHandler(Host_PreviewKeyDown),
+            handledEventsToo: true);
+    }
+
+    private static void Host_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (!ShouldRevealOnScrollChange(e.VerticalChange, e.HorizontalChange)
+            || sender is not FrameworkElement host)
+        {
+            return;
+        }
+
+        RevealTemporarily(host);
+    }
+
+    private static void Host_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not FrameworkElement host)
+        {
+            return;
+        }
+
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (!IsScrollRevealNavigationKey(key, Keyboard.Modifiers))
+        {
+            return;
+        }
+
+        RevealTemporarilyIfScrollable(host);
+    }
+
+    /// <summary>溢れているときだけ一時表示。収まっているリストでは出さない。</summary>
+    public static void RevealTemporarilyIfScrollable(FrameworkElement host)
+    {
+        var viewer = FindScrollViewer(host);
+        if (viewer is null || !NeedsScrollBars(viewer))
+        {
+            return;
+        }
+
+        RevealTemporarily(host, viewer);
     }
 
     /// <summary>選択などで一時的に出す。端付近でなくてもよい。動かなければ約 3 秒で消える。</summary>
-    public static void RevealTemporarily(FrameworkElement host)
+    public static void RevealTemporarily(FrameworkElement host) =>
+        RevealTemporarily(host, FindScrollViewer(host));
+
+    private static void RevealTemporarily(FrameworkElement host, ScrollViewer? viewer)
     {
-        var viewer = FindScrollViewer(host);
         if (viewer is null)
         {
             return;
         }
 
+        host.SetValue(TemporaryRevealProperty, true);
         Apply(viewer, vertical: true, horizontal: true, idle: false);
         LibraryHoverIdle.Arm(host, () => OnScrollIdle(host));
     }
@@ -156,30 +284,35 @@ internal static class LibraryScrollReveal
             return;
         }
 
-        bool vertical;
-        bool horizontal;
-        if ((bool)host.GetValue(HoverRevealProperty))
-        {
-            vertical = true;
-            horizontal = true;
-        }
-        else
+        var temporary = (bool)host.GetValue(TemporaryRevealProperty);
+        var hoverReveal = (bool)host.GetValue(HoverRevealProperty);
+        var nearVertical = false;
+        var nearHorizontal = false;
+        if (!temporary && !hoverReveal)
         {
             var pos = e.GetPosition(viewer);
             var distance = DesignMetrics.LibraryScrollRevealDistance;
             var slop = DesignMetrics.LibrarySplitterHitThickness;
-            vertical = IsOverVerticalBar(
+            nearVertical = IsOverVerticalBar(
                 pos.X, pos.Y, viewer.ActualWidth, viewer.ActualHeight, distance, slop);
-            horizontal = IsOverHorizontalBar(
+            nearHorizontal = IsOverHorizontalBar(
                 pos.X, pos.Y, viewer.ActualWidth, viewer.ActualHeight, distance, slop);
         }
 
+        ResolveRevealAxes(
+            temporary,
+            hoverReveal,
+            nearVertical,
+            nearHorizontal,
+            out var vertical,
+            out var horizontal);
         Apply(viewer, vertical, horizontal, idle: false);
         LibraryHoverIdle.Arm(host, () => OnScrollIdle(host));
     }
 
     private static void OnScrollIdle(FrameworkElement host)
     {
+        host.SetValue(TemporaryRevealProperty, false);
         var viewer = FindScrollViewer(host);
         Apply(viewer, vertical: false, horizontal: false, idle: true);
         if (viewer is not null && EnumerateScrollBars(viewer).Any(IsHeld))
@@ -195,6 +328,7 @@ internal static class LibraryScrollReveal
             return;
         }
 
+        host.SetValue(TemporaryRevealProperty, false);
         LibraryHoverIdle.Disarm(host);
         Apply(FindScrollViewer(host), vertical: false, horizontal: false, idle: true);
     }

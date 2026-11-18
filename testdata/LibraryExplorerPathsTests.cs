@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows.Input;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 using MgaSonicAnvil.UI;
@@ -225,6 +226,64 @@ public sealed class LibraryExplorerPathsTests
         Assert.False(LibraryScrollReveal.IsOverHorizontalBar(400, 90, 100, 100, 32, 24));
         Assert.True(LibraryScrollReveal.IsOverVerticalBar(90, 50, 100, 100, 32, 24));
         Assert.False(LibraryScrollReveal.IsOverVerticalBar(90, 400, 100, 100, 32, 24));
+    }
+
+    [Fact]
+    public void LibraryScrollReveal_Temporary_KeepsBothAxesAwayFromEdge()
+    {
+        LibraryScrollReveal.ResolveRevealAxes(
+            temporary: true,
+            hoverReveal: false,
+            nearVertical: false,
+            nearHorizontal: false,
+            out var vertical,
+            out var horizontal);
+        Assert.True(vertical);
+        Assert.True(horizontal);
+
+        LibraryScrollReveal.ResolveRevealAxes(
+            temporary: false,
+            hoverReveal: false,
+            nearVertical: true,
+            nearHorizontal: false,
+            out vertical,
+            out horizontal);
+        Assert.True(vertical);
+        Assert.False(horizontal);
+
+        LibraryScrollReveal.ResolveRevealAxes(
+            temporary: false,
+            hoverReveal: true,
+            nearVertical: false,
+            nearHorizontal: false,
+            out vertical,
+            out horizontal);
+        Assert.True(vertical);
+        Assert.True(horizontal);
+    }
+
+    [Fact]
+    public void LibraryScrollReveal_ShouldRevealOnScrollChange_IgnoresLayoutOnly()
+    {
+        Assert.False(LibraryScrollReveal.ShouldRevealOnScrollChange(0, 0));
+        Assert.True(LibraryScrollReveal.ShouldRevealOnScrollChange(1, 0));
+        Assert.True(LibraryScrollReveal.ShouldRevealOnScrollChange(0, -2));
+        Assert.True(LibraryScrollReveal.ShouldRevealOnScrollChange(3, 4));
+    }
+
+    [Fact]
+    public void LibraryScrollReveal_NavigationKey_RequiresOverflow()
+    {
+        Assert.True(LibraryScrollReveal.IsScrollRevealNavigationKey(Key.Up, ModifierKeys.None));
+        Assert.True(LibraryScrollReveal.IsScrollRevealNavigationKey(Key.Down, ModifierKeys.Shift));
+        Assert.True(LibraryScrollReveal.IsScrollRevealNavigationKey(Key.PageUp, ModifierKeys.None));
+        Assert.True(LibraryScrollReveal.IsScrollRevealNavigationKey(Key.Home, ModifierKeys.None));
+        Assert.False(LibraryScrollReveal.IsScrollRevealNavigationKey(Key.Up, ModifierKeys.Alt));
+        Assert.False(LibraryScrollReveal.IsScrollRevealNavigationKey(Key.A, ModifierKeys.None));
+        Assert.False(LibraryScrollReveal.NeedsScrollBars(0, 0));
+        Assert.False(LibraryScrollReveal.NeedsScrollBars(0.5, 0));
+        Assert.True(LibraryScrollReveal.NeedsScrollBars(1, 0));
+        Assert.True(LibraryScrollReveal.NeedsScrollBars(0, 2));
     }
 
     [Fact]

@@ -2459,6 +2459,9 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
+        // 実スクロール前でも、溢れていればナビキーでバーを出す。
+        LibraryScrollReveal.RevealTemporarilyIfScrollable(_folderTree);
+
         var caret = CurrentExplorerItem();
         var index = caret is null ? -1 : items.IndexOf(caret);
         if (index < 0)
@@ -2836,6 +2839,9 @@ internal sealed partial class LibraryBrowserView
         {
             return;
         }
+
+        // 実スクロール前でも、溢れていればナビキーでバーを出す。
+        LibraryScrollReveal.RevealTemporarilyIfScrollable(_favoritesList);
 
         var caret = FavoritesCaretIndex();
         var index = caret;
