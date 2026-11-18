@@ -943,6 +943,9 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
     }
 
+    /// <summary>プレイリスト帯選択の件数（チェック専用モードの件数ではない）。</summary>
+    public int PlaylistSelectedCount => _playlistSelectedRows.Count;
+
     private void SetPlaylistRowSelected(LibraryFileRow row, bool selected)
     {
         if (selected)

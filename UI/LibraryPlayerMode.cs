@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -1885,6 +1886,17 @@ internal static class LibraryPlayerMode
     /// <summary>表示用の「いまいくつめ / 総ファイル」（1 始まり）。</summary>
     public static string FormatPlaylistTrackLabel(int trackIndex0Based, int trackCount) =>
         FormatCurrentOfTotalLabel(trackIndex0Based, trackCount);
+
+    /// <summary>
+    /// ステータスバー「n / m Files」の n。
+    /// プレイヤーで複数選択中は選択件数、それ以外は現在位置（1 始まり）。
+    /// </summary>
+    public static int ResolveStatusFileNumber(bool playerMode, int selectedCount, int position1Based) =>
+        playerMode && selectedCount > 1 ? selectedCount : position1Based;
+
+    /// <summary>ステータスバー冒頭の「n / m Files」。</summary>
+    public static string FormatStatusFileCount(int number, int fileCount) =>
+        string.Create(CultureInfo.InvariantCulture, $"{number} / {fileCount} Files");
 
     /// <summary>
     /// PDF ページ番号の桁送り（キーボード上段のみ。1 始まり。二桁可）。

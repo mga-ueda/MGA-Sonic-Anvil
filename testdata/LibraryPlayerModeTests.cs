@@ -1055,6 +1055,10 @@ public sealed class LibraryPlayerModeTests
             chromeHidden: true, isVisual: true, trackCount: 1));
         Assert.Equal("2 / 5", LibraryPlayerMode.FormatPlaylistTrackLabel(1, 5));
         Assert.Equal("1 / 2", LibraryPlayerMode.FormatCurrentOfTotalLabel(0, 2));
+        Assert.Equal(3, LibraryPlayerMode.ResolveStatusFileNumber(playerMode: true, selectedCount: 3, position1Based: 1));
+        Assert.Equal(1, LibraryPlayerMode.ResolveStatusFileNumber(playerMode: true, selectedCount: 1, position1Based: 1));
+        Assert.Equal(7, LibraryPlayerMode.ResolveStatusFileNumber(playerMode: false, selectedCount: 3, position1Based: 7));
+        Assert.Equal("3 / 10 Files", LibraryPlayerMode.FormatStatusFileCount(3, 10));
         Assert.Equal(
             LibraryPlayerMode.PdfPageNumberToastHoldSeconds,
             LibraryPlayerMode.PlaylistTrackIndexToastHoldSeconds);

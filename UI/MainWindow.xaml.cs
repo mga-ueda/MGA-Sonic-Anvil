@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -1105,15 +1104,20 @@ public partial class MainWindow : Window
 
         // 複数ファイルを開いているときだけ、冒頭に「n / m Files」を出す。
         // プレイヤーは列ソートとグループの表示順。セッション配列の順ではない。
+        // プレイヤーで複数選択中は「選択数 / 全体」、単一選択時は「現在位置 / 全体」。
         var fileCount = IsLibraryMaximized ? DisplayedPlaylistCount() : _sessions.Count;
         if (fileCount >= 2)
         {
             var index = IsLibraryMaximized
                 ? DisplayedPlaylistIndex(_activeSession)
                 : _activeSession is null ? -1 : _sessions.IndexOf(_activeSession);
-            var number = index < 0 ? 0 : index + 1;
+            var position = index < 0 ? 0 : index + 1;
+            var number = LibraryPlayerMode.ResolveStatusFileNumber(
+                IsLibraryMaximized,
+                LibraryBrowser.PlaylistSelectedCount,
+                position);
             AppendStatusRun(
-                string.Create(CultureInfo.InvariantCulture, $"{number} / {fileCount} Files"),
+                LibraryPlayerMode.FormatStatusFileCount(number, fileCount),
                 edited: false,
                 normal,
                 edited);

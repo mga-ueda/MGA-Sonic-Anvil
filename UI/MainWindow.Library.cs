@@ -1607,6 +1607,12 @@ public partial class MainWindow
 
     private void OnLibraryPlaylistSelectionChanged()
     {
+        // 選択数はラウドネス defer 中でもすぐステータスへ出す。
+        if (IsLibraryMaximized)
+        {
+            RefreshStatus();
+        }
+
         // Shift+矢印の範囲伸ばし中は毎キーの平均計算を避ける（キーリピート滞留の一因）。
         if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0
             && (Keyboard.IsKeyDown(Key.Up)
