@@ -26,7 +26,7 @@
     <Utf8Output>true</Utf8Output>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
     <PublishDir>$(MSBuildThisFileDirectory)publish\</PublishDir>
     <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
