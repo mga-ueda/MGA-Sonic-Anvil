@@ -3353,6 +3353,53 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void AppendSessionsRaw_LockPlaylistOrder_ThenUpdateKeepsOrder()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var zebra = Session("zzz.mp3");
+            zebra.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Album = "Zebra",
+                Title = "Z",
+            });
+            var alpha = Session("aaa.mp3");
+            alpha.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Album = "Alpha",
+                Title = "A",
+            });
+
+            var view = new LibraryBrowserView();
+            // 追加順は Zebra → Alpha。Album ソート確定後の冒頭は Alpha。
+            view.AppendSessionsRaw([zebra, alpha], select: null);
+            Flush();
+            Assert.Same(zebra, view.FirstPlaylistSession);
+
+            var head = view.LockPlaylistOrder();
+            Flush();
+            Assert.Same(alpha, head);
+            Assert.Same(alpha, view.FirstPlaylistSession);
+            Assert.Equal([alpha, zebra], view.PlaylistSessionsInDisplayOrder());
+
+            // 後追いで Album が入れ替わっても、並びはロックしたまま。
+            alpha.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Album = "Omega",
+                Title = "A",
+            });
+            view.UpdateSessionRow(alpha);
+            Flush();
+            Assert.Equal([alpha, zebra], view.PlaylistSessionsInDisplayOrder());
+            Assert.Same(alpha, view.FirstPlaylistSession);
+        });
+    }
+
+    [Fact]
     public void SetSessions_PinsCollectionViewCurrentToSelection_NotFirstRow()
     {
         RunSta(() =>
@@ -4826,6 +4873,27 @@ public sealed class LibraryBrowserSelectionTests
 
     private static DocumentSession Session(string name) =>
         new(AudioDocument.CreateDeferred(Path.Combine(Path.GetTempPath(), name)));
+
+    private static void WriteMinimalWav(string path)
+    {
+        var pcm = new byte[4];
+        var fmt = new byte[]
+        {
+            1, 0, 1, 0, 0x44, 0xAC, 0, 0, 0x88, 0x58, 0x01, 0, 2, 0, 16, 0,
+        };
+        using var ms = new MemoryStream();
+        using var w = new BinaryWriter(ms);
+        w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+        w.Write(36 + pcm.Length);
+        w.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+        w.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+        w.Write(fmt.Length);
+        w.Write(fmt);
+        w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+        w.Write(pcm.Length);
+        w.Write(pcm);
+        File.WriteAllBytes(path, ms.ToArray());
+    }
 
     private static readonly byte[] OnePixelPng =
     [

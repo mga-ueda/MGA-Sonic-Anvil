@@ -6,6 +6,15 @@ internal static partial class UiStrings
     public static string WaapiBadgeConnect => Get("CONNECT", "CONNECT");
     public static string WaapiBadgeDisconnect => Get("DISCONNECT", "DISCONNECT");
     public static string PlaylistBusyEnumerate => Get("ファイルリスト取得中", "Listing files");
+    public static string PlaylistBusyEnumerateProgress(int loaded, int total) =>
+        total <= 0
+            ? PlaylistBusyEnumerate
+            : Format(
+                $"ファイルリスト取得中 {loaded}/{total}",
+                $"Listing files {loaded}/{total}",
+                loaded,
+                total);
+    public static string PlaylistBusyEnumerateFinalize => Get("プレイリスト整理中", "Organizing playlist");
     public static string PlaylistBusyWaveform => Get("波形描画中", "Drawing waveforms");
     public static string PlaylistBusyLoudness => Get("ラウドネス取得中", "Measuring loudness");
     public static string LabelWwise => Get("Wwise", "Wwise");

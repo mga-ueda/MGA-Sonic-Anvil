@@ -2260,12 +2260,14 @@ public partial class MainWindow
     /// <summary>プレイヤー突入の一覧。再生と背景の差し替えはしない。</summary>
     private void SelectLibraryFirstTrackForEnter()
     {
-        var first = LibraryPlayerMode.FirstSession(_sessions);
-        IReadOnlyList<DocumentSession> selected = first is null ? [] : [first];
-        // 同一集合なら DataGrid を張り直さず選択だけ先頭へ（起動・明示的な playFirst 用）。
-        LibraryBrowser.SetSessions(_sessions, first, selected, rebuild: false);
+        // 同一集合なら DataGrid を張り直さず、ソート後の表示冒頭へ選択だけ移す。
+        LibraryBrowser.SetSessions(_sessions, null, [], rebuild: false);
+        SyncSessionsToPlaylistOrder();
+        var first = LibraryBrowser.FirstPlaylistSession
+            ?? LibraryPlayerMode.FirstSession(_sessions);
         if (first is not null)
         {
+            LibraryBrowser.SelectSessionQuiet(first);
             _libraryHoldJacketWash = false;
             LibraryBrowser.RequestListFocus();
         }
@@ -2295,10 +2297,13 @@ public partial class MainWindow
             return;
         }
 
-        var first = LibraryPlayerMode.FirstSession(_sessions);
+        SyncSessionsToPlaylistOrder();
+        var first = LibraryBrowser.FirstPlaylistSession
+            ?? LibraryPlayerMode.FirstSession(_sessions);
         var keepGlow = LibraryBrowser.AmbientGlowAnimating;
         if (first is not null)
         {
+            LibraryBrowser.SelectSessionQuiet(first);
             await EnsureLibrarySessionLoadedAsync(first).ConfigureAwait(true);
             if (!LibraryEnterPlaybackStillPending(generation))
             {
@@ -2347,16 +2352,17 @@ public partial class MainWindow
 
     private void SelectAndPlayFirstLibraryTrack(bool deferAmbientWash = false)
     {
-        var first = LibraryPlayerMode.FirstSession(_sessions);
-        var selected = first is null
-            ? (IReadOnlyList<DocumentSession>)[]
-            : [first];
+        // 追加順ではなく、現行ソート／グループ後の表示冒頭を再生する。
+        LibraryBrowser.SetSessions(_sessions, null, []);
+        SyncSessionsToPlaylistOrder();
+        var first = LibraryBrowser.FirstPlaylistSession
+            ?? LibraryPlayerMode.FirstSession(_sessions);
         if (first is not null)
         {
+            LibraryBrowser.SelectSessionQuiet(first);
             ScanLibraryArtwork(first);
         }
 
-        LibraryBrowser.SetSessions(_sessions, first, selected);
         if (deferAmbientWash)
         {
             if (first is not null)
@@ -2706,6 +2712,7 @@ public partial class MainWindow
 
         var session = _libraryFolderPlaySession
             ?? LibraryBrowser.SelectedSession
+            ?? LibraryBrowser.FirstPlaylistSession
             ?? LibraryPlayerMode.FirstSession(_sessions);
         if (session is not null)
         {
@@ -3192,19 +3199,57 @@ public partial class MainWindow
     /// </summary>
     private static DocumentSession CreateLibrarySession(string file)
     {
-        var document = AudioDocument.CreateDeferred(file);
-        AudioTagProbe.Ensure(document);
-        if (!document.HasArtwork && LibraryMediaCache.TryGetArtwork(file, out var art))
-        {
-            document.SetArtwork(art);
-        }
+        var session = CreateLibrarySessionStub(file);
+        EnrichLibrarySessionTags(session);
+        EnrichLibrarySessionMedia(session);
+        return session;
+    }
 
-        // 一度出した波形列があればメモリへ戻し、追加直後の再デコードを避ける。
-        _ = LibraryPlaylistWaveform.HasEntry(file, LibraryPlaylistWaveform.BarCount);
+    /// <summary>
+    /// パスだけ載せたスタブ。大量追加時はファイル名を先に出し、タグ／メディアは後追いする。
+    /// </summary>
+    private static DocumentSession CreateLibrarySessionStub(string file)
+    {
+        var document = AudioDocument.CreateDeferred(file);
         var session = new DocumentSession(document);
         // エディタへ戻したとき同じスロット＋プラグインが有効になるよう、開いた時点で載せる。
         ApplyDefaultVstInserts(session);
         return session;
+    }
+
+    /// <summary>ソート／グループ／列表示用のタグを載せる（PCM は展開しない）。</summary>
+    private static void EnrichLibrarySessionTags(DocumentSession session) =>
+        AudioTagProbe.Ensure(session.Document);
+
+    /// <summary>ジャケットと波形キャッシュを載せる。並びには使わない。</summary>
+    private static void EnrichLibrarySessionMedia(DocumentSession session)
+    {
+        var file = session.Document.SourcePath;
+        if (string.IsNullOrEmpty(file))
+        {
+            return;
+        }
+
+        if (!session.Document.HasArtwork && LibraryMediaCache.TryGetArtwork(file, out var art))
+        {
+            session.Document.SetArtwork(art);
+        }
+
+        // 一度出した波形列があればメモリへ戻し、追加直後の再デコードを避ける。
+        _ = LibraryPlaylistWaveform.HasEntry(file, LibraryPlaylistWaveform.BarCount);
+    }
+
+    /// <summary>表示順に内部リストを揃える（FirstSession とプレイリスト冒頭を一致させる）。</summary>
+    private void SyncSessionsToPlaylistOrder()
+    {
+        var ordered = LibraryBrowser.PlaylistSessionsInDisplayOrder();
+        if (ordered.Length == 0 || ordered.Length != _sessions.Count)
+        {
+            return;
+        }
+
+        _sessions.Clear();
+        _sessions.AddRange(ordered);
     }
 
     private void ReleaseHeldLibraryJacket()

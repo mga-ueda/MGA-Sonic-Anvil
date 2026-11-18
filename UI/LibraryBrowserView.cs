@@ -3805,12 +3805,29 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// フォルダ読み込み用。1 件追加して現在の並べ替え位置へ挿入する。全件 SetSessions より軽い。
     /// </summary>
     public void AppendSession(DocumentSession session, bool select) =>
-        AppendSessionCore(session, select, refreshColumns: true, manageActivateDefer: true);
+        AppendSessionCore(
+            session,
+            select,
+            refreshColumns: true,
+            manageActivateDefer: true,
+            placeBySort: true);
 
     /// <summary>
     /// 複数曲を一度に挿入する。列があるときはその位置、無いときは末尾。列再計算は最後の1回だけ。
     /// </summary>
-    public void AppendSessions(IReadOnlyList<DocumentSession> sessions, DocumentSession? select)
+    public void AppendSessions(IReadOnlyList<DocumentSession> sessions, DocumentSession? select) =>
+        AppendSessionsCore(sessions, select, placeBySort: true);
+
+    /// <summary>
+    /// 大量追加用。ソート位置を探さず末尾へ足す。並びは <see cref="LockPlaylistOrder"/> で確定する。
+    /// </summary>
+    public void AppendSessionsRaw(IReadOnlyList<DocumentSession> sessions, DocumentSession? select) =>
+        AppendSessionsCore(sessions, select, placeBySort: false);
+
+    private void AppendSessionsCore(
+        IReadOnlyList<DocumentSession> sessions,
+        DocumentSession? select,
+        bool placeBySort)
     {
         if (sessions.Count == 0)
         {
@@ -3844,7 +3861,8 @@ internal sealed partial class LibraryBrowserView : UserControl
                     session,
                     pick,
                     refreshColumns: i + 1 == sessions.Count,
-                    manageActivateDefer: false);
+                    manageActivateDefer: false,
+                    placeBySort: placeBySort);
             }
         }
         finally
@@ -3856,11 +3874,97 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
     }
 
+    /// <summary>表示上の先頭曲（現行ソート／グループ／検索フィルタ後）。</summary>
+    public DocumentSession? FirstPlaylistSession
+    {
+        get
+        {
+            if (_items.Count > 0 && _items[0].Tag is DocumentSession visible)
+            {
+                return visible;
+            }
+
+            if (_rows.Count > 0 && _rows[0].Tag is DocumentSession row)
+            {
+                return row;
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>表示順のセッション一覧。</summary>
+    public DocumentSession[] PlaylistSessionsInDisplayOrder()
+    {
+        var source = _items.Count > 0 ? _items : _rows;
+        var list = new DocumentSession[source.Count];
+        var n = 0;
+        for (var i = 0; i < source.Count; i++)
+        {
+            if (source[i].Tag is DocumentSession session)
+            {
+                list[n++] = session;
+            }
+        }
+
+        if (n == list.Length)
+        {
+            return list;
+        }
+
+        Array.Resize(ref list, n);
+        return list;
+    }
+
+    /// <summary>
+    /// タグが揃ったあと、現行ソート／グループで並びを確定する。表示冒頭を返す。
+    /// </summary>
+    public DocumentSession? LockPlaylistOrder(
+        DocumentSession? active = null,
+        IReadOnlyList<DocumentSession>? selected = null)
+    {
+        if (_rows.Count == 0)
+        {
+            return null;
+        }
+
+        var keepActive = active;
+        var keepSelected = selected;
+        BeginColumnOrderCommitGate();
+        try
+        {
+            _rows = SortRows(_rows);
+            LibraryFileList.ApplyGroupKeys(_rows, _group);
+            BeginRowSync();
+            try
+            {
+                BindRowsCore(keepActive, keepSelected);
+            }
+            finally
+            {
+                EndRowSync();
+            }
+
+            RefreshEffectiveColumns();
+        }
+        finally
+        {
+            EndColumnOrderCommitGate();
+        }
+
+        return FirstPlaylistSession;
+    }
+
     /// <summary>
     /// 現行の列ソート位置へ1件入れる。ソート見出しが無いときは末尾。入れた行の番号を返す。
     /// </summary>
     public int InsertSessionByCurrentSort(DocumentSession session, bool select) =>
-        AppendSessionCore(session, select, refreshColumns: false, manageActivateDefer: true);
+        AppendSessionCore(
+            session,
+            select,
+            refreshColumns: false,
+            manageActivateDefer: true,
+            placeBySort: true);
 
     /// <summary>表示から外す。内部の曲リストは触らない。</summary>
     public void RemovePlaylistSession(DocumentSession session)
@@ -3937,7 +4041,8 @@ internal sealed partial class LibraryBrowserView : UserControl
                     sessions[i],
                     select: false,
                     refreshColumns: false,
-                    manageActivateDefer: false);
+                    manageActivateDefer: false,
+                    placeBySort: true);
             }
         }
         finally
@@ -3958,7 +4063,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         DocumentSession session,
         bool select,
         bool refreshColumns,
-        bool manageActivateDefer)
+        bool manageActivateDefer,
+        bool placeBySort)
     {
         var row = CreateRowWithDefaults(session);
         row.GroupKey = LibraryFileList.GroupLabel(row, _group);
@@ -4003,7 +4109,8 @@ internal sealed partial class LibraryBrowserView : UserControl
             }
 
             var insertAt = _items.Count;
-            if (_sortColumn is { } sortColumn)
+            var rowIndex = _rows.Count;
+            if (placeBySort && _sortColumn is { } sortColumn)
             {
                 insertAt = 0;
                 while (insertAt < _items.Count
@@ -4011,14 +4118,10 @@ internal sealed partial class LibraryBrowserView : UserControl
                 {
                     insertAt++;
                 }
-            }
 
-            var rowIndex = _rows.Count;
-            if (_sortColumn is { } sortForRows)
-            {
                 rowIndex = 0;
                 while (rowIndex < _rows.Count
-                    && LibraryFileList.Compare(_rows[rowIndex], row, sortForRows, _sortDirection) <= 0)
+                    && LibraryFileList.Compare(_rows[rowIndex], row, sortColumn, _sortDirection) <= 0)
                 {
                     rowIndex++;
                 }

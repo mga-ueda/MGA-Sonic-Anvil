@@ -32,9 +32,13 @@ public partial class MainWindow
         // フォルダ再帰追加と同じく、追加完了まで背景色替えを遅延する。
         var batchGeneration = _libraryFolderShowGeneration;
         var deferWash = IsLibraryMaximized;
-        if (deferWash)
+        if (deferWash || showProgress)
         {
             SetLibraryFolderShowInProgress(true);
+            if (showProgress)
+            {
+                LibraryBrowser.SetPlaylistEnumerateProgress(0, paths.Count);
+            }
         }
 
         try
@@ -45,6 +49,7 @@ public partial class MainWindow
                 if (showProgress)
                 {
                     SetOpenStatus(i + 1, paths.Count, Path.GetFileName(path) ?? path);
+                    LibraryBrowser.SetPlaylistEnumerateProgress(i + 1, paths.Count);
                 }
 
                 var existing = FindSessionByPath(path);
@@ -133,13 +138,16 @@ public partial class MainWindow
                 ClearOpenStatus();
             }
 
-            if (deferWash
+            if ((deferWash || showProgress)
                 && LibraryPlayerMode.OwnsPlaylistBatchCompletion(
                     batchGeneration,
                     _libraryFolderShowGeneration))
             {
                 SetLibraryFolderShowInProgress(false);
-                await FlushPendingLibraryWashAsync().ConfigureAwait(true);
+                if (deferWash)
+                {
+                    await FlushPendingLibraryWashAsync().ConfigureAwait(true);
+                }
             }
         }
     }
@@ -219,7 +227,7 @@ public partial class MainWindow
     /// 再生するのはクリアして追加かつ Auto Play オンのときだけ。
     /// Shift 付き追加は再生も停止もしない。
     /// ツリーの Enter（クリア追加）は Auto Play のオン／オフに関わらず、載せ終わったあとプレイリストへフォーカスする。
-    /// クリア追加の再生は先頭が音声なら見つけ次第、動画／PDF は全件追加後。
+    /// 大量追加はファイル名スタブを先に出し、タグ列を後追い更新したあと並びを確定し、表示冒頭を再生する。
     /// 検索中のツリーは見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
     /// お気に入りは検索フィルタを掛けない。
     /// </summary>
@@ -294,13 +302,13 @@ public partial class MainWindow
         });
 
         var firstHandled = false;
-        var folderPlayStarted = false;
-        var playlistFocusTicket = 0;
         var playlistWasEmpty = _sessions.Count == 0;
         var loaded = 0;
         var planned = 0;
         var showProgress = false;
         var pending = new List<DocumentSession>();
+        var batchSessions = new List<DocumentSession>();
+        var enrichTasks = new List<Task>();
         var flushClock = Stopwatch.StartNew();
 
         bool Alive() => generation == _libraryFolderShowGeneration && IsLibraryMaximized;
@@ -317,9 +325,34 @@ public partial class MainWindow
             {
                 showProgress = true;
             }
+
+            // 行がまだ無くても赤バッジで件数を出す。
+            LibraryBrowser.SetPlaylistEnumerateProgress(loaded, planned);
         }
 
-        bool FlushPending()
+        void RefreshEnumerateBadge(string? label = null)
+        {
+            if (label is not null)
+            {
+                LibraryBrowser.SetPlaylistEnumerateBusy(true, label);
+                return;
+            }
+
+            LibraryBrowser.SetPlaylistEnumerateProgress(loaded, planned);
+        }
+
+        void ScheduleTagEnrich(IReadOnlyList<DocumentSession> sessions)
+        {
+            if (sessions.Count == 0)
+            {
+                return;
+            }
+
+            var copy = sessions.ToArray();
+            enrichTasks.Add(EnrichPlaylistSessionsTagsAsync(copy, generation));
+        }
+
+        async Task<bool> FlushPendingAsync()
         {
             if (pending.Count == 0)
             {
@@ -332,17 +365,34 @@ public partial class MainWindow
             }
 
             var first = !firstHandled;
+            // Auto Play は並び確定後に表示冒頭を選ぶ。途中は空リストへ足したときだけ仮選択。
             var selectFirst = first
+                && !playFirst
                 && ShouldSelectAppendedLibrarySession(
-                    playFirst,
+                    playFirst: false,
                     firstInBatch: true,
                     playlistWasEmpty);
             var head = pending[0];
             if (placeByCurrentSort)
             {
+                // 既存リストへの差し込みは、ソートキーを揃えてから正しい位置へ入れる。
+                var placeBatch = pending.ToArray();
+                await Task.Run(() =>
+                {
+                    foreach (var session in placeBatch)
+                    {
+                        EnrichLibrarySessionTags(session);
+                    }
+                }).ConfigureAwait(true);
+                if (!Alive())
+                {
+                    return false;
+                }
+
                 foreach (var session in pending)
                 {
                     PlacePlaylistSession(session, selectFirst && ReferenceEquals(session, head));
+                    batchSessions.Add(session);
                 }
             }
             else
@@ -350,7 +400,12 @@ public partial class MainWindow
                 foreach (var session in pending)
                 {
                     _sessions.Add(session);
+                    batchSessions.Add(session);
                 }
+
+                // ファイル名スタブを末尾へ先出し。並びはタグ後に一括ロックする。
+                LibraryBrowser.AppendSessionsRaw(pending, selectFirst ? head : null);
+                ScheduleTagEnrich(pending);
             }
 
             if (selectFirst)
@@ -358,35 +413,13 @@ public partial class MainWindow
                 ScanLibraryArtwork(head);
             }
 
-            if (!placeByCurrentSort)
-            {
-                LibraryBrowser.AppendSessions(pending, selectFirst ? head : null);
-            }
             SyncPlayerMeterFade();
             loaded += pending.Count;
+            RefreshEnumerateBadge();
             if (showProgress)
             {
                 var name = Path.GetFileName(pending[^1].Document.SourcePath ?? string.Empty);
                 SetOpenStatus(loaded, Math.Max(planned, loaded), name);
-            }
-
-            if (first && playFirst)
-            {
-                _libraryFolderPlaySession = head;
-                if (ShouldPlayFolderFirstImmediately(head.Document.SourcePath))
-                {
-                    folderPlayStarted = true;
-                    // 動的背景は全件載せ終わってから差し替える。
-                    _ = PlayLibrarySessionAsync(head, keepAmbientGlow: true);
-                    if (Alive())
-                    {
-                        playlistFocusTicket = LibraryBrowser.RequestListFocus();
-                    }
-                }
-            }
-            else if (playFirst && folderPlayStarted && IsPlaybackActive())
-            {
-                ScheduleLibraryGaplessPrefetch();
             }
 
             firstHandled = true;
@@ -425,7 +458,7 @@ public partial class MainWindow
 
                 pending.Add(item.Session);
                 var flush = item.FlushNow
-                    || (!firstHandled && playFirst)
+                    || (!firstHandled && (playFirst || playlistWasEmpty))
                     || pending.Count >= LibraryPlayerMode.PlaylistLoadUiFlushCount
                     || flushClock.ElapsedMilliseconds >= LibraryPlayerMode.PlaylistLoadUiFlushMs;
                 if (!flush)
@@ -433,7 +466,7 @@ public partial class MainWindow
                     continue;
                 }
 
-                if (!FlushPending())
+                if (!await FlushPendingAsync().ConfigureAwait(true))
                 {
                     if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
                             generation,
@@ -447,7 +480,30 @@ public partial class MainWindow
                 }
             }
 
-            if (!FlushPending())
+            if (!await FlushPendingAsync().ConfigureAwait(true))
+            {
+                if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                        generation,
+                        _libraryFolderShowGeneration))
+                {
+                    LibraryBrowser.FinishIncrementalSessionLoad();
+                    EnsurePendingLibraryWashFromPlaylist();
+                }
+
+                return;
+            }
+
+            if (enrichTasks.Count > 0 || (!placeByCurrentSort && batchSessions.Count > 0))
+            {
+                RefreshEnumerateBadge(UiStrings.PlaylistBusyEnumerateFinalize);
+            }
+
+            if (enrichTasks.Count > 0)
+            {
+                await Task.WhenAll(enrichTasks).ConfigureAwait(true);
+            }
+
+            if (!Alive())
             {
                 if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
                         generation,
@@ -463,35 +519,61 @@ public partial class MainWindow
             if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration)
                 && IsLibraryMaximized)
             {
+                DocumentSession? playlistHead = null;
+                if (firstHandled && !placeByCurrentSort && batchSessions.Count > 0)
+                {
+                    // タグ反映済みの行を現行ソートで確定し、表示冒頭を再生対象にする。
+                    playlistHead = LibraryBrowser.LockPlaylistOrder();
+                    SyncSessionsToPlaylistOrder();
+                    playlistHead = LibraryBrowser.FirstPlaylistSession ?? playlistHead;
+                }
+                else if (firstHandled)
+                {
+                    playlistHead = LibraryBrowser.FirstPlaylistSession
+                        ?? LibraryBrowser.SelectedSession;
+                }
+
                 // 列・波形の仕上げと並行してウォッシュを裏で作り、バッチ終了後に 1 回だけ Apply。
                 Task<LibraryBrowserView.PreparedArtworkPresentation>? artPrepare = null;
                 DocumentSession? artSession = null;
                 var artHadArt = false;
-                if (firstHandled && playFirst && _libraryFolderPlaySession is { } playHead)
+                if (firstHandled && playFirst && playlistHead is { } playHead)
                 {
+                    _libraryFolderPlaySession = playHead;
                     artSession = playHead;
                     artHadArt = playHead.Document.HasArtwork;
                     artPrepare = Task.Run(() =>
                     {
+                        EnrichLibrarySessionMedia(playHead);
                         ScanLibraryArtwork(playHead);
                         return LibraryBrowserView.PrepareArtworkPresentation(playHead.Document.Artwork);
                     });
                 }
-                else if (firstHandled && !playFirst && LibraryBrowser.SelectedSession is { } selectedIdle)
+                else if (firstHandled && !playFirst)
                 {
-                    artSession = selectedIdle;
-                    artHadArt = selectedIdle.Document.HasArtwork;
-                    artPrepare = Task.Run(() =>
+                    artSession = playlistHead ?? LibraryBrowser.SelectedSession;
+                    if (artSession is not null)
                     {
-                        ScanLibraryArtwork(selectedIdle);
-                        return LibraryBrowserView.PrepareArtworkPresentation(selectedIdle.Document.Artwork);
-                    });
+                        artHadArt = artSession.Document.HasArtwork;
+                        var idle = artSession;
+                        artPrepare = Task.Run(() =>
+                        {
+                            EnrichLibrarySessionMedia(idle);
+                            ScanLibraryArtwork(idle);
+                            return LibraryBrowserView.PrepareArtworkPresentation(idle.Document.Artwork);
+                        });
+                    }
                 }
 
                 LibraryBrowser.FinishIncrementalSessionLoad();
+                if (batchSessions.Count > 0)
+                {
+                    _ = EnrichPlaylistSessionsMediaAsync(batchSessions.ToArray(), generation);
+                }
+
                 if (firstHandled)
                 {
-                    if (playFirst && _libraryFolderPlaySession is { } first)
+                    if (playFirst && playlistHead is { } first)
                     {
                         var selected = LibraryBrowser.SelectedSession;
                         if (ShouldRestoreFolderPlaySelection(selected, first))
@@ -500,39 +582,25 @@ public partial class MainWindow
                         }
 
                         QueuePendingLibraryWash(first, artPrepare, artHadArt);
-                        if (!folderPlayStarted)
+                        // 並び確定後の表示冒頭を再生。色替えはバッチ終了 Flush で Apply。
+                        await PlayLibrarySessionAsync(first, keepAmbientGlow: true).ConfigureAwait(true);
+                        if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
+                                generation,
+                                _libraryFolderShowGeneration)
+                            && IsLibraryMaximized)
                         {
-                            // 再生開始はウォッシュ準備と並行。色替えはバッチ終了 Flush で Apply。
-                            var playTask = PlayLibrarySessionAsync(first, keepAmbientGlow: true);
-                            await playTask.ConfigureAwait(true);
-                            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
-                                    generation,
-                                    _libraryFolderShowGeneration)
-                                && IsLibraryMaximized)
-                            {
-                                LibraryBrowser.RequestListFocus();
-                            }
-                        }
-                        else
-                        {
-                            if (IsPlaybackActive())
-                            {
-                                ScheduleLibraryGaplessPrefetch();
-                            }
-
-                            // 再生開始直後に移しても、続きの行追加でツリーへ戻る。
-                            // 仕上げのあと、そのあいだにツリーへ残す操作が無ければもう一度移す。
-                            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
-                                    generation,
-                                    _libraryFolderShowGeneration)
-                                && IsLibraryMaximized)
-                            {
-                                LibraryBrowser.RequestListFocusIfCurrent(playlistFocusTicket);
-                            }
+                            LibraryBrowser.RequestListFocus();
                         }
                     }
                     else if (!playFirst)
                     {
+                        if (playlistWasEmpty
+                            && artSession is not null
+                            && ShouldRestoreFolderPlaySelection(LibraryBrowser.SelectedSession, artSession))
+                        {
+                            LibraryBrowser.SelectSessionQuiet(artSession);
+                        }
+
                         if (artSession is not null)
                         {
                             QueuePendingLibraryWash(artSession, artPrepare, artHadArt);
@@ -593,8 +661,72 @@ public partial class MainWindow
         }
     }
 
+    private async Task EnrichPlaylistSessionsTagsAsync(DocumentSession[] sessions, int generation)
+    {
+        await Task.Run(() =>
+        {
+            foreach (var session in sessions)
+            {
+                if (generation != _libraryFolderShowGeneration)
+                {
+                    return;
+                }
+
+                try
+                {
+                    EnrichLibrarySessionTags(session);
+                }
+                catch (Exception)
+                {
+                }
+            }
+        }).ConfigureAwait(true);
+
+        if (generation != _libraryFolderShowGeneration || !IsLibraryMaximized)
+        {
+            return;
+        }
+
+        foreach (var session in sessions)
+        {
+            LibraryBrowser.UpdateSessionRow(session);
+        }
+    }
+
+    private async Task EnrichPlaylistSessionsMediaAsync(DocumentSession[] sessions, int generation)
+    {
+        await Task.Run(() =>
+        {
+            foreach (var session in sessions)
+            {
+                if (generation != _libraryFolderShowGeneration)
+                {
+                    return;
+                }
+
+                try
+                {
+                    EnrichLibrarySessionMedia(session);
+                }
+                catch (Exception)
+                {
+                }
+            }
+        }).ConfigureAwait(true);
+
+        if (generation != _libraryFolderShowGeneration || !IsLibraryMaximized)
+        {
+            return;
+        }
+
+        foreach (var session in sessions)
+        {
+            LibraryBrowser.UpdateSessionRow(session);
+        }
+    }
+
     /// <summary>
-    /// フォルダ走査とタグ読みはすべて裏スレッド。UI へは完成したセッションだけ流す。
+    /// フォルダ走査は裏スレッド。UI へはパスだけのスタブを先に流し、タグは後追いする。
     /// </summary>
     private static void ProduceLibraryFolderSessions(
         IReadOnlyList<(string Path, bool AncestorHit)> roots,
@@ -628,7 +760,7 @@ public partial class MainWindow
                     writer.TryWrite(LibraryFolderProduceItem.Plan(1));
                     try
                     {
-                        var session = CreateLibrarySession(current.Path);
+                        var session = CreateLibrarySessionStub(current.Path);
                         writer.TryWrite(LibraryFolderProduceItem.FromSession(session, flushNow: true));
                     }
                     catch (Exception)
@@ -676,44 +808,24 @@ public partial class MainWindow
                 writer.TryWrite(LibraryFolderProduceItem.Plan(files.Length));
             }
 
-            // キャッシュが揃っていれば層ごと作って一気に流す。欠けがあるときは1曲ずつ。
-            if (files.Length > 1 && LibraryPlaylistCache.AreAllWarm(files))
+            // パス列挙が軽いので層ごと一気に流し、タグは UI 側で後追いする。
+            for (var i = 0; i < files.Length; i++)
             {
-                for (var i = 0; i < files.Length; i++)
+                if (cancelled())
                 {
-                    if (cancelled())
-                    {
-                        return;
-                    }
-
-                    try
-                    {
-                        var session = CreateLibrarySession(files[i]);
-                        writer.TryWrite(
-                            LibraryFolderProduceItem.FromSession(session, flushNow: i + 1 == files.Length));
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    return;
                 }
-            }
-            else
-            {
-                for (var i = 0; i < files.Length; i++)
-                {
-                    if (cancelled())
-                    {
-                        return;
-                    }
 
-                    try
-                    {
-                        var session = CreateLibrarySession(files[i]);
-                        writer.TryWrite(LibraryFolderProduceItem.FromSession(session, flushNow: false));
-                    }
-                    catch (Exception)
-                    {
-                    }
+                try
+                {
+                    var session = CreateLibrarySessionStub(files[i]);
+                    writer.TryWrite(
+                        LibraryFolderProduceItem.FromSession(
+                            session,
+                            flushNow: i + 1 == files.Length));
+                }
+                catch (Exception)
+                {
                 }
             }
 
@@ -760,8 +872,8 @@ public partial class MainWindow
         selected is null || ReferenceEquals(selected, first);
 
     /// <summary>
-    /// Enter の先頭再生を全件追加前に始めてよいか。
-    /// 動画／PDF は Open と後続追加が競合するので待つ。
+    /// 表示冒頭が音声なら即再生してよいか（動画／PDF は Open と競合しやすい）。
+    /// フォルダ大量追加の Auto Play は並び確定後に再生するため、ここでは使わない。
     /// </summary>
     internal static bool ShouldPlayFolderFirstImmediately(string? path) =>
         !string.IsNullOrWhiteSpace(path) && !LibraryPlaylistDocuments.IsDocument(path);

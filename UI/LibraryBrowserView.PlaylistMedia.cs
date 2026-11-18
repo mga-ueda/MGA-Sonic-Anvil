@@ -461,10 +461,22 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>フォルダ走査などファイル列挙の待ち表示。</summary>
-    public void SetPlaylistEnumerateBusy(bool busy)
+    public void SetPlaylistEnumerateBusy(bool busy) =>
+        SetPlaylistEnumerateBusy(busy, UiStrings.PlaylistBusyEnumerate);
+
+    /// <summary>列挙待ち表示。既に表示中でもラベルを差し替える。</summary>
+    public void SetPlaylistEnumerateBusy(bool busy, string label)
     {
         if (_playlistEnumerateBusy == busy)
         {
+            if (busy)
+            {
+                ShowPlaylistBusyBadge(
+                    _playlistBusyEnumerateBadge,
+                    ref _playlistBusyEnumerateBack,
+                    label);
+            }
+
             return;
         }
 
@@ -474,8 +486,14 @@ internal sealed partial class LibraryBrowserView
             ref _playlistBusyEnumerateBack,
             ref _playlistBusyEnumerateFadeTicket,
             busy,
-            UiStrings.PlaylistBusyEnumerate);
+            label);
     }
+
+    /// <summary>空リストのあいだも件数が見えるよう、列挙バッジの進捗を更新する。</summary>
+    public void SetPlaylistEnumerateProgress(int loaded, int planned) =>
+        SetPlaylistEnumerateBusy(
+            true,
+            UiStrings.PlaylistBusyEnumerateProgress(loaded, Math.Max(planned, loaded)));
 
     private void SetPlaylistWaveBusy(bool busy)
     {
