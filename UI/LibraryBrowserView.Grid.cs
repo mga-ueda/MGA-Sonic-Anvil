@@ -123,6 +123,7 @@ internal sealed partial class LibraryBrowserView
         _grid.ColumnReordered += Grid_ColumnReordered;
         _grid.SelectionChanged += Grid_SelectionChanged;
         _grid.PreviewMouseLeftButtonDown += Grid_PreviewMouseLeftButtonDown;
+        _grid.PreviewMouseWheel += Grid_PreviewMouseWheel;
         _grid.MouseDoubleClick += Grid_MouseDoubleClick;
         RebuildListContextMenu();
 

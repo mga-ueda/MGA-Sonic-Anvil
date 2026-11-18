@@ -609,6 +609,12 @@ internal static class DesignMetrics
     /// <summary>プレイヤーのスクロールバーを出す距離。端からこの幅までマウスが近いと表示。</summary>
     public static double LibraryScrollRevealDistance => From96(320);
 
+    /// <summary>プレイリスト横スクロール。←／→ 1 回ぶん。</summary>
+    public static double LibraryPlaylistHorizontalKeyStep => From96(48);
+
+    /// <summary>プレイリスト横スクロール。Shift+ホイール 1 ノッチぶん。</summary>
+    public static double LibraryPlaylistHorizontalWheelStep => From96(80);
+
     /// <summary>オーディオタブの入力／出力列のすき間。</summary>
     public static double SettingsColumnGap => From96(20);
 

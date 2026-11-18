@@ -2287,13 +2287,22 @@ public partial class MainWindow
         }
 
         if (IsLibraryMaximized
-            && key is Key.Left or Key.Right
-            && modifiers == ModifierKeys.None)
+            && LibraryPlayerMode.IsPlaylistHorizontalScrollKey(key, modifiers))
         {
             StopPlaybackShuttle();
             if (IsLibraryExplorerFocused || IsLibraryHeaderStructureFocused)
             {
                 return false;
+            }
+
+            // 横に溢れているプレイリストでは ←／→ で左右スクロール（早送り／巻き戻しはしない）。
+            if (LibraryBrowser.IsPlaylistGridFocused
+                && LibraryBrowser.TryScrollPlaylistHorizontal(
+                    LibraryPlayerMode.PlaylistHorizontalKeyDelta(
+                        key,
+                        DesignMetrics.LibraryPlaylistHorizontalKeyStep)))
+            {
+                return true;
             }
 
             return true;

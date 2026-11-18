@@ -664,6 +664,21 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.IsPlaylistScroll(Key.Down, ModifierKeys.Alt));
         Assert.False(LibraryPlayerMode.IsPlaylistScroll(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsPlaylistScroll(Key.Up, ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsPlaylistHorizontalScrollKey(Key.Left, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.IsPlaylistHorizontalScrollKey(Key.Right, ModifierKeys.None));
+        Assert.False(LibraryPlayerMode.IsPlaylistHorizontalScrollKey(Key.Left, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.CanScrollPlaylistHorizontally(0));
+        Assert.False(LibraryPlayerMode.CanScrollPlaylistHorizontally(0.5));
+        Assert.True(LibraryPlayerMode.CanScrollPlaylistHorizontally(0.51));
+        Assert.Equal(-48, LibraryPlayerMode.PlaylistHorizontalKeyDelta(Key.Left, 48));
+        Assert.Equal(48, LibraryPlayerMode.PlaylistHorizontalKeyDelta(Key.Right, 48));
+        Assert.Equal(
+            -80,
+            LibraryPlayerMode.PlaylistHorizontalWheelDelta(Mouse.MouseWheelDeltaForOneLine, 80));
+        Assert.Equal(
+            80,
+            LibraryPlayerMode.PlaylistHorizontalWheelDelta(-Mouse.MouseWheelDeltaForOneLine, 80));
+        Assert.Equal(0, LibraryPlayerMode.PlaylistHorizontalWheelDelta(0, 80));
         Assert.True(LibraryPlayerMode.PrefersPrerollOnCtrlSpace(waveformFocused: true));
         Assert.False(LibraryPlayerMode.PrefersPrerollOnCtrlSpace(waveformFocused: false));
         Assert.False(LibraryPlayerMode.BlocksExplorerKey(Key.Up, ModifierKeys.Alt));

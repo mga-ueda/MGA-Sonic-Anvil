@@ -3404,6 +3404,61 @@ internal sealed partial class LibraryBrowserView : UserControl
         LibraryScrollReveal.RevealTemporarily(_grid);
     }
 
+    /// <summary>横に溢れているときだけ true（スクロールバー表示可否の判定）。</summary>
+    public bool CanScrollPlaylistHorizontally()
+    {
+        var scroll = FindDataGridScrollViewer();
+        return scroll is not null
+            && LibraryPlayerMode.CanScrollPlaylistHorizontally(scroll.ScrollableWidth);
+    }
+
+    /// <summary>
+    /// 選択は変えず横スクロールする。溢れていれば端でもバーを出し、処理済みとして true。
+    /// </summary>
+    public bool TryScrollPlaylistHorizontal(double delta)
+    {
+        if (delta == 0 || FindDataGridScrollViewer() is not { } scroll)
+        {
+            return false;
+        }
+
+        if (!LibraryPlayerMode.CanScrollPlaylistHorizontally(scroll.ScrollableWidth))
+        {
+            return false;
+        }
+
+        var next = Math.Clamp(scroll.HorizontalOffset + delta, 0, scroll.ScrollableWidth);
+        if (Math.Abs(scroll.HorizontalOffset - next) >= 0.01)
+        {
+            scroll.ScrollToHorizontalOffset(next);
+        }
+
+        LibraryScrollReveal.RevealTemporarily(_grid);
+        return true;
+    }
+
+    private void Grid_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (Keyboard.Modifiers == ModifierKeys.Shift)
+        {
+            var delta = LibraryPlayerMode.PlaylistHorizontalWheelDelta(
+                e.Delta,
+                DesignMetrics.LibraryPlaylistHorizontalWheelStep);
+            if (TryScrollPlaylistHorizontal(delta))
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (Keyboard.Modifiers == ModifierKeys.None)
+        {
+            // 既定の縦スクロールはそのまま通し、バーだけ一時表示する。
+            LibraryScrollReveal.RevealTemporarily(_grid);
+        }
+    }
+
     private double RowHeightHint()
     {
         var item = _grid.SelectedItem ?? (_grid.Items.Count > 0 ? _grid.Items[0] : null);

@@ -209,6 +209,8 @@ public sealed class LibraryExplorerPathsTests
         Assert.Equal(DesignMetrics.LibrarySplitterHitThickness, DesignMetrics.LibraryFavoritesSplitterHitHeight);
         Assert.Equal(240, DesignMetrics.LibrarySplitterRevealDistance);
         Assert.Equal(320, DesignMetrics.LibraryScrollRevealDistance);
+        Assert.Equal(48, DesignMetrics.LibraryPlaylistHorizontalKeyStep);
+        Assert.Equal(80, DesignMetrics.LibraryPlaylistHorizontalWheelStep);
     }
 
     [Fact]

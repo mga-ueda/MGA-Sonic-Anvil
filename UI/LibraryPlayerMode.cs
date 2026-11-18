@@ -675,6 +675,35 @@ internal static class LibraryPlayerMode
     public static bool IsPlaylistScroll(Key key, ModifierKeys modifiers) =>
         key is Key.Up or Key.Down && modifiers == ModifierKeys.Alt;
 
+    /// <summary>プレイリストで横に溢れているときの ←／→（早送り／巻き戻しにはしない）。</summary>
+    public static bool IsPlaylistHorizontalScrollKey(Key key, ModifierKeys modifiers) =>
+        key is Key.Left or Key.Right && modifiers == ModifierKeys.None;
+
+    /// <summary>横スクロールバーが出る状態（内容がビューより広い）。</summary>
+    public static bool CanScrollPlaylistHorizontally(double scrollableWidth) =>
+        scrollableWidth > 0.5;
+
+    /// <summary>← は左（offset 減）、→ は右（offset 増）。</summary>
+    public static double PlaylistHorizontalKeyDelta(Key key, double step) =>
+        key == Key.Left ? -Math.Abs(step) : Math.Abs(step);
+
+    /// <summary>Shift+ホイール。上ノッチで左へ（HorizontalOffset 減）。</summary>
+    public static double PlaylistHorizontalWheelDelta(int wheelDelta, double stepPerNotch)
+    {
+        if (wheelDelta == 0 || stepPerNotch <= 0)
+        {
+            return 0;
+        }
+
+        var notches = wheelDelta / Mouse.MouseWheelDeltaForOneLine;
+        if (notches == 0)
+        {
+            notches = Math.Sign(wheelDelta);
+        }
+
+        return -notches * stepPerNotch;
+    }
+
     /// <summary>Shift+Space。プレイリストのチェック選択モードをトグル（ツリーは折りたたみのまま）。</summary>
     public static bool IsCheckSelectModeToggle(Key key, ModifierKeys modifiers) =>
         key == Key.Space && modifiers == ModifierKeys.Shift;

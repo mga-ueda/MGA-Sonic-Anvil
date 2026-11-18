@@ -5143,6 +5143,69 @@ public sealed class LibraryBrowserSelectionTests
         });
     }
 
+    [Fact]
+    public void Playlist_HorizontalKeyAndWheelHelpers_ScrollAndRevealBars()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[8];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), "album", $"track-{i:D2}-very-long-name.mp3"));
+                document.ApplyTags(new AudioFileTags
+                {
+                    Probed = true,
+                    Title = $"Very Long Title {i:D2} for horizontal scroll",
+                    Artist = "CAPCOM",
+                    Album = "Album",
+                    Comment = Path.Combine(@"V:\very\long\folder\path\for\scroll", $"disc{i}"),
+                });
+                sessions[i] = new DocumentSession(document);
+                document.SetArtwork(OnePixelPng);
+            }
+
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumns(LibraryColumnFilter.All);
+            var window = new Window
+            {
+                Content = view,
+                Width = 640,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            window.UpdateLayout();
+            Flush();
+
+            Assert.True(view.CanScrollPlaylistHorizontally());
+            var scroll = FindScroll(view.FileGrid);
+            Assert.NotNull(scroll);
+            Assert.True(
+                view.TryScrollPlaylistHorizontal(DesignMetrics.LibraryPlaylistHorizontalKeyStep));
+            Flush();
+            Assert.True(scroll!.HorizontalOffset > 1);
+            Assert.Contains(
+                FindDescendants<ScrollBar>(view.FileGrid),
+                bar => LibraryScrollReveal.GetRevealed(bar));
+
+            var before = scroll.HorizontalOffset;
+            var wheelDelta = LibraryPlayerMode.PlaylistHorizontalWheelDelta(
+                -Mouse.MouseWheelDeltaForOneLine,
+                DesignMetrics.LibraryPlaylistHorizontalWheelStep);
+            Assert.True(view.TryScrollPlaylistHorizontal(wheelDelta));
+            Flush();
+            Assert.True(scroll.HorizontalOffset > before);
+
+            window.Close();
+        });
+    }
+
     private static int CountCyanInHeader(Window window, DataGridColumnHeader header)
     {
         window.UpdateLayout();
