@@ -227,7 +227,9 @@ public partial class MainWindow
     /// 再生するのはクリアして追加かつ Auto Play オンのときだけ。
     /// Shift 付き追加は再生も停止もしない。
     /// ツリーの Enter（クリア追加）は Auto Play のオン／オフに関わらず、載せ終わったあとプレイリストへフォーカスする。
-    /// 大量追加はファイル名スタブを先に出し、タグ列を後追い更新したあと並びを確定し、表示冒頭を再生する。
+    /// 大量追加はフォルダ名を先に集めて見出し順に並べ、フォルダごとにファイル名スタブを流す。
+    /// パスだけで順が決まる（親フォルダグループ＋名前など）ときは先頭フラッシュで即再生し、
+    /// タグ／列は後追い。タグ依存ソートは全タグ後に並び確定してから再生する。
     /// 検索中のツリーは見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
     /// お気に入りは検索フィルタを掛けない。
     /// </summary>
@@ -310,6 +312,12 @@ public partial class MainWindow
         var batchSessions = new List<DocumentSession>();
         var enrichTasks = new List<Task>();
         var flushClock = Stopwatch.StartNew();
+        // パスだけで順が決まるときは、先頭フォルダの先頭曲をタグ待ちせず鳴らす。
+        var pathOrder = !placeByCurrentSort
+            && LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
+                LibraryBrowser.CurrentGroup,
+                LibraryBrowser.CurrentSortColumn);
+        var playedEarly = false;
 
         bool Alive() => generation == _libraryFolderShowGeneration && IsLibraryMaximized;
 
@@ -348,8 +356,9 @@ public partial class MainWindow
                 return;
             }
 
+            // UI は触らずタグだけ先読み。行の差し替えは全スタブ後に一度だけ。
             var copy = sessions.ToArray();
-            enrichTasks.Add(EnrichPlaylistSessionsTagsAsync(copy, generation));
+            enrichTasks.Add(EnrichPlaylistSessionsTagsOnlyAsync(copy, generation));
         }
 
         async Task<bool> FlushPendingAsync()
@@ -403,7 +412,8 @@ public partial class MainWindow
                     batchSessions.Add(session);
                 }
 
-                // ファイル名スタブを末尾へ先出し。並びはタグ後に一括ロックする。
+                // ファイル名スタブを末尾へ先出し。生産側がフォルダ名順で流すので
+                // ここでの Lock はしない（毎フラッシュの再バインドが重い）。最終ロックは後で。
                 LibraryBrowser.AppendSessionsRaw(pending, selectFirst ? head : null);
                 ScheduleTagEnrich(pending);
             }
@@ -420,6 +430,28 @@ public partial class MainWindow
             {
                 var name = Path.GetFileName(pending[^1].Document.SourcePath ?? string.Empty);
                 SetOpenStatus(loaded, Math.Max(planned, loaded), name);
+            }
+
+            // 行を描画してから次の受信へ進む。再生の await でチャネルを止めない。
+            await Dispatcher.Yield(DispatcherPriority.Render);
+
+            // パス順が確定しているなら、冒頭を並行再生（ロードループは止めない）。
+            if (pathOrder
+                && playFirst
+                && first
+                && !playedEarly
+                && Alive())
+            {
+                var earlyHead = LibraryBrowser.FirstPlaylistSession ?? head;
+                _libraryFolderPlaySession = earlyHead;
+                if (ShouldRestoreFolderPlaySelection(LibraryBrowser.SelectedSession, earlyHead))
+                {
+                    LibraryBrowser.SelectSessionQuiet(earlyHead);
+                }
+
+                playedEarly = true;
+                var playGeneration = generation;
+                _ = PlayLibraryFolderHeadEarlyAsync(earlyHead, playGeneration);
             }
 
             firstHandled = true;
@@ -522,7 +554,9 @@ public partial class MainWindow
                 DocumentSession? playlistHead = null;
                 if (firstHandled && !placeByCurrentSort && batchSessions.Count > 0)
                 {
-                    // タグ反映済みの行を現行ソートで確定し、表示冒頭を再生対象にする。
+                    // タグを行へ一度だけ載せ、現行ソートで確定する。
+                    LibraryBrowser.UpdateSessionRows(batchSessions);
+                    await Dispatcher.Yield(DispatcherPriority.Render);
                     playlistHead = LibraryBrowser.LockPlaylistOrder();
                     SyncSessionsToPlaylistOrder();
                     playlistHead = LibraryBrowser.FirstPlaylistSession ?? playlistHead;
@@ -582,8 +616,16 @@ public partial class MainWindow
                         }
 
                         QueuePendingLibraryWash(first, artPrepare, artHadArt);
-                        // 並び確定後の表示冒頭を再生。色替えはバッチ終了 Flush で Apply。
-                        await PlayLibrarySessionAsync(first, keepAmbientGlow: true).ConfigureAwait(true);
+                        // 早期再生済みで冒頭が変わっていなければ聞き直ししない。
+                        var alreadyPlayingHead = playedEarly
+                            && ReferenceEquals(_libraryFolderPlaySession, first)
+                            && ReferenceEquals(_activeSession, first);
+                        if (!alreadyPlayingHead)
+                        {
+                            await PlayLibrarySessionAsync(first, keepAmbientGlow: true)
+                                .ConfigureAwait(true);
+                        }
+
                         if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(
                                 generation,
                                 _libraryFolderShowGeneration)
@@ -661,7 +703,27 @@ public partial class MainWindow
         }
     }
 
-    private async Task EnrichPlaylistSessionsTagsAsync(DocumentSession[] sessions, int generation)
+    /// <summary>
+    /// フォルダ追加の冒頭再生。ロードループ（チャネル読み）とは独立して走らせる。
+    /// </summary>
+    private async Task PlayLibraryFolderHeadEarlyAsync(DocumentSession head, int generation)
+    {
+        try
+        {
+            await PlayLibrarySessionAsync(head, keepAmbientGlow: true).ConfigureAwait(true);
+            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration)
+                && IsLibraryMaximized)
+            {
+                LibraryBrowser.RequestListFocus();
+            }
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    /// <summary>タグだけ読む。行 UI は更新しない（大量追加中の再描画を避ける）。</summary>
+    private async Task EnrichPlaylistSessionsTagsOnlyAsync(DocumentSession[] sessions, int generation)
     {
         await Task.Run(() =>
         {
@@ -681,16 +743,17 @@ public partial class MainWindow
                 }
             }
         }).ConfigureAwait(true);
+    }
 
+    private async Task EnrichPlaylistSessionsTagsAsync(DocumentSession[] sessions, int generation)
+    {
+        await EnrichPlaylistSessionsTagsOnlyAsync(sessions, generation).ConfigureAwait(true);
         if (generation != _libraryFolderShowGeneration || !IsLibraryMaximized)
         {
             return;
         }
 
-        foreach (var session in sessions)
-        {
-            LibraryBrowser.UpdateSessionRow(session);
-        }
+        LibraryBrowser.UpdateSessionRows(sessions);
     }
 
     private async Task EnrichPlaylistSessionsMediaAsync(DocumentSession[] sessions, int generation)
@@ -719,14 +782,14 @@ public partial class MainWindow
             return;
         }
 
-        foreach (var session in sessions)
-        {
-            LibraryBrowser.UpdateSessionRow(session);
-        }
+        LibraryBrowser.UpdateSessionRows(sessions);
     }
 
     /// <summary>
-    /// フォルダ走査は裏スレッド。UI へはパスだけのスタブを先に流し、タグは後追いする。
+    /// フォルダ走査は裏スレッド。
+    /// 1) フォルダ名だけ再帰収集 → 見出し名順に並べる
+    /// 2) その順でフォルダごとにファイル（名前順）をスタブ送信
+    /// タグは UI 側で後追い。親フォルダグループ＋名前ソートなら流した順＝最終順。
     /// </summary>
     private static void ProduceLibraryFolderSessions(
         IReadOnlyList<(string Path, bool AncestorHit)> roots,
@@ -736,12 +799,95 @@ public partial class MainWindow
         Func<bool> cancelled,
         bool recursive = true)
     {
+        var looseFiles = new List<string>();
+        var folders = new List<(string Path, bool FolderHit)>();
+        CollectLibraryFolderTargets(roots, filter, recursive, cancelled, looseFiles, folders);
+        if (cancelled())
+        {
+            return;
+        }
+
+        if (looseFiles.Count > 0)
+        {
+            looseFiles.Sort(StringComparer.OrdinalIgnoreCase);
+            EmitLibraryFolderFileBatch(looseFiles, knownPaths, writer, cancelled);
+            if (cancelled())
+            {
+                return;
+            }
+        }
+
+        if (folders.Count == 0)
+        {
+            return;
+        }
+
+        var folderPaths = new List<string>(folders.Count);
+        var folderHits = new Dictionary<string, bool>(folders.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in folders)
+        {
+            folderPaths.Add(entry.Path);
+            folderHits[entry.Path] = entry.FolderHit;
+        }
+
+        LibraryPlayerMode.SortFoldersByDisplayName(folderPaths);
+
+        foreach (var folder in folderPaths)
+        {
+            if (cancelled())
+            {
+                return;
+            }
+
+            if (!folderHits.TryGetValue(folder, out var folderHit))
+            {
+                folderHit = false;
+            }
+
+            string[] layerFiles;
+            try
+            {
+                AudioCodec.CollectPlayerOpenableDirectoryLayer(folder, out layerFiles, out _);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            var included = new List<string>(layerFiles.Length);
+            foreach (var file in layerFiles)
+            {
+                if (filter.IncludeFile(file, folderHit))
+                {
+                    included.Add(file);
+                }
+            }
+
+            if (included.Count == 0)
+            {
+                continue;
+            }
+
+            EmitLibraryFolderFileBatch(included, knownPaths, writer, cancelled);
+        }
+    }
+
+    /// <summary>ルートからフォルダ一覧と単体ファイルを集める（中身のファイル列挙はまだしない）。</summary>
+    private static void CollectLibraryFolderTargets(
+        IReadOnlyList<(string Path, bool AncestorHit)> roots,
+        LibraryExplorerPlaylistWalk filter,
+        bool recursive,
+        Func<bool> cancelled,
+        List<string> looseFiles,
+        List<(string Path, bool FolderHit)> folders)
+    {
         var remaining = new Stack<(string Path, bool AncestorHit)>(roots.Count);
         for (var i = roots.Count - 1; i >= 0; i--)
         {
             remaining.Push(roots[i]);
         }
 
+        var seenFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         while (remaining.Count > 0)
         {
             if (cancelled())
@@ -754,79 +900,29 @@ public partial class MainWindow
             {
                 if (File.Exists(current.Path)
                     && AudioCodec.IsPlayerOpenable(current.Path)
-                    && filter.IncludeFile(current.Path, current.AncestorHit)
-                    && knownPaths.Add(current.Path))
+                    && filter.IncludeFile(current.Path, current.AncestorHit))
                 {
-                    writer.TryWrite(LibraryFolderProduceItem.Plan(1));
-                    try
-                    {
-                        var session = CreateLibrarySessionStub(current.Path);
-                        writer.TryWrite(LibraryFolderProduceItem.FromSession(session, flushNow: true));
-                    }
-                    catch (Exception)
-                    {
-                    }
+                    looseFiles.Add(current.Path);
                 }
 
                 continue;
             }
 
-            string[] files;
-            (string Path, bool AncestorHit)[] children;
+            bool folderHit;
+            string[] children;
             try
             {
-                var folderHit = filter.FolderNameHit(current.Path, current.AncestorHit);
-                AudioCodec.CollectPlayerOpenableDirectoryLayer(current.Path, out var layerFiles, out var layerChildren);
-                var included = new List<string>();
-                foreach (var file in layerFiles)
-                {
-                    if (filter.IncludeFile(file, folderHit) && knownPaths.Add(file))
-                    {
-                        included.Add(file);
-                    }
-                }
-
-                var next = new List<(string Path, bool AncestorHit)>();
-                foreach (var child in layerChildren)
-                {
-                    if (filter.IncludeChild(child, folderHit))
-                    {
-                        next.Add((child, folderHit));
-                    }
-                }
-
-                files = included.ToArray();
-                children = next.ToArray();
+                folderHit = filter.FolderNameHit(current.Path, current.AncestorHit);
+                children = AudioCodec.CollectPlayerOpenableChildDirectories(current.Path);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 continue;
             }
 
-            if (files.Length > 0)
+            if (seenFolders.Add(current.Path))
             {
-                writer.TryWrite(LibraryFolderProduceItem.Plan(files.Length));
-            }
-
-            // パス列挙が軽いので層ごと一気に流し、タグは UI 側で後追いする。
-            for (var i = 0; i < files.Length; i++)
-            {
-                if (cancelled())
-                {
-                    return;
-                }
-
-                try
-                {
-                    var session = CreateLibrarySessionStub(files[i]);
-                    writer.TryWrite(
-                        LibraryFolderProduceItem.FromSession(
-                            session,
-                            flushNow: i + 1 == files.Length));
-                }
-                catch (Exception)
-                {
-                }
+                folders.Add((current.Path, folderHit));
             }
 
             if (!recursive)
@@ -836,7 +932,53 @@ public partial class MainWindow
 
             for (var i = children.Length - 1; i >= 0; i--)
             {
-                remaining.Push(children[i]);
+                var child = children[i];
+                if (filter.IncludeChild(child, folderHit))
+                {
+                    remaining.Push((child, folderHit));
+                }
+            }
+        }
+    }
+
+    private static void EmitLibraryFolderFileBatch(
+        IReadOnlyList<string> files,
+        HashSet<string> knownPaths,
+        ChannelWriter<LibraryFolderProduceItem> writer,
+        Func<bool> cancelled)
+    {
+        var toEmit = new List<string>(files.Count);
+        foreach (var path in files)
+        {
+            if (knownPaths.Add(path))
+            {
+                toEmit.Add(path);
+            }
+        }
+
+        if (toEmit.Count == 0)
+        {
+            return;
+        }
+
+        writer.TryWrite(LibraryFolderProduceItem.Plan(toEmit.Count));
+        for (var i = 0; i < toEmit.Count; i++)
+        {
+            if (cancelled())
+            {
+                return;
+            }
+
+            try
+            {
+                var session = CreateLibrarySessionStub(toEmit[i]);
+                writer.TryWrite(
+                    LibraryFolderProduceItem.FromSession(
+                        session,
+                        flushNow: i + 1 == toEmit.Count));
+            }
+            catch (Exception)
+            {
             }
         }
     }

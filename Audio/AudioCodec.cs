@@ -167,8 +167,8 @@ internal static class AudioCodec
         out string[] children)
     {
         files = [];
-        children = [];
-        if (string.IsNullOrWhiteSpace(directory))
+        children = CollectPlayerOpenableChildDirectories(directory);
+        if (children.Length == 0 && string.IsNullOrWhiteSpace(directory))
         {
             return;
         }
@@ -185,6 +185,7 @@ internal static class AudioCodec
 
         if (!Directory.Exists(full))
         {
+            children = [];
             return;
         }
 
@@ -192,6 +193,33 @@ internal static class AudioCodec
         CollectFilesInDirectory(full, found, player: true);
         found.Sort(StringComparer.OrdinalIgnoreCase);
         files = found.ToArray();
+    }
+
+    /// <summary>
+    /// 子フォルダだけ（名前順）。ジャンクション除外。
+    /// フォルダ名先集めのときにファイル列挙を二度走らせない用。
+    /// </summary>
+    public static string[] CollectPlayerOpenableChildDirectories(string directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return [];
+        }
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(directory.Trim());
+        }
+        catch
+        {
+            return [];
+        }
+
+        if (!Directory.Exists(full))
+        {
+            return [];
+        }
 
         var nested = new List<string>();
         try
@@ -214,7 +242,7 @@ internal static class AudioCodec
         }
 
         nested.Sort(StringComparer.OrdinalIgnoreCase);
-        children = nested.ToArray();
+        return nested.ToArray();
     }
 
     private static string[] CollectOpenableFromDirectory(string directory, bool recursive, bool player)

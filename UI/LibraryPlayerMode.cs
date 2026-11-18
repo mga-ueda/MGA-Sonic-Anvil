@@ -2330,6 +2330,68 @@ internal static class LibraryPlayerMode
     public const int PlaylistLoadUiFlushMs = 33;
 
     /// <summary>
+    /// パス／ファイル名だけでプレイリスト順が決まるか。
+    /// true ならフォルダ名順で流した時点で冒頭が確定し、タグ待ちなしで再生できる。
+    /// </summary>
+    public static bool CanResolvePlaylistOrderFromPaths(
+        LibraryFileGroup group,
+        LibraryFileColumn? sortColumn)
+    {
+        if (group is not (LibraryFileGroup.None or LibraryFileGroup.Folder))
+        {
+            return false;
+        }
+
+        return sortColumn is null
+            or LibraryFileColumn.Name
+            or LibraryFileColumn.ParentFolder
+            or LibraryFileColumn.Folder
+            or LibraryFileColumn.Kind
+            or LibraryFileColumn.Size
+            or LibraryFileColumn.Date;
+    }
+
+    /// <summary>
+    /// 親フォルダグループ用。フォルダ表示名（＝ファイルの ParentFolder）で並べ、
+    /// 同名はフルパスで安定化する。
+    /// </summary>
+    public static void SortFoldersByDisplayName(List<string> folders)
+    {
+        folders.Sort(static (left, right) =>
+        {
+            var byName = string.Compare(
+                FolderDisplayName(left),
+                FolderDisplayName(right),
+                StringComparison.CurrentCultureIgnoreCase);
+            return byName != 0
+                ? byName
+                : string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    /// <summary>フォルダパスからグループ見出しになる名前（末端のフォルダ名）。</summary>
+    public static string FolderDisplayName(string? folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var trimmed = folderPath.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
+            var name = Path.GetFileName(trimmed);
+            return string.IsNullOrEmpty(name) ? trimmed : name;
+        }
+        catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
+        {
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
     /// プレイリスト追加バッチ中は背景ウォッシュ（動的背景の色替え）を Apply しない。
     /// 完了後に保留分を 1 回だけ載せる。
     /// </summary>

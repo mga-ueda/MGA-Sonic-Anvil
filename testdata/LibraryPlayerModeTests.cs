@@ -1851,6 +1851,29 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.PlaylistExtendMaxGroupsPerFrame >= 1);
         Assert.Equal(16, LibraryPlayerMode.PlaylistLoadUiFlushCount);
         Assert.Equal(33, LibraryPlayerMode.PlaylistLoadUiFlushMs);
+        Assert.True(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
+            LibraryFileGroup.Folder,
+            LibraryFileColumn.Name));
+        Assert.True(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
+            LibraryFileGroup.None,
+            sortColumn: null));
+        Assert.False(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
+            LibraryFileGroup.Folder,
+            LibraryFileColumn.Album));
+        Assert.False(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
+            LibraryFileGroup.Artist,
+            LibraryFileColumn.Name));
+        Assert.Equal("bass", LibraryPlayerMode.FolderDisplayName(@"G:\Wave\devil neta\bass"));
+        var folders = new List<string>
+        {
+            @"D:\music\Zebra",
+            @"D:\music\Alpha",
+            @"D:\music\bass",
+        };
+        LibraryPlayerMode.SortFoldersByDisplayName(folders);
+        Assert.Equal(
+            [@"D:\music\Alpha", @"D:\music\bass", @"D:\music\Zebra"],
+            folders);
         Assert.Equal(50, LibraryPlayerMode.PlayheadIdleInvalidateMs);
         Assert.True(LibraryPlayerMode.ShouldRefreshPlayheadPaint(double.NaN, 0, 10, 0));
         Assert.False(LibraryPlayerMode.ShouldRefreshPlayheadPaint(10, 100, 10.2, 120));
