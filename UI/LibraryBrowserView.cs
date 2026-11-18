@@ -1768,6 +1768,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             list.Add(row);
         }
 
+        order.Sort(StringComparer.CurrentCultureIgnoreCase);
         var result = new List<LibraryFileRow>(rows.Count);
         foreach (var key in order)
         {
@@ -4115,18 +4116,32 @@ internal sealed partial class LibraryBrowserView : UserControl
 
             var insertAt = _items.Count;
             var rowIndex = _rows.Count;
-            if (placeBySort && _sortColumn is { } sortColumn)
+            if (placeBySort && (_sortColumn is not null || _group != LibraryFileGroup.None))
             {
+                var sortColumn = _sortColumn ?? LibraryFileColumn.Name;
+                var sortDirection = _sortColumn is null
+                    ? LibrarySortDirection.Ascending
+                    : _sortDirection;
                 insertAt = 0;
                 while (insertAt < _items.Count
-                    && LibraryFileList.Compare(_items[insertAt], row, sortColumn, _sortDirection) <= 0)
+                    && LibraryFileList.Compare(
+                        _items[insertAt],
+                        row,
+                        sortColumn,
+                        sortDirection,
+                        _group) <= 0)
                 {
                     insertAt++;
                 }
 
                 rowIndex = 0;
                 while (rowIndex < _rows.Count
-                    && LibraryFileList.Compare(_rows[rowIndex], row, sortColumn, _sortDirection) <= 0)
+                    && LibraryFileList.Compare(
+                        _rows[rowIndex],
+                        row,
+                        sortColumn,
+                        sortDirection,
+                        _group) <= 0)
                 {
                     rowIndex++;
                 }

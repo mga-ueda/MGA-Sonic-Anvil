@@ -112,6 +112,7 @@ internal sealed partial class LibraryBrowserView
 
         var active = SelectedSession;
         var selected = SelectedSessions;
+        _rows = SortRows(_rows);
         LibraryFileList.ApplyGroupKeys(_rows, _group);
         BindRows(active, selected);
         InvalidateGroupJackets();
@@ -437,10 +438,22 @@ internal sealed partial class LibraryBrowserView
         BindRows(active, selected);
     }
 
-    private IReadOnlyList<LibraryFileRow> SortRows(IReadOnlyList<LibraryFileRow> rows) =>
-        _sortColumn is { } column
-            ? LibraryFileList.Sort(rows, column, _sortDirection)
-            : rows;
+    private IReadOnlyList<LibraryFileRow> SortRows(IReadOnlyList<LibraryFileRow> rows)
+    {
+        if (_sortColumn is { } column)
+        {
+            return LibraryFileList.Sort(rows, column, _sortDirection, _group);
+        }
+
+        // 列ソート無しでもグループ名順は揃える（グループ内はファイル名）。
+        return _group == LibraryFileGroup.None
+            ? rows
+            : LibraryFileList.Sort(
+                rows,
+                LibraryFileColumn.Name,
+                LibrarySortDirection.Ascending,
+                _group);
+    }
 
     private void RefreshEffectiveColumns()
     {
@@ -1176,6 +1189,7 @@ internal sealed partial class LibraryBrowserView
         _group = group;
         var active = SelectedSession;
         var selected = SelectedSessions;
+        _rows = SortRows(_rows);
         LibraryFileList.ApplyGroupKeys(_rows, _group);
         SyncGroupChrome();
         BindRows(active, selected);

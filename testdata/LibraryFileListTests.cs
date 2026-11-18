@@ -127,6 +127,31 @@ public sealed class LibraryFileListTests
     }
 
     [Fact]
+    public void Sort_WithFolderGroup_OrdersByParentFolderThenName()
+    {
+        // ファイル名だけだと Zebra フォルダが先頭になるが、グループ名順なら Alpha が先。
+        var rows = new[]
+        {
+            Row("aaa.wav", folder: @"D:\music\Zebra"),
+            Row("zzz.wav", folder: @"D:\music\Alpha"),
+            Row("mmm.wav", folder: @"D:\music\Alpha"),
+        };
+
+        var flat = LibraryFileList.Sort(rows, LibraryFileColumn.Name, LibrarySortDirection.Ascending);
+        Assert.Equal(["aaa.wav", "mmm.wav", "zzz.wav"], flat.Select(row => row.Name).ToArray());
+
+        var grouped = LibraryFileList.Sort(
+            rows,
+            LibraryFileColumn.Name,
+            LibrarySortDirection.Ascending,
+            LibraryFileGroup.Folder);
+        Assert.Equal(["mmm.wav", "zzz.wav", "aaa.wav"], grouped.Select(row => row.Name).ToArray());
+        Assert.Equal(
+            ["Alpha", "Alpha", "Zebra"],
+            grouped.Select(row => row.ParentFolder).ToArray());
+    }
+
+    [Fact]
     public void Sort_Date_UsesTicksNotText()
     {
         var early = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Local);

@@ -320,7 +320,8 @@ internal static class LibraryFileList
     public static IReadOnlyList<LibraryFileRow> Sort(
         IReadOnlyList<LibraryFileRow> rows,
         LibraryFileColumn column,
-        LibrarySortDirection direction)
+        LibrarySortDirection direction,
+        LibraryFileGroup group = LibraryFileGroup.None)
     {
         if (rows.Count == 0)
         {
@@ -333,7 +334,7 @@ internal static class LibraryFileList
             copy[i] = rows[i];
         }
 
-        Array.Sort(copy, (left, right) => Compare(left, right, column, direction));
+        Array.Sort(copy, (left, right) => Compare(left, right, column, direction, group));
         return copy;
     }
 
@@ -457,8 +458,23 @@ internal static class LibraryFileList
         LibraryFileRow left,
         LibraryFileRow right,
         LibraryFileColumn column,
-        LibrarySortDirection direction)
+        LibrarySortDirection direction,
+        LibraryFileGroup group = LibraryFileGroup.None)
     {
+        // グループ化時は見出し名を常に昇順で固めてから、列ソートする。
+        // （WPF のグループ順＝ソース上の初出順なので、先に並べておく。）
+        if (group != LibraryFileGroup.None)
+        {
+            var byGroup = string.Compare(
+                GroupLabel(left, group),
+                GroupLabel(right, group),
+                StringComparison.CurrentCultureIgnoreCase);
+            if (byGroup != 0)
+            {
+                return byGroup;
+            }
+        }
+
         var sign = direction == LibrarySortDirection.Descending ? -1 : 1;
         var compared = column switch
         {
