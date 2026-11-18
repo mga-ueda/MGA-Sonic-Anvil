@@ -2934,6 +2934,38 @@ public sealed class LibraryBrowserSelectionTests
                         select: true);
                     Flush();
                     Assert.Empty(view.HeaderStructureTree.Items);
+
+                    // 再表示後、ナビキー押し中は選択だけ進め、離してからヘッダを読む。
+                    view.ToggleHeaderStructureVisible(focusWhenShown: false);
+                    Flush();
+                    Assert.True(view.HeaderStructureVisible);
+                    Assert.False(view.IsHeaderStructureRefreshDeferred);
+                    var beforePath = view.HeaderStructureLoadedPath;
+                    Assert.False(string.IsNullOrWhiteSpace(beforePath));
+
+                    var keyHeld = true;
+                    view.PlaylistNavigationKeyHeldForTest = () => keyHeld;
+                    try
+                    {
+                        // path3 は末尾選択なので ↑ で前の曲へ。
+                        view.MoveSelection(-1, wrap: false);
+                        Flush();
+                        Assert.True(view.IsHeaderStructureRefreshDeferred);
+                        Assert.Equal(beforePath, view.HeaderStructureLoadedPath, StringComparer.OrdinalIgnoreCase);
+
+                        keyHeld = false;
+                        view.FlushDeferredHeaderStructureRefresh();
+                        Flush();
+                        Assert.False(view.IsHeaderStructureRefreshDeferred);
+                        Assert.NotEqual(
+                            beforePath,
+                            view.HeaderStructureLoadedPath,
+                            StringComparer.OrdinalIgnoreCase);
+                    }
+                    finally
+                    {
+                        view.PlaylistNavigationKeyHeldForTest = null;
+                    }
                 }
                 finally
                 {
@@ -4825,6 +4857,9 @@ public sealed class LibraryBrowserSelectionTests
         Application.Current.Resources["LatchToggleOffForeBrush"] = new SolidColorBrush(Color.FromRgb(0xC8, 0xC8, 0xC8));
         Application.Current.Resources["LatchToggleOnBackBrush"] = new SolidColorBrush(Color.FromRgb(0x2F, 0x6F, 0xED));
         Application.Current.Resources["LatchToggleOffBackBrush"] = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x40));
+        // RefreshAppearance が BUSY バッジ色を読む。
+        Application.Current.Resources["PlaylistBusyBadgeBackBrush"] =
+            new SolidColorBrush(Color.FromRgb(0xBE, 0x32, 0x32));
     }
 
     private static void Flush() =>
