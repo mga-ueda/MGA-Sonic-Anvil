@@ -188,6 +188,16 @@ public partial class MainWindow
         DeletePlaylistFiles();
     }
 
+    private void CreateExplorerFolderFromMenu()
+    {
+        if (IsUiBusy)
+        {
+            return;
+        }
+
+        CreateExplorerFolder();
+    }
+
     private void PasteLibraryClipboard(bool ontoTree)
     {
         var pane = ontoTree ? LibraryPane.Explorer : LibraryPane.List;

@@ -1818,6 +1818,7 @@ internal static partial class UiStrings
     public static string LibraryMenuCopy => Get("コピー", "Copy");
     public static string LibraryMenuCut => Get("切り取り", "Cut");
     public static string LibraryMenuPaste => Get("貼り付け", "Paste");
+    public static string LibraryMenuNewFolder => Get("新しいフォルダ", "New Folder");
     public static string LibraryMenuRename => Get("名前の変更", "Rename");
     public static string LibraryMenuDelete => Get("削除", "Delete");
     public static string LibraryMenuPitchUp => Get("ピッチシフトしてプレビュー（半音上げる）", "Pitch Shift Preview (Semitone Up)");

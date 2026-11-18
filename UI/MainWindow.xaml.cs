@@ -229,6 +229,7 @@ public partial class MainWindow : Window
         LibraryBrowser.LibraryPasteRequested += (_, pane) => PasteLibraryFromMenu(pane);
         LibraryBrowser.LibraryRenameRequested += (_, pane) => RenameLibraryFromMenu(pane);
         LibraryBrowser.LibraryDeleteRequested += (_, pane) => DeleteLibraryFromMenu(pane);
+        LibraryBrowser.LibraryNewFolderRequested += (_, _) => CreateExplorerFolderFromMenu();
         LibraryBrowser.PlaybackPitchUpRequested += (_, _) => ApplyPlaybackPitchStep(1);
         LibraryBrowser.PlaybackPitchDownRequested += (_, _) => ApplyPlaybackPitchStep(-1);
         LibraryBrowser.PlaybackPitchResetRequested += (_, _) => ApplyPlaybackPitchStep(0);

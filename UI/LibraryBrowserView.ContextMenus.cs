@@ -107,9 +107,15 @@ internal sealed partial class LibraryBrowserView
             out var copyNames,
             out var copyPaths,
             out var explorer);
+        var newFolder = new MenuItem
+        {
+            Header = UiStrings.LibraryMenuNewFolder,
+            InputGestureText = "F7",
+        };
+        newFolder.Click += (_, _) => LibraryNewFolderRequested?.Invoke(this, EventArgs.Empty);
         // 並びはウィンドウメニューに寄せる（編集→再生）。プレイリスト／ツリーはライブラリ固有。
         var playlist = Submenu(UiStrings.LibraryMenuCatPlaylist, replace, append, replaceRecursive, appendRecursive);
-        var edit = Submenu(UiStrings.LibraryMenuCatEdit, copy, cut, paste, rename, delete);
+        var edit = Submenu(UiStrings.LibraryMenuCatEdit, copy, cut, paste, newFolder, rename, delete);
         var playback = Submenu(UiStrings.LibraryMenuCatPitch, pitchUp, pitchDown, pitchReset);
         var tree = Submenu(
             UiStrings.LibraryMenuCatTree,
@@ -155,6 +161,7 @@ internal sealed partial class LibraryBrowserView
             copy.IsEnabled = transfer.Length > 0;
             cut.IsEnabled = transfer.Length > 0;
             paste.IsEnabled = true;
+            newFolder.IsEnabled = existing.Length > 0;
             rename.IsEnabled = selected;
             delete.IsEnabled = SelectionCanRegisterExplorerRoot();
             pitchUp.IsEnabled = true;

@@ -494,6 +494,9 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     public event EventHandler<LibraryPane>? LibraryDeleteRequested;
 
+    /// <summary>ツリーの選択フォルダ直下に新しいフォルダを作る（F7）。</summary>
+    public event EventHandler? LibraryNewFolderRequested;
+
     public event EventHandler? PlaybackPitchUpRequested;
 
     public event EventHandler? PlaybackPitchDownRequested;
