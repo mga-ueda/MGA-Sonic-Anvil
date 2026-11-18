@@ -519,12 +519,6 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>ツリーの選択フォルダ直下に新しいフォルダを作る（F7）。</summary>
     public event EventHandler? LibraryNewFolderRequested;
 
-    public event EventHandler? PlaybackPitchUpRequested;
-
-    public event EventHandler? PlaybackPitchDownRequested;
-
-    public event EventHandler? PlaybackPitchResetRequested;
-
     /// <summary>リストの右クリックメニューを開いた／閉じた。F10 誤解除や plain-press 確定を抑止する。</summary>
     public event EventHandler? ListContextMenuOpened;
 

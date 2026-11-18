@@ -1373,7 +1373,6 @@ public sealed class LibraryBrowserSelectionTests
                 UiStrings.WaveMenuCatOther,
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
-            Assert.Equal(UiStrings.WaveMenuCatPlayback, UiStrings.LibraryMenuCatPitch);
             var listEdit = view.OpenContextMenuItems[3];
             var listFormat = view.OpenContextMenuItems[4];
             var listExport = view.OpenContextMenuItems[5];

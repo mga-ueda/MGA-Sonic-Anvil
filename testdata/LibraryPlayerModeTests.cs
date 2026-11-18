@@ -1923,7 +1923,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
             LibraryFileGroup.Artist,
             LibraryFileColumn.Name));
-        Assert.Equal("bass", LibraryPlayerMode.FolderDisplayName(@"G:\Wave\devil neta\bass"));
+        Assert.Equal("bass", LibraryPlayerMode.FolderDisplayName(@"G:\Wave\sample\bass"));
         var folders = new List<string>
         {
             @"D:\music\Zebra",

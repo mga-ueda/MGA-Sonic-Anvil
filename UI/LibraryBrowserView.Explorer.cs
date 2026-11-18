@@ -2724,11 +2724,8 @@ internal sealed partial class LibraryBrowserView
         }
     }
 
-    private static string FolderDisplayName(string path)
-    {
-        var name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        return string.IsNullOrEmpty(name) ? path : name;
-    }
+    private static string FolderDisplayName(string path) =>
+        LibraryPlayerMode.FolderDisplayName(path);
 
     private static string NormalizeFolderPath(string path) =>
         PathUtil.TryGetFullPathTrimmedSeparators(path, out var full)

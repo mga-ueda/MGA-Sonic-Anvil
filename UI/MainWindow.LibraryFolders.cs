@@ -745,17 +745,6 @@ public partial class MainWindow
         }).ConfigureAwait(true);
     }
 
-    private async Task EnrichPlaylistSessionsTagsAsync(DocumentSession[] sessions, int generation)
-    {
-        await EnrichPlaylistSessionsTagsOnlyAsync(sessions, generation).ConfigureAwait(true);
-        if (generation != _libraryFolderShowGeneration || !IsLibraryMaximized)
-        {
-            return;
-        }
-
-        LibraryBrowser.UpdateSessionRows(sessions);
-    }
-
     private async Task EnrichPlaylistSessionsMediaAsync(DocumentSession[] sessions, int generation)
     {
         await Task.Run(() =>

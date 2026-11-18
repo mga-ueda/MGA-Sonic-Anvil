@@ -101,9 +101,6 @@ internal sealed partial class LibraryBrowserView
             out var paste,
             out var rename,
             out var delete,
-            out _,
-            out _,
-            out _,
             out var copyNames,
             out var copyPaths,
             out var explorer);
@@ -207,9 +204,6 @@ internal sealed partial class LibraryBrowserView
             out var paste,
             out var rename,
             out var delete,
-            out _,
-            out _,
-            out _,
             out var copyNames,
             out var copyPaths,
             out var explorer);
@@ -300,9 +294,6 @@ internal sealed partial class LibraryBrowserView
             out var paste,
             out var rename,
             out var delete,
-            out _,
-            out _,
-            out _,
             out var copyNames,
             out var copyPaths,
             out var explorer);
@@ -649,9 +640,6 @@ internal sealed partial class LibraryBrowserView
         out MenuItem paste,
         out MenuItem rename,
         out MenuItem delete,
-        out MenuItem pitchUp,
-        out MenuItem pitchDown,
-        out MenuItem pitchReset,
         out MenuItem copyNames,
         out MenuItem copyPaths,
         out MenuItem explorer)
@@ -686,24 +674,6 @@ internal sealed partial class LibraryBrowserView
             InputGestureText = "Ctrl+Delete",
         };
         delete.Click += (_, _) => LibraryDeleteRequested?.Invoke(this, pane);
-        pitchUp = new MenuItem
-        {
-            Header = UiStrings.LibraryMenuPitchUp,
-            InputGestureText = MenuGestures.PitchUp,
-        };
-        pitchUp.Click += (_, _) => PlaybackPitchUpRequested?.Invoke(this, EventArgs.Empty);
-        pitchDown = new MenuItem
-        {
-            Header = UiStrings.LibraryMenuPitchDown,
-            InputGestureText = MenuGestures.PitchDown,
-        };
-        pitchDown.Click += (_, _) => PlaybackPitchDownRequested?.Invoke(this, EventArgs.Empty);
-        pitchReset = new MenuItem
-        {
-            Header = UiStrings.LibraryMenuPitchReset,
-            InputGestureText = MenuGestures.PitchReset,
-        };
-        pitchReset.Click += (_, _) => PlaybackPitchResetRequested?.Invoke(this, EventArgs.Empty);
         copyNames = new MenuItem { Header = UiStrings.LibraryMenuCopyFileName };
         copyNames.Click += (_, _) => CopyPathTexts(CopyPathsFor(pane), fullPath: false);
         copyPaths = new MenuItem { Header = UiStrings.LibraryMenuCopyFilePath };

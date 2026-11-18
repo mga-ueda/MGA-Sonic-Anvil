@@ -1806,8 +1806,6 @@ internal static partial class UiStrings
     public static string LibraryMenuCatAudio => WaveMenuCatAudio;
     public static string LibraryMenuCatFormat => WaveMenuCatFormat;
     public static string LibraryMenuCatExport => WaveMenuCatExport;
-    /// <summary>旧「再生・ピッチ」。ウィンドウメニューの「再生」に揃える。</summary>
-    public static string LibraryMenuCatPitch => WaveMenuCatPlayback;
     public static string LibraryMenuCatTree => Get("ツリー(_T)", "_Tree");
     public static string LibraryMenuCatOther => WaveMenuCatOther;
     public static string LibraryMenuMatchLoudness => Get("ラウドネスを揃える", "Match Loudness");
@@ -1821,9 +1819,6 @@ internal static partial class UiStrings
     public static string LibraryMenuNewFolder => Get("新しいフォルダ", "New Folder");
     public static string LibraryMenuRename => Get("名前の変更", "Rename");
     public static string LibraryMenuDelete => Get("削除", "Delete");
-    public static string LibraryMenuPitchUp => Get("ピッチシフトしてプレビュー（半音上げる）", "Pitch Shift Preview (Semitone Up)");
-    public static string LibraryMenuPitchDown => Get("ピッチシフトしてプレビュー（半音下げる）", "Pitch Shift Preview (Semitone Down)");
-    public static string LibraryMenuPitchReset => Get("ピッチシフトをリセット", "Reset Pitch Shift");
     public static string LibraryMenuColor => Get("カラー(_C)", "_Color");
     public static string LibraryMenuColorAutomatic => Get("自動に戻す", "Use automatic");
     public static string LibraryMenuCopyFileName => Get("ファイル名をコピー", "Copy File Name");
