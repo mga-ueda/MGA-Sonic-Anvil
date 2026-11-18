@@ -702,6 +702,7 @@ public partial class MainWindow
             }
 
             FlushDeferredPlaylistSelectionLoudness();
+            LibraryBrowser.FlushDeferredHeaderStructureRefresh();
         }
 
         if (key is Key.Apps or Key.F10)
@@ -773,12 +774,14 @@ public partial class MainWindow
 
             FlushPlaylistExtendPending();
             FlushDeferredPlaylistSelectionLoudness();
+            LibraryBrowser.FlushDeferredHeaderStructureRefresh();
             TryPlayLibraryAfterArrowRelease();
             return;
         }
 
         if (key is Key.NumPad4 or Key.NumPad6)
         {
+            LibraryBrowser.FlushDeferredHeaderStructureRefresh();
             TryPlayLibraryAfterTrackKeyRelease();
         }
 
@@ -786,6 +789,7 @@ public partial class MainWindow
         {
             FlushPlaylistExtendPending();
             FlushDeferredPlaylistSelectionLoudness();
+            LibraryBrowser.FlushDeferredHeaderStructureRefresh();
             if (!LibraryBrowser.PlaylistVisualIsPdf)
             {
                 TryPlayLibraryAfterArrowRelease();
@@ -2637,6 +2641,7 @@ public partial class MainWindow
                 {
                     FlushPlaylistExtendPending();
                     FlushDeferredPlaylistSelectionLoudness();
+                    LibraryBrowser.FlushDeferredHeaderStructureRefresh();
                     return true;
                 }
 
@@ -2674,6 +2679,7 @@ public partial class MainWindow
                 {
                     FlushPlaylistExtendPending();
                     FlushDeferredPlaylistSelectionLoudness();
+                    LibraryBrowser.FlushDeferredHeaderStructureRefresh();
                     return true;
                 }
 

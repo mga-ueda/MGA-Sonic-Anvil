@@ -644,6 +644,91 @@ internal sealed partial class LibraryBrowserView
         }
     }
 
+    /// <summary>
+    /// 選択変更からのヘッダ再読込。ナビキー押し中は解析せず、離したときに読む。
+    /// </summary>
+    private void RequestHeaderStructureRefresh()
+    {
+        if (_suppressHeaderStructureRefresh || !_headerStructureVisible)
+        {
+            return;
+        }
+
+        if (IsPlaylistNavigationKeyHeld())
+        {
+            ScheduleDeferredHeaderStructureRefresh();
+            return;
+        }
+
+        _headerStructureRefreshDeferred = false;
+        _headerStructureRefreshDeferTicket++;
+        RefreshHeaderStructure();
+    }
+
+    /// <summary>テスト用。null なら実キー状態を見る。</summary>
+    internal Func<bool>? PlaylistNavigationKeyHeldForTest { get; set; }
+
+    /// <summary>テスト用。キー離し待ちのヘッダ再読込が溜まっているか。</summary>
+    internal bool IsHeaderStructureRefreshDeferred => _headerStructureRefreshDeferred;
+
+    /// <summary>テスト用。いま表示しているヘッダの読み込み元パス（和集合キー含む）。</summary>
+    internal string? HeaderStructureLoadedPath => _structureLoadedPath;
+
+    private bool IsPlaylistNavigationKeyHeld() =>
+        PlaylistNavigationKeyHeldForTest?.Invoke()
+        ?? (Keyboard.IsKeyDown(Key.Up)
+            || Keyboard.IsKeyDown(Key.Down)
+            || Keyboard.IsKeyDown(Key.Home)
+            || Keyboard.IsKeyDown(Key.End)
+            || Keyboard.IsKeyDown(Key.PageUp)
+            || Keyboard.IsKeyDown(Key.PageDown)
+            || Keyboard.IsKeyDown(Key.NumPad4)
+            || Keyboard.IsKeyDown(Key.NumPad6));
+
+    private void ScheduleDeferredHeaderStructureRefresh()
+    {
+        _headerStructureRefreshDeferred = true;
+        var ticket = ++_headerStructureRefreshDeferTicket;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _headerStructureRefreshDeferTicket
+                    || !_headerStructureRefreshDeferred)
+                {
+                    return;
+                }
+
+                if (IsPlaylistNavigationKeyHeld())
+                {
+                    return;
+                }
+
+                FlushDeferredHeaderStructureRefresh();
+            },
+            DispatcherPriority.Background);
+    }
+
+    /// <summary>↑↓／Page／テンキー 4・6 を離したあとに溜めたヘッダ解析を実行する。</summary>
+    internal void FlushDeferredHeaderStructureRefresh()
+    {
+        if (!_headerStructureRefreshDeferred)
+        {
+            return;
+        }
+
+        if (IsPlaylistNavigationKeyHeld())
+        {
+            return;
+        }
+
+        _headerStructureRefreshDeferred = false;
+        _headerStructureRefreshDeferTicket++;
+        if (!_suppressHeaderStructureRefresh)
+        {
+            RefreshHeaderStructure();
+        }
+    }
+
     private void RefreshHeaderStructure()
     {
         // 非表示時は読まない。選択変更・追加（Append/SetSessions）もここ経由なので、
@@ -1706,6 +1791,8 @@ internal sealed partial class LibraryBrowserView
         if (!show)
         {
             // 中身・幅・選択行記憶を捨てる。オフ中の選択追従コストも切る。
+            _headerStructureRefreshDeferred = false;
+            _headerStructureRefreshDeferTicket++;
             ClearHeaderStructure();
             _structureRememberedChunkPath = null;
             ApplyHeaderStructureCollapsedChrome();
