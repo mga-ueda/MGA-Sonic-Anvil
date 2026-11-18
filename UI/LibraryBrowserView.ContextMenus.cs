@@ -101,9 +101,9 @@ internal sealed partial class LibraryBrowserView
             out var paste,
             out var rename,
             out var delete,
-            out var pitchUp,
-            out var pitchDown,
-            out var pitchReset,
+            out _,
+            out _,
+            out _,
             out var copyNames,
             out var copyPaths,
             out var explorer);
@@ -113,10 +113,9 @@ internal sealed partial class LibraryBrowserView
             InputGestureText = "F7",
         };
         newFolder.Click += (_, _) => LibraryNewFolderRequested?.Invoke(this, EventArgs.Empty);
-        // 並びはウィンドウメニューに寄せる（編集→再生）。プレイリスト／ツリーはライブラリ固有。
+        // 並びはウィンドウメニューに寄せる。ツリーに再生（ピッチ）は付けない。
         var playlist = Submenu(UiStrings.LibraryMenuCatPlaylist, replace, append, replaceRecursive, appendRecursive);
         var edit = Submenu(UiStrings.LibraryMenuCatEdit, copy, cut, paste, newFolder, rename, delete);
-        var playback = Submenu(UiStrings.LibraryMenuCatPitch, pitchUp, pitchDown, pitchReset);
         var tree = Submenu(
             UiStrings.LibraryMenuCatTree,
             expand,
@@ -137,7 +136,6 @@ internal sealed partial class LibraryBrowserView
             explorer);
         menu.Items.Add(playlist);
         menu.Items.Add(edit);
-        menu.Items.Add(playback);
         menu.Items.Add(tree);
         menu.Items.Add(other);
         menu.Opened += (_, _) =>
@@ -164,13 +162,10 @@ internal sealed partial class LibraryBrowserView
             newFolder.IsEnabled = existing.Length > 0;
             rename.IsEnabled = selected;
             delete.IsEnabled = SelectionCanRegisterExplorerRoot();
-            pitchUp.IsEnabled = true;
-            pitchDown.IsEnabled = true;
-            pitchReset.IsEnabled = true;
             copyNames.IsEnabled = transfer.Length > 0;
             copyPaths.IsEnabled = transfer.Length > 0;
             explorer.IsEnabled = existing.Length > 0;
-            SyncSubmenuEnabled(playlist, edit, playback, tree, other);
+            SyncSubmenuEnabled(playlist, edit, tree, other);
         };
         ArmContextMenuDismissGuard(menu);
         _folderTree.ContextMenu = menu;
@@ -212,9 +207,9 @@ internal sealed partial class LibraryBrowserView
             out var paste,
             out var rename,
             out var delete,
-            out var pitchUp,
-            out var pitchDown,
-            out var pitchReset,
+            out _,
+            out _,
+            out _,
             out var copyNames,
             out var copyPaths,
             out var explorer);
@@ -228,11 +223,9 @@ internal sealed partial class LibraryBrowserView
             cut,
             paste,
             delete);
-        var playback = Submenu(UiStrings.LibraryMenuCatPitch, pitchUp, pitchDown, pitchReset);
         var other = Submenu(UiStrings.LibraryMenuCatOther, copyNames, copyPaths, explorer);
         menu.Items.Add(playlist);
         menu.Items.Add(edit);
-        menu.Items.Add(playback);
         menu.Items.Add(other);
         menu.Opened += (_, _) =>
         {
@@ -248,13 +241,10 @@ internal sealed partial class LibraryBrowserView
             paste.IsEnabled = false;
             rename.IsEnabled = selected;
             delete.IsEnabled = false;
-            pitchUp.IsEnabled = true;
-            pitchDown.IsEnabled = true;
-            pitchReset.IsEnabled = true;
             copyNames.IsEnabled = paths.Length > 0;
             copyPaths.IsEnabled = paths.Length > 0;
             explorer.IsEnabled = paths.Length > 0;
-            SyncSubmenuEnabled(playlist, edit, playback, other);
+            SyncSubmenuEnabled(playlist, edit, other);
         };
         ArmContextMenuDismissGuard(menu);
         _favoritesList.ContextMenu = menu;

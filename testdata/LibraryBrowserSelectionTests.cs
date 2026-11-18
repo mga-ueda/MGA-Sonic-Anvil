@@ -1035,15 +1035,14 @@ public sealed class LibraryBrowserSelectionTests
             [
                 UiStrings.LibraryMenuCatPlaylist,
                 UiStrings.LibraryMenuCatEdit,
-                UiStrings.LibraryMenuCatPitch,
                 UiStrings.LibraryMenuCatTree,
                 UiStrings.LibraryMenuCatOther,
             ],
             items.Select(item => (string)item.Header).ToArray());
             var playlist = items[0];
             var edit = items[1];
-            var tree = items[3];
-            var other = items[4];
+            var tree = items[2];
+            var other = items[3];
             Assert.Equal("Enter", ((MenuItem)playlist.Items[0]).InputGestureText);
             Assert.Equal("Shift+Enter", ((MenuItem)playlist.Items[1]).InputGestureText);
             Assert.Equal("Ctrl+Enter", ((MenuItem)playlist.Items[2]).InputGestureText);
@@ -1078,7 +1077,6 @@ public sealed class LibraryBrowserSelectionTests
             [
                 UiStrings.LibraryMenuCatPlaylist,
                 UiStrings.LibraryMenuCatEdit,
-                UiStrings.LibraryMenuCatPitch,
                 UiStrings.LibraryMenuCatOther,
             ],
             view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
