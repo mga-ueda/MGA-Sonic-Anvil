@@ -116,6 +116,29 @@ internal sealed class AcrylicGlassPopup
         }
     }
 
+    /// <summary>
+    /// 開いているオーバーレイの Placement をやり直す。
+    /// 親窓の移動では Popup HWND が自動追従しないため、LocationChanged から呼ぶ。
+    /// </summary>
+    public static void RefreshOpenPlacements()
+    {
+        AcrylicGlassPopup[] live;
+        lock (TrackGate)
+        {
+            PruneTracked();
+            live = Tracked
+                .Select(weak => weak.TryGetTarget(out var popup) ? popup : null)
+                .Where(popup => popup is not null)
+                .Cast<AcrylicGlassPopup>()
+                .ToArray();
+        }
+
+        foreach (var popup in live)
+        {
+            popup.RefreshPlacement();
+        }
+    }
+
     /// <summary>タイムコード専用ホスト（角丸はトーストと同じ DWM Round）。</summary>
     public static AcrylicGlassPopup CreateTimecode() => new(AcrylicOverlayKind.Timecode);
 

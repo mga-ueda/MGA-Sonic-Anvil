@@ -457,6 +457,8 @@ public partial class MainWindow : Window
         LocationChanged += (_, _) =>
         {
             RememberVideoLaunchPlacementIfNeeded();
+            // Acrylic Popup（タイムコード等）は親窓移動に自動追従しない。
+            AcrylicGlassPopup.RefreshOpenPlacements();
             if (_activeLayoutSlot is not null || IsFullscreenMaximizeMode(_waveformMaximizeMode))
             {
                 PersistCurrentWindowPlacement();
