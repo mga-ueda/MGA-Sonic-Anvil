@@ -60,9 +60,11 @@ internal sealed partial class LibraryBrowserView
         _folderTree.FontSize = LibraryListFontSize;
         ScrollViewer.SetHorizontalScrollBarVisibility(_folderTree, ScrollBarVisibility.Auto);
         ScrollViewer.SetVerticalScrollBarVisibility(_folderTree, ScrollBarVisibility.Auto);
-        _folderTree.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
+        // 見出し位置はピクセルで合わせる（Item 単位だと Transform と合わず見切れる）。
+        ScrollViewer.SetCanContentScroll(_folderTree, false);
         VirtualizingPanel.SetIsVirtualizing(_folderTree, true);
         VirtualizingPanel.SetVirtualizationMode(_folderTree, VirtualizationMode.Recycling);
+        VirtualizingPanel.SetScrollUnit(_folderTree, ScrollUnit.Pixel);
 
         // 既定のシステム選択色（非アクティブ時の白など）をアプリの色に差し替える。
         var hover = GrayHoverBrush();
@@ -89,11 +91,12 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>
-    /// 既定の BringIntoView は長い名前で横に飛ぶ。縦は ScrollViewer に任せ、横位置は戻す。
+    /// 既定の BringIntoView は展開ノード全体（子も含む高さ）をビューへ入れようとして
+    /// 先頭行を追い出す。ツリー／項目の両方で握り、見出し行だけ最小限スクロールする。
     /// </summary>
-    private void ExplorerItem_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+    private void ExplorerTree_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
     {
-        if (_explorerBringIntoViewBusy || sender is not TreeViewItem item)
+        if (FindAncestor<ScrollBar>(e.OriginalSource as DependencyObject) is not null)
         {
             return;
         }
@@ -103,28 +106,103 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
-        if (FindAncestor<ScrollBar>(e.OriginalSource as DependencyObject) is not null
-            || IsExplorerHorizontalScrollHeld(scroll))
+        // 展開ノード全体の既定スクロールは常に止める。
+        e.Handled = true;
+        if (IsExplorerHorizontalScrollHeld(scroll) || _explorerSuppressBringIntoView)
         {
-            e.Handled = true;
             return;
         }
 
-        var header = FindExplorerHeader(item) ?? item;
-        var height = header.ActualHeight > 0 ? header.ActualHeight : 1;
+        var item = sender as TreeViewItem
+            ?? FindTreeViewItem(e.OriginalSource as DependencyObject);
+        if (item is null)
+        {
+            return;
+        }
+
+        EnsureExplorerItemHeaderVisible(item, scroll);
+    }
+
+    private void ExplorerItem_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+    {
+        ExplorerTree_RequestBringIntoView(sender, e);
+    }
+
+    /// <summary>
+    /// 見出し行の上端がビュー内ならスクロールしない（展開子の高さは見ない）。
+    /// 画面外のときだけ、見出し1行が入る量だけ動かす。
+    /// </summary>
+    internal void EnsureExplorerItemHeaderVisible(TreeViewItem item, ScrollViewer? scroll = null)
+    {
+        scroll ??= FindDescendantScrollViewer(_folderTree);
+        if (scroll is null || IsExplorerHorizontalScrollHeld(scroll))
+        {
+            return;
+        }
+
         var keepX = scroll.HorizontalOffset;
-        e.Handled = true;
-        _explorerBringIntoViewBusy = true;
         try
         {
-            header.BringIntoView(new Rect(0, 0, 1, height));
+            var header = ResolveExplorerHeaderRow(item);
+            if (header is null)
+            {
+                return;
+            }
+
+            var host = FindDescendant<ScrollContentPresenter>(scroll) ?? (FrameworkElement)scroll;
+            header.UpdateLayout();
+            var top = header.TransformToAncestor(host).Transform(new Point(0, 0)).Y;
+            // 展開ノード全体の ActualHeight を絶対に使わない。1行分に制限する。
+            var height = Math.Clamp(header.ActualHeight > 1 ? header.ActualHeight : 22, 1, 40);
+            var viewH = host.ActualHeight > 1 ? host.ActualHeight : scroll.ViewportHeight;
+            if (viewH <= 0)
+            {
+                return;
+            }
+
+            // 見出し1行分だけ見て、画面内ならスクロールしない。
+            // 展開子を含めた高さで判定すると ↓ 一回で先頭行が消える。
+            if (top >= -0.5 && top + height <= viewH + 0.5)
+            {
+                return;
+            }
+
+            if (IsExplorerRootItem(item) && ReferenceEquals(_folderTree.Items.OfType<TreeViewItem>().FirstOrDefault(), item))
+            {
+                scroll.ScrollToVerticalOffset(0);
+                return;
+            }
+
+            if (top < 0)
+            {
+                scroll.ScrollToVerticalOffset(Math.Max(0, scroll.VerticalOffset + top));
+            }
+            else
+            {
+                // 見出しがビューより下 → 見出し下端がちょうど入るまで。
+                var next = scroll.VerticalOffset + (top + height - viewH);
+                scroll.ScrollToVerticalOffset(Math.Min(next, Math.Max(0, scroll.ScrollableHeight)));
+            }
+        }
+        catch (InvalidOperationException)
+        {
         }
         finally
         {
-            _explorerBringIntoViewBusy = false;
+            RestoreExplorerHorizontalOffset(scroll, keepX);
+        }
+    }
+
+    /// <summary>テンプレートの見出し帯（Bd）だけ。子 ItemsPresenter は含めない。</summary>
+    private static FrameworkElement? ResolveExplorerHeaderRow(TreeViewItem item)
+    {
+        item.ApplyTemplate();
+        if (item.Template?.FindName("Bd", item) is FrameworkElement named)
+        {
+            return named;
         }
 
-        RestoreExplorerHorizontalOffset(scroll, keepX);
+        return FindExplorerHeader(item);
     }
 
     private static void RestoreExplorerHorizontalOffset(ScrollViewer scroll, double offset)

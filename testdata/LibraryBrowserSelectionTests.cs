@@ -822,6 +822,111 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void Explorer_ArrowNav_ScrollsOnlyWhenHeaderLeavesViewport()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-tree-arrow-scroll-" + Guid.NewGuid().ToString("N"));
+            var anime = Path.Combine(root, "Anime");
+            var nested = Path.Combine(anime, "Nested");
+            Directory.CreateDirectory(nested);
+            for (var i = 0; i < 50; i++)
+            {
+                Directory.CreateDirectory(Path.Combine(nested, $"Track{i:D2}"));
+            }
+
+            for (var i = 0; i < 30; i++)
+            {
+                Directory.CreateDirectory(Path.Combine(root, $"Other{i:D2}"));
+            }
+
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 480,
+                    Height = 360,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                var folder = view.ExplorerFirstFolder;
+                Assert.NotNull(folder);
+                folder!.IsExpanded = true;
+                Flush();
+                var animeItem = folder.Items.OfType<TreeViewItem>()
+                    .First(item => item.Tag is string path
+                        && path.EndsWith("Anime", StringComparison.OrdinalIgnoreCase));
+                animeItem.IsExpanded = true;
+                Flush();
+                var nestedItem = animeItem.Items.OfType<TreeViewItem>()
+                    .First(item => item.Tag is string);
+                nestedItem.IsExpanded = true;
+                Flush();
+                view.UpdateLayout();
+                window.UpdateLayout();
+                Flush();
+
+                var scroll = FindAncestorScroll(folder);
+                Assert.NotNull(scroll);
+                Assert.True(scroll!.ScrollableHeight > 8, "precondition: tree must overflow");
+
+                // 1) ルート先頭 → 直下へ ↓。展開子が多くてもスクロールしない。
+                scroll.ScrollToVerticalOffset(0);
+                folder.IsSelected = true;
+                view.BeginExplorerPlainPress(folder, control: false);
+                Flush();
+                view.EnsureExplorerItemHeaderVisible(folder);
+                Flush();
+                var offsetBeforeDown = scroll.VerticalOffset;
+                view.MoveExplorerSelection(1, extend: false);
+                Flush();
+                Assert.True(animeItem.IsSelected);
+                Assert.True(
+                    Math.Abs(scroll.VerticalOffset - offsetBeforeDown) < 1.0,
+                    $"expected no scroll on ↓ to visible child, before={offsetBeforeDown}, after={scroll.VerticalOffset}");
+
+                // 2) 深い末尾から先頭ルートへ ↑。ルート見出しを最上段へ。
+                var deepChildren = nestedItem.Items.OfType<TreeViewItem>()
+                    .Where(item => item.Tag is string)
+                    .ToArray();
+                Assert.True(deepChildren.Length >= 2);
+                deepChildren[^1].IsSelected = true;
+                view.BeginExplorerPlainPress(deepChildren[^1], control: false);
+                Flush();
+                scroll.ScrollToVerticalOffset(scroll.ScrollableHeight);
+                Flush();
+                Assert.True(scroll.VerticalOffset > 4, "precondition: scrolled down");
+
+                for (var i = 0; i < deepChildren.Length + 8; i++)
+                {
+                    view.MoveExplorerSelection(-1, extend: false);
+                    Flush();
+                }
+
+                Assert.True(folder.IsSelected, "expected root selected");
+                Assert.True(
+                    scroll.VerticalOffset < 1.5,
+                    $"expected scroll at top after ↑ to root, got {scroll.VerticalOffset}");
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void Explorer_ShiftArrow_SelectsVisibleRange()
     {
         RunSta(() =>
@@ -5301,6 +5406,21 @@ public sealed class LibraryBrowserSelectionTests
         foreach (var scroll in FindDescendants<ScrollViewer>(root))
         {
             return scroll;
+        }
+
+        return null;
+    }
+
+    private static ScrollViewer? FindAncestorScroll(DependencyObject? node)
+    {
+        while (node is not null)
+        {
+            if (node is ScrollViewer scroll)
+            {
+                return scroll;
+            }
+
+            node = VisualTreeHelper.GetParent(node);
         }
 
         return null;

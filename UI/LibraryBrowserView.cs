@@ -221,7 +221,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     private string[] _explorerRoots = LibraryExplorerPaths.ResolveRoots(null);
     private readonly HashSet<string> _explorerExpanded = new(StringComparer.OrdinalIgnoreCase);
     private bool _treeExpansionBusy;
-    private bool _explorerBringIntoViewBusy;
+    private bool _explorerSuppressBringIntoView;
     private readonly ComboBox _groupCombo = new();
     private readonly TextBlock _playlistLabel = new();
     private readonly TextBlock _groupLabel = new();

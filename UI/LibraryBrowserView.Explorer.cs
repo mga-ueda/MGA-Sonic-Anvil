@@ -2494,8 +2494,18 @@ internal sealed partial class LibraryBrowserView
                 _treeMultiSelected.Add(current);
                 ApplyTreeMultiSelectChrome();
                 current.IsSelected = true;
-                current.BringIntoView();
-                current.Focus();
+                EnsureExplorerItemHeaderVisible(current);
+                // Focus の BringIntoView は見出し確保後に握る（展開ノードで再スクロールしない）。
+                _explorerSuppressBringIntoView = true;
+                try
+                {
+                    current.Focus();
+                }
+                finally
+                {
+                    _explorerSuppressBringIntoView = false;
+                }
+
                 return;
             }
 
@@ -2503,8 +2513,16 @@ internal sealed partial class LibraryBrowserView
             _explorerCaret = current;
             SelectExplorerVisibleRange(_treeSelectionAnchor, current);
             current.IsSelected = true;
-            current.BringIntoView();
-            current.Focus();
+            EnsureExplorerItemHeaderVisible(current);
+            _explorerSuppressBringIntoView = true;
+            try
+            {
+                current.Focus();
+            }
+            finally
+            {
+                _explorerSuppressBringIntoView = false;
+            }
         }
         finally
         {

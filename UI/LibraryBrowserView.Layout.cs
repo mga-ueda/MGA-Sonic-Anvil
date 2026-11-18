@@ -50,6 +50,11 @@ internal sealed partial class LibraryBrowserView
         _folderTree.PreviewMouseRightButtonDown += FolderTree_PreviewMouseRightButtonDown;
         _folderTree.PreviewKeyDown += FolderTree_PreviewKeyDown;
         _folderTree.PreviewTextInput += FolderTree_PreviewTextInput;
+        // 展開ノード全体の BringIntoView をツリー段階でも握る（EventSetter 漏れ対策）。
+        _folderTree.AddHandler(
+            FrameworkElement.RequestBringIntoViewEvent,
+            new RequestBringIntoViewEventHandler(ExplorerTree_RequestBringIntoView),
+            handledEventsToo: true);
         // 上段 0–9 は割合ジャンプ。ツリーのインクリメンタル検索には使わない。
         _folderTree.IsTextSearchEnabled = false;
         BindLibraryCopyCommand(_folderTree, LibraryPane.Explorer);
