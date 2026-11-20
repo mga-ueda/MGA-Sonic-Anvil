@@ -1,10 +1,13 @@
+using System.Collections.Concurrent;
 using System.Globalization;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -65,7 +68,23 @@ internal static class DesignMetrics
     /// <summary>入力欄・ボタン・バッジ・マーカー旗など、アプリ全体で共有する角丸。既定は 5。</summary>
     public const double ControlCornerRadiusDefault = AppSettings.ControlCornerRadiusDefault;
 
-    public static CornerChrome Chrome { get; } = new();
+    private static double _sharedCornerRadius = ControlCornerRadiusDefault;
+    private static readonly ConcurrentDictionary<Dispatcher, CornerChrome> ChromeByDispatcher = new();
+
+    /// <summary>
+    /// 呼び出し元 Dispatcher ごとの角丸ソース。
+    /// テストが別 STA で Application を立てても DependencySource 衝突しない。
+    /// </summary>
+    public static CornerChrome Chrome
+    {
+        get
+        {
+            var dispatcher = Dispatcher.FromThread(Thread.CurrentThread) ?? Dispatcher.CurrentDispatcher;
+            return ChromeByDispatcher.GetOrAdd(
+                dispatcher,
+                static _ => new CornerChrome { Radius = Volatile.Read(ref _sharedCornerRadius) });
+        }
+    }
 
     public static double ControlCornerRadius => Chrome.Radius;
 
@@ -75,8 +94,12 @@ internal static class DesignMetrics
     public static RectangleGeometry ControlCornerClip(Rect bounds) =>
         new(bounds, ControlCornerRadius, ControlCornerRadius);
 
-    public static void ApplyControlCornerRadius(double radius) =>
-        Chrome.Radius = AppSettings.ClampControlCornerRadius(radius);
+    public static void ApplyControlCornerRadius(double radius)
+    {
+        var clamped = AppSettings.ClampControlCornerRadius(radius);
+        Volatile.Write(ref _sharedCornerRadius, clamped);
+        Chrome.Radius = clamped;
+    }
 
     public static Binding CornerBinding() => new(nameof(CornerChrome.Corner))
     {
