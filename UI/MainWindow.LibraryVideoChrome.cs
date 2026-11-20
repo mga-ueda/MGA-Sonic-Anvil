@@ -1516,6 +1516,39 @@ public partial class MainWindow
         return false;
     }
 
+    /// <summary>
+    /// プロキシ保存を出せるか。キャッシュ済み、または ffmpeg で生成できる要プロキシ動画があるとき有効。
+    /// プレイリストの複数選択も対象（本再生中でも選択を優先）。
+    /// </summary>
+    private bool CanOfferCopyVideoProxy()
+    {
+        if (!IsLibraryMaximized || IsUiBusy)
+        {
+            return false;
+        }
+
+        foreach (var session in ResolveCopyVideoProxySessions())
+        {
+            if (!LibraryPlaylistDocuments.IsVideo(session.Document)
+                || session.Document.SourcePath is not { Length: > 0 } path)
+            {
+                continue;
+            }
+
+            if (VideoProxy.TryGetCached(path, out _))
+            {
+                return true;
+            }
+
+            if (!VideoCodecProbe.CanPlayWithoutProxy(path) && VideoProxy.CanForceEncodeProxy())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private bool IsPlaylistVideoPlaying() =>
         IsLibraryMaximized
         && LibraryBrowser.PlaylistVisualShown

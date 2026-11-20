@@ -24,7 +24,7 @@ internal static partial class UiStrings
     public static string WaveMenuCatAnalysis => Get("解析(_A)", "_Analysis");
     /// <summary>表示の中。F8〜F12。</summary>
     public static string WaveMenuCatScreen => Get("表示モード(_F)", "Display Mode (_F)");
-    /// <summary>表示の中。動画／PDF の本再生。</summary>
+    /// <summary>トップメニュー。動画／PDF の本再生クローム（オーディオの次）。V は表示と衝突するため Q。</summary>
     public static string WaveMenuCatVideo => Get("映像(_Q)", "Video (_Q)");
     /// <summary>表示の中。チャンネルソロ。</summary>
     public static string WaveMenuCatSolo => Get("ソロ(_N)", "Solo (_N)");
@@ -188,6 +188,10 @@ internal static partial class UiStrings
     public static string WaveMenuPdfBackgroundPin => Get("PDFを背景に固定(_2)", "Pin PDF Background (_2)");
     public static string WaveMenuExitRealPlayback => Get("プレビューに戻る(_3)", "Back to Preview (_3)");
     public static string WaveMenuForceVideoProxy => Get("プロキシを生成(_4)", "Encode Proxy (_4)");
+    public static string WaveMenuCopyVideoProxy => Get("プロキシを保存(_5)", "Save Proxy (_5)");
+    public static string WaveMenuCopyVideoProxySelected => Get(
+        "選択動画のプロキシを保存(_5)",
+        "Save Selected Proxies (_5)");
 
     public static string WaveMenuNew => Get("新規(_N)", "_New");
     public static string WaveMenuOpen => Get("開く(_O)", "_Open");

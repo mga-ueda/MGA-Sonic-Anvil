@@ -6,6 +6,7 @@ using Xunit;
 
 namespace MgaSonicAnvil.Tests;
 
+[Collection("UiChrome")]
 public sealed class TransportToolbarSettingsTests
 {
     [Fact]
@@ -322,6 +323,8 @@ public sealed class TransportToolbarSettingsTests
         Assert.Contains(TransportCommand.CenterLock, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.ExportByMarkers, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.CopyFileName, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.SaveVideoProxy, TransportToolbarCatalog.AllCommands);
+        Assert.Contains(TransportCommand.ForceVideoProxy, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.MergeTabs, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.ExportByChannels, TransportToolbarCatalog.AllCommands);
         Assert.Contains(TransportCommand.DeleteAllMarkers, TransportToolbarCatalog.AllCommands);

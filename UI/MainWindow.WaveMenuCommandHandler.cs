@@ -446,6 +446,9 @@ public partial class MainWindow
             case WaveMenuCommand.ForceVideoProxy:
                 RequestForceVideoProxyEncode();
                 break;
+            case WaveMenuCommand.CopyVideoProxy:
+                RequestCopyVideoProxy();
+                break;
             case WaveMenuCommand.SoloNext:
                 CycleChannelSolo(1);
                 break;

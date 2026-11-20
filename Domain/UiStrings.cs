@@ -508,6 +508,8 @@ internal static partial class UiStrings
     public static string LabelToolbarHeaderStructure => WithoutAccessKey(WaveMenuHeaderStructure).Trim();
     public static string LabelToolbarAlwaysOnTop => WithoutAccessKey(WaveMenuAlwaysOnTop).Trim();
     public static string LabelToolbarCenterLock => WithoutAccessKey(WaveMenuCenterLock).Trim();
+    public static string LabelToolbarForceVideoProxy => WithoutAccessKey(WaveMenuForceVideoProxy);
+    public static string LabelToolbarCopyVideoProxy => WithoutAccessKey(WaveMenuCopyVideoProxy);
     public static string LabelToolbarWaveformMaximize => LabelLayoutPresetF11;
     public static string LabelToolbarMinimalChrome => LabelLayoutPresetF9;
     public static string LabelToolbarAddMarker => WithoutAccessKey(WaveMenuAddMarker);
@@ -1409,6 +1411,26 @@ internal static partial class UiStrings
                 "Could not create the video proxy.\n{0}",
                 text);
     }
+    public static string CopyVideoProxyFolderTitle => Get(
+        "プロキシの保存先フォルダ",
+        "Save proxy to folder");
+    public static string FilterSaveVideoProxy => Get("AVI|*.avi|All|*.*", "AVI|*.avi|All|*.*");
+    public static string InfoVideoProxyCopied(int count) => count <= 1
+        ? Get("プロキシを保存しました。", "Saved the video proxy.")
+        : Format("プロキシを {0} 件保存しました。", "Saved {0} video proxies.", count);
+    public static string ErrorVideoProxyCopyFailed => Get(
+        "プロキシを保存できませんでした。",
+        "Could not save the video proxy.");
+    public static string ErrorVideoProxyCopyFailedDetail(string detail)
+    {
+        var text = (detail ?? string.Empty).Trim();
+        return string.IsNullOrEmpty(text)
+            ? ErrorVideoProxyCopyFailed
+            : Format(
+                "プロキシを保存できませんでした。\n{0}",
+                "Could not save the video proxy.\n{0}",
+                text);
+    }
     public static string OverlayExportCount(int finished, int total) => Format(
         "{0} / {1}",
         "{0} / {1}",
@@ -1493,6 +1515,10 @@ internal static partial class UiStrings
     public static string TooltipHeaderStructure => TipOptionLibraryHeaderStructure;
     public static string TooltipAlwaysOnTop => TipOptionAlwaysOnTop;
     public static string TooltipCenterLock => TipOptionCenterLock;
+    public static string TooltipForceVideoProxy => Get(
+        "プロキシを生成 (Ctrl+Shift+P)",
+        "Encode proxy (Ctrl+Shift+P)");
+    public static string TooltipCopyVideoProxy => LabelToolbarCopyVideoProxy;
     public static string TooltipWaveformMaximize => LabelLayoutPresetF11;
     public static string TooltipMinimalChrome => LabelLayoutPresetF9;
     public static string TooltipSettings => Get("設定 (Ctrl+Shift+O)", "Settings (Ctrl+Shift+O)");

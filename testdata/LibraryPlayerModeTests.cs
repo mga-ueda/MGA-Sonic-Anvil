@@ -102,6 +102,7 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.SelectSameColor));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.VideoMini));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ForceVideoProxy));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.CopyVideoProxy));
         Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.Undo));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewSpectrogram));
         Assert.True(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.ViewOverlay));
@@ -1412,6 +1413,15 @@ public sealed class LibraryPlayerModeTests
             LibraryPlayerMode.FormatPlaylistVideoFileName("clip.mov", usingProxy: true));
         Assert.Equal(string.Empty, LibraryPlayerMode.FormatPlaylistVideoFileName(null, usingProxy: true));
         Assert.Equal(string.Empty, LibraryPlayerMode.FormatPlaylistVideoFileName("", usingProxy: true));
+        Assert.Equal(
+            "clip" + LibraryPlayerMode.VideoProxyCopyExtension,
+            LibraryPlayerMode.FormatVideoProxyCopyFileName(@"D:\media\clip.mov", "clip.mov"));
+        Assert.Equal(
+            "a_b" + LibraryPlayerMode.VideoProxyCopyExtension,
+            LibraryPlayerMode.FormatVideoProxyCopyFileName(null, "a:b"));
+        Assert.True(LibraryPlayerMode.PrefersPlaylistSelectionForProxyCopy(2));
+        Assert.True(LibraryPlayerMode.PrefersPlaylistSelectionForProxyCopy(1));
+        Assert.False(LibraryPlayerMode.PrefersPlaylistSelectionForProxyCopy(0));
         Assert.Equal(
             108,
             LibraryPlayerMode.PlaylistVideoFileNameBottomAboveBand(

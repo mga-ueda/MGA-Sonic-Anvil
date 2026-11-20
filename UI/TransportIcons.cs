@@ -106,6 +106,10 @@ internal enum TransportIcon
     HeaderStructure,
     /// <summary>常に最前面（ピン）。</summary>
     AlwaysOnTop,
+    /// <summary>動画プロキシを生成。</summary>
+    ForceVideoProxy,
+    /// <summary>動画プロキシを保存。</summary>
+    SaveVideoProxy,
 }
 
 internal enum TransportCommand
@@ -205,6 +209,10 @@ internal enum TransportCommand
     HeaderStructure,
     AlwaysOnTop,
     CenterLock,
+    /// <summary>動画プロキシを生成。</summary>
+    ForceVideoProxy,
+    /// <summary>動画プロキシを保存（任意フォルダへ書き出し）。</summary>
+    SaveVideoProxy,
 }
 
 /// <summary>メニュー／リスト用のトランスポートアイコン。ツールバーと同じ <see cref="TransportIconDrawing"/> を描く。</summary>
@@ -1043,6 +1051,12 @@ internal static class TransportIconDrawing
                 dc.DrawRoundedRectangle(null, pen, new Rect(cx - 10, cy - 8, 20, 16), 2, 2);
                 DrawSmallChevron(dc, pen, cx + 3, cy, left: false);
                 dc.DrawLine(pen, new Point(cx + 6, cy - 4.5), new Point(cx + 6, cy + 4.5));
+                break;
+            case TransportIcon.ForceVideoProxy:
+                DrawForceVideoProxy(dc, pen, cx, cy);
+                break;
+            case TransportIcon.SaveVideoProxy:
+                DrawSaveVideoProxy(dc, pen, cx, cy);
                 break;
         }
 
@@ -1982,6 +1996,33 @@ internal static class TransportIconDrawing
         dc.DrawLine(pen, new Point(cx - 8, cy), new Point(cx + 8, cy));
         dc.DrawEllipse(brush, pen, new Point(cx, cy - 7), 2.2, 2.2);
         dc.DrawLine(pen, new Point(cx, cy - 5), new Point(cx, cy - 1));
+    }
+
+    /// <summary>フィルム帯＋エンコード矢印。</summary>
+    private static void DrawForceVideoProxy(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawRoundedRectangle(null, pen, new Rect(cx - 9, cy - 5, 12, 10), 1.2, 1.2);
+        dc.DrawLine(pen, new Point(cx - 9, cy - 2), new Point(cx + 3, cy - 2));
+        dc.DrawLine(pen, new Point(cx - 9, cy + 2), new Point(cx + 3, cy + 2));
+        dc.DrawLine(pen, new Point(cx - 6, cy - 5), new Point(cx - 6, cy + 5));
+        dc.DrawLine(pen, new Point(cx, cy - 5), new Point(cx, cy + 5));
+        dc.DrawLine(pen, new Point(cx + 5, cy), new Point(cx + 10, cy));
+        dc.DrawLine(pen, new Point(cx + 10, cy), new Point(cx + 7, cy - 3));
+        dc.DrawLine(pen, new Point(cx + 10, cy), new Point(cx + 7, cy + 3));
+    }
+
+    /// <summary>フィルム帯＋下向き保存矢印（生成＝横矢印、保存＝下矢印で区別）。</summary>
+    private static void DrawSaveVideoProxy(DrawingContext dc, Pen pen, double cx, double cy)
+    {
+        dc.DrawRoundedRectangle(null, pen, new Rect(cx - 8, cy - 9, 16, 10), 1.2, 1.2);
+        dc.DrawLine(pen, new Point(cx - 8, cy - 6), new Point(cx + 8, cy - 6));
+        dc.DrawLine(pen, new Point(cx - 8, cy - 3), new Point(cx + 8, cy - 3));
+        dc.DrawLine(pen, new Point(cx - 4, cy - 9), new Point(cx - 4, cy + 1));
+        dc.DrawLine(pen, new Point(cx + 4, cy - 9), new Point(cx + 4, cy + 1));
+        dc.DrawLine(pen, new Point(cx, cy), new Point(cx, cy + 8));
+        dc.DrawLine(pen, new Point(cx, cy + 8), new Point(cx - 3.5, cy + 4.5));
+        dc.DrawLine(pen, new Point(cx, cy + 8), new Point(cx + 3.5, cy + 4.5));
+        dc.DrawLine(pen, new Point(cx - 7, cy + 9), new Point(cx + 7, cy + 9));
     }
 
     private static void DrawFormatGlyph(

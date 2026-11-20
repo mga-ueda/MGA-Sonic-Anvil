@@ -131,6 +131,11 @@ internal static class TransportToolbarCatalog
         new(TransportCommand.Bounce, TransportIcon.Bounce,
             WaveMenuCommand.Bounce, () => UiStrings.LabelToolbarBounce, () => UiStrings.TooltipBounce),
 
+        new(TransportCommand.ForceVideoProxy, TransportIcon.ForceVideoProxy,
+            WaveMenuCommand.ForceVideoProxy, () => UiStrings.LabelToolbarForceVideoProxy, () => UiStrings.TooltipForceVideoProxy),
+        new(TransportCommand.SaveVideoProxy, TransportIcon.SaveVideoProxy,
+            WaveMenuCommand.CopyVideoProxy, () => UiStrings.LabelToolbarCopyVideoProxy, () => UiStrings.TooltipCopyVideoProxy),
+
         new(TransportCommand.NewDocument, TransportIcon.NewDocument,
             WaveMenuCommand.NewDocument, () => UiStrings.LabelToolbarNew, () => UiStrings.TooltipNew),
         new(TransportCommand.Open, TransportIcon.Folder,
@@ -174,7 +179,7 @@ internal static class TransportToolbarCatalog
             WaveMenuCommand.DeleteRegions, () => UiStrings.LabelToolbarDeleteRegions, () => UiStrings.TooltipDeleteRegions),
         new(TransportCommand.DeleteAllRegions, TransportIcon.DeleteAllRegions,
             WaveMenuCommand.DeleteAllRegions, () => UiStrings.LabelToolbarDeleteAllRegions, () => UiStrings.TooltipDeleteAllRegions),
-        // タイル・WAAPI 等のメニュー Check トグルは非掲載（Silent Skip／Single Loop／Always on Top は掲載）
+        // タイル・WAAPI 等のメニュー Check トグルは非掲載（Silent Skip／Single Loop／Always on Top／動画プロキシは掲載）
 
         new(TransportCommand.SampleRate, TransportIcon.SampleRate,
             WaveMenuCommand.SampleRate, () => UiStrings.LabelToolbarSampleRate, () => UiStrings.TooltipSampleRate),
@@ -386,7 +391,9 @@ internal static class TransportToolbarCatalog
         command switch
         {
             TransportCommand.PreviousTrack
-                or TransportCommand.NextTrack =>
+                or TransportCommand.NextTrack
+                or TransportCommand.ForceVideoProxy
+                or TransportCommand.SaveVideoProxy =>
                 UiStrings.NoteToolbarPlayerMode,
             TransportCommand.ToggleMinimalChrome
                 or TransportCommand.ToggleLibraryMaximize

@@ -94,6 +94,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.PdfBackgroundPin
             or WaveMenuCommand.ExitRealPlayback
             or WaveMenuCommand.ForceVideoProxy
+            or WaveMenuCommand.CopyVideoProxy
             or WaveMenuCommand.ViewWaveform
             or WaveMenuCommand.SilentSkip
             or WaveMenuCommand.AutoLoop
@@ -1826,6 +1827,9 @@ internal static class LibraryPlayerMode
     /// <summary>再生用プロキシを参照しているとき、ファイル名の後に付ける。</summary>
     public const string PlaylistVideoProxySuffix = " (Proxy)";
 
+    /// <summary>プロキシ保存時の拡張子。キャッシュ実体は常に MJPEG AVI。</summary>
+    public const string VideoProxyCopyExtension = ".avi";
+
     /// <summary>下中央のファイル名。プロキシ参照中は <see cref="PlaylistVideoProxySuffix"/> を付ける。</summary>
     public static string FormatPlaylistVideoFileName(string? displayName, bool usingProxy)
     {
@@ -1837,6 +1841,20 @@ internal static class LibraryPlayerMode
 
         return name + PlaylistVideoProxySuffix;
     }
+
+    /// <summary>
+    /// プロキシを任意フォルダへ保存するときのファイル名。元動画の名前（拡張子なし）＋ .avi。
+    /// </summary>
+    public static string FormatVideoProxyCopyFileName(string? sourcePath, string? displayName)
+    {
+        var baseName = AudioExport.SuggestBaseName(sourcePath, displayName ?? string.Empty);
+        return baseName + VideoProxyCopyExtension;
+    }
+
+    /// <summary>
+    /// プロキシ保存の対象解決。プレイリスト選択があれば本再生／ミニ中でもそれを優先する。
+    /// </summary>
+    public static bool PrefersPlaylistSelectionForProxyCopy(int selectedCount) => selectedCount > 0;
 
     /// <summary>
     /// ファイル名を波形／アナライザ帯の上に置くための Bottom 余白。

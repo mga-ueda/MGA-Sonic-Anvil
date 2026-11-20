@@ -1172,6 +1172,7 @@ public partial class MainWindow
                 && (LibraryBrowser.PlaylistVisualIsPdf || LibraryBrowser.PdfBackgroundPinned),
             CanExitRealPlayback = CanOfferExitRealPlayback(),
             CanForceVideoProxy = CanOfferForceVideoProxy(),
+            CanCopyVideoProxy = CanOfferCopyVideoProxy(),
             TileMode = _tileMode,
             TileSearchActive = TileSearchBox.Text.Length > 0,
             KeepTarget = WaapiBar.KeepTargetChecked,

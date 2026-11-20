@@ -113,6 +113,7 @@ internal enum WaveMenuCommand
     PdfBackgroundPin,
     ExitRealPlayback,
     ForceVideoProxy,
+    CopyVideoProxy,
     ViewWaveform,
     ViewSpectrogram,
     ViewOverlay,
@@ -252,6 +253,7 @@ internal sealed class WaveformContextMenuModel
     public bool CanTogglePdfBackground { get; init; }
     public bool CanExitRealPlayback { get; init; }
     public bool CanForceVideoProxy { get; init; }
+    public bool CanCopyVideoProxy { get; init; }
     public bool TileMode { get; init; }
     public bool TileSearchActive { get; init; }
     public bool KeepTarget { get; init; }
@@ -339,6 +341,15 @@ internal sealed class WaveformContextMenuModel
         AutoPlay = true,
         CheckSelectMode = true,
         CanSelectSameColor = true,
+        CanToggleVideoMini = true,
+        CanToggleVideoFullscreen = true,
+        CanScaleVideoMini = true,
+        CanToggleVideoHud = true,
+        CanToggleVideoTimecode = true,
+        CanTogglePdfBackground = true,
+        CanExitRealPlayback = true,
+        CanForceVideoProxy = true,
+        CanCopyVideoProxy = true,
         KeepTarget = true,
         AutoActive = true,
         CanKeepTarget = true,
@@ -457,6 +468,7 @@ internal static class WaveformContextMenuBuilder
         items.Add(Sub(UiStrings.WaveMenuCatTabs, TabItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatPlayback, PlaybackItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatAudio, AudioItems(m)));
+        items.Add(Sub(UiStrings.WaveMenuCatVideo, VideoChromeItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatWwise, WwiseItems(m)));
         items.Add(Sub(UiStrings.WaveMenuCatOther, OtherItems(m)));
         var built = m.LibraryMaximized
@@ -1155,7 +1167,6 @@ internal static class WaveformContextMenuBuilder
             enabled: true),
         WaveMenuSeparatorEntry.Instance,
         Sub(UiStrings.WaveMenuCatSolo, SoloViewItems(m)),
-        Sub(UiStrings.WaveMenuCatVideo, VideoChromeItems(m)),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> AnalysisViewItems(WaveformContextMenuModel m) =>
@@ -1205,6 +1216,12 @@ internal static class WaveformContextMenuBuilder
         Check(UiStrings.WaveMenuPdfBackgroundPin, WaveMenuCommand.PdfBackgroundPin, "W", m.PdfBackgroundPinned, m.CanTogglePdfBackground && !m.IsBusy),
         Cmd(UiStrings.WaveMenuExitRealPlayback, WaveMenuCommand.ExitRealPlayback, MenuGestures.ExitRealPlayback, m.CanExitRealPlayback && !m.IsBusy),
         Cmd(UiStrings.WaveMenuForceVideoProxy, WaveMenuCommand.ForceVideoProxy, "Ctrl+Shift+P", m.CanForceVideoProxy && !m.IsBusy),
+        Cmd(
+            m.HasMultipleSelectedTabs
+                ? UiStrings.WaveMenuCopyVideoProxySelected
+                : UiStrings.WaveMenuCopyVideoProxy,
+            WaveMenuCommand.CopyVideoProxy,
+            enabled: m.CanCopyVideoProxy && !m.IsBusy),
     ];
 
     private static IReadOnlyList<WaveMenuEntry> SoloViewItems(WaveformContextMenuModel m) =>

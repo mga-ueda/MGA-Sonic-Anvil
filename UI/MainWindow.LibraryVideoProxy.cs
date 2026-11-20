@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -355,5 +356,238 @@ public partial class MainWindow
 
         var one = LibraryBrowser.SelectedSession ?? _activeSession;
         return one is null ? [] : [one];
+    }
+
+    /// <summary>
+    /// プロキシ保存用。プレイリスト選択を優先し、複数選択は本再生／ミニ中でも維持する。
+    /// 選択が無いときだけ再生中／アクティブへ落とす。
+    /// </summary>
+    private IReadOnlyList<DocumentSession> ResolveCopyVideoProxySessions()
+    {
+        var selected = LibraryBrowser.SelectedSessions;
+        if (LibraryPlayerMode.PrefersPlaylistSelectionForProxyCopy(selected.Length))
+        {
+            return selected;
+        }
+
+        if (IsVideoMiniPlayerActive()
+            || (LibraryBrowser.PlaylistVisualShown
+                && LibraryBrowser.PlaylistVisualIsVideo
+                && (LibraryBrowser.PlaylistVisualPlaying || _playlistVideoImmersivePause)))
+        {
+            var playing = _activeSession ?? LibraryBrowser.SelectedSession;
+            return playing is null ? [] : [playing];
+        }
+
+        var one = LibraryBrowser.SelectedSession ?? _activeSession;
+        return one is null ? [] : [one];
+    }
+
+    /// <summary>
+    /// 映像メニュー／プレイリストから、現行プロキシを任意フォルダへ保存する。
+    /// 無ければその場で生成し、ファイル名は元動画名＋ .avi。複数選択はフォルダへ一括。
+    /// </summary>
+    private void RequestCopyVideoProxy() => _ = CopyVideoProxyAsync();
+
+    private async Task CopyVideoProxyAsync()
+    {
+        if (!IsLibraryMaximized || IsUiBusy)
+        {
+            return;
+        }
+
+        var targets = new List<DocumentSession>();
+        foreach (var session in ResolveCopyVideoProxySessions())
+        {
+            if (!LibraryPlaylistDocuments.IsVideo(session.Document)
+                || session.Document.SourcePath is not { Length: > 0 } path)
+            {
+                continue;
+            }
+
+            if (VideoProxy.TryGetCached(path, out _)
+                || (!VideoCodecProbe.CanPlayWithoutProxy(path) && VideoProxy.CanForceEncodeProxy()))
+            {
+                targets.Add(session);
+            }
+        }
+
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var jobs = new List<(DocumentSession Session, string Dest)>();
+        if (targets.Count == 1)
+        {
+            var session = targets[0];
+            var fileName = LibraryPlayerMode.FormatVideoProxyCopyFileName(
+                session.Document.SourcePath,
+                session.DisplayName);
+            var dialog = new SaveFileDialog
+            {
+                Filter = UiStrings.FilterSaveVideoProxy,
+                Title = UiStrings.WithoutAccessKey(UiStrings.WaveMenuCopyVideoProxy),
+                FileName = fileName,
+                OverwritePrompt = true,
+                InitialDirectory = ResolveExportInitialDirectory(session),
+            };
+            if (dialog.ShowDialog(this) != true)
+            {
+                RestoreDefaultContentFocusAfterOverlay();
+                return;
+            }
+
+            RememberExportFolder(Path.GetDirectoryName(dialog.FileName));
+            RestoreDefaultContentFocusAfterOverlay();
+            jobs.Add((session, dialog.FileName));
+        }
+        else
+        {
+            if (!TryPickExportFolder(targets, out var folder, UiStrings.CopyVideoProxyFolderTitle))
+            {
+                return;
+            }
+
+            var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var session in targets)
+            {
+                var dest = AudioExport.UniqueInDirectory(
+                    folder,
+                    AudioExport.SuggestBaseName(session.Document.SourcePath, session.DisplayName),
+                    LibraryPlayerMode.VideoProxyCopyExtension,
+                    reserved);
+                jobs.Add((session, dest));
+            }
+
+            var overwrite = ConfirmExportOverwrites(
+                jobs.ConvertAll(job => new ExportJob(job.Session.DisplayName, job.Dest, job.Session.Document)));
+            if (overwrite == MessageBoxResult.Cancel)
+            {
+                return;
+            }
+
+            if (overwrite == MessageBoxResult.No)
+            {
+                jobs.RemoveAll(job => File.Exists(job.Dest));
+                if (jobs.Count == 0)
+                {
+                    return;
+                }
+            }
+        }
+
+        var needEncode = new List<DocumentSession>();
+        foreach (var (session, _) in jobs)
+        {
+            var path = session.Document.SourcePath!;
+            if (!VideoProxy.TryGetCached(path, out _))
+            {
+                needEncode.Add(session);
+            }
+        }
+
+        if (needEncode.Count > 0)
+        {
+            _videoProxyCts?.Cancel();
+            _videoProxyCts?.Dispose();
+            _videoProxyCts = new CancellationTokenSource();
+            var token = _videoProxyCts.Token;
+            _videoProxyBusy = true;
+            var total = needEncode.Count;
+            ShowBusyGlass(UiStrings.OverlayVideoProxyBatch(1, total));
+            try
+            {
+                for (var i = 0; i < needEncode.Count; i++)
+                {
+                    if (token.IsCancellationRequested || !IsLoaded)
+                    {
+                        break;
+                    }
+
+                    var index = i;
+                    _busyGlass.SetMessage(UiStrings.OverlayVideoProxyBatch(index + 1, total));
+                    _busyGlass.SetProgress(index / (double)total);
+                    var progress = new Progress<double>(p =>
+                        _busyGlass.SetProgress((index + Math.Clamp(p, 0, 1)) / total));
+                    await TryPrepareVideoProxyAsync(
+                        needEncode[i],
+                        playTicket: -1,
+                        forceEncode: true,
+                        manageBusy: false,
+                        progress).ConfigureAwait(true);
+                }
+            }
+            finally
+            {
+                if (_videoProxyCts is null || token == _videoProxyCts.Token)
+                {
+                    _videoProxyBusy = false;
+                    if (_busyGlass.IsShowingBusy)
+                    {
+                        _busyGlass.BeginFadeOut();
+                    }
+                }
+            }
+
+            if (!IsLoaded || token.IsCancellationRequested)
+            {
+                return;
+            }
+        }
+
+        var ok = 0;
+        var errors = new List<string>();
+        foreach (var (session, dest) in jobs)
+        {
+            var path = session.Document.SourcePath!;
+            if (!VideoProxy.TryGetCached(path, out var proxy) || !File.Exists(proxy))
+            {
+                errors.Add(session.DisplayName + ": " + UiStrings.ErrorVideoProxyFailed);
+                continue;
+            }
+
+            try
+            {
+                var dir = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                File.Copy(proxy, dest, overwrite: true);
+                ok++;
+            }
+            catch (Exception ex)
+            {
+                errors.Add(session.DisplayName + ": " + ex.Message);
+            }
+        }
+
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        if (ok > 0 && errors.Count == 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.InfoVideoProxyCopied(ok),
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (errors.Count > 0)
+        {
+            OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ErrorVideoProxyCopyFailedDetail(string.Join(Environment.NewLine, errors)),
+                UiStrings.AppName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 }

@@ -172,6 +172,7 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(UiStrings.WaveMenuCatHere, headers);
             Assert.Contains(UiStrings.WaveMenuCatEdit, headers);
             Assert.Contains(UiStrings.WaveMenuCatAudio, headers);
+            Assert.Contains(UiStrings.WaveMenuCatVideo, headers);
             Assert.Contains(UiStrings.WaveMenuCatFormat, headers);
             Assert.Contains(UiStrings.WaveMenuCatTimeline, headers);
             Assert.Contains(UiStrings.WaveMenuCatPlayback, headers);
@@ -181,6 +182,9 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(UiStrings.WaveMenuCatExport, headers);
             Assert.Contains(UiStrings.WaveMenuCatWwise, headers);
             Assert.Contains(UiStrings.WaveMenuCatOther, headers);
+            Assert.Equal(
+                Array.IndexOf(headers, UiStrings.WaveMenuCatAudio) + 1,
+                Array.IndexOf(headers, UiStrings.WaveMenuCatVideo));
 
             var commands = WaveformContextMenuBuilder.Commands(tree).ToHashSet();
             Assert.Contains(WaveMenuCommand.Undo, commands);
@@ -312,7 +316,19 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.AlwaysOnTop, view.OfType<WaveMenuItemEntry>()
                 .Where(item => item.Command is not null)
                 .Select(item => item.Command!.Value));
-            Assert.Contains(UiStrings.WaveMenuCatVideo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+            Assert.DoesNotContain(UiStrings.WaveMenuCatVideo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
+            Assert.Contains(WaveMenuCommand.ForceVideoProxy, CommandsIn(tree, UiStrings.WaveMenuCatVideo));
+            Assert.Contains(WaveMenuCommand.CopyVideoProxy, CommandsIn(tree, UiStrings.WaveMenuCatVideo));
+            Assert.Equal(UiStrings.WaveMenuCopyVideoProxy, Find(tree, WaveMenuCommand.CopyVideoProxy)?.Header);
+            Assert.Equal(
+                UiStrings.WaveMenuCopyVideoProxySelected,
+                Find(
+                    WaveformContextMenuBuilder.Build(new WaveformContextMenuModel
+                    {
+                        HasMultipleSelectedTabs = true,
+                        CanCopyVideoProxy = true,
+                    }),
+                    WaveMenuCommand.CopyVideoProxy)?.Header);
             Assert.Contains(UiStrings.WaveMenuCatSolo, view.OfType<WaveMenuItemEntry>().Select(item => item.Header));
             Assert.Contains(WaveMenuCommand.ViewSpectrogram, CommandsIn(view, UiStrings.WaveMenuCatAnalysis));
             Assert.Contains(WaveMenuCommand.HeaderStructure, CommandsIn(view, UiStrings.WaveMenuCatAnalysis));
@@ -709,6 +725,7 @@ public sealed class WaveformContextMenuTests
         var idle = WaveformContextMenuBuilder.Build(new WaveformContextMenuModel());
         Assert.False(Category(idle, UiStrings.WaveMenuCatEdit).Enabled);
         Assert.False(Category(idle, UiStrings.WaveMenuCatAudio).Enabled);
+        Assert.False(Category(idle, UiStrings.WaveMenuCatVideo).Enabled);
         Assert.False(Category(idle, UiStrings.WaveMenuCatFormat).Enabled);
         Assert.False(Category(idle, UiStrings.WaveMenuCatTimeline).Enabled);
         Assert.True(Category(idle, UiStrings.WaveMenuCatPlayback).Enabled);
@@ -850,6 +867,7 @@ public sealed class WaveformContextMenuTests
                 Assert.Equal(UiStrings.WaveMenuCatTabs, byKey['B']);
                 Assert.Equal(UiStrings.WaveMenuCatPlayback, byKey['P']);
                 Assert.Equal(UiStrings.WaveMenuCatAudio, byKey['A']);
+                Assert.Equal(UiStrings.WaveMenuCatVideo, byKey['Q']);
                 Assert.Equal(UiStrings.WaveMenuCatWwise, byKey['W']);
                 Assert.Equal(UiStrings.WaveMenuCatOther, byKey['O']);
 
@@ -864,6 +882,7 @@ public sealed class WaveformContextMenuTests
                 Assert.Contains('V', byKey.Keys);
                 Assert.Contains('X', byKey.Keys);
                 Assert.Contains('A', byKey.Keys);
+                Assert.Contains('Q', byKey.Keys);
                 Assert.Contains('O', byKey.Keys);
             }
         }

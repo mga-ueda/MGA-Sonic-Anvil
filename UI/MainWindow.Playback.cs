@@ -253,6 +253,12 @@ public partial class MainWindow
             case TransportCommand.CenterLock:
                 ToggleCenterLock();
                 break;
+            case TransportCommand.ForceVideoProxy:
+                RequestForceVideoProxyEncode();
+                break;
+            case TransportCommand.SaveVideoProxy:
+                RequestCopyVideoProxy();
+                break;
             case TransportCommand.SeekViewLeft:
                 Waveform.SeekToViewEdge(-1);
                 break;
