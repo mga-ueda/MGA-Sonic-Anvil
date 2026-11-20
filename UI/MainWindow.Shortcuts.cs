@@ -3098,8 +3098,12 @@ public partial class MainWindow
 
         if (key == Key.X && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
-            // 対象不足時も MergeSelectedTabs 側でダイアログを出す（サイレントにしない）。
-            MergeSelectedTabs();
+            // メニュー／ツールバーと同じく、2 本以上のときだけ実行する。
+            if (CanMergeSelectedTabs())
+            {
+                MergeSelectedTabs();
+            }
+
             return true;
         }
 
