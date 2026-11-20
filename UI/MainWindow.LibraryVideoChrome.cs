@@ -387,8 +387,14 @@ public partial class MainWindow
             return true;
         }
 
-        if (!LibraryBrowser.PlaylistVisualShown
-            || !(LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf))
+        // 入場は本再生中のみ（暗いプレビューで F を押しても全画面にしない）。
+        if (!LibraryPlayerMode.CanEnterPlaylistVisualFullscreen(
+                LibraryBrowser.PlaylistVisualShown,
+                LibraryBrowser.PlaylistVisualIsVideo,
+                LibraryBrowser.PlaylistVisualIsPdf,
+                LibraryBrowser.PlaylistVisualPlaying,
+                _playlistVideoImmersivePause,
+                LibraryBrowser.PlaylistVisualFramePaused))
         {
             return false;
         }
@@ -400,7 +406,7 @@ public partial class MainWindow
     /// <summary>
     /// 動画／PDF の本再生（明るい表示）／ミニ中のダブルクリックは
     /// フル（タイトルバー無しの F 全画面）⇔ミニ（F8）切替。
-    /// 暗いプレビュー上は F キーと同じ全画面オン／オフ。操作系 UI 上は無視。
+    /// 暗いプレビューでは全画面に入らない（F と同じ）。操作系 UI 上は無視。
     /// </summary>
     private void MainWindow_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {

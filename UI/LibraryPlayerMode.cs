@@ -1421,9 +1421,25 @@ internal static class LibraryPlayerMode
         key == Key.F && modifiers == ModifierKeys.None;
 
     /// <summary>
+    /// F 全画面への入場可否。解除は常可。
+    /// 入場は動画／PDF の本再生中のみ（暗いプレビューでは不可）。
+    /// 動画は再生中・イマーシブ一時停止・フレーム一時停止を本再生扱い。
+    /// </summary>
+    public static bool CanEnterPlaylistVisualFullscreen(
+        bool visualShown,
+        bool isVideo,
+        bool isPdf,
+        bool visualPlaying,
+        bool immersivePause,
+        bool framePaused) =>
+        visualShown
+        && ((isVideo && (visualPlaying || immersivePause || framePaused))
+            || (isPdf && visualPlaying));
+
+    /// <summary>
     /// 動画／PDF の本再生（明るい表示）／ミニ中のダブルクリックは
     /// フル（タイトルバー無しの F 全画面）⇔ミニ（F8）切替。
-    /// 暗いプレビューでは従来どおり F 全画面のオン／オフ。
+    /// 暗いプレビューでは全画面に入らない（F と同じ）。
     /// </summary>
     public static bool PrefersVisualFullMiniToggleOnDoubleClick(
         bool visualRealPlayback,

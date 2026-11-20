@@ -1160,8 +1160,13 @@ public partial class MainWindow
             VideoFullscreen = _playlistVideoFullscreen,
             CanToggleVideoFullscreen = IsLibraryMaximized
                 && (_playlistVideoFullscreen
-                    || (LibraryBrowser.PlaylistVisualShown
-                        && (LibraryBrowser.PlaylistVisualIsVideo || LibraryBrowser.PlaylistVisualIsPdf))),
+                    || LibraryPlayerMode.CanEnterPlaylistVisualFullscreen(
+                        LibraryBrowser.PlaylistVisualShown,
+                        LibraryBrowser.PlaylistVisualIsVideo,
+                        LibraryBrowser.PlaylistVisualIsPdf,
+                        LibraryBrowser.PlaylistVisualPlaying,
+                        _playlistVideoImmersivePause,
+                        LibraryBrowser.PlaylistVisualFramePaused)),
             CanScaleVideoMini = CanScaleVideoLaunchWindow(),
             VideoHud = _playlistVideoHud,
             CanToggleVideoHud = IsPlaylistVisualHudContext(),

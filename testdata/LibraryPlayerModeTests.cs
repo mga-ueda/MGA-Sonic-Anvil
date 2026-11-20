@@ -1147,6 +1147,25 @@ public sealed class LibraryPlayerModeTests
             isPdf: false, chromeHidden: true));
         Assert.True(LibraryPlayerMode.IsVideoFullscreenToggle(Key.F, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.IsVideoFullscreenToggle(Key.F, ModifierKeys.Control));
+        // 暗いプレビュー（表示中・非本再生）では入場不可。本再生／一時停止は可。
+        Assert.False(LibraryPlayerMode.CanEnterPlaylistVisualFullscreen(
+            visualShown: true, isVideo: true, isPdf: false,
+            visualPlaying: false, immersivePause: false, framePaused: false));
+        Assert.True(LibraryPlayerMode.CanEnterPlaylistVisualFullscreen(
+            visualShown: true, isVideo: true, isPdf: false,
+            visualPlaying: true, immersivePause: false, framePaused: false));
+        Assert.True(LibraryPlayerMode.CanEnterPlaylistVisualFullscreen(
+            visualShown: true, isVideo: true, isPdf: false,
+            visualPlaying: false, immersivePause: true, framePaused: false));
+        Assert.True(LibraryPlayerMode.CanEnterPlaylistVisualFullscreen(
+            visualShown: true, isVideo: true, isPdf: false,
+            visualPlaying: false, immersivePause: false, framePaused: true));
+        Assert.True(LibraryPlayerMode.CanEnterPlaylistVisualFullscreen(
+            visualShown: true, isVideo: false, isPdf: true,
+            visualPlaying: true, immersivePause: false, framePaused: false));
+        Assert.False(LibraryPlayerMode.CanEnterPlaylistVisualFullscreen(
+            visualShown: true, isVideo: false, isPdf: true,
+            visualPlaying: false, immersivePause: false, framePaused: false));
         Assert.True(LibraryPlayerMode.PrefersVisualFullMiniToggleOnDoubleClick(
             visualRealPlayback: true, visualMiniPlayer: false));
         Assert.True(LibraryPlayerMode.PrefersVisualFullMiniToggleOnDoubleClick(
