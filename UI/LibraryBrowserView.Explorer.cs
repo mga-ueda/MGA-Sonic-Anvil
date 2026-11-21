@@ -1324,11 +1324,14 @@ internal sealed partial class LibraryBrowserView
     /// <summary>登録パスが見つからないときの文字色（エラー文字）。不正チャンクも同じ。</summary>
     internal const string MissingRegisteredPathForeBrushKey = "StatusBarErrorDetailForeBrush";
 
-    /// <summary>一般未定義の独自チャンク（オレンジ／注意色）。</summary>
-    internal const string WaveStructureCustomChunkForeBrushKey = "LoudnessCautionBrush";
+    /// <summary>削除してよいチャンク（赤）。旧名互換。</summary>
+    internal const string WaveStructureCustomChunkForeBrushKey = WaveChunkCleanPolicy.RemovableForeBrushKey;
 
-    /// <summary>専門メタ（iXML / bext 等）。ゴミではないが一般コアではない。</summary>
-    internal const string WaveStructureSpecializedChunkForeBrushKey = "AccentCyanBrush";
+    /// <summary>保護チャンク（シアン）。旧名互換。</summary>
+    internal const string WaveStructureSpecializedChunkForeBrushKey = WaveChunkCleanPolicy.ProtectedForeBrushKey;
+
+    /// <summary>注意チャンク（オレンジ）。</summary>
+    internal const string WaveStructureCautionChunkForeBrushKey = WaveChunkCleanPolicy.CautionForeBrushKey;
 
     /// <summary>
     /// 見出し TextBlock に色を載せる。TreeViewItem.Foreground だけだと ContentPresenter 経由で
@@ -1938,12 +1941,16 @@ internal sealed partial class LibraryBrowserView
                 _treeSelectionAnchor = item;
             }
 
+            // Preview で先にマーク済みでも、選択確定後に帯の角を取り直す。
             if ((modifiers & ModifierKeys.Control) == 0
-                && (modifiers & ModifierKeys.Shift) == 0
-                && !_treeMultiSelected.Contains(item))
+                && (modifiers & ModifierKeys.Shift) == 0)
             {
-                ClearTreeMultiSelect();
-                _treeMultiSelected.Add(item);
+                if (!_treeMultiSelected.Contains(item))
+                {
+                    ClearTreeMultiSelect();
+                    _treeMultiSelected.Add(item);
+                }
+
                 ApplyTreeMultiSelectChrome();
             }
         }
@@ -1957,17 +1964,20 @@ internal sealed partial class LibraryBrowserView
 
     private void FolderTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        CancelPlaylistFocusRestore();
-        ReleasePlaylistFocusHold();
         ClearTreeDrag();
         if (e.OriginalSource is not DependencyObject origin
             || FindTreeViewItem(origin) is not { Tag: string } item
             || FindTreeExpandToggle(origin) is not null
             || FindAncestor<CheckBox>(origin) is not null)
         {
+            // 行以外の余白でもツリーをアクティブにする（先頭選択はしない）。
+            ActivateExplorerPaneFromClick();
             return;
         }
 
+        CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
         var modifiers = Keyboard.Modifiers;
         var control = (modifiers & ModifierKeys.Control) != 0;
         var shift = (modifiers & ModifierKeys.Shift) != 0;
@@ -2157,7 +2167,8 @@ internal sealed partial class LibraryBrowserView
                 var marked = _treeMultiSelected.Contains(child);
                 child.SetValue(TreeMarkedProperty, marked);
                 child.Background = marked ? selected : Brushes.Transparent;
-                if (marked || child.IsSelected)
+                // IsSelected は帯に入れない（Preview 中の前行選択と混ざると角が歪む）。
+                if (marked)
                 {
                     run.Add(child);
                 }
@@ -2977,16 +2988,21 @@ internal sealed partial class LibraryBrowserView
 
     private void FavoritesList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        CancelPlaylistFocusRestore();
         _favoritesDragStart = e.GetPosition(null);
-        if ((Keyboard.Modifiers & ModifierKeys.Shift) == 0
-            || e.OriginalSource is not DependencyObject origin)
+        var index = e.OriginalSource is DependencyObject origin
+            ? FavoritesIndexFromOrigin(origin)
+            : -1;
+        if (index < 0)
         {
+            // 行以外の余白でもお気に入りをアクティブにする（先頭選択はしない）。
+            ActivateFavoritesPaneFromClick();
             return;
         }
 
-        var index = FavoritesIndexFromOrigin(origin);
-        if (index < 0)
+        CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) == 0)
         {
             return;
         }

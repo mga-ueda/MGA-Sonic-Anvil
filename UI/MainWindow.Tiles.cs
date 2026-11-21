@@ -341,6 +341,12 @@ public partial class MainWindow
 
         _tileArrange = arrange;
         SyncDocumentTabHostVisibility();
+        // タイル表示ではヘッダ修復 UI は出さない。
+        if (fromOff)
+        {
+            HeaderChunkStrip.SetRepairTargets(Array.Empty<string>());
+        }
+
         // F12 中はタイル突入で dB 列を畳み、仕切りを出す。
         ApplyWaveformScaleLanes();
         var generation = ++_tileBuildGeneration;
@@ -726,6 +732,8 @@ public partial class MainWindow
         SyncViewChrome();
         RefreshStatus();
         AttachPlaybackToActiveWaveform();
+        // 非タイル復帰後、修復対象を再評価。
+        RefreshEditorHeaderRepairTargets();
     }
 
     private void NotifyWaveformSessionsChanged()

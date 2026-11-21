@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
 using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
@@ -74,6 +75,8 @@ public partial class MainWindow
 
     /// <summary>
     /// タブ選択またはプレイヤー選択へ一括編集。実行に入ったら true。
+    /// 新規の破壊編集（フォーマット変換・ノーマライズ等）はここ経由にすること。
+    /// 完了後のプレイリスト載せ替えは <see cref="RefreshViewsAfterHistoryPaste"/> が担う。
     /// </summary>
     private bool TryRunBatchEdit(
         string overlayMessage,
@@ -175,6 +178,8 @@ public partial class MainWindow
             ShowBusyGlass(overlayMessage);
             ReportHistoryPasteBusy(names, progress, weights);
 
+            // PCM 読込は全体の前半、変換本体は後半。読込中もファイル単位で％が進むようにする。
+            const double pcmPhaseEnd = 0.28;
             if (ensurePcm)
             {
                 for (var i = 0; i < sessions.Length; i++)
@@ -184,8 +189,12 @@ public partial class MainWindow
                         return;
                     }
 
-                    progress[i] = Math.Max(progress[i], 0.02);
+                    progress[i] = Math.Max(progress[i], 0.04);
                     ReportHistoryPasteBusy(names, progress, weights);
+                    // 長い Load のあいだ UI が描画できるように一度返す。
+                    await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Background)
+                        .Task
+                        .ConfigureAwait(true);
                     ready[i] = await EnsureSessionPcmForEditAsync(sessions[i]).ConfigureAwait(true);
                     if (!ready[i])
                     {
@@ -195,11 +204,19 @@ public partial class MainWindow
                     }
 
                     weights[i] = Math.Max(1L, sessions[i].Document.FrameCount);
+                    progress[i] = pcmPhaseEnd;
+                    ReportHistoryPasteBusy(names, progress, weights);
                 }
             }
             else
             {
                 Array.Fill(ready, true);
+                for (var i = 0; i < progress.Length; i++)
+                {
+                    progress[i] = Math.Max(progress[i], pcmPhaseEnd);
+                }
+
+                ReportHistoryPasteBusy(names, progress, weights);
             }
 
             if (!IsLoaded)
@@ -232,7 +249,8 @@ public partial class MainWindow
                 var perTabProgress = new IProgress<double>?[sessions.Length];
                 foreach (var i in buildIndices)
                 {
-                    perTabProgress[i] = busyProgress.ForTab(i);
+                    // 読込済み 0.28 から変換完了直前まで。
+                    perTabProgress[i] = ScaleBusyProgress(busyProgress.ForTab(i), pcmPhaseEnd, 0.99);
                 }
 
                 await Task.Run(() =>
@@ -248,6 +266,8 @@ public partial class MainWindow
                             try
                             {
                                 commands[i] = build(session, perTabProgress[i]);
+                                // 進捗を出さない変換でもバーが動くよう、完了を明示する。
+                                perTabProgress[i]?.Report(1);
                             }
                             catch (Exception ex)
                             {
@@ -294,11 +314,6 @@ public partial class MainWindow
                     {
                         PrepareSessionForHistoryPaste(sessions[i]);
                         sessions[i].History.Do(sessions[i].Document, command);
-                        if (IsLibraryMaximized)
-                        {
-                            LibraryBrowser.UpdateSessionRow(sessions[i]);
-                        }
-
                         applied[i]++;
                     }
 
@@ -351,6 +366,7 @@ public partial class MainWindow
             return;
         }
 
+        // プレイリスト全件載せ替えはここ（保存時は Save 側でもう一度日付／サイズを載せる）。
         RefreshViewsAfterHistoryPaste(sessions, applied);
         if (error is not null)
         {

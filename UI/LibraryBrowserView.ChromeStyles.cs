@@ -896,7 +896,7 @@ internal sealed partial class LibraryBrowserView
             Value = true,
             Setters = { new Setter(Border.BackgroundProperty, selected, "Bd") },
         });
-        // 全選択（Ctrl+A）用。エクスプローラの複数マークと同じ帯。
+        // Ctrl+A／Shift範囲／Ctrl個別の複数マーク。エクスプローラと同じ帯。
         template.Triggers.Add(new Trigger
         {
             Property = TreeMarkedProperty,

@@ -65,6 +65,10 @@ internal sealed partial class LibraryBrowserView
         ApplyPaneTitleStyle(_explorerLabel);
         ApplyPaneTitleStyle(_favoritesLabel);
         ApplyPaneTitleStyle(_playlistLabel, new Thickness(0, 0, 8, 0));
+        // 見出しの空きクリックでもそのペインをアクティブにする。
+        _explorerLabel.PreviewMouseLeftButtonDown += (_, _) => ActivateExplorerPaneFromClick();
+        _favoritesLabel.PreviewMouseLeftButtonDown += (_, _) => ActivateFavoritesPaneFromClick();
+        _playlistLabel.PreviewMouseLeftButtonDown += (_, _) => ActivatePlaylistPaneFromClick();
         _favoritesList.ItemsSource = _favorites;
         _favoritesList.ItemTemplate = FavoriteRowTemplate();
         _favoritesList.SelectionMode = SelectionMode.Extended;

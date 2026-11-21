@@ -1289,6 +1289,7 @@ internal sealed partial class LibraryBrowserView
         }
 
         var keepFocus = _restoreListFocus || _grid.IsKeyboardFocusWithin;
+        var changed = false;
         for (var i = 0; i < rows.Count; i++)
         {
             if (LibraryFileList.SameContent(_items[i], rows[i]))
@@ -1312,9 +1313,17 @@ internal sealed partial class LibraryBrowserView
             {
                 SyncPlaylistCaretToGrid(_items[i]);
             }
+
+            changed = true;
         }
 
         _rows = [.. _items];
+        if (changed)
+        {
+            // AfterEdit → SetSessions の部分差し替えでも、キャレット再確定を Idle まで延ばす。
+            StabilizePlaylistSelectionAfterRowRewrite();
+        }
+
         if (keepFocus)
         {
             EnsureListFocused();

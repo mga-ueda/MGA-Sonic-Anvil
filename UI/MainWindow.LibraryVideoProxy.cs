@@ -257,8 +257,12 @@ public partial class MainWindow
                 {
                     ok++;
                     await RestartLibraryPeaksForSessionAsync(targets[i]).ConfigureAwait(true);
-                    LibraryBrowser.UpdateSessionRow(targets[i]);
                 }
+            }
+
+            if (ok > 0 && IsLibraryMaximized)
+            {
+                LibraryBrowser.RematerializeBoundPlaylistRows();
             }
         }
         finally

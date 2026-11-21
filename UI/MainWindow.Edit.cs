@@ -416,11 +416,6 @@ public partial class MainWindow
                                     : tags.WithIntegratedLufs(after));
                         }
 
-                        if (IsLibraryMaximized)
-                        {
-                            LibraryBrowser.UpdateSessionRow(session);
-                        }
-
                         applied[i]++;
                     }
 
@@ -3502,10 +3497,6 @@ public partial class MainWindow
 
             applied[i] = 1;
             any = true;
-            if (IsLibraryMaximized)
-            {
-                LibraryBrowser.UpdateSessionRow(session);
-            }
         }
 
         if (!any)
@@ -3513,6 +3504,7 @@ public partial class MainWindow
             return;
         }
 
+        // プレイリスト載せ替えは RefreshViewsAfterHistoryPaste に集約。
         RefreshViewsAfterHistoryPaste(sessions, applied);
         ShowEditAppliedToast(redo ? "Redo" : "Undo");
     }
