@@ -703,6 +703,7 @@ public partial class MainWindow
 
             FlushDeferredPlaylistSelectionLoudness();
             LibraryBrowser.FlushDeferredHeaderStructureRefresh();
+            LibraryBrowser.FlushPlaylistMoveDefer();
         }
 
         if (key is Key.Apps or Key.F10)
@@ -775,6 +776,8 @@ public partial class MainWindow
             FlushPlaylistExtendPending();
             FlushDeferredPlaylistSelectionLoudness();
             LibraryBrowser.FlushDeferredHeaderStructureRefresh();
+            LibraryBrowser.FlushPlaylistMoveDefer();
+            HeaderChunkStrip.FlushDeferredChunkApply();
             TryPlayLibraryAfterArrowRelease();
             return;
         }
@@ -782,6 +785,7 @@ public partial class MainWindow
         if (key is Key.NumPad4 or Key.NumPad6)
         {
             LibraryBrowser.FlushDeferredHeaderStructureRefresh();
+            LibraryBrowser.FlushPlaylistMoveDefer();
             TryPlayLibraryAfterTrackKeyRelease();
         }
 
@@ -790,6 +794,8 @@ public partial class MainWindow
             FlushPlaylistExtendPending();
             FlushDeferredPlaylistSelectionLoudness();
             LibraryBrowser.FlushDeferredHeaderStructureRefresh();
+            LibraryBrowser.FlushPlaylistMoveDefer();
+            HeaderChunkStrip.FlushDeferredChunkApply();
             if (!LibraryBrowser.PlaylistVisualIsPdf)
             {
                 TryPlayLibraryAfterArrowRelease();
@@ -2521,24 +2527,25 @@ public partial class MainWindow
             return true;
         }
 
+        var extendHeader = modifiers == ModifierKeys.Shift;
         if (key is Key.Up or Key.Down
             && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
-            HeaderChunkStrip.MoveSelection(key == Key.Up ? -1 : 1);
+            HeaderChunkStrip.MoveSelection(key == Key.Up ? -1 : 1, extendHeader);
             return true;
         }
 
         if (key is Key.Home or Key.End
             && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
-            HeaderChunkStrip.MoveSelectionToEdge(key == Key.Home ? -1 : 1);
+            HeaderChunkStrip.MoveSelectionToEdge(key == Key.Home ? -1 : 1, extendHeader);
             return true;
         }
 
         if (key is Key.PageUp or Key.PageDown
             && modifiers is ModifierKeys.None or ModifierKeys.Shift)
         {
-            HeaderChunkStrip.MoveSelection(key == Key.PageUp ? -8 : 8);
+            HeaderChunkStrip.MoveSelection(key == Key.PageUp ? -8 : 8, extendHeader);
             return true;
         }
 
@@ -2595,24 +2602,31 @@ public partial class MainWindow
                     return true;
                 }
 
+                var extendStructure = modifiers == ModifierKeys.Shift;
                 if (key is Key.Up or Key.Down
                     && modifiers is ModifierKeys.None or ModifierKeys.Shift)
                 {
-                    LibraryBrowser.MoveHeaderStructureSelection(key == Key.Up ? -1 : 1);
+                    LibraryBrowser.MoveHeaderStructureSelection(
+                        key == Key.Up ? -1 : 1,
+                        extendStructure);
                     return true;
                 }
 
                 if (key is Key.Home or Key.End
                     && modifiers is ModifierKeys.None or ModifierKeys.Shift)
                 {
-                    LibraryBrowser.MoveHeaderStructureSelectionToEdge(key == Key.Home ? -1 : 1);
+                    LibraryBrowser.MoveHeaderStructureSelectionToEdge(
+                        key == Key.Home ? -1 : 1,
+                        extendStructure);
                     return true;
                 }
 
                 if (key is Key.PageUp or Key.PageDown
                     && modifiers is ModifierKeys.None or ModifierKeys.Shift)
                 {
-                    LibraryBrowser.MoveHeaderStructureSelection(key == Key.PageUp ? -8 : 8);
+                    LibraryBrowser.MoveHeaderStructureSelection(
+                        key == Key.PageUp ? -8 : 8,
+                        extendStructure);
                     return true;
                 }
 
@@ -2640,6 +2654,25 @@ public partial class MainWindow
                 return true;
             }
 
+            // Ctrl+Shift+Space: 選択反転（チェックモード中はチェック、オフ時は帯）。
+            if (LibraryPlayerMode.IsInvertPlaylistSelection(key, modifiers)
+                && !IsLibraryExplorerFocused
+                && !IsLibraryFavoritesFocused)
+            {
+                if (!isRepeat)
+                {
+                    if (LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
+                            _playlistVideoChromeVisible))
+                    {
+                        return true;
+                    }
+
+                    LibraryBrowser.InvertPlaylistSelection();
+                }
+
+                return true;
+            }
+
             // Ctrl+Shift+↑↓: グループ単位の範囲選択（エディタの振幅ズームより先）。
             if ((key is Key.Up or Key.Down)
                 && modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
@@ -2651,6 +2684,7 @@ public partial class MainWindow
                     FlushPlaylistExtendPending();
                     FlushDeferredPlaylistSelectionLoudness();
                     LibraryBrowser.FlushDeferredHeaderStructureRefresh();
+                    LibraryBrowser.FlushPlaylistMoveDefer();
                     return true;
                 }
 
@@ -2689,6 +2723,7 @@ public partial class MainWindow
                     FlushPlaylistExtendPending();
                     FlushDeferredPlaylistSelectionLoudness();
                     LibraryBrowser.FlushDeferredHeaderStructureRefresh();
+                    LibraryBrowser.FlushPlaylistMoveDefer();
                     return true;
                 }
 

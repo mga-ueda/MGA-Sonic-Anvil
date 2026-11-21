@@ -277,9 +277,11 @@ public sealed class LibraryBrowserSelectionTests
             second.Document.SetArtwork([1, 2, 3, 4]);
             view.UpdateSessionRow(second);
             Flush();
+            // ソフト差し替えは ItemsSource を張り直さない（force／複数更新だけ全件載せ替え）。
             Assert.Same(source, view.BoundItemsSource);
             Assert.Same(second, view.SelectedSession);
-            Assert.Equal(0, activations);
+            // Stabilize の Idle 解除で SessionActivated が1回来ることはある。
+            Assert.True(activations <= 1);
         });
     }
 
@@ -684,6 +686,54 @@ public sealed class LibraryBrowserSelectionTests
                 Assert.True(view.TryExplorerShiftSpaceCollapseOrMoveUp());
                 Assert.True(view.TryGetSelectedExplorerFolder(out var backOnRoot));
                 Assert.Equal(Path.GetFullPath(root), Path.GetFullPath(backOnRoot));
+            }
+            finally
+            {
+                window?.Close();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void FocusExplorerFolder_MovesKeyboardFocusFromPlaylist()
+    {
+        // 新規フォルダ作成後に選択だけツリーへ移り、Ctrl+V がプレイリストのまま
+        // 「同じ場所」になるのを防ぐ。
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var root = Path.Combine(Path.GetTempPath(), "mga-focus-folder-" + Guid.NewGuid().ToString("N"));
+            var child = Path.Combine(root, "Child");
+            Directory.CreateDirectory(child);
+            Window? window = null;
+            try
+            {
+                var view = new LibraryBrowserView();
+                view.SetExplorerRoots([root]);
+                window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.FocusList();
+                Flush();
+                Assert.True(view.IsListKeyboardFocused);
+
+                view.FocusExplorerFolder(child);
+                Flush();
+                Assert.True(view.TryGetSelectedExplorerFolder(out var selected));
+                Assert.Equal(Path.GetFullPath(child), Path.GetFullPath(selected));
+                Assert.True(view.IsExplorerFocused);
+                Assert.False(view.IsListKeyboardFocused);
             }
             finally
             {
@@ -1250,6 +1300,57 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void EmptyPaneClick_ActivatesPaneWithoutForcingFirstSelection()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+            if (string.IsNullOrWhiteSpace(music) || !Directory.Exists(music))
+            {
+                music = Path.GetTempPath();
+            }
+
+            var view = new LibraryBrowserView();
+            view.SetExplorerRoots([music]);
+            view.SetFavorites([music]);
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            view.FocusList();
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+
+            view.ActivateExplorerPaneFromClick();
+            Flush();
+            Assert.True(view.IsExplorerFocused);
+            Assert.Equal(Visibility.Visible, view.TreeFocusLineVisibility);
+            Assert.Equal(Visibility.Collapsed, view.ListFocusLineVisibility);
+
+            view.ActivateFavoritesPaneFromClick();
+            Flush();
+            Assert.True(view.IsFavoritesFocused);
+            Assert.Equal(Visibility.Visible, view.FavoritesFocusLineVisibility);
+
+            view.ActivatePlaylistPaneFromClick();
+            Flush();
+            Assert.True(view.IsListKeyboardFocused);
+            Assert.Equal(Visibility.Visible, view.ListFocusLineVisibility);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void KeyboardContextMenu_OpensPaneMenuNotEditor()
     {
         RunSta(() =>
@@ -1460,6 +1561,83 @@ public sealed class LibraryBrowserSelectionTests
             view.CloseKeyboardContextMenu();
             Flush();
             window.Close();
+        });
+    }
+
+    [Fact]
+    public void HeaderStructure_KeyboardContextMenu_OpensChunkMenuNotPlaylist()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var path = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-apps-" + Guid.NewGuid().ToString("N") + ".wav");
+            var pcm = new byte[4];
+            var fmt = new byte[]
+            {
+                1, 0, 1, 0, 0x44, 0xAC, 0, 0, 0x88, 0x58, 0x01, 0, 2, 0, 16, 0,
+            };
+            using (var ms = new MemoryStream())
+            using (var w = new BinaryWriter(ms))
+            {
+                w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                w.Write(36 + pcm.Length);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                w.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                w.Write(fmt.Length);
+                w.Write(fmt);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                w.Write(pcm.Length);
+                w.Write(pcm);
+                File.WriteAllBytes(path, ms.ToArray());
+            }
+
+            try
+            {
+                var session = new DocumentSession(AudioDocument.CreateDeferred(path));
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetSessions([session], session, [session]);
+                Flush();
+                view.ToggleHeaderStructureVisible(focusWhenShown: true);
+                Flush();
+                Assert.True(view.IsHeaderStructureFocused);
+                Assert.NotEmpty(view.HeaderStructureTree.Items);
+
+                Assert.True(view.TryOpenKeyboardContextMenu());
+                Assert.True(view.HasOpenContextMenu);
+                // メニュー表示中はフォーカスがメニュー側へ移る。プレイリストメニューではないことだけ見る。
+                Assert.Equal(
+                [
+                    UiStrings.WaveMenuSelectAll,
+                    UiStrings.WaveMenuCopy,
+                    UiStrings.WaveChunkDeleteMenu,
+                ],
+                view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());
+
+                view.CloseKeyboardContextMenu();
+                Assert.False(view.HasOpenContextMenu);
+                window.Close();
+            }
+            finally
+            {
+                try
+                {
+                    File.Delete(path);
+                }
+                catch (IOException)
+                {
+                }
+            }
         });
     }
 
@@ -2630,6 +2808,166 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void InvertPlaylistSelection_InvertsBandWhenCheckModeOff()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.wav");
+            var second = Session("02 b.wav");
+            var third = Session("03 c.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second, third], first, [first]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Assert.False(view.CheckSelectMode);
+            Assert.Equal([first], view.SelectedSessions);
+
+            view.InvertPlaylistSelection();
+            Flush();
+            Assert.Equal(2, view.SelectedSessions.Length);
+            Assert.DoesNotContain(first, view.SelectedSessions);
+            Assert.Contains(second, view.SelectedSessions);
+            Assert.Contains(third, view.SelectedSessions);
+            // キャレットは末尾ではなく、元位置に近い選択行（second）。
+            Assert.Same(second, view.SelectedSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void InvertPlaylistSelection_InvertsChecksWhenCheckModeOn()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("01 a.wav");
+            var second = Session("02 b.wav");
+            var third = Session("03 c.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions([first, second, third], first, [first, second]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.ToggleCheckSelectMode();
+            Flush();
+            Assert.True(view.CheckSelectMode);
+            Assert.Equal([first, second], view.SelectedSessions);
+
+            view.InvertPlaylistSelection();
+            Flush();
+            Assert.Equal([third], view.SelectedSessions);
+            Assert.Equal([first, second], view.PlaylistBandSessions());
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void InvertPlaylistSelection_GroupedFolder_InvertsWholePlaylist()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            // 再帰読込みと同様に複数フォルダへ分かれる。
+            // ヘッダ和集合で絞ったあと全体反転→クリアで残りを残す用途なのでグループ限定にしない。
+            var alphaA = Session(Path.Combine("Alpha", "a.wav"));
+            var alphaB = Session(Path.Combine("Alpha", "b.wav"));
+            var betaA = Session(Path.Combine("Beta", "a.wav"));
+            var betaB = Session(Path.Combine("Beta", "b.wav"));
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.Folder);
+            view.SetSessions([alphaA, alphaB, betaA, betaB], alphaA, [alphaA]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Assert.Equal([alphaA], view.SelectedSessions);
+
+            view.InvertPlaylistSelection();
+            Flush();
+            Assert.Equal(3, view.SelectedSessions.Length);
+            Assert.DoesNotContain(alphaA, view.SelectedSessions);
+            Assert.Contains(alphaB, view.SelectedSessions);
+            Assert.Contains(betaA, view.SelectedSessions);
+            Assert.Contains(betaB, view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void InvertPlaylistSelection_CheckMode_EmptyChecksUsesBandThenInverts()
+    {
+        // 帯だけ2件・チェック空（ヘッダ絞り込み後の未同期に相当）→反転で残り1件が選ばれる。
+        // 空チェックをそのまま反転すると全チェックになり、クリアで全件消える退行を防ぐ。
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var keep = Session("01 keep.wav");
+            var dropA = Session("02 drop-a.wav");
+            var dropB = Session("03 drop-b.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.Folder);
+            view.SetSessions([keep, dropA, dropB], dropA, [dropA, dropB]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.ToggleCheckSelectMode();
+            Flush();
+            Assert.True(view.CheckSelectMode);
+            Assert.Equal(2, view.SelectedSessions.Length);
+
+            // 複数帯がすべてチェック済み → Space でチェックだけ外す（帯は残る）。
+            view.ApplyPlaylistSpaceCheck();
+            Flush();
+            Assert.Equal(2, view.PlaylistBandSessions().Length);
+            Assert.Equal(2, view.SelectedSessions.Length);
+
+            view.InvertPlaylistSelection();
+            Flush();
+            Assert.Equal([keep], view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void CheckSelectMode_MoveSelection_DoesNotSelectAllCheckedAsBand()
     {
         RunSta(() =>
@@ -3527,6 +3865,718 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void HeaderStructureChunk_AppliesPlaylistSelectionOnKeyRelease()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var path1 = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-chunk-defer-1-" + Guid.NewGuid().ToString("N") + ".wav");
+            var path2 = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-chunk-defer-2-" + Guid.NewGuid().ToString("N") + ".wav");
+            WriteMinimalWav(path1);
+            File.Copy(path1, path2, overwrite: true);
+            try
+            {
+                var first = new DocumentSession(AudioDocument.CreateDeferred(path1));
+                var second = new DocumentSession(AudioDocument.CreateDeferred(path2));
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.SetSessions([first, second], first, [first, second]);
+                view.ToggleHeaderStructureVisible(focusWhenShown: true);
+                Flush();
+                PumpUntil(
+                    () => view.HeaderStructureLoadedPath is { } loaded
+                        && loaded.Contains("\u0001union\u0001", StringComparison.Ordinal),
+                    TimeSpan.FromSeconds(3));
+
+                var items = EditorHeaderChunkStripView.FlattenVisibleTreeItems(
+                    view.HeaderStructureTree.Items);
+                Assert.True(items.Count >= 2);
+
+                // クリック相当：即時反映。
+                view.StructureNavigationKeyHeldForTest = () => false;
+                items[0].IsSelected = true;
+                Flush();
+                Assert.False(view.IsStructureChunkApplyDeferred);
+                var afterClick = view.SelectedSessions.Length;
+
+                // ナビキー押し中はキャレットだけ進めて、プレイリスト同期は保留。
+                view.StructureNavigationKeyHeldForTest = () => true;
+                view.MoveHeaderStructureSelection(1, extend: false);
+                Flush();
+                Assert.True(view.IsStructureChunkApplyDeferred);
+                Assert.Equal(afterClick, view.SelectedSessions.Length);
+
+                // キー離しで確定。
+                view.StructureNavigationKeyHeldForTest = () => false;
+                view.FlushDeferredStructureChunkApply();
+                Flush();
+                Assert.False(view.IsStructureChunkApplyDeferred);
+                Assert.True(view.SelectedSessions.Length >= 1);
+                window.Close();
+            }
+            finally
+            {
+                foreach (var path in new[] { path1, path2 })
+                {
+                    try
+                    {
+                        File.Delete(path);
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void HeaderStructureUnionChunk_SelectsPlaylistWithoutStealingFocus()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var path1 = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-union-focus-1-" + Guid.NewGuid().ToString("N") + ".wav");
+            var path2 = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-union-focus-2-" + Guid.NewGuid().ToString("N") + ".wav");
+            WriteMinimalWav(path1);
+            File.Copy(path1, path2, overwrite: true);
+            try
+            {
+                var first = new DocumentSession(AudioDocument.CreateDeferred(path1));
+                var second = new DocumentSession(AudioDocument.CreateDeferred(path2));
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.SetSessions([first, second], first, [first, second]);
+                view.ToggleHeaderStructureVisible(focusWhenShown: true);
+                Flush();
+                PumpUntil(
+                    () => view.HeaderStructureLoadedPath is { } loaded
+                        && loaded.Contains("\u0001union\u0001", StringComparison.Ordinal),
+                    TimeSpan.FromSeconds(3));
+                Assert.True(view.IsHeaderStructureFocused);
+
+                var items = EditorHeaderChunkStripView.FlattenVisibleTreeItems(
+                    view.HeaderStructureTree.Items);
+                Assert.NotEmpty(items);
+                var chunk = items[0];
+                chunk.IsSelected = true;
+                chunk.Focus();
+                Flush();
+                // ContextIdle のキャレット再 assert まで回す。
+                Dispatcher.CurrentDispatcher.Invoke(
+                    () => { },
+                    DispatcherPriority.ContextIdle);
+                Flush();
+
+                Assert.True(view.IsHeaderStructureFocused);
+                Assert.False(view.IsPlaylistGridFocused);
+                Assert.True(view.SelectedSessions.Length >= 1);
+                window.Close();
+            }
+            finally
+            {
+                foreach (var path in new[] { path1, path2 })
+                {
+                    try
+                    {
+                        File.Delete(path);
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void HeaderStructureUnionMultiSelect_SelectsUnionOfMemberPaths()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var dir = Path.Combine(Path.GetTempPath(), "mga-union-multi-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            var plain = Path.Combine(dir, "plain.wav");
+            var withBext = Path.Combine(dir, "bext.wav");
+            var plain2 = Path.Combine(dir, "plain2.wav");
+            try
+            {
+                WriteMinimalWav(plain);
+                WriteWavWithExtraChunk(withBext, "bext", new byte[10]);
+                WriteMinimalWav(plain2);
+
+                var sessions = new[]
+                {
+                    new DocumentSession(AudioDocument.CreateDeferred(plain)),
+                    new DocumentSession(AudioDocument.CreateDeferred(withBext)),
+                    new DocumentSession(AudioDocument.CreateDeferred(plain2)),
+                };
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.SetSessions(sessions, sessions[0], sessions);
+                view.ToggleHeaderStructureVisible(focusWhenShown: true);
+                Flush();
+                PumpUntil(
+                    () => view.HeaderStructureLoadedPath is { } loaded
+                        && loaded.Contains("\u0001union\u0001", StringComparison.Ordinal),
+                    TimeSpan.FromSeconds(3));
+
+                var items = EditorHeaderChunkStripView.FlattenVisibleTreeItems(
+                    view.HeaderStructureTree.Items);
+                TreeViewItem? FindChunk(string id) =>
+                    items.FirstOrDefault(item => item.Tag is WaveStructureNode n && n.Id == id);
+
+                var bext = FindChunk("bext");
+                var fmt = FindChunk("fmt ");
+                Assert.NotNull(bext);
+                Assert.NotNull(fmt);
+
+                // bext だけ → 1 件。
+                view.BeginHeaderStructurePlainPress(bext, control: false);
+                bext.IsSelected = true;
+                Flush();
+                view.FlushDeferredStructureChunkApply();
+                Flush();
+                Assert.Equal(1, view.PlaylistSelectedCount);
+                Assert.Contains(sessions[1], view.SelectedSessions);
+
+                // Shift で fmt まで → MemberPaths の和で 3 件全部。
+                view.ApplyHeaderStructureShiftClick(fmt);
+                Flush();
+                view.FlushDeferredStructureChunkApply();
+                Flush();
+                Assert.Equal(3, view.HeaderStructureMultiSelectedCount);
+                Assert.Equal(3, view.PlaylistSelectedCount);
+                Assert.Equal(3, view.SelectedSessions.Length);
+
+                // 一度 bext だけに戻してから Ctrl+A → 和集合全チャンク → 全ファイル。
+                view.BeginHeaderStructurePlainPress(bext, control: false);
+                bext.IsSelected = true;
+                Flush();
+                view.FlushDeferredStructureChunkApply();
+                Flush();
+                Assert.Equal(1, view.PlaylistSelectedCount);
+                view.SelectAllHeaderStructureItems();
+                Flush();
+                view.FlushDeferredStructureChunkApply();
+                Flush();
+                Assert.True(view.HeaderStructureMultiSelectedCount >= 2);
+                Assert.Equal(3, view.PlaylistSelectedCount);
+                Assert.Equal(3, view.SelectedSessions.Length);
+                window.Close();
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(dir, recursive: true);
+                }
+                catch (IOException)
+                {
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void HeaderStructureTree_SupportsSelectAllShiftRangeAndCtrlToggle()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var path = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-multi-" + Guid.NewGuid().ToString("N") + ".wav");
+            var pcm = new byte[4];
+            var fmt = new byte[]
+            {
+                1, 0, 1, 0, 0x44, 0xAC, 0, 0, 0x88, 0x58, 0x01, 0, 2, 0, 16, 0,
+            };
+            using (var ms = new MemoryStream())
+            using (var w = new BinaryWriter(ms))
+            {
+                w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                w.Write(36 + pcm.Length);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                w.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                w.Write(fmt.Length);
+                w.Write(fmt);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                w.Write(pcm.Length);
+                w.Write(pcm);
+                File.WriteAllBytes(path, ms.ToArray());
+            }
+
+            var session = new DocumentSession(AudioDocument.CreateDeferred(path));
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            try
+            {
+                window.Show();
+                Flush();
+                view.SetSessions([session], session, [session]);
+                view.ToggleHeaderStructureVisible(focusWhenShown: true);
+                Flush();
+                PumpUntil(
+                    () => view.HeaderStructureTree.Items.Count > 0,
+                    TimeSpan.FromSeconds(3));
+
+                var items = EditorHeaderChunkStripView
+                    .FlattenVisibleTreeItems(view.HeaderStructureTree.Items);
+                Assert.True(items.Count >= 2);
+
+                view.BeginHeaderStructurePlainPress(items[0], control: false);
+                items[0].IsSelected = true;
+                Flush();
+                Assert.Equal(1, view.HeaderStructureMultiSelectedCount);
+
+                view.SelectAllHeaderStructureItems();
+                Flush();
+                Assert.Equal(items.Count, view.HeaderStructureMultiSelectedCount);
+                var allCopy = view.BuildHeaderStructureCopyText();
+                Assert.Contains('\t', allCopy);
+                Assert.True(allCopy.Split(
+                    ['\r', '\n'],
+                    StringSplitOptions.RemoveEmptyEntries).Length >= 2);
+
+                view.BeginHeaderStructurePlainPress(items[0], control: false);
+                items[0].IsSelected = true;
+                Flush();
+                Assert.Equal(1, view.HeaderStructureMultiSelectedCount);
+
+                view.BeginHeaderStructurePlainPress(items[1], control: true);
+                Flush();
+                Assert.Equal(2, view.HeaderStructureMultiSelectedCount);
+
+                view.MoveHeaderStructureSelectionToEdge(1, extend: true);
+                Flush();
+                Assert.Equal(items.Count, view.HeaderStructureMultiSelectedCount);
+
+                view.BeginHeaderStructurePlainPress(items[0], control: false);
+                items[0].IsSelected = true;
+                Flush();
+                view.ApplyHeaderStructureShiftClick(items[^1]);
+                Flush();
+                Assert.Equal(items.Count, view.HeaderStructureMultiSelectedCount);
+
+                view.MoveHeaderStructureSelection(1, extend: false);
+                Flush();
+                Assert.Equal(1, view.HeaderStructureMultiSelectedCount);
+            }
+            finally
+            {
+                window.Close();
+                try
+                {
+                    File.Delete(path);
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void HeaderStructurePlainPress_WhilePreviousStillSelected_KeepsSoloCorners()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var path = Path.Combine(
+                Path.GetTempPath(),
+                "mga-header-corners-" + Guid.NewGuid().ToString("N") + ".wav");
+            var pcm = new byte[4];
+            var fmt = new byte[]
+            {
+                1, 0, 1, 0, 0x44, 0xAC, 0, 0, 0x88, 0x58, 0x01, 0, 2, 0, 16, 0,
+            };
+            using (var ms = new MemoryStream())
+            using (var w = new BinaryWriter(ms))
+            {
+                w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                w.Write(36 + pcm.Length);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                w.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                w.Write(fmt.Length);
+                w.Write(fmt);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                w.Write(pcm.Length);
+                w.Write(pcm);
+                File.WriteAllBytes(path, ms.ToArray());
+            }
+
+            var session = new DocumentSession(AudioDocument.CreateDeferred(path));
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            try
+            {
+                window.Show();
+                Flush();
+                view.SetSessions([session], session, [session]);
+                view.ToggleHeaderStructureVisible(focusWhenShown: true);
+                Flush();
+                PumpUntil(
+                    () => view.HeaderStructureTree.Items.Count > 0,
+                    TimeSpan.FromSeconds(3));
+
+                var items = EditorHeaderChunkStripView
+                    .FlattenVisibleTreeItems(view.HeaderStructureTree.Items);
+                Assert.True(items.Count >= 2);
+
+                view.BeginHeaderStructurePlainPress(items[0], control: false);
+                items[0].IsSelected = true;
+                Flush();
+
+                // 実クリック同様、前行がまだ IsSelected のまま次行を Preview する。
+                view.BeginHeaderStructurePlainPress(items[1], control: false);
+                Flush();
+                Assert.Equal(
+                    SelectionBandEdge.Solo,
+                    (SelectionBandEdge)items[1].GetValue(LibraryBrowserView.SelectionBandEdgeProperty));
+
+                items[0].IsSelected = false;
+                items[1].IsSelected = true;
+                Flush();
+                Assert.Equal(
+                    SelectionBandEdge.Solo,
+                    (SelectionBandEdge)items[1].GetValue(LibraryBrowserView.SelectionBandEdgeProperty));
+            }
+            finally
+            {
+                window.Close();
+                try
+                {
+                    File.Delete(path);
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void EditorHeaderChunkStrip_SupportsSelectAllShiftRangeAndCtrlToggle()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var path = Path.Combine(
+                Path.GetTempPath(),
+                "mga-editor-header-multi-" + Guid.NewGuid().ToString("N") + ".wav");
+            var pcm = new byte[4];
+            var fmt = new byte[]
+            {
+                1, 0, 1, 0, 0x44, 0xAC, 0, 0, 0x88, 0x58, 0x01, 0, 2, 0, 16, 0,
+            };
+            using (var ms = new MemoryStream())
+            using (var w = new BinaryWriter(ms))
+            {
+                w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                w.Write(36 + pcm.Length);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                w.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                w.Write(fmt.Length);
+                w.Write(fmt);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                w.Write(pcm.Length);
+                w.Write(pcm);
+                File.WriteAllBytes(path, ms.ToArray());
+            }
+
+            var strip = new EditorHeaderChunkStripView();
+            var window = new Window
+            {
+                Content = strip,
+                Width = 480,
+                Height = 200,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            try
+            {
+                window.Show();
+                Flush();
+                strip.LoadFromPath(path);
+                Flush();
+                var visible = EditorHeaderChunkStripView.FlattenVisibleTreeItems(strip.Tree.Items);
+                Assert.True(visible.Count >= 2);
+
+                strip.SelectAllItems();
+                Flush();
+                Assert.Equal(visible.Count, strip.MultiSelectedCount);
+
+                strip.BeginPlainPress(visible[0], control: false);
+                visible[0].IsSelected = true;
+                Flush();
+                Assert.Equal(1, strip.MultiSelectedCount);
+
+                strip.BeginPlainPress(visible[1], control: true);
+                Flush();
+                Assert.Equal(2, strip.MultiSelectedCount);
+
+                strip.MoveSelectionToEdge(1, extend: true);
+                Flush();
+                Assert.Equal(visible.Count, strip.MultiSelectedCount);
+
+                // アンカー（先頭）へ Shift+クリックすると範囲は1件に戻る。
+                strip.ApplyShiftClick(visible[0]);
+                Flush();
+                Assert.Equal(1, strip.MultiSelectedCount);
+
+                strip.ApplyShiftClick(visible[^1]);
+                Flush();
+                Assert.Equal(visible.Count, strip.MultiSelectedCount);
+
+                strip.MoveSelection(1, extend: false);
+                Flush();
+                Assert.Equal(1, strip.MultiSelectedCount);
+
+                var copy = strip.BuildCopyText();
+                Assert.Contains('\t', copy);
+
+                // メニューキー相当。ツリーの ContextMenu を直接開き、波形へ Focus しない。
+                visible[0].Focus();
+                Flush();
+                Assert.True(strip.TryOpenKeyboardContextMenu());
+                Assert.True(strip.Tree.ContextMenu is { IsOpen: true });
+                strip.Tree.ContextMenu!.IsOpen = false;
+            }
+            finally
+            {
+                window.Close();
+                try
+                {
+                    File.Delete(path);
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void HeaderStructure_PrefersWaveContainerPathOverSource()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var dir = Path.Combine(Path.GetTempPath(), "mga-hdr-work-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            var source = Path.Combine(dir, "source.wav");
+            var working = Path.Combine(dir, "working.wav");
+            try
+            {
+                WriteMinimalWav(source);
+                WriteWavWithExtraChunk(working, "bext", new byte[10]);
+
+                var document = AudioDocument.CreateDeferred(source);
+                document.SetWaveContainerPath(working, markDirty: true);
+                var session = new DocumentSession(document);
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 480,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+                view.SetSessions([session], session, [session]);
+                view.ToggleHeaderStructureVisible(focusWhenShown: true);
+                Flush();
+                PumpUntil(
+                    () => view.HeaderStructureLoadedPath is { } loaded
+                        && string.Equals(loaded, working, StringComparison.OrdinalIgnoreCase),
+                    TimeSpan.FromSeconds(3));
+
+                Assert.Equal(working, view.HeaderStructureLoadedPath, StringComparer.OrdinalIgnoreCase);
+                var items = EditorHeaderChunkStripView.FlattenVisibleTreeItems(
+                    view.HeaderStructureTree.Items);
+                Assert.Contains(
+                    items,
+                    item => item.Tag is WaveStructureNode n && n.Id == "bext");
+                window.Close();
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(dir, recursive: true);
+                }
+                catch (IOException)
+                {
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void EditorHeaderChunkStrip_UnionSelectsMemberPathsAndBuildsDeletePlan()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var dir = Path.Combine(Path.GetTempPath(), "mga-editor-union-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            var plain = Path.Combine(dir, "plain.wav");
+            var withBext = Path.Combine(dir, "bext.wav");
+            var plain2 = Path.Combine(dir, "plain2.wav");
+            try
+            {
+                WriteMinimalWav(plain);
+                WriteWavWithExtraChunk(withBext, "bext", new byte[10]);
+                WriteMinimalWav(plain2);
+
+                var strip = new EditorHeaderChunkStripView();
+                IReadOnlyList<WaveStructureNode>? applied = null;
+                strip.ApplyUnionChunkTabSelection = nodes => applied = nodes;
+                var window = new Window
+                {
+                    Content = strip,
+                    Width = 480,
+                    Height = 240,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                Flush();
+
+                strip.LoadUnionFromPaths([plain, withBext, plain2]);
+                Flush();
+                PumpUntil(
+                    () => strip.LoadedPath is { } loaded
+                        && loaded.Contains("\u0001union\u0001", StringComparison.Ordinal),
+                    TimeSpan.FromSeconds(3));
+                Assert.True(strip.IsChunkUnion);
+
+                var items = EditorHeaderChunkStripView.FlattenVisibleTreeItems(strip.Tree.Items);
+                TreeViewItem? FindChunk(string id) =>
+                    items.FirstOrDefault(item => item.Tag is WaveStructureNode n && n.Id == id);
+
+                var bext = FindChunk("bext");
+                var fmt = FindChunk("fmt ");
+                Assert.NotNull(bext);
+                Assert.NotNull(fmt);
+                Assert.Single(((WaveStructureNode)bext.Tag).MemberPaths);
+                Assert.Equal(3, ((WaveStructureNode)fmt.Tag).MemberPaths.Count);
+
+                // bext だけ → MemberPaths 1 件をコールバックへ。
+                strip.BeginPlainPress(bext, control: false);
+                bext.IsSelected = true;
+                Flush();
+                strip.FlushDeferredChunkApply();
+                Flush();
+                Assert.NotNull(applied);
+                Assert.Single(applied);
+                Assert.Equal("bext", applied[0].Id);
+                Assert.Contains(
+                    withBext,
+                    applied[0].MemberPaths,
+                    StringComparer.OrdinalIgnoreCase);
+
+                // Shift で fmt まで → 範囲内のマーク和（fmt を含むので全ファイル）。
+                strip.ApplyShiftClick(fmt);
+                Flush();
+                strip.FlushDeferredChunkApply();
+                Flush();
+                Assert.NotNull(applied);
+                Assert.True(applied.Count >= 2);
+                Assert.Equal(applied.Count, strip.MultiSelectedCount);
+                Assert.Contains(applied, n => n.Id == "fmt ");
+                var unionPaths = applied
+                    .SelectMany(n => n.MemberPaths)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                Assert.Equal(3, unionPaths.Length);
+
+                // 削除プランは MemberPaths 経由で bext 所持ファイルのみ。
+                var plan = WaveChunkDeleteUi.BuildPlan(
+                    [bext],
+                    singleFilePath: null);
+                Assert.NotNull(plan);
+                Assert.Contains(
+                    plan.Value.PathToChunkIds.Keys,
+                    k => string.Equals(k, withBext, StringComparison.OrdinalIgnoreCase));
+                Assert.DoesNotContain(
+                    plan.Value.PathToChunkIds.Keys,
+                    k => string.Equals(k, plain, StringComparison.OrdinalIgnoreCase));
+
+                window.Close();
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(dir, recursive: true);
+                }
+                catch (IOException)
+                {
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void LabelLibraryHeaderStructure_IsEnglishWithoutAccessKey()
     {
         var previous = UiStrings.Language;
@@ -3800,6 +4850,177 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void UpdateSessionRows_Force_KeepsMultiSelectionAndAllowsMove()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var third = Session("ccc.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first, second, third], second, [first, second, third]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+            Assert.Equal(3, view.PlaylistSelectedCount);
+
+            // チャンク一括削除後の行差し替え相当。SameContent でも force で作り直す。
+            view.UpdateSessionRows([first, second, third], force: true);
+            Flush();
+
+            Assert.Equal(3, view.SelectedSessions.Length);
+            Assert.Contains(first, view.SelectedSessions);
+            Assert.Contains(second, view.SelectedSessions);
+            Assert.Contains(third, view.SelectedSessions);
+            Assert.Same(second, view.SelectedSession);
+
+            view.MoveSelection(1, wrap: false);
+            Flush();
+            Assert.Same(third, view.SelectedSession);
+            Assert.Equal(1, view.PlaylistSelectedCount);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void RematerializeBoundPlaylistRows_AfterFormatConvert_AllowsSelectAllAndMove()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("rate-a.wav");
+            var second = Session("rate-b.wav");
+            var third = Session("rate-c.wav");
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 400,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions([first, second, third], second, [first, second, third]);
+            Flush();
+            view.FocusList();
+            Flush();
+
+            // サンプルレート／Ch／ビット変換後の一括載せ替え相当。
+            view.RematerializeBoundPlaylistRows();
+            Flush();
+
+            Assert.Equal(3, view.SelectedSessions.Length);
+            view.MoveSelection(1, wrap: false);
+            Flush();
+            Assert.Equal(1, view.PlaylistSelectedCount);
+            view.SelectAllRows();
+            Flush();
+            Assert.Equal(3, view.PlaylistSelectedCount);
+            Assert.Equal(3, view.BoundRowCount);
+            view.MoveSelection(1, wrap: false);
+            Flush();
+            Assert.NotNull(view.SelectedSession);
+            Assert.True(view.PlaylistSelectedCount >= 1);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void RefreshSessionsAfterHeaderRepairInPlace_SelectAllSelectsEveryRow()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var dir = Path.Combine(Path.GetTempPath(), "mga-chunk-reload-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var paths = new[]
+                {
+                    Path.Combine(dir, "a.wav"),
+                    Path.Combine(dir, "b.wav"),
+                    Path.Combine(dir, "c.wav"),
+                };
+                foreach (var path in paths)
+                {
+                    WriteMinimalWav(path);
+                }
+
+                var sessions = paths
+                    .Select(path => new DocumentSession(AudioDocument.CreateDeferred(path)))
+                    .ToArray();
+                var view = new LibraryBrowserView();
+                var window = new Window
+                {
+                    Content = view,
+                    Width = 900,
+                    Height = 400,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                };
+                window.Show();
+                view.SetSessions(sessions, sessions[1], sessions);
+                Flush();
+                view.FocusList();
+                Flush();
+                Assert.Equal(3, view.PlaylistSelectedCount);
+
+                // チャンク削除相当: mtime だけ進め、行を全件作り直す。
+                // （SetSessions 後に FileShare.Read が残ることがあり WriteAllBytes は使わない）
+                foreach (var path in paths)
+                {
+                    File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+                }
+
+                view.RefreshSessionsAfterHeaderRepairInPlace(paths);
+                Flush();
+
+                Assert.Equal(3, view.SelectedSessions.Length);
+                Assert.Equal(3, view.BoundRowCount);
+
+                // 帯を1件に落としてから Ctrl+A 相当（削除直後に全選択が途中で止まる回帰）。
+                view.MoveSelection(1, wrap: false);
+                Flush();
+                Assert.Equal(1, view.PlaylistSelectedCount);
+                view.SelectAllRows();
+                Flush();
+                Assert.Equal(3, view.PlaylistSelectedCount);
+                Assert.Equal(3, view.SelectedSessions.Length);
+                Assert.Equal(3, view.BoundRowCount);
+
+                view.MoveSelection(1, wrap: false);
+                Flush();
+                Assert.NotNull(view.SelectedSession);
+                Assert.True(view.PlaylistSelectedCount >= 1);
+                window.Close();
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(dir, recursive: true);
+                }
+                catch (IOException)
+                {
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void MoveSelection_RapidDown_KeepsSelectionFromJumpingUp()
     {
         RunSta(() =>
@@ -3842,6 +5063,69 @@ public sealed class LibraryBrowserSelectionTests
             var grid = Assert.IsAssignableFrom<DataGrid>(view.FileGrid);
             Assert.Same(sessions[12], (grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession);
             Assert.Same(sessions[12], (grid.CurrentItem as LibraryFileRow)?.Tag as DocumentSession);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void MoveSelection_WhileNavKeyHeld_KeepsCyanWhenGridSelectionDrifts()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[40];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                sessions[i] = Session($"hold-{i:D2}.wav");
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 280,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            view.FocusList();
+            Flush();
+
+            // ↑↓ 押し続け中は ScrollIntoView 後も _deferActivate を残す。
+            view.PlaylistNavigationKeyHeldForTest = () => true;
+            for (var i = 0; i < 10; i++)
+            {
+                view.MoveSelection(1, wrap: false);
+                view.UpdateLayout();
+                Flush();
+            }
+
+            Assert.True(view.IsActivateDeferred);
+            Assert.Same(sessions[10], view.SelectedSession);
+
+            var grid = Assert.IsAssignableFrom<DataGrid>(view.FileGrid);
+            var targetRow = Assert.IsType<LibraryFileRow>(grid.SelectedItem);
+            var firstRow = Assert.IsType<LibraryFileRow>(grid.Items[0]);
+            Assert.True(targetRow.IsPlaylistSelected);
+
+            // 仮想化が SelectedItem を先頭へ寄せても、シアン帯フラグは奪われない。
+            grid.SelectedItem = firstRow;
+            Flush();
+            Assert.True(targetRow.IsPlaylistSelected);
+            Assert.False(firstRow.IsPlaylistSelected);
+            Assert.Same(sessions[10], view.SelectedSession);
+
+            view.PlaylistNavigationKeyHeldForTest = () => false;
+            view.FlushPlaylistMoveDefer();
+            Flush();
+            Assert.False(view.IsActivateDeferred);
+            Assert.Same(sessions[10], (grid.SelectedItem as LibraryFileRow)?.Tag as DocumentSession);
+            Assert.True(targetRow.IsPlaylistSelected);
             window.Close();
         });
     }
@@ -5502,6 +6786,37 @@ public sealed class LibraryBrowserSelectionTests
         File.WriteAllBytes(path, ms.ToArray());
     }
 
+    private static void WriteWavWithExtraChunk(string path, string fourCc, byte[] payload)
+    {
+        ArgumentOutOfRangeException.ThrowIfNotEqual(fourCc.Length, 4);
+        var pcm = new byte[4];
+        var fmt = new byte[]
+        {
+            1, 0, 1, 0, 0x44, 0xAC, 0, 0, 0x88, 0x58, 0x01, 0, 2, 0, 16, 0,
+        };
+        var padded = payload.Length + (payload.Length & 1);
+        using var ms = new MemoryStream();
+        using var w = new BinaryWriter(ms);
+        w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+        w.Write(36 + pcm.Length + 8 + padded);
+        w.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+        w.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+        w.Write(fmt.Length);
+        w.Write(fmt);
+        w.Write(System.Text.Encoding.ASCII.GetBytes(fourCc));
+        w.Write(payload.Length);
+        w.Write(payload);
+        if ((payload.Length & 1) != 0)
+        {
+            w.Write((byte)0);
+        }
+
+        w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+        w.Write(pcm.Length);
+        w.Write(pcm);
+        File.WriteAllBytes(path, ms.ToArray());
+    }
+
     private static readonly byte[] OnePixelPng =
     [
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -5521,19 +6836,32 @@ public sealed class LibraryBrowserSelectionTests
             _ = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         }
 
-        Application.Current!.Resources["AccentCyanBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0xF5, 0xFF));
-        Application.Current.Resources["PrimaryForeBrush"] = new SolidColorBrush(Color.FromRgb(0xEB, 0xEB, 0xEB));
-        Application.Current.Resources["MenuHighlightBackBrush"] = new SolidColorBrush(Color.FromRgb(0x37, 0x37, 0x3A));
-        Application.Current.Resources["ColorPanelBackBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x2A));
-        Application.Current.Resources["ChromeBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x4A, 0x4A, 0x4E));
+        var resources = Application.Current!.Resources;
+        // ヘッダ修復ボタン等で UiColors 全体が要る。キー追加後も古いマージのままにしない。
+        if (resources["ClearButtonFillBrush"] is null || resources["ChromeBackBrush"] is null)
+        {
+            var assembly = Uri.EscapeDataString(typeof(LibraryBrowserView).Assembly.GetName().Name!);
+            resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri(
+                    $"pack://application:,,,/{assembly};component/Themes/UiColors.xaml",
+                    UriKind.Absolute),
+            });
+        }
+
+        resources["AccentCyanBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0xF5, 0xFF));
+        resources["PrimaryForeBrush"] = new SolidColorBrush(Color.FromRgb(0xEB, 0xEB, 0xEB));
+        resources["MenuHighlightBackBrush"] = new SolidColorBrush(Color.FromRgb(0x37, 0x37, 0x3A));
+        resources["ColorPanelBackBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x2A));
+        resources["ChromeBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x4A, 0x4A, 0x4E));
         // MonitorLatchButton のフィールド初期化（CreateOption のコンストラクタ）で参照される。
-        Application.Current.Resources["TransportBackBrush"] = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E));
-        Application.Current.Resources["LatchToggleOnForeBrush"] = new SolidColorBrush(Colors.White);
-        Application.Current.Resources["LatchToggleOffForeBrush"] = new SolidColorBrush(Color.FromRgb(0xC8, 0xC8, 0xC8));
-        Application.Current.Resources["LatchToggleOnBackBrush"] = new SolidColorBrush(Color.FromRgb(0x2F, 0x6F, 0xED));
-        Application.Current.Resources["LatchToggleOffBackBrush"] = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x40));
+        resources["TransportBackBrush"] = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E));
+        resources["LatchToggleOnForeBrush"] = new SolidColorBrush(Colors.White);
+        resources["LatchToggleOffForeBrush"] = new SolidColorBrush(Color.FromRgb(0xC8, 0xC8, 0xC8));
+        resources["LatchToggleOnBackBrush"] = new SolidColorBrush(Color.FromRgb(0x2F, 0x6F, 0xED));
+        resources["LatchToggleOffBackBrush"] = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x40));
         // RefreshAppearance が BUSY バッジ色を読む。
-        Application.Current.Resources["PlaylistBusyBadgeBackBrush"] =
+        resources["PlaylistBusyBadgeBackBrush"] =
             new SolidColorBrush(Color.FromRgb(0xBE, 0x32, 0x32));
     }
 

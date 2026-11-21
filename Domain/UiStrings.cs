@@ -1807,6 +1807,178 @@ internal static partial class UiStrings
         "Select a playlist file to inspect its header structure.";
     public static string WaveStructureSelectNode =>
         "Select a chunk in the tree to view its contents.";
+    public static string WaveHeaderRepairButton => Get("ヘッダを修復", "Repair Header");
+    public static string WaveHeaderRepairPrompt => Get(
+        "修復しますか？",
+        "Repair this header?");
+    public static string WaveHeaderRepairPromptMany(int count) => Format(
+        "{0} 件を修復しますか？",
+        "Repair {0} files?",
+        count);
+    public static string WaveHeaderRepairAsCopy => Get("別名で修復", "Repair As Copy");
+    public static string WaveHeaderRepairOverwrite => Get("上書きで修復", "Repair In Place");
+    /// <summary>エディタ用。即時保存せず編集履歴へ載せる。</summary>
+    public static string WaveHeaderRepairApplyEdit => Get("修復する", "Repair");
+    public static string WaveHeaderRepairEdited => Get(
+        "ヘッダを修復しました（未保存）。",
+        "Header repaired (unsaved).");
+    public static string WaveChunkStripEdited(int chunkKinds) => Format(
+        "チャンク（{0} 種）を削除しました（未保存）。",
+        "Removed {0} chunk type(s) (unsaved).",
+        chunkKinds);
+    /// <summary>別名修復のファイル名サフィックス。言語に依らず英語固定。</summary>
+    public static string WaveHeaderRepairFileSuffix => "_repaired";
+    public static string WaveHeaderRepairWaveOnly => Get(
+        "WAVE ファイルだけ修復できます。",
+        "Only WAVE files can be repaired.");
+    public static string WaveHeaderRepairFailed(string detail) => Format(
+        "ヘッダ修復に失敗しました。{0}",
+        "Header repair failed. {0}",
+        detail);
+    public static string WaveHeaderRepairSavedAs(string path) => Format(
+        "修復ファイルを保存しました: {0}",
+        "Saved repaired file: {0}",
+        path);
+    public static string WaveHeaderRepairSavedAsMany(int succeeded, int failed) => failed > 0
+        ? Format(
+            "修復ファイルを {0} 件保存しました（失敗 {1} 件）。",
+            "Saved {0} repaired file(s) ({1} failed).",
+            succeeded,
+            failed)
+        : Format(
+            "修復ファイルを {0} 件保存しました。",
+            "Saved {0} repaired file(s).",
+            succeeded);
+    public static string WaveHeaderRepairOverwritten => Get(
+        "ヘッダを修復して上書き保存しました。",
+        "Header repaired and overwritten.");
+    public static string WaveHeaderRepairOverwrittenMany(int succeeded, int failed) => failed > 0
+        ? Format(
+            "{0} 件を上書き修復しました（失敗 {1} 件）。",
+            "Repaired {0} file(s) in place ({1} failed).",
+            succeeded,
+            failed)
+        : Format(
+            "{0} 件を上書き修復しました。",
+            "Repaired {0} file(s) in place.",
+            succeeded);
+    public static string WaveHeaderRepairNoChange => Get(
+        "修復できる箇所はありませんでした。",
+        "Nothing needed repairing.");
+    public static string WaveChunkDeleteMenu => Get("チャンクを削除(_D)", "_Delete Chunk");
+    public static string WaveChunkDeleteMenuMany => Get("選択チャンクを削除(_D)", "_Delete Selected Chunks");
+    public static string WaveChunkStripUnsupported => Get(
+        "WAVE / AIFF 以外はチャンク削除できません。",
+        "Chunk deletion is only supported for WAVE / AIFF.");
+    public static string WaveChunkStripTruncated => Get(
+        "チャンク境界が壊れているため削除できません。先にヘッダ修復を試してください。",
+        "Chunk boundaries are damaged. Try header repair first.");
+    public static string WaveChunkStripMissingEssential => Get(
+        "必須チャンクが残らないため削除できません。",
+        "Deletion would remove essential chunks.");
+    public static string WaveChunkStripFailed(string detail) => Format(
+        "チャンク削除に失敗しました。{0}",
+        "Chunk deletion failed. {0}",
+        detail);
+    public static string WaveChunkStripDone(int files, int chunkKinds) => Format(
+        "{0} ファイルからチャンク（{1} 種）を削除しました。",
+        "Removed {1} chunk type(s) from {0} file(s).",
+        files,
+        chunkKinds);
+    public static string WaveChunkStripNoChange => Get(
+        "削除対象のチャンクは見つかりませんでした。",
+        "No matching chunks were found to delete.");
+    public static string WaveChunkDeleteForbiddenOnly => Get(
+        "選択されたチャンクは削除できません（再生に必須）。",
+        "The selected chunk(s) cannot be deleted (required for playback).");
+    public static string WaveChunkDeleteForbiddenSkipped(string list) => Format(
+        "次の必須チャンクは削除対象から除外します:\n{0}",
+        "These required chunks will be skipped:\n{0}",
+        list);
+    public static string WaveChunkConfirmDeleteRemovable(string list) => Format(
+        "次のチャンクを削除しますか？\n\n{0}",
+        "Delete these chunks?\n\n{0}",
+        list);
+    public static string WaveChunkConfirmDeleteCaution(string list) => Format(
+        "次のチャンクを削除すると制作メタ等が失われます。削除しますか？\n\n{0}",
+        "Deleting these chunks removes production metadata. Continue?\n\n{0}",
+        list);
+    public static string WaveChunkConfirmDeleteProtected(string list) => Format(
+        "次のチャンクはマーカー／リージョン／サンプルループ／チャンネルレイアウトです。削除しますか？\n\n{0}",
+        "These chunks are markers, regions, sample loops, or channel layouts. Delete them?\n\n{0}",
+        list);
+    public static string WaveChunkConfirmDeleteMixed(string list) => Format(
+        "次のチャンクを削除しますか？\n\n{0}",
+        "Delete the following chunks?\n\n{0}",
+        list);
+    /// <summary>fact 削除時の追記。17bit 超／非 PCM の保存で書き戻されることがある。</summary>
+    public static string WaveChunkDeleteFactMayReturn => Get(
+        "注意: fact は保存時（17 bit 超または非 PCM の WAVE）に再び書き込まれることがあります。",
+        "Note: fact may be written again on save for WAVE files over 16-bit or non-PCM.");
+    public static string WaveChunkDescBlankFourCc => Get(
+        "空または不正な FourCC（****）。チャンク削除では扱えないので、ヘッダ修復を使ってください。",
+        "Blank or invalid FourCC (****). Chunk delete cannot handle this; use header repair.");
+    public static string WaveChunkDescCue => Get(
+        "キューポイント（マーカー位置）。",
+        "Cue points (marker positions).");
+    public static string WaveChunkDescLabl => Get("キューのラベル文字列。", "Cue point labels.");
+    public static string WaveChunkDescNote => Get("キューのノート文字列。", "Cue point notes.");
+    public static string WaveChunkDescLtxt => Get("キュー区間のラベル付きテキスト。", "Labeled text spanning a cue range.");
+    public static string WaveChunkDescR64m => Get("RF64 用マーカー。", "RF64 markers.");
+    public static string WaveChunkDescRegn => Get("リージョンテーブル。", "Region table.");
+    public static string WaveChunkDescSmpl => Get("サンプラーのループ点など。", "Sampler loop points and related data.");
+    public static string WaveChunkDescInstWav => Get("WAV インストゥルメント情報。", "WAV instrument data.");
+    public static string WaveChunkDescAcid => Get("ACID ループ（テンポ・拍子など）。", "ACID loop tempo/meter metadata.");
+    public static string WaveChunkDescStrc => Get("ACID 系スライス／トランジェント。", "ACID-style slice/transient markers.");
+    public static string WaveChunkDescMark => Get("AIFF マーカー。", "AIFF markers.");
+    public static string WaveChunkDescInstAiff => Get("AIFF インストゥルメント／ループ。", "AIFF instrument/loop data.");
+    public static string WaveChunkDescBasc => Get("Apple Loops メタ。", "Apple Loops metadata.");
+    public static string WaveChunkDescTrns => Get("Apple Loops のトランスポーズ関連。", "Apple Loops transpose-related data.");
+    public static string WaveChunkDescChna => Get(
+        "ADM のトラック↔チャンネル対応。",
+        "ADM track-to-channel mapping.");
+    public static string WaveChunkDescChan => Get(
+        "AIFF のチャンネル／スピーカーレイアウト。",
+        "AIFF channel/speaker layout.");
+    public static string WaveChunkDescPlst => Get("キューのプレイリスト。", "Cue playlist.");
+    public static string WaveChunkDescAdtl => Get("キュー注釈リスト。", "Associated data list for cues.");
+    public static string WaveChunkDescBext => Get(
+        "Broadcast Wave 拡張（タイムコード・作成者など）。",
+        "Broadcast Wave extension (timecode, originator, etc.).");
+    public static string WaveChunkDescIxml => Get(
+        "制作メタ XML（シーン／テイク等）。",
+        "Production metadata XML (scene/take, etc.).");
+    public static string WaveChunkDescTcod => Get("開始タイムコード。", "Start timecode.");
+    public static string WaveChunkDescFact => Get(
+        "サンプル長など（非 PCM で重要）。",
+        "Sample count and related info (important for non-PCM).");
+    public static string WaveChunkDescList => Get(
+        "LIST コンテナ（INFO／adtl 等。中身次第）。",
+        "LIST container (INFO/adtl/etc.; depends on contents).");
+    public static string WaveChunkDescAesd => Get("AES チャンネルステータス。", "AES channel status.");
+    public static string WaveChunkDescMidi => Get("埋め込み MIDI データ。", "Embedded MIDI data.");
+    public static string WaveChunkDescSaxl => Get("AIFF-C 圧縮シーク補助。", "AIFF-C compression seek assist.");
+    public static string WaveChunkDescAxml => Get("ADM 等の XML メタ。", "ADM or other XML metadata.");
+    public static string WaveChunkDescCart => Get("放送カートメタ。", "Broadcast cart metadata.");
+    public static string WaveChunkDescPmx => Get("Adobe XMP メタ。", "Adobe XMP metadata.");
+    public static string WaveChunkDescLevl => Get("ピークエンベロープ概要。", "Peak-envelope overview.");
+    public static string WaveChunkDescCset => Get("文字セット情報。", "Character set information.");
+    public static string WaveChunkDescProtectedGeneric(string id) => Format(
+        "{0}: マーカー／リージョン／ループ／チャンネルレイアウト系。",
+        "{0}: marker/region/loop/channel-layout related.",
+        id);
+    public static string WaveChunkDescCautionGeneric(string id) => Format(
+        "{0}: 制作メタまたは補助情報。削除すると失われます。",
+        "{0}: production or auxiliary metadata that will be lost if deleted.",
+        id);
+    public static string WaveChunkDescRemovableGeneric(string id) => Format(
+        "{0}: パディング／タグ／ベンダー固有などで、再生には不要。",
+        "{0}: padding/tag/vendor data not required for playback.",
+        id);
+    public static string WaveChunkDescForbiddenGeneric(string id) => Format(
+        "{0}: 再生に必須のため削除できません。",
+        "{0}: required for playback and cannot be deleted.",
+        id);
     public static string LibraryMenuAddToFavorites => Get("お気に入りへ追加", "Add to Favorites");
     public static string LibraryMenuAddAsExplorerRoot => Get("ツリーのルートに登録", "Register as Tree Root");
     public static string LibraryMenuRemoveExplorerRoot => Get("ツリーのルートから外す", "Remove Tree Root");
@@ -2058,6 +2230,8 @@ internal static partial class UiStrings
         "Convert Sample Rate" => Get("サンプリングレート", "Convert Sample Rate"),
         "Convert Bit Depth" => Get("ビット深度", "Convert Bit Depth"),
         "Convert Channels" => Get("チャンネル数", "Convert Channels"),
+        "Repair Header" => Get("ヘッダ修復", "Repair Header"),
+        "Delete Chunks" => Get("チャンク削除", "Delete Chunks"),
         _ => name,
     };
 

@@ -79,6 +79,10 @@ public partial class MainWindow
 
     /// <summary>プレイヤーを抜ける直前の全曲。エディタでは選択分だけタブに残し、戻りでは消さない。</summary>
     private DocumentSession[]? _playlistParked;
+    /// <summary>
+    /// エディタで破壊編集／ヘッダ修復などしたあと、プレイヤー復帰時にプレイリスト行とヘッダ構造を取り直す。
+    /// </summary>
+    private bool _libraryPlaylistStaleFromEditor;
     /// <summary>F10 突入前のタイル配置。退出後に付け直す。</summary>
     private WaveformTileArrange _librarySuspendedTileArrange;
     private bool _libraryWaapiSuspended;
@@ -318,6 +322,17 @@ public partial class MainWindow
             _layoutModeToastUntilUtc = null;
             SyncVstInsertEngine();
             ProbeLibraryTags();
+            var playlistStale = _libraryPlaylistStaleFromEditor;
+            if (playlistStale)
+            {
+                _libraryPlaylistStaleFromEditor = false;
+                // Rematerialize を SetSessions のあとに重ねると、SchedulePlaylistLoudness が
+                // 二重キャンセルされ、全件の再計測が途中で潰れる。
+                // 作業コピーの cue 同期＋ラウドネスキャッシュ再スタンプのあと、SetSessions 一回で済ませる。
+                SyncPlaylistDocumentsAfterEditorEdits();
+                LibraryBrowser.InvalidateHeaderStructureCache();
+            }
+
             if (_libraryPlayFirstPending)
             {
                 // 再生はクロムの描画が終わってから。ここでは選択だけ。
@@ -325,9 +340,20 @@ public partial class MainWindow
             }
             else
             {
-                // 離脱中もブラウザの行は残っているので rebuild しない（同一集合なら patch）。
-                LibraryBrowser.SetSessions(_sessions, _activeSession, rebuild: false);
+                // stale 時は行を必ず張り直す。通常復帰は同一集合なら patch。
+                LibraryBrowser.SetSessions(
+                    _sessions,
+                    _activeSession,
+                    rebuild: playlistStale);
                 ShowLibraryArtworkOrClear(_activeSession);
+            }
+
+            if (playlistStale)
+            {
+                // ラウドネス計測の ApplicationIdle 開始をヘッダ和集合のディスク走査で塞がない。
+                Dispatcher.BeginInvoke(
+                    () => LibraryBrowser.RefreshHeaderStructureIfVisible(),
+                    DispatcherPriority.Background);
             }
 
             // 行高が 133px に落ちたあとの描画でないと、エディタサイズのビットマップが画面外へずれたまま残る。
@@ -336,6 +362,8 @@ public partial class MainWindow
         }
         else
         {
+            // エディタへ出るとき進行中のプレイリスト計測を止める（復帰時に世代だけ進んで空振りしない）。
+            LibraryBrowser.CancelPlaylistBackgroundWork();
             // 抜けるときの Persist（SetWaveformMaximizeMode）より先にフラグを消すと
             // 映像サイズが F9 ミニマム枠へ書かれるので、位置だけ残してから消す。
             if (_videoLaunchPlacement)
@@ -2980,6 +3008,169 @@ public partial class MainWindow
             Transport.SetHeaderStructure(LibraryBrowser.HeaderStructureVisible);
             RebuildMainMenuBar();
         }
+    }
+
+    /// <summary>プレイリストモード: 別名修復ファイルをプレイリストへ追加（自動再生しない）。</summary>
+    private void LibraryBrowser_HeaderRepairedAsCopy(object? sender, IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0 || !IsLibraryMaximized)
+        {
+            return;
+        }
+
+        OpenPaths(paths, folderRecursive: false, libraryPlay: false);
+    }
+
+    /// <summary>上書き修復後: 開いている文書の日付／サイズ／ラウドネスをディスクに合わせる。</summary>
+    private void LibraryBrowser_HeaderRepairedInPlace(object? sender, IReadOnlyList<string> paths) =>
+        RefreshSessionsAfterHeaderRepair(paths);
+
+    /// <summary>エディタ編集後、プレイヤー復帰時にプレイリストを載せ替える印。</summary>
+    private void MarkLibraryPlaylistStaleFromEditor() => _libraryPlaylistStaleFromEditor = true;
+
+    /// <summary>
+    /// エディタ作業コピーの埋め込みメタをプレイリスト文書へ載せ、ラウドネスをキャッシュへ書き戻す。
+    /// Hydrate が size/mtime ずれで Tags を落とさないようにする。
+    /// </summary>
+    private void SyncPlaylistDocumentsAfterEditorEdits()
+    {
+        foreach (var session in _sessions)
+        {
+            var document = session.Document;
+            var loudness = document.Tags.HasFileLoudness
+                ? document.Tags.ToFileLoudness()
+                : (FileLoudness?)null;
+            if (!string.IsNullOrWhiteSpace(document.WaveContainerPath))
+            {
+                AudioCodec.ReloadEmbeddedMeta(document);
+            }
+
+            if (loudness is not { } kept
+                || string.IsNullOrWhiteSpace(document.SourcePath))
+            {
+                continue;
+            }
+
+            document.ApplyTags(document.Tags.WithFileLoudness(kept));
+            LibraryMediaCache.PutFileLoudness(document.SourcePath, kept);
+        }
+    }
+
+    /// <summary>
+    /// ヘッダ上書きで size/mtime が変わる。日付・サイズを取り直し、
+    /// メモリ上のラウドネスは新スタンプで書き戻し、選択平均も取り直す。
+    /// </summary>
+    private void RefreshSessionsAfterHeaderRepair(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        var pathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            if (PathUtil.TryGetFullPathTrimmed(path, out var full))
+            {
+                pathSet.Add(full);
+            }
+            else if (!string.IsNullOrWhiteSpace(path))
+            {
+                pathSet.Add(path);
+            }
+        }
+
+        if (pathSet.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var session in _sessions)
+        {
+            var document = session.Document;
+            string? matchedPath = null;
+            foreach (var candidate in new[]
+                     {
+                         document.SourcePath,
+                         document.ResolveWaveContainerPath(),
+                         document.WaveContainerPath,
+                     })
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    continue;
+                }
+
+                var full = PathUtil.TryGetFullPathTrimmed(candidate, out var normalized)
+                    ? normalized
+                    : candidate;
+                if (pathSet.Contains(full))
+                {
+                    matchedPath = full;
+                    break;
+                }
+            }
+
+            if (matchedPath is null)
+            {
+                continue;
+            }
+
+            var loudness = document.Tags.HasFileLoudness
+                ? document.Tags.ToFileLoudness()
+                : (FileLoudness?)null;
+            document.RefreshFileBytes();
+            // チャンク削除後も、ディスクに無いマーカー／ループがエディタへ残らないようにする。
+            AudioCodec.ReloadEmbeddedMeta(document);
+            if (loudness is { } kept)
+            {
+                document.ApplyTags(document.Tags.WithFileLoudness(kept));
+                if (!string.IsNullOrWhiteSpace(document.SourcePath)
+                    && PathUtil.TryGetFullPathTrimmed(document.SourcePath, out var sourceFull))
+                {
+                    LibraryMediaCache.PutFileLoudness(sourceFull, kept);
+                }
+                else
+                {
+                    LibraryMediaCache.PutFileLoudness(matchedPath, kept);
+                }
+            }
+        }
+
+        if (_document is not null)
+        {
+            var activeMatched = false;
+            foreach (var candidate in new[]
+                     {
+                         _document.SourcePath,
+                         _document.ResolveWaveContainerPath(),
+                         _document.WaveContainerPath,
+                     })
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    continue;
+                }
+
+                var key = PathUtil.TryGetFullPathTrimmed(candidate, out var activeFull)
+                    ? activeFull
+                    : candidate;
+                if (pathSet.Contains(key))
+                {
+                    activeMatched = true;
+                    break;
+                }
+            }
+
+            if (activeMatched)
+            {
+                Waveform.Refresh();
+                Overview.Refresh();
+                RefreshTransportCommandsEnabled();
+            }
+        }
+
+        SyncSelectionLoudness(measureMissing: true);
     }
 
     /// <summary>現モードのヘッダ情報オンオフ（プレイヤー／エディタは別記憶）。</summary>

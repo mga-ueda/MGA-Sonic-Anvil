@@ -239,15 +239,24 @@ internal sealed partial class LibraryBrowserView
         SetPlaylistWaveBusy(false);
     }
 
+    /// <summary>プレイヤー退出時など。波形／ラウドネスの裏仕事を止める。</summary>
+    internal void CancelPlaylistBackgroundWork()
+    {
+        CancelPlaylistWaveforms(clearBusy: true);
+        CancelPlaylistLoudness(clearBusy: true);
+    }
+
     private void SchedulePlaylistLoudness()
     {
-        CancelPlaylistLoudness(clearBusy: false);
+        // 列オフ／空のときは「先にキャンセルしてから return」だと、
+        // Bind 途中の空振り呼び出しで進行中の全件計測まで潰す。可視なときだけ張り直す。
         if (!IsLoudnessColumnEffectivelyVisible() || _items.Count == 0)
         {
-            SetPlaylistLoudnessBusy(false);
+            CancelPlaylistLoudness(clearBusy: true);
             return;
         }
 
+        CancelPlaylistLoudness(clearBusy: false);
         var cts = new CancellationTokenSource();
         _playlistLoudnessCts = cts;
         var generation = ++_playlistLoudnessGeneration;
@@ -766,7 +775,7 @@ internal sealed partial class LibraryBrowserView
                     }
                 }
 
-                _items[i] = next;
+                ReplaceBoundPlaylistRowAt(i, next);
                 changed = true;
             }
 
@@ -784,6 +793,11 @@ internal sealed partial class LibraryBrowserView
         finally
         {
             EndRowSync();
+        }
+
+        if (changed)
+        {
+            StabilizePlaylistSelectionAfterRowRewrite();
         }
 
         // フォーカスが外れたときだけ戻す。毎回 Ensure するとキー選択が阻害される。

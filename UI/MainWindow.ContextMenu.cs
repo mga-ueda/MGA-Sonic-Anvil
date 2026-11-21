@@ -1005,6 +1005,13 @@ public partial class MainWindow
             return true;
         }
 
+        // エディタのヘッダ情報。未処理だと波形メニューへ落ちてフォーカスが移る。
+        if (IsEditorHeaderStructureFocused
+            && HeaderChunkStrip.TryOpenKeyboardContextMenu())
+        {
+            return true;
+        }
+
         if (TryOpenTabContextMenuUnderPointer())
         {
             return true;
@@ -1263,12 +1270,22 @@ public partial class MainWindow
         return items;
     }
 
-    private void CopySessionPathTexts(bool fullPath)
+    private void CopySessionPathTexts(bool fullPath) =>
+        CopySessionPathTexts(ResolvePathCopySessions(), fullPath);
+
+    /// <summary>
+    /// ファイル名／フルパスコピーの対象。プレイヤーはプレイリスト選択、エディタはタブ選択。
+    /// </summary>
+    private DocumentSession[] ResolvePathCopySessions()
     {
-        var sessions = HasTabSelection
+        if (IsLibraryMaximized)
+        {
+            return ResolvePlaylistLoudnessMatchTargets();
+        }
+
+        return HasTabSelection
             ? SelectedTabsInOrder()
             : _activeSession is null ? [] : [_activeSession];
-        CopySessionPathTexts(sessions, fullPath);
     }
 
     private void CopySessionPathTexts(IReadOnlyList<DocumentSession> sessions, bool fullPath)

@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -59,7 +60,11 @@ internal sealed partial class LibraryBrowserView
         _structureTree.SelectedItemChanged += StructureTree_SelectedItemChanged;
         _structureTree.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _structureTree.PreviewKeyDown += StructurePane_PreviewKeyDown;
+        _structureTree.PreviewMouseLeftButtonDown += StructureTree_PreviewMouseLeftButtonDown;
+        _structureTree.PreviewMouseRightButtonDown += StructureTree_PreviewMouseRightButtonDown;
+        _structureLabel.PreviewMouseLeftButtonDown += (_, _) => ActivateHeaderStructureTreeFromClick();
         RebuildHeaderStructureTreeContextMenu();
+        BuildHeaderStructureRepairPanel();
 
         _structureDetailBox.IsReadOnly = true;
         _structureDetailBox.AcceptsReturn = true;
@@ -83,6 +88,8 @@ internal sealed partial class LibraryBrowserView
         HookStructureDetailScrollFit(_structureDetailBox);
         _structureDetailBox.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _structureDetailBox.PreviewKeyDown += StructurePane_PreviewKeyDown;
+        _structureDetailBox.PreviewMouseLeftButtonDown += (_, _) => ActivateHeaderStructureDetailFromClick();
+        _structureDetailLabel.PreviewMouseLeftButtonDown += (_, _) => ActivateHeaderStructureDetailFromClick();
         ScrollViewer.SetCanContentScroll(_structureDetailBox, true);
 
         _structureDetailMeta.FontFamily = StructureDetailMonoFont;
@@ -97,6 +104,7 @@ internal sealed partial class LibraryBrowserView
         _structureXmlTree.Visibility = Visibility.Collapsed;
         _structureXmlTree.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _structureXmlTree.PreviewKeyDown += StructurePane_PreviewKeyDown;
+        _structureXmlTree.PreviewMouseLeftButtonDown += (_, _) => ActivateHeaderStructureDetailFromClick();
 
         _structureTreeColumn.Width = new GridLength(DesignMetrics.LibraryHeaderStructureTreeWidth);
         _structureTreeColumn.MinWidth = DesignMetrics.LibraryHeaderStructureTreeMinWidth;
@@ -112,10 +120,27 @@ internal sealed partial class LibraryBrowserView
         _structureBody = body;
 
         // ヘッダ構造（ツリー）と情報エリアを列単位で分離。各列に見出し＋フォーカスグラデ。
+        // 修復ボタンは列の下端ではなく、ツリー本体の直後に密着させる。
+        var treeStack = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            VerticalAlignment = VerticalAlignment.Top,
+            Background = Brushes.Transparent,
+        };
+        treeStack.Children.Add(_structureTree);
+        treeStack.Children.Add(_structureRepairPanel);
+        var treeScroll = new ScrollViewer
+        {
+            Background = Brushes.Transparent,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = false,
+            Content = treeStack,
+        };
         var treePane = new DockPanel { Background = Brushes.Transparent };
         DockPanel.SetDock(_structureLabel, Dock.Top);
         treePane.Children.Add(_structureLabel);
-        treePane.Children.Add(_structureTree);
+        treePane.Children.Add(treeScroll);
         var treeHost = new Grid { Background = Brushes.Transparent };
         treeHost.Children.Add(treePane);
         treeHost.Children.Add(_structureFocusLine);
@@ -188,13 +213,15 @@ internal sealed partial class LibraryBrowserView
     {
         _structureTree.Background = Brushes.Transparent;
         _structureTree.BorderThickness = new Thickness(0);
-        _structureTree.Padding = new Thickness(4, 4, 4, 6);
+        // 下の修復ボタンと密着させるため、ツリー側の下余白は持たない。
+        _structureTree.Padding = new Thickness(4, 4, 4, 0);
+        _structureTree.VerticalAlignment = VerticalAlignment.Top;
         ApplyHeaderStructureDetailTypography(_structureTree);
+        // スクロールは外側（ツリー＋修復ボタン）で行う。中身高さに合わせるため仮想化オフ。
         ScrollViewer.SetHorizontalScrollBarVisibility(_structureTree, ScrollBarVisibility.Disabled);
-        ScrollViewer.SetVerticalScrollBarVisibility(_structureTree, ScrollBarVisibility.Auto);
+        ScrollViewer.SetVerticalScrollBarVisibility(_structureTree, ScrollBarVisibility.Disabled);
         _structureTree.SetResourceReference(ForegroundProperty, "PrimaryForeBrush");
-        VirtualizingPanel.SetIsVirtualizing(_structureTree, true);
-        VirtualizingPanel.SetVirtualizationMode(_structureTree, VirtualizationMode.Recycling);
+        VirtualizingPanel.SetIsVirtualizing(_structureTree, false);
 
         var hover = GrayHoverBrush();
         var selected = CyanSelectionBrush();
@@ -299,6 +326,105 @@ internal sealed partial class LibraryBrowserView
 
         _structureTree.Focus();
         SyncPaneFocusChrome();
+    }
+
+    /// <summary>
+    /// 余白・見出しクリックでヘッダ構造ツリーをアクティブにする。
+    /// 未選択のとき先頭を勝手に選ばない（<see cref="FocusHeaderStructure"/> とは別）。
+    /// </summary>
+    internal void ActivateHeaderStructureTreeFromClick()
+    {
+        if (!_headerStructureVisible)
+        {
+            return;
+        }
+
+        ClearExplorerTypeahead();
+        CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
+        if (_structureTree.SelectedItem is TreeViewItem selected)
+        {
+            selected.Focus();
+        }
+        else
+        {
+            _structureTree.Focus();
+        }
+
+        SyncPaneFocusChrome();
+    }
+
+    /// <summary>余白・見出しクリックでヘッダ構造の情報エリアをアクティブにする。</summary>
+    internal void ActivateHeaderStructureDetailFromClick()
+    {
+        if (!_headerStructureVisible)
+        {
+            return;
+        }
+
+        ClearExplorerTypeahead();
+        CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
+        if (_structureXmlTree.Visibility == Visibility.Visible)
+        {
+            if (_structureXmlTree.SelectedItem is TreeViewItem selected)
+            {
+                selected.Focus();
+            }
+            else
+            {
+                _structureXmlTree.Focus();
+            }
+        }
+        else
+        {
+            _structureDetailBox.Focus();
+        }
+
+        SyncPaneFocusChrome();
+    }
+
+    private void StructureTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject origin
+            || FindTreeViewItem(origin) is not { } item
+            || FindTreeExpandToggle(origin) is not null)
+        {
+            ActivateHeaderStructureTreeFromClick();
+            return;
+        }
+
+        CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
+        var modifiers = Keyboard.Modifiers;
+        var control = (modifiers & ModifierKeys.Control) != 0;
+        var shift = (modifiers & ModifierKeys.Shift) != 0;
+        BeginHeaderStructurePlainPress(item, control, shift);
+        if (control || shift)
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>右クリック行が未マークなら、その1行だけを対象にする（複数マーク中はそのまま）。</summary>
+    private void StructureTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject origin
+            || FindTreeViewItem(origin) is not { } item
+            || FindTreeExpandToggle(origin) is not null)
+        {
+            return;
+        }
+
+        if (_structureMultiSelected.Contains(item))
+        {
+            return;
+        }
+
+        BeginHeaderStructurePlainPress(item, control: false, shift: false);
     }
 
     public void FocusHeaderStructureDetail()
@@ -664,7 +790,7 @@ internal sealed partial class LibraryBrowserView
         }
 
         // 全選択など。和集合のディスク走査を選択 UI の後ろへ回す。
-        if (SelectedSessions.Length > 1)
+        if (HeaderStructureSessions().Length > 1)
         {
             ScheduleSettledHeaderStructureRefresh();
             return;
@@ -748,6 +874,9 @@ internal sealed partial class LibraryBrowserView
     /// <summary>↑↓／Page／テンキー 4・6 を離したあと、または複数選択の待ち後に溜めたヘッダ解析を実行する。</summary>
     internal void FlushDeferredHeaderStructureRefresh()
     {
+        // 構造ツリー側のチャンク選択保留も同じキー離しで確定する。
+        FlushDeferredStructureChunkApply();
+
         if (!_headerStructureRefreshDeferred)
         {
             return;
@@ -766,6 +895,124 @@ internal sealed partial class LibraryBrowserView
         }
     }
 
+    /// <summary>テスト用。null なら実キー状態を見る。</summary>
+    internal Func<bool>? StructureNavigationKeyHeldForTest { get; set; }
+
+    /// <summary>テスト用。キー離し待ちのチャンク選択副作用が溜まっているか。</summary>
+    internal bool IsStructureChunkApplyDeferred => _structureChunkApplyDeferred;
+
+    private bool IsStructureNavigationKeyHeld() =>
+        StructureNavigationKeyHeldForTest?.Invoke()
+        ?? (Keyboard.IsKeyDown(Key.Up)
+            || Keyboard.IsKeyDown(Key.Down)
+            || Keyboard.IsKeyDown(Key.Home)
+            || Keyboard.IsKeyDown(Key.End)
+            || Keyboard.IsKeyDown(Key.PageUp)
+            || Keyboard.IsKeyDown(Key.PageDown));
+
+    /// <summary>
+    /// 構造ツリーのチャンク選択副作用。ナビキー押し中は保留し、離してから詳細／和集合同期する。
+    /// </summary>
+    private void RequestStructureChunkSelectionApply()
+    {
+        if (IsStructureNavigationKeyHeld())
+        {
+            ScheduleDeferredStructureChunkApply();
+            return;
+        }
+
+        ApplyStructureChunkSelectionNow();
+    }
+
+    private void ScheduleDeferredStructureChunkApply()
+    {
+        _structureChunkApplyDeferred = true;
+        var ticket = ++_structureChunkApplyTicket;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _structureChunkApplyTicket
+                    || !_structureChunkApplyDeferred)
+                {
+                    return;
+                }
+
+                if (IsStructureNavigationKeyHeld())
+                {
+                    return;
+                }
+
+                FlushDeferredStructureChunkApply();
+            },
+            DispatcherPriority.Background);
+    }
+
+    /// <summary>構造ツリーのナビキーを離したあと、溜めたチャンク選択を確定する。</summary>
+    internal void FlushDeferredStructureChunkApply()
+    {
+        if (!_structureChunkApplyDeferred)
+        {
+            return;
+        }
+
+        if (IsStructureNavigationKeyHeld())
+        {
+            return;
+        }
+
+        ApplyStructureChunkSelectionNow();
+    }
+
+    private void ApplyStructureChunkSelectionNow()
+    {
+        _structureChunkApplyDeferred = false;
+        _structureChunkApplyTicket++;
+
+        if (_structureDocument is { IsChunkUnion: true })
+        {
+            ShowStructureDetail(string.Empty);
+            SelectPlaylistSessionsMatchingUnionChunks(CollectUnionChunkSelectionNodes());
+            return;
+        }
+
+        if (_structureTree.SelectedItem is TreeViewItem { Tag: WaveStructureNode node } item)
+        {
+            if (!_structureSuppressRemember)
+            {
+                RememberStructureChunkPath(item);
+            }
+
+            ShowStructureNode(node);
+        }
+    }
+
+    /// <summary>
+    /// 和集合ツリーのマーク行（無ければキャレット行）のチャンクノード。
+    /// Shift／Ctrl／Ctrl+A の複数マークをプレイリストへ和で渡す。
+    /// </summary>
+    private List<WaveStructureNode> CollectUnionChunkSelectionNodes()
+    {
+        var nodes = new List<WaveStructureNode>();
+        foreach (var item in FlattenVisibleStructureItems())
+        {
+            if (!_structureMultiSelected.Contains(item)
+                || item.Tag is not WaveStructureNode node)
+            {
+                continue;
+            }
+
+            nodes.Add(node);
+        }
+
+        if (nodes.Count == 0
+            && _structureTree.SelectedItem is TreeViewItem { Tag: WaveStructureNode selected })
+        {
+            nodes.Add(selected);
+        }
+
+        return nodes;
+    }
+
     private void RefreshHeaderStructure()
     {
         // 非表示時は読まない。選択変更・追加（Append/SetSessions）もここ経由なので、
@@ -781,7 +1028,8 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
-        var sessions = SelectedSessions;
+        // チェックモードでも未チェックならシアン帯を見る（SelectedSessions だけだと空になる）。
+        var sessions = HeaderStructureSessions();
         if (sessions.Length == 0)
         {
             ClearHeaderStructure();
@@ -798,7 +1046,8 @@ internal sealed partial class LibraryBrowserView
         _structureUnionBuildTicket++;
         _structureUnionPendingKey = null;
 
-        var path = sessions[0].Document.SourcePath;
+        // エディタ未保存の作業コピーがあればそちら（SourcePath 固定だと修復／削除が戻って見える）。
+        var path = sessions[0].Document.ResolveWaveContainerPath();
         if (string.IsNullOrWhiteSpace(path))
         {
             ClearHeaderStructure();
@@ -815,6 +1064,9 @@ internal sealed partial class LibraryBrowserView
         _structureLoadedPath = path;
         var document = WaveContainerStructure.TryRead(path);
         _structureDocument = document;
+        _structureRepairPaths = WaveHeaderRepair.NeedsRepair(document)
+            ? new[] { path }
+            : Array.Empty<string>();
         PopulateHeaderStructure(document);
     }
 
@@ -826,7 +1078,7 @@ internal sealed partial class LibraryBrowserView
         var paths = new List<string>(sessions.Count);
         foreach (var session in sessions)
         {
-            var p = session.Document.SourcePath;
+            var p = session.Document.ResolveWaveContainerPath();
             if (!string.IsNullOrWhiteSpace(p))
             {
                 paths.Add(p);
@@ -860,7 +1112,12 @@ internal sealed partial class LibraryBrowserView
 
         _structureUnionPendingKey = cacheKey;
         var ticket = ++_structureUnionBuildTicket;
-        _ = Task.Run(() => WaveContainerStructure.BuildChunkUnion(paths))
+        _ = Task.Run(() =>
+            {
+                var document = WaveContainerStructure.BuildChunkUnion(paths);
+                var repairTargets = WaveHeaderRepair.CollectRepairTargets(paths);
+                return (document, repairTargets);
+            })
             .ContinueWith(task =>
             {
                 Dispatcher.BeginInvoke(() =>
@@ -878,10 +1135,11 @@ internal sealed partial class LibraryBrowserView
                         return;
                     }
 
-                    var document = task.Result;
+                    var (document, repairTargets) = task.Result;
                     _structureUnionPendingKey = null;
                     _structureLoadedPath = cacheKey;
                     _structureDocument = document;
+                    _structureRepairPaths = repairTargets;
                     PopulateHeaderStructure(document);
                 });
             });
@@ -903,25 +1161,35 @@ internal sealed partial class LibraryBrowserView
     /// <summary>ツリー／本文だけ空ける。列幅の記憶は触らない（表示中の再解析抑止用）。</summary>
     private void DiscardHeaderStructureContent()
     {
-        _structureTreeSelectAll = false;
+        _structureMultiSelected.Clear();
+        _structureSelectionAnchor = null;
+        _structureRangeBusy = false;
+        _structureChunkApplyDeferred = false;
+        _structureChunkApplyTicket++;
         _structureUnionBuildTicket++;
         _structureUnionPendingKey = null;
         _structureLoadedPath = null;
         _structureDocument = null;
+        _structureRepairPaths = Array.Empty<string>();
         _structureTree.Items.Clear();
         _structureErrorBanner.Visibility = Visibility.Collapsed;
         _structureErrorText.Text = string.Empty;
+        ResetHeaderStructureRepairUi(show: false);
         ShowStructureDetail(string.Empty);
     }
 
     private void PopulateHeaderStructure(WaveStructureDocument document)
     {
+        _structureMultiSelected.Clear();
+        _structureSelectionAnchor = null;
         _structureTree.Items.Clear();
         if (document.IsUnsupported)
         {
             // mp3 等はメッセージを出さず空欄のまま。
             _structureErrorBanner.Visibility = Visibility.Collapsed;
             _structureErrorText.Text = string.Empty;
+            _structureRepairPaths = Array.Empty<string>();
+            ResetHeaderStructureRepairUi(show: false);
             ShowStructureDetail(string.Empty);
             return;
         }
@@ -950,8 +1218,9 @@ internal sealed partial class LibraryBrowserView
                         unionFileCounts: true));
             }
 
-            // 複数選択は和集合一覧のみ。情報エリアは出さない。
+            // 複数選択は和集合一覧のみ。情報エリアは出さない。修復 UI は対象があれば出す。
             ShowStructureDetail(string.Empty);
+            ResetHeaderStructureRepairUi(show: _structureRepairPaths.Count > 0);
             return;
         }
 
@@ -994,6 +1263,317 @@ internal sealed partial class LibraryBrowserView
         {
             ShowStructureDetail(UiStrings.WaveStructureSelectNode);
         }
+
+        ResetHeaderStructureRepairUi(show: _structureRepairPaths.Count > 0);
+    }
+
+    private void BuildHeaderStructureRepairPanel()
+    {
+        _structureRepairPanel.Orientation = Orientation.Vertical;
+        // ツリー最終行の直下へ。左右はツリー Padding(4) に揃える。
+        _structureRepairPanel.Margin = new Thickness(4, 6, 4, 8);
+        _structureRepairPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _structureRepairPanel.Visibility = Visibility.Collapsed;
+
+        _structureRepairAskButton.Content = UiStrings.WaveHeaderRepairButton;
+        _structureRepairAskButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _structureRepairAskButton.MinHeight = DesignMetrics.From96(28);
+        _structureRepairAskButton.Padding = new Thickness(10, 4, 10, 4);
+        _structureRepairAskButton.Margin = new Thickness(0);
+        // 破損警告と同系の赤（ClearButton パレット）。
+        ActionButtonLooks.ApplyClear(_structureRepairAskButton);
+        _structureRepairAskButton.Click += (_, _) => ShowHeaderStructureRepairConfirm();
+
+        _structureRepairPrompt.Text = UiStrings.WaveHeaderRepairPrompt;
+        _structureRepairPrompt.TextWrapping = TextWrapping.Wrap;
+        _structureRepairPrompt.Margin = new Thickness(0, 0, 0, 6);
+        _structureRepairPrompt.FontSize = LibraryListFontSize;
+        _structureRepairPrompt.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+
+        _structureRepairAsCopyButton.Content = UiStrings.WaveHeaderRepairAsCopy;
+        _structureRepairAsCopyButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _structureRepairAsCopyButton.MinHeight = DesignMetrics.From96(28);
+        _structureRepairAsCopyButton.Padding = new Thickness(10, 4, 10, 4);
+        _structureRepairAsCopyButton.Margin = new Thickness(0, 0, 0, 4);
+        ActionButtonLooks.ApplyClear(_structureRepairAsCopyButton);
+        _structureRepairAsCopyButton.Click += (_, _) => _ = RepairHeaderStructureAsync(overwrite: false);
+
+        _structureRepairOverwriteButton.Content = UiStrings.WaveHeaderRepairOverwrite;
+        _structureRepairOverwriteButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _structureRepairOverwriteButton.MinHeight = DesignMetrics.From96(28);
+        _structureRepairOverwriteButton.Padding = new Thickness(10, 4, 10, 4);
+        _structureRepairOverwriteButton.Margin = new Thickness(0);
+        ActionButtonLooks.ApplyOrange(_structureRepairOverwriteButton);
+        _structureRepairOverwriteButton.Click += (_, _) => _ = RepairHeaderStructureAsync(overwrite: true);
+
+        _structureRepairConfirmPanel.Orientation = Orientation.Vertical;
+        _structureRepairConfirmPanel.Visibility = Visibility.Collapsed;
+        _structureRepairConfirmPanel.Children.Add(_structureRepairPrompt);
+        _structureRepairConfirmPanel.Children.Add(_structureRepairAsCopyButton);
+        _structureRepairConfirmPanel.Children.Add(_structureRepairOverwriteButton);
+
+        _structureRepairPanel.Children.Add(_structureRepairAskButton);
+        _structureRepairPanel.Children.Add(_structureRepairConfirmPanel);
+    }
+
+    private void ResetHeaderStructureRepairUi(bool show)
+    {
+        _structureRepairConfirming = false;
+        _structureRepairAskButton.Visibility = Visibility.Visible;
+        _structureRepairConfirmPanel.Visibility = Visibility.Collapsed;
+        _structureRepairAskButton.IsEnabled = true;
+        _structureRepairAsCopyButton.IsEnabled = true;
+        _structureRepairOverwriteButton.IsEnabled = true;
+        _structureRepairAskButton.Content = UiStrings.WaveHeaderRepairButton;
+        _structureRepairPrompt.Text = FormatHeaderStructureRepairPrompt();
+        _structureRepairAsCopyButton.Content = UiStrings.WaveHeaderRepairAsCopy;
+        _structureRepairOverwriteButton.Content = UiStrings.WaveHeaderRepairOverwrite;
+        _structureRepairPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private string FormatHeaderStructureRepairPrompt() =>
+        _structureRepairPaths.Count > 1
+            ? UiStrings.WaveHeaderRepairPromptMany(_structureRepairPaths.Count)
+            : UiStrings.WaveHeaderRepairPrompt;
+
+    private void ShowHeaderStructureRepairConfirm()
+    {
+        if (_structureRepairPanel.Visibility != Visibility.Visible
+            || _structureRepairPaths.Count == 0)
+        {
+            return;
+        }
+
+        _structureRepairConfirming = true;
+        _structureRepairPrompt.Text = FormatHeaderStructureRepairPrompt();
+        _structureRepairAskButton.Visibility = Visibility.Collapsed;
+        _structureRepairConfirmPanel.Visibility = Visibility.Visible;
+    }
+
+    private async Task RepairHeaderStructureAsync(bool overwrite)
+    {
+        if (!_structureRepairConfirming || _structureRepairPaths.Count == 0)
+        {
+            return;
+        }
+
+        var sources = _structureRepairPaths.ToArray();
+        _structureRepairAsCopyButton.IsEnabled = false;
+        _structureRepairOverwriteButton.IsEnabled = false;
+        try
+        {
+            var batch = await Task.Run(() => WaveHeaderRepair.RepairMany(sources, overwrite))
+                .ConfigureAwait(true);
+
+            if (batch.Succeeded == 0)
+            {
+                ShowHeaderStructureRepairToast(
+                    batch.FirstError ?? UiStrings.WaveHeaderRepairFailed("unknown"));
+                ResetHeaderStructureRepairUi(show: true);
+                ShowHeaderStructureRepairConfirm();
+                return;
+            }
+
+            if (overwrite)
+            {
+                // 日付／サイズ／ラウドネスとヘッダ構造（修復ボタン含む）をディスクに合わせる。
+                RefreshSessionsAfterHeaderRepairInPlace(batch.WrittenPaths);
+                HeaderRepairedInPlace?.Invoke(this, batch.WrittenPaths);
+                ShowHeaderStructureRepairToast(FormatHeaderStructureRepairOverwriteToast(batch));
+            }
+            else
+            {
+                // 確認 UI を畳み、冒頭の「ヘッダを修復」へ戻す（元ファイルはまだ要修復）。
+                ResetHeaderStructureRepairUi(show: true);
+                ShowHeaderStructureRepairToast(FormatHeaderStructureRepairCopyToast(batch, sources.Length));
+                if (batch.WrittenPaths.Count > 0)
+                {
+                    HeaderRepairedAsCopy?.Invoke(this, batch.WrittenPaths);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowHeaderStructureRepairToast(UiStrings.WaveHeaderRepairFailed(ex.Message));
+            ResetHeaderStructureRepairUi(show: true);
+            ShowHeaderStructureRepairConfirm();
+        }
+    }
+
+    /// <summary>
+    /// 次回のヘッダ構造表示で必ずディスクを読み直す。
+    /// エディタで修復／チャンク削除したあと、プレイヤー側の古い修復ボタンが残らないようにする。
+    /// </summary>
+    internal void InvalidateHeaderStructureCache()
+    {
+        _structureUnionBuildTicket++;
+        _structureUnionPendingKey = null;
+        _structureLoadedPath = null;
+        _structureDocument = null;
+        _structureRepairPaths = Array.Empty<string>();
+        ResetHeaderStructureRepairUi(show: false);
+    }
+
+    /// <summary>表示中ならヘッダ構造を今すぐ取り直す（エディタ作業コピー反映用）。</summary>
+    internal void RefreshHeaderStructureIfVisible()
+    {
+        if (_headerStructureVisible)
+        {
+            RefreshHeaderStructure();
+        }
+    }
+
+    /// <summary>
+    /// 上書き修復／チャンク削除後: 日付・サイズをディスクから取り直し、
+    /// プレイリスト行を <see cref="BindRows"/> で全件作り直す（部分 Replace だと全選択が中途半端になる）。
+    /// ヘッダ構造のキャッシュも捨て、表示中なら修復要否を取り直す。
+    /// </summary>
+    internal void RefreshSessionsAfterHeaderRepairInPlace(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        var pathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            if (PathUtil.TryGetFullPathTrimmed(path, out var full))
+            {
+                pathSet.Add(full);
+            }
+            else if (!string.IsNullOrWhiteSpace(path))
+            {
+                pathSet.Add(path);
+            }
+        }
+
+        if (pathSet.Count == 0)
+        {
+            return;
+        }
+
+        // 行が無くてもキャッシュは捨てる（エディタ側で直したあとプレイヤーへ戻る経路）。
+        InvalidateHeaderStructureCache();
+
+        var touched = false;
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            if (_rows[i].Tag is not DocumentSession session)
+            {
+                continue;
+            }
+
+            var document = session.Document;
+            // Source または作業コピーが writtenPaths に含まれるとき更新。
+            string? matchedPath = null;
+            foreach (var candidate in new[]
+                     {
+                         document.SourcePath,
+                         document.ResolveWaveContainerPath(),
+                         document.WaveContainerPath,
+                     })
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    continue;
+                }
+
+                var full = PathUtil.TryGetFullPathTrimmed(candidate, out var normalized)
+                    ? normalized
+                    : candidate;
+                if (pathSet.Contains(full))
+                {
+                    matchedPath = full;
+                    break;
+                }
+            }
+
+            if (matchedPath is null)
+            {
+                continue;
+            }
+
+            var loudness = document.Tags.HasFileLoudness
+                ? document.Tags.ToFileLoudness()
+                : (FileLoudness?)null;
+            document.RefreshFileBytes();
+            // cue / smpl / adtl を消したあとも、メモリ上のマーカーがエディタへ残らないようにする。
+            AudioCodec.ReloadEmbeddedMeta(document);
+            if (loudness is { } kept)
+            {
+                document.ApplyTags(document.Tags.WithFileLoudness(kept));
+                // ラウドネスキャッシュは Source 基準のまま。
+                if (!string.IsNullOrWhiteSpace(document.SourcePath)
+                    && PathUtil.TryGetFullPathTrimmed(document.SourcePath, out var sourceFull))
+                {
+                    LibraryMediaCache.PutFileLoudness(sourceFull, kept);
+                }
+                else
+                {
+                    LibraryMediaCache.PutFileLoudness(matchedPath, kept);
+                }
+            }
+
+            touched = true;
+        }
+
+        if (touched)
+        {
+            RematerializeBoundPlaylistRows();
+        }
+        else
+        {
+            SchedulePlaylistLoudness();
+        }
+
+        if (_headerStructureVisible)
+        {
+            RefreshHeaderStructure();
+        }
+    }
+
+    private static string FormatHeaderStructureRepairOverwriteToast(WaveHeaderRepair.BatchResult batch)
+    {
+        if (batch.Changed == 0 && batch.Failed == 0)
+        {
+            return UiStrings.WaveHeaderRepairNoChange;
+        }
+
+        if (batch.Succeeded == 1 && batch.Failed == 0)
+        {
+            return batch.Changed > 0
+                ? UiStrings.WaveHeaderRepairOverwritten
+                : UiStrings.WaveHeaderRepairNoChange;
+        }
+
+        return UiStrings.WaveHeaderRepairOverwrittenMany(batch.Succeeded, batch.Failed);
+    }
+
+    private static string FormatHeaderStructureRepairCopyToast(
+        WaveHeaderRepair.BatchResult batch,
+        int requested)
+    {
+        if (batch.Changed == 0 && batch.Failed == 0)
+        {
+            return UiStrings.WaveHeaderRepairNoChange;
+        }
+
+        if (requested == 1 && batch.Succeeded == 1 && batch.Failed == 0)
+        {
+            var name = Path.GetFileName(batch.WrittenPaths[0]);
+            return batch.Changed > 0
+                ? UiStrings.WaveHeaderRepairSavedAs(name)
+                : UiStrings.WaveHeaderRepairNoChange;
+        }
+
+        return UiStrings.WaveHeaderRepairSavedAsMany(batch.Succeeded, batch.Failed);
+    }
+
+    private void ShowHeaderStructureRepairToast(string message)
+    {
+        EnsureTransferToastHost();
+        _transferToast.Show(message);
     }
 
     private TreeViewItem CreateStructureTreeItem(
@@ -1014,15 +1594,8 @@ internal sealed partial class LibraryBrowserView
             item.ItemContainerStyle = style;
         }
 
-        // 不正／空 FourCC=赤、独自=オレンジ、専門メタ=シアン、コア=通常。
-        // 空 FourCC は IsCustom にも当たるが、不正色を優先して情報欄と揃える。
-        var brushKey = node.IsInvalid || WaveStructureNode.IsBlankFourCc(node.Id)
-            ? MissingRegisteredPathForeBrushKey
-            : node.IsCustom
-                ? WaveStructureCustomChunkForeBrushKey
-                : node.IsSpecialized
-                    ? WaveStructureSpecializedChunkForeBrushKey
-                    : "PrimaryForeBrush";
+        // 可=赤、注意=オレンジ、保護=シアン、不可=通常。不正／空 FourCC はエラー色。
+        var brushKey = WaveChunkCleanPolicy.ResolveForeBrushKey(node);
         var header = new TextBlock
         {
             Text = unionFileCounts
@@ -1054,29 +1627,32 @@ internal sealed partial class LibraryBrowserView
 
     private void StructureTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        // 通常クリック／矢印移動では全選択マークを外す。
-        ClearHeaderStructureTreeSelectAllMarks();
-
-        if (_structureDocument is { IsChunkUnion: true })
+        if (!_structureRangeBusy
+            && e.NewValue is TreeViewItem selected)
         {
-            ShowStructureDetail(string.Empty);
-            if (_structureTree.SelectedItem is TreeViewItem { Tag: WaveStructureNode unionNode })
+            var modifiers = Keyboard.Modifiers;
+            if ((modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
             {
-                SelectPlaylistSessionsMatchingUnionChunk(unionNode);
+                _structureSelectionAnchor = selected;
             }
 
-            return;
-        }
-
-        if (_structureTree.SelectedItem is TreeViewItem { Tag: WaveStructureNode node } item)
-        {
-            if (!_structureSuppressRemember)
+            // 通常クリック／矢印は1行マークに揃える。
+            // Preview で先にマーク済みでも、IsSelected が切り替わったあとに帯の角を取り直す
+            // （直前行がまだ IsSelected のまま帯を組むと Last 角のまま残る）。
+            if ((modifiers & ModifierKeys.Control) == 0
+                && (modifiers & ModifierKeys.Shift) == 0)
             {
-                RememberStructureChunkPath(item);
-            }
+                if (!_structureMultiSelected.Contains(selected))
+                {
+                    ClearHeaderStructureMultiSelect();
+                    _structureMultiSelected.Add(selected);
+                }
 
-            ShowStructureNode(node);
+                ApplyHeaderStructureMultiSelectChrome();
+            }
         }
+
+        RequestStructureChunkSelectionApply();
     }
 
     private void RebuildHeaderStructureTreeContextMenu()
@@ -1086,6 +1662,7 @@ internal sealed partial class LibraryBrowserView
         {
             menu.Items.Clear();
             var hasRows = FlattenVisibleStructureItems().Count > 0;
+            var selected = CollectHeaderStructureDeleteTargets();
             var selectAll = new MenuItem
             {
                 Header = UiStrings.WaveMenuSelectAll,
@@ -1100,14 +1677,109 @@ internal sealed partial class LibraryBrowserView
                 IsEnabled = hasRows,
             };
             copy.Click += (_, _) => CopyHeaderStructureSelection();
+            var delete = new MenuItem
+            {
+                Header = selected.Count > 1
+                    ? UiStrings.WaveChunkDeleteMenuMany
+                    : UiStrings.WaveChunkDeleteMenu,
+                // 不可のみ（****／fmt／data 等）はグレー。
+                IsEnabled = selected.Count > 0
+                    && WaveChunkDeleteUi.HasDeletableSelection(selected),
+            };
+            delete.Click += (_, _) => _ = DeleteHeaderStructureChunksAsync();
             menu.Items.Add(selectAll);
             menu.Items.Add(copy);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(delete);
         };
         ArmContextMenuDismissGuard(menu);
         _structureTree.ContextMenu = menu;
     }
 
-    /// <summary>表示中のチャンク行をすべてマーク（コピー用）。</summary>
+    private List<TreeViewItem> CollectHeaderStructureDeleteTargets()
+    {
+        var list = new List<TreeViewItem>();
+        foreach (var item in FlattenVisibleStructureItems())
+        {
+            if (_structureMultiSelected.Contains(item))
+            {
+                list.Add(item);
+            }
+        }
+
+        if (list.Count > 0)
+        {
+            return list;
+        }
+
+        if (_structureTree.SelectedItem is TreeViewItem selected)
+        {
+            list.Add(selected);
+        }
+
+        return list;
+    }
+
+    private async Task DeleteHeaderStructureChunksAsync()
+    {
+        var targets = CollectHeaderStructureDeleteTargets();
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var singlePath = _structureDocument?.IsChunkUnion == true
+            ? null
+            : _structureLoadedPath;
+        var plan = WaveChunkDeleteUi.BuildPlan(targets, singlePath);
+        if (plan is null)
+        {
+            return;
+        }
+
+        var owner = Window.GetWindow(this);
+        if (!WaveChunkDeleteUi.Confirm(owner, plan.Value))
+        {
+            return;
+        }
+
+        if (plan.Value.PathToChunkIds.Count == 0)
+        {
+            ShowHeaderStructureRepairToast(UiStrings.WaveChunkDeleteForbiddenOnly);
+            return;
+        }
+
+        try
+        {
+            var batch = await Task.Run(() => WaveChunkStripper.StripMany(plan.Value.PathToChunkIds))
+                .ConfigureAwait(true);
+            if (batch.Succeeded == 0)
+            {
+                ShowHeaderStructureRepairToast(
+                    batch.FirstError ?? UiStrings.WaveChunkStripFailed("unknown"));
+                return;
+            }
+
+            if (batch.Changed == 0)
+            {
+                ShowHeaderStructureRepairToast(UiStrings.WaveChunkStripNoChange);
+                return;
+            }
+
+            RefreshSessionsAfterHeaderRepairInPlace(batch.WrittenPaths);
+            HeaderRepairedInPlace?.Invoke(this, batch.WrittenPaths);
+            ShowHeaderStructureRepairToast(
+                UiStrings.WaveChunkStripDone(
+                    batch.Changed,
+                    plan.Value.Entries.Count(static e => e.Verdict != WaveChunkCleanVerdict.Forbidden)));
+        }
+        catch (Exception ex)
+        {
+            ShowHeaderStructureRepairToast(UiStrings.WaveChunkStripFailed(ex.Message));
+        }
+    }
+
+    /// <summary>表示中のチャンク行をすべてマーク（コピー／和集合→プレイリスト同期用）。</summary>
     public void SelectAllHeaderStructureItems()
     {
         if (!_headerStructureVisible)
@@ -1121,16 +1793,18 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
-        _structureTreeSelectAll = true;
-        // プレイリストと同じ連続帯：先頭／末尾だけ角丸、中間は直角。
-        for (var i = 0; i < items.Count; i++)
+        _structureMultiSelected.Clear();
+        foreach (var item in items)
         {
-            var item = items[i];
-            item.SetValue(TreeMarkedProperty, true);
-            item.SetValue(
-                SelectionBandEdgeProperty,
-                SelectionBandCorners.EdgeAt(i, items.Count));
+            _structureMultiSelected.Add(item);
         }
+
+        _structureSelectionAnchor =
+            _structureTree.SelectedItem as TreeViewItem ?? items[0];
+        ApplyHeaderStructureMultiSelectChrome();
+
+        // 和集合ではマーク全件の MemberPaths をプレイリストへ（キャレット1件だけにしない）。
+        RequestStructureChunkSelectionApply();
 
         if (!_structureTree.IsKeyboardFocusWithin)
         {
@@ -1139,7 +1813,7 @@ internal sealed partial class LibraryBrowserView
     }
 
     /// <summary>
-    /// 全選択中なら全行、そうでなければ選択行をタブ区切りでクリップボードへ。
+    /// 複数マークがあればその行、なければ選択行をタブ区切りでクリップボードへ。
     /// </summary>
     public void CopyHeaderStructureSelection()
     {
@@ -1157,19 +1831,24 @@ internal sealed partial class LibraryBrowserView
         SystemClipboard.TrySetText(text, Window.GetWindow(this));
     }
 
-    private string BuildHeaderStructureCopyText()
+    internal string BuildHeaderStructureCopyText()
     {
-        if (_structureTreeSelectAll)
+        var lines = new List<string>();
+        foreach (var item in FlattenVisibleStructureItems())
         {
-            var lines = new List<string>();
-            foreach (var item in FlattenVisibleStructureItems())
+            if (!_structureMultiSelected.Contains(item))
             {
-                if (StructureTreeItemCopyLine(item) is { Length: > 0 } line)
-                {
-                    lines.Add(line);
-                }
+                continue;
             }
 
+            if (StructureTreeItemCopyLine(item) is { Length: > 0 } line)
+            {
+                lines.Add(line);
+            }
+        }
+
+        if (lines.Count > 0)
+        {
             return string.Join(Environment.NewLine, lines);
         }
 
@@ -1194,7 +1873,7 @@ internal sealed partial class LibraryBrowserView
             });
         }
 
-        // 空 FourCC は ----。通常は FourCC（末尾空白は表貼り付け用に落とす）。
+        // 空／不正 FourCC は ****。通常は FourCC（末尾空白は表貼り付け用に落とす）。
         var name = node.FormatDisplayFourCc().TrimEnd();
         if (name.Length == 0)
         {
@@ -1215,33 +1894,156 @@ internal sealed partial class LibraryBrowserView
         return indent + name + "\t" + WaveStructureNode.FormatSize(node.Size);
     }
 
-    private void ClearHeaderStructureTreeSelectAllMarks()
+    internal int HeaderStructureMultiSelectedCount => _structureMultiSelected.Count;
+
+    internal void BeginHeaderStructurePlainPress(TreeViewItem item, bool control, bool shift = false)
     {
-        if (!_structureTreeSelectAll)
+        if (shift)
+        {
+            ApplyHeaderStructureShiftClick(item);
+            return;
+        }
+
+        if (control)
+        {
+            ToggleHeaderStructureMultiSelect(item);
+            // SelectedItemChanged がアンカーを上書きしないよう握る（実キーの Ctrl 修飾が無い呼び出しも含む）。
+            _structureRangeBusy = true;
+            try
+            {
+                SelectStructureTreeItem(item, remember: true);
+            }
+            finally
+            {
+                _structureRangeBusy = false;
+            }
+
+            return;
+        }
+
+        ClearHeaderStructureMultiSelect();
+        _structureMultiSelected.Add(item);
+        _structureSelectionAnchor = item;
+        ApplyHeaderStructureMultiSelectChrome();
+    }
+
+    internal void ApplyHeaderStructureShiftClick(TreeViewItem item) =>
+        ApplyHeaderStructureMoveSelection(item, _structureTree.SelectedItem as TreeViewItem, extend: true);
+
+    private void ToggleHeaderStructureMultiSelect(TreeViewItem item)
+    {
+        if (!_structureMultiSelected.Add(item))
+        {
+            _structureMultiSelected.Remove(item);
+        }
+
+        ApplyHeaderStructureMultiSelectChrome();
+    }
+
+    private void ClearHeaderStructureMultiSelect()
+    {
+        if (_structureMultiSelected.Count == 0)
         {
             return;
         }
 
-        _structureTreeSelectAll = false;
+        _structureMultiSelected.Clear();
+        ApplyHeaderStructureMultiSelectChrome();
+    }
+
+    private void ApplyHeaderStructureMultiSelectChrome()
+    {
+        var run = new List<TreeViewItem>();
+        void Flush()
+        {
+            for (var i = 0; i < run.Count; i++)
+            {
+                run[i].SetValue(SelectionBandEdgeProperty, SelectionBandCorners.EdgeAt(i, run.Count));
+            }
+
+            run.Clear();
+        }
+
         foreach (var item in FlattenVisibleStructureItems())
         {
-            item.SetValue(TreeMarkedProperty, false);
-            item.SetValue(SelectionBandEdgeProperty, SelectionBandEdge.None);
+            var marked = _structureMultiSelected.Contains(item);
+            item.SetValue(TreeMarkedProperty, marked);
+            // IsSelected は帯に入れない。Preview 時点では前行がまだ選択のままなので、
+            // 混ぜると2行帯扱いになり角丸が First/Last のまま残る。
+            if (marked)
+            {
+                run.Add(item);
+            }
+            else
+            {
+                Flush();
+                item.SetValue(SelectionBandEdgeProperty, SelectionBandEdge.None);
+            }
         }
+
+        Flush();
+    }
+
+    private void SelectHeaderStructureVisibleRange(TreeViewItem from, TreeViewItem to)
+    {
+        var items = FlattenVisibleStructureItems();
+        var start = items.IndexOf(from);
+        var end = items.IndexOf(to);
+        if (end < 0)
+        {
+            return;
+        }
+
+        if (start < 0)
+        {
+            start = end;
+        }
+
+        var lo = Math.Min(start, end);
+        var hi = Math.Max(start, end);
+        _structureMultiSelected.Clear();
+        for (var i = lo; i <= hi; i++)
+        {
+            _structureMultiSelected.Add(items[i]);
+        }
+
+        ApplyHeaderStructureMultiSelectChrome();
     }
 
     /// <summary>
-    /// 和集合のチャンク行を選んだとき、そのチャンクを持つプレイリスト行を選択する。
-    /// 和集合ツリー自体は作り直さない。
+    /// 和集合のチャンク行（複数可）を選んだとき、いずれかのチャンクを持つプレイリスト行を選択する。
+    /// 和集合ツリー自体は作り直さない。フォーカスはヘッダ側に残す。
     /// </summary>
-    private void SelectPlaylistSessionsMatchingUnionChunk(WaveStructureNode node)
+    private void SelectPlaylistSessionsMatchingUnionChunks(IReadOnlyList<WaveStructureNode> nodes)
     {
-        if (node.MemberPaths.Count == 0)
+        if (nodes.Count == 0)
         {
             return;
         }
 
-        var pathSet = new HashSet<string>(node.MemberPaths, StringComparer.OrdinalIgnoreCase);
+        // NAS／共有ドライブでも一致するよう正規化して比較する。
+        // 複数マーク時は MemberPaths の和（Shift 範囲／Ctrl+A で「全部」になる）。
+        var pathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var node in nodes)
+        {
+            foreach (var member in node.MemberPaths)
+            {
+                if (PathUtil.TryGetFullPathTrimmed(member, out var full))
+                {
+                    pathSet.Add(full);
+                }
+                else if (!string.IsNullOrWhiteSpace(member))
+                {
+                    pathSet.Add(member);
+                }
+            }
+        }
+
+        if (pathSet.Count == 0)
+        {
+            return;
+        }
+
         var selected = new List<DocumentSession>();
         DocumentSession? caret = null;
         foreach (var row in BoundRows)
@@ -1251,8 +2053,29 @@ internal sealed partial class LibraryBrowserView
                 continue;
             }
 
-            var path = session.Document.SourcePath;
-            if (string.IsNullOrWhiteSpace(path) || !pathSet.Contains(path))
+            // 作業コピー（Resolve）と Source の両方を照合（エディタ削除後の和集合）。
+            var matched = false;
+            foreach (var candidate in new[]
+                     {
+                         session.Document.ResolveWaveContainerPath(),
+                         session.Document.SourcePath,
+                     })
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    continue;
+                }
+
+                matched = PathUtil.TryGetFullPathTrimmed(candidate, out var full)
+                    ? pathSet.Contains(full)
+                    : pathSet.Contains(candidate);
+                if (matched)
+                {
+                    break;
+                }
+            }
+
+            if (!matched)
             {
                 continue;
             }
@@ -1266,14 +2089,32 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
+        // 遅延の RequestListFocus／キャレット再 assert にプレイリストへ吸われないようにする。
+        CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
+        var keepTreeItem = _structureTree.SelectedItem as TreeViewItem;
         _suppressHeaderStructureRefresh = true;
         try
         {
             ApplyRowSelectionCore(caret, selected);
+            // チェックモード中は SelectedSessions がチェック側。帯だけ変えると
+            // 反転→クリアで全件消える（空チェックの反転が全チェックになる）ので同期する。
+            if (_checkSelectMode)
+            {
+                ApplyPlaylistChecksFromSelection();
+            }
         }
         finally
         {
             _suppressHeaderStructureRefresh = false;
+        }
+
+        // 選択同期の副作用でフォーカスが落ちてもヘッダツリーへ戻す。
+        if (keepTreeItem is not null)
+        {
+            keepTreeItem.Focus();
+            SyncPaneFocusChrome();
         }
     }
 
@@ -1361,7 +2202,7 @@ internal sealed partial class LibraryBrowserView
         }
     }
 
-    public void MoveHeaderStructureSelection(int delta)
+    public void MoveHeaderStructureSelection(int delta, bool extend = false)
     {
         if (delta == 0)
         {
@@ -1374,18 +2215,18 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
-        var current = _structureTree.SelectedItem as TreeViewItem;
-        var index = current is null ? -1 : items.IndexOf(current);
+        var caret = _structureTree.SelectedItem as TreeViewItem;
+        var index = caret is null ? -1 : items.IndexOf(caret);
         if (index < 0)
         {
             index = delta > 0 ? -1 : items.Count;
         }
 
         var next = Math.Clamp(index + delta, 0, items.Count - 1);
-        SelectStructureTreeItem(items[next], remember: true);
+        ApplyHeaderStructureMoveSelection(items[next], caret, extend);
     }
 
-    public void MoveHeaderStructureSelectionToEdge(int edge)
+    public void MoveHeaderStructureSelectionToEdge(int edge, bool extend = false)
     {
         var items = FlattenVisibleStructureItems();
         if (items.Count == 0)
@@ -1393,7 +2234,33 @@ internal sealed partial class LibraryBrowserView
             return;
         }
 
-        SelectStructureTreeItem(edge < 0 ? items[0] : items[^1], remember: true);
+        var caret = _structureTree.SelectedItem as TreeViewItem;
+        ApplyHeaderStructureMoveSelection(edge < 0 ? items[0] : items[^1], caret, extend);
+    }
+
+    private void ApplyHeaderStructureMoveSelection(TreeViewItem current, TreeViewItem? caret, bool extend)
+    {
+        _structureRangeBusy = true;
+        try
+        {
+            if (!extend)
+            {
+                _structureSelectionAnchor = current;
+                ClearHeaderStructureMultiSelect();
+                _structureMultiSelected.Add(current);
+                ApplyHeaderStructureMultiSelectChrome();
+                SelectStructureTreeItem(current, remember: true);
+                return;
+            }
+
+            _structureSelectionAnchor ??= caret ?? current;
+            SelectHeaderStructureVisibleRange(_structureSelectionAnchor, current);
+            SelectStructureTreeItem(current, remember: true);
+        }
+        finally
+        {
+            _structureRangeBusy = false;
+        }
     }
 
     private void SelectStructureTreeItem(TreeViewItem item, bool remember)
@@ -1403,6 +2270,7 @@ internal sealed partial class LibraryBrowserView
         _structureSuppressRemember = !remember;
         try
         {
+            var alreadySelected = ReferenceEquals(_structureTree.SelectedItem, item);
             item.IsSelected = true;
             item.BringIntoView();
             if (IsHeaderStructureFocused)
@@ -1410,14 +2278,11 @@ internal sealed partial class LibraryBrowserView
                 item.Focus();
             }
 
-            if (item.Tag is WaveStructureNode node)
+            // SelectedItemChanged 経由で詳細／和集合同期（ナビキー中はキー離しまで保留）。
+            // 既選択の再指定では Changed が飛ばないので明示する。
+            if (alreadySelected)
             {
-                if (remember)
-                {
-                    RememberStructureChunkPath(item);
-                }
-
-                ShowStructureNode(node);
+                RequestStructureChunkSelectionApply();
             }
         }
         finally
@@ -2010,6 +2875,36 @@ internal sealed partial class LibraryBrowserView
                     + _structureTree.Padding.Right
                     + 24);
             treeNatural = Math.Max(treeNatural, treeLabelWidth);
+        }
+
+        if (_structureRepairPanel.Visibility == Visibility.Visible)
+        {
+            var repairFace = new Typeface(
+                _structureRepairAskButton.FontFamily,
+                FontStyles.Normal,
+                FontWeights.Normal,
+                FontStretches.Normal);
+            var repairTexts = new[]
+            {
+                UiStrings.WaveHeaderRepairButton,
+                FormatHeaderStructureRepairPrompt(),
+                UiStrings.WaveHeaderRepairAsCopy,
+                UiStrings.WaveHeaderRepairOverwrite,
+            };
+            var repairWidth = 0d;
+            foreach (var text in repairTexts)
+            {
+                repairWidth = Math.Max(
+                    repairWidth,
+                    MeasureLineWidth(text, repairFace, LibraryListFontSize, dpi));
+            }
+
+            treeNatural = Math.Max(
+                treeNatural,
+                repairWidth
+                    + _structureRepairPanel.Margin.Left
+                    + _structureRepairPanel.Margin.Right
+                    + DesignMetrics.From96(24));
         }
 
         double detailNatural;

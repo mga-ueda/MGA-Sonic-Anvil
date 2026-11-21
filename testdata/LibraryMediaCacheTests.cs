@@ -138,6 +138,48 @@ public sealed class LibraryMediaCacheTests : IDisposable
     }
 
     [Fact]
+    public void PutFileLoudness_RestoresHydrateAfterHeaderRepairStampChange()
+    {
+        // ヘッダ上書き修復と同様: size/mtime が変わっても Tags の値を Put し直せば消えない。
+        var path = Path.Combine(_dir, "repaired.wav");
+        File.WriteAllBytes(path, new byte[64]);
+        var stored = new FileLoudness(-11f, -15f, -8f, 3.5f, -0.8f);
+        LibraryMediaCache.PutFileLoudness(path, stored);
+
+        File.WriteAllBytes(path, new byte[65]); // pad 相当の1バイト増
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+        Assert.False(LibraryMediaCache.TryGetFileLoudness(path, out _));
+
+        var document = AudioDocument.CreateDeferred(path);
+        document.ApplyTags(document.Tags.WithFileLoudness(stored));
+        LibraryMediaCache.PutFileLoudness(path, stored);
+
+        var tags = LibraryBrowserView.HydrateIntegratedLufsFromCache(document);
+        Assert.True(tags.HasFileLoudness);
+        Assert.Equal(stored, tags.ToFileLoudness());
+    }
+
+    [Fact]
+    public void RefreshFileBytes_PicksUpSizeAndDateAfterInPlaceRewrite()
+    {
+        var path = Path.Combine(_dir, "rewrite.wav");
+        File.WriteAllBytes(path, new byte[64]);
+        var document = AudioDocument.CreateDeferred(path);
+        var beforeBytes = document.FileBytes;
+        var beforeDate = document.FileLastWriteTime;
+        Assert.Equal(64, beforeBytes);
+        Assert.NotNull(beforeDate);
+
+        File.WriteAllBytes(path, new byte[80]);
+        File.SetLastWriteTimeUtc(path, beforeDate.Value.ToUniversalTime().AddMinutes(3));
+        document.RefreshFileBytes();
+
+        Assert.Equal(80, document.FileBytes);
+        Assert.NotNull(document.FileLastWriteTime);
+        Assert.True(document.FileLastWriteTime > beforeDate);
+    }
+
+    [Fact]
     public void PlaylistWaveform_PersistsOnTrySet()
     {
         var path = Path.Combine(_dir, "persist.wav");

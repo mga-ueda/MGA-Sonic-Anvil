@@ -174,6 +174,15 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly TextBlock _structureDetailMeta = new();
     private readonly Border _structureErrorBanner = new();
     private readonly TextBlock _structureErrorText = new();
+    private readonly StackPanel _structureRepairPanel = new();
+    private readonly RoundedButton _structureRepairAskButton = new();
+    private readonly StackPanel _structureRepairConfirmPanel = new();
+    private readonly TextBlock _structureRepairPrompt = new();
+    private readonly RoundedButton _structureRepairAsCopyButton = new();
+    private readonly RoundedButton _structureRepairOverwriteButton = new();
+    private bool _structureRepairConfirming;
+    /// <summary>選択中のうちヘッダ修復対象の WAVE パス（単一／複数）。</summary>
+    private IReadOnlyList<string> _structureRepairPaths = Array.Empty<string>();
     private FrameworkElement? _structurePaneHost;
     private string? _structureLoadedPath;
     private WaveStructureDocument? _structureDocument;
@@ -205,8 +214,13 @@ internal sealed partial class LibraryBrowserView : UserControl
     private double _structureDetailHeldWidth;
     /// <summary>ヘッダ構造ツリー列に必要な幅の高水位。展開が戻っても勝手には下げない。H トグルで忘れる。</summary>
     private double _structureTreeHeldWidth;
-    /// <summary>ヘッダ構造ツリーの全選択（コピー用マーク）。通常の1行選択で解除。</summary>
-    private bool _structureTreeSelectAll;
+    /// <summary>ヘッダ構造ツリーの複数選択（コピー用マーク）。Ctrl+A／Shift範囲／Ctrl個別。</summary>
+    private readonly HashSet<TreeViewItem> _structureMultiSelected = [];
+    private TreeViewItem? _structureSelectionAnchor;
+    private bool _structureRangeBusy;
+    /// <summary>ヘッダ構造のナビキー押し中はチャンク選択副作用（詳細／和集合→プレイリスト）を保留する。</summary>
+    private bool _structureChunkApplyDeferred;
+    private int _structureChunkApplyTicket;
     /// <summary>フォルダツリー＋見出し。ルート登録ドロップの当たり判定用。</summary>
     private FrameworkElement? _explorerDropHost;
     private readonly ObservableCollection<LibraryFavoriteRow> _favorites = [];
@@ -348,6 +362,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     private bool _playlistSelectionNotifyPending;
     private int _playlistScrollRevealSelectionStamp = int.MinValue;
     private bool _deferActivate;
+    /// <summary>
+    /// <see cref="ApplyMoveSelectionFile"/> が延ばした <see cref="_deferActivate"/> の世代。
+    /// ScrollIntoView 後の仮想化が SelectedItem を寄せるあいだシアンを守る。
+    /// </summary>
+    private int _playlistMoveDeferGeneration;
     /// <summary>
     /// 非選択の連続 Append で <see cref="_deferActivate"/> をネストしたときの深さ。
     /// 各件が「追加前の値」へ戻すと、内側の Idle が true を残してクリック不能になる。
@@ -823,6 +842,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     public bool HasOpenContextMenu =>
         _folderTree.ContextMenu is { IsOpen: true }
         || _favoritesList.ContextMenu is { IsOpen: true }
+        || _structureTree.ContextMenu is { IsOpen: true }
         || _grid.ContextMenu is { IsOpen: true }
         || _columnHeaderMenu is { IsOpen: true };
 
@@ -931,15 +951,23 @@ internal sealed partial class LibraryBrowserView : UserControl
     {
         get
         {
-            // チェックモード中は右クリック／一括操作の対象をチェック行にする。
+            // チェックモード中はチェック行を操作対象にする。
+            // 未チェックだと空になり Delete／ヘッダ解析などが効かなくなるので、シアン帯へ落とす。
             if (_checkSelectMode)
             {
-                return CheckedPlaylistSessions();
+                var checkedSessions = CheckedPlaylistSessions();
+                if (checkedSessions.Length > 0)
+                {
+                    return checkedSessions;
+                }
             }
 
             return PlaylistBandSessions();
         }
     }
+
+    /// <summary>ヘッダ構造の解析対象。<see cref="SelectedSessions"/> と同じフォールバック。</summary>
+    internal DocumentSession[] HeaderStructureSessions() => SelectedSessions;
 
     /// <summary>
     /// シアン帯の選択（表示順）。チェックモード中もチェック行ではなく帯だけを返す。
@@ -980,6 +1008,30 @@ internal sealed partial class LibraryBrowserView : UserControl
 
         _playlistSelectedRows.Remove(row);
         row.IsPlaylistSelected = false;
+    }
+
+    /// <summary>
+    /// 単一選択の帯を <paramref name="row"/> へ移す。
+    /// 全クリア→再設定だと一瞬シアンが消えるので、他行だけ外してから付ける。
+    /// </summary>
+    private void MovePlaylistSingleSelectionTo(LibraryFileRow row)
+    {
+        if (_playlistSelectedRows.Count == 1
+            && row.IsPlaylistSelected
+            && _playlistSelectedRows.Contains(row))
+        {
+            return;
+        }
+
+        foreach (var other in _playlistSelectedRows.ToArray())
+        {
+            if (!ReferenceEquals(other, row))
+            {
+                SetPlaylistRowSelected(other, false);
+            }
+        }
+
+        SetPlaylistRowSelected(row, true);
     }
 
     private void ClearPlaylistRowSelectionFlags()
@@ -1107,6 +1159,9 @@ internal sealed partial class LibraryBrowserView : UserControl
             ApplyPlaylistSelectionFromChecks();
             ClearAllPlaylistChecks();
         }
+
+        // SelectedSessions の意味が変わるのでヘッダ対象を取り直す。
+        RequestHeaderStructureRefresh();
 
         if (raise)
         {
@@ -1495,6 +1550,12 @@ internal sealed partial class LibraryBrowserView : UserControl
     }
 
     public event EventHandler? HeaderStructureVisibleChanged;
+
+    /// <summary>ヘッダ別名修復で作ったファイル。プレイリストへ追加する。</summary>
+    public event EventHandler<IReadOnlyList<string>>? HeaderRepairedAsCopy;
+
+    /// <summary>ヘッダを上書き修復したあと（元パス）。ラウドネス再スタンプ用。</summary>
+    public event EventHandler<IReadOnlyList<string>>? HeaderRepairedInPlace;
 
     public void ToggleHeaderStructureVisible(bool focusWhenShown = true) =>
         SetHeaderStructureVisible(!_headerStructureVisible, focusWhenShown);
@@ -2362,6 +2423,56 @@ internal sealed partial class LibraryBrowserView : UserControl
         _favoritesList.Focus();
     }
 
+    /// <summary>
+    /// 余白・見出しクリックでツリーをアクティブにする。
+    /// 未選択のとき先頭を勝手に選ばない（<see cref="FocusExplorer"/> とは別）。
+    /// </summary>
+    internal void ActivateExplorerPaneFromClick()
+    {
+        ClearExplorerTypeahead();
+        CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
+        if (_folderTree.SelectedItem is TreeViewItem selected)
+        {
+            selected.BringIntoView();
+            if (selected.Focus())
+            {
+                return;
+            }
+        }
+
+        _folderTree.Focus();
+    }
+
+    /// <summary>
+    /// 余白・見出しクリックでお気に入りをアクティブにする。
+    /// 未選択のとき先頭を勝手に選ばない（<see cref="FocusFavorites"/> とは別）。
+    /// </summary>
+    internal void ActivateFavoritesPaneFromClick()
+    {
+        ClearExplorerTypeahead();
+        CancelPlaylistFocusRestore();
+        ReleasePlaylistFocusHold();
+        _listFocusTicket++;
+        if (_favoritesList.SelectedItem is { } selected
+            && _favoritesList.ItemContainerGenerator.ContainerFromItem(selected) is UIElement row)
+        {
+            row.Focus();
+            return;
+        }
+
+        _favoritesList.Focus();
+    }
+
+    /// <summary>余白・見出し・列ヘッダクリックでプレイリストをアクティブにする。</summary>
+    internal void ActivatePlaylistPaneFromClick()
+    {
+        ClearExplorerTypeahead();
+        RememberPlaylistClickFocus();
+        EnsureListFocused();
+    }
+
     public void CyclePaneFocus(bool reverse)
     {
         switch (LibraryPlayerMode.NextPane(ActivePane, reverse))
@@ -2428,7 +2539,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
     }
 
-    /// <summary>メニューキー。フォーカス中のツリー／お気に入り／プレイリストのメニューを開く。</summary>
+    /// <summary>メニューキー。フォーカス中のツリー／お気に入り／ヘッダ構造／プレイリストのメニューを開く。</summary>
     public bool TryOpenKeyboardContextMenu()
     {
         if (IsExplorerFocused)
@@ -2439,6 +2550,12 @@ internal sealed partial class LibraryBrowserView : UserControl
         if (IsFavoritesFocused)
         {
             return OpenOwnedContextMenu(_favoritesList);
+        }
+
+        // プレイリストより先。ここを落とすと Apps がリストメニューへ落ちる。
+        if (IsHeaderStructureFocused)
+        {
+            return OpenOwnedContextMenu(_structureTree);
         }
 
         if (IsListKeyboardFocused)
@@ -2460,6 +2577,7 @@ internal sealed partial class LibraryBrowserView : UserControl
                      {
                          _folderTree.ContextMenu,
                          _favoritesList.ContextMenu,
+                         _structureTree.ContextMenu,
                          _grid.ContextMenu,
                          _columnHeaderMenu,
                      })
@@ -2484,6 +2602,11 @@ internal sealed partial class LibraryBrowserView : UserControl
         if (_favoritesList.ContextMenu is { IsOpen: true } favorites)
         {
             favorites.IsOpen = false;
+        }
+
+        if (_structureTree.ContextMenu is { IsOpen: true } structure)
+        {
+            structure.IsOpen = false;
         }
 
         if (_grid.ContextMenu is { IsOpen: true } list)
@@ -2746,12 +2869,18 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
     }
 
+    /// <summary>
+    /// 指定フォルダを選び、キーボードフォーカスもツリーへ移す。
+    /// （選択だけだと Ctrl+V がプレイリスト側のまま「同じ場所」になる。）
+    /// </summary>
     public void FocusExplorerFolder(string path)
     {
         if (!string.IsNullOrWhiteSpace(path))
         {
             RevealFolder(path);
         }
+
+        FocusExplorer();
     }
 
     private string[] CopyPathsFor(LibraryPane pane) =>
@@ -3101,6 +3230,9 @@ internal sealed partial class LibraryBrowserView : UserControl
         // ScrollIntoView／仮想化のあいだも _syncing と _deferActivate を維持する。
         // 先に外すと、レイアウトが SelectedItem を先頭へ寄せた瞬間に
         // Grid_SelectionChanged がシアンを上へ吸い戻し、↓連打で即再現する。
+        // EnsureRowVisible の Loaded 再アサートより後まで _deferActivate を残し、
+        // ナビキー押し続け中はキー離し（FlushPlaylistMoveDefer）まで外さない。
+        var moveGen = ++_playlistMoveDeferGeneration;
         _deferActivate = true;
         _syncing = true;
         SuspendPlaylistSelectionNotify();
@@ -3110,8 +3242,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             {
                 _anchorIndex = index;
                 _playlistRangeCaretIndex = -1;
-                ClearPlaylistRowSelectionFlags();
-                SetPlaylistRowSelected(row, true);
+                MovePlaylistSingleSelectionTo(row);
                 SyncPlaylistCaretToGrid(row);
             }
             else
@@ -3140,7 +3271,75 @@ internal sealed partial class LibraryBrowserView : UserControl
         {
             _syncing = false;
             ResumePlaylistSelectionNotify();
-            _deferActivate = false;
+            ScheduleEndPlaylistMoveDefer(moveGen);
+        }
+    }
+
+    /// <summary>
+    /// ↑↓ 連打の <see cref="_deferActivate"/> を、レイアウト／仮想化のあとで外す。
+    /// ナビキー押し中は残し、キー離しの <see cref="FlushPlaylistMoveDefer"/> で確定する。
+    /// </summary>
+    private void ScheduleEndPlaylistMoveDefer(int moveGen)
+    {
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (moveGen != _playlistMoveDeferGeneration)
+                {
+                    return;
+                }
+
+                if (IsPlaylistNavigationKeyHeld())
+                {
+                    // 押し続け中は SelectionChanged にシアンを奪わせない。
+                    return;
+                }
+
+                CompletePlaylistMoveDefer(moveGen);
+            },
+            DispatcherPriority.ContextIdle);
+    }
+
+    /// <summary>
+    /// キー離しで、押し続け中に延ばしていた移動用 <see cref="_deferActivate"/> を外す。
+    /// </summary>
+    internal void FlushPlaylistMoveDefer()
+    {
+        CompletePlaylistMoveDefer(_playlistMoveDeferGeneration);
+    }
+
+    private void CompletePlaylistMoveDefer(int moveGen)
+    {
+        if (moveGen != _playlistMoveDeferGeneration)
+        {
+            return;
+        }
+
+        if (ResolvePlaylistCaretRow() is { } caret)
+        {
+            ReassertPlaylistCaretOnly(caret);
+        }
+
+        var wasDeferred = _deferActivate;
+        _deferActivate = false;
+        if (!wasDeferred)
+        {
+            return;
+        }
+
+        // 遅延中に飛ばした SessionActivated を、今のキャレットへ一度だけ通す。
+        if (!_syncing && SelectedSession is { } session)
+        {
+            RefreshGroupJacketsForActiveRow();
+            SessionActivated?.Invoke(this, session);
+        }
+
+        if (!_grid.IsKeyboardFocusWithin
+            && !IsHeaderStructureFocused
+            && !IsExplorerFocused
+            && !IsFavoritesFocused)
+        {
+            EnsureListFocused(pinCurrent: false);
         }
     }
 
@@ -3152,12 +3351,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     {
         if (!extend)
         {
-            if (!row.IsPlaylistSelected || _playlistSelectedRows.Count != 1)
-            {
-                ClearPlaylistRowSelectionFlags();
-                SetPlaylistRowSelected(row, true);
-            }
-
+            MovePlaylistSingleSelectionTo(row);
             SyncPlaylistCaretToGrid(row);
         }
         else
@@ -3735,6 +3929,14 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        // 末尾へキャレットを送ると FocusList の EnsureRowVisible でリストが飛び込む。
+        // 全選択では今見えている行のキャレットを維持する。
+        var caret = ResolvePlaylistCaretRow();
+        if (caret is null || !files.Contains(caret))
+        {
+            caret = files[0];
+        }
+
         _syncing = true;
         SuspendPlaylistSelectionNotify();
         try
@@ -3745,9 +3947,117 @@ internal sealed partial class LibraryBrowserView : UserControl
                 SetPlaylistRowSelected(row, true);
             }
 
+            // チェックモード中は操作対象がチェック側なので帯に合わせる。
+            if (_checkSelectMode)
+            {
+                ApplyPlaylistChecksFromSelection();
+            }
+
             _playlistRangeCaretIndex = -1;
-            SyncPlaylistCaretToGrid(files[^1]);
+            SyncPlaylistCaretToGrid(caret);
             SetPlaylistAnchorToRow(files[0]);
+            PinSelectionCurrent();
+            // キャレットが末尾へ動かないと SelectedItem が変わらず SelectionChanged が来ない。
+            // 帯だけ全選択したことをヘッダ和集合へ通知する。
+            NotePlaylistSelectionChanged();
+        }
+        finally
+        {
+            _syncing = false;
+            ResumePlaylistSelectionNotify();
+        }
+
+        FocusList();
+    }
+
+    /// <summary>
+    /// 選択を反転。チェックモード中はチェック、オフ時はシアン帯。
+    /// プレイリスト全体を対象にする（ヘッダ和集合で絞ったあと、反転→クリアで残りを残す用途）。
+    /// </summary>
+    public void InvertPlaylistSelection()
+    {
+        var files = SnapshotPlaylistFiles();
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        if (_checkSelectMode)
+        {
+            // チェックが空のとき帯だけ絞られていると、空→全チェックの反転で全件クリア事故になる。
+            var anyChecked = false;
+            foreach (var row in files)
+            {
+                if (!row.IsChecked)
+                {
+                    continue;
+                }
+
+                anyChecked = true;
+                break;
+            }
+
+            if (!anyChecked)
+            {
+                ApplyPlaylistChecksFromSelection();
+            }
+
+            foreach (var row in files)
+            {
+                row.IsChecked = !row.IsChecked;
+            }
+
+            NotePlaylistSelectionChanged();
+            FocusList();
+            return;
+        }
+
+        // 帯フラグが古い行に残っていても、束縛行のセッション集合で反転する。
+        var selected = new HashSet<DocumentSession>();
+        foreach (var session in PlaylistBandSessions())
+        {
+            selected.Add(session);
+        }
+
+        var caret = ResolvePlaylistCaretRow();
+        var caretIndex = caret is null ? -1 : files.IndexOf(caret);
+        LibraryFileRow? lastSelected = null;
+        LibraryFileRow? firstSelected = null;
+        _syncing = true;
+        SuspendPlaylistSelectionNotify();
+        try
+        {
+            foreach (var row in files)
+            {
+                if (row.Tag is not DocumentSession session)
+                {
+                    continue;
+                }
+
+                var next = !selected.Contains(session);
+                SetPlaylistRowSelected(row, next);
+                if (!next)
+                {
+                    continue;
+                }
+
+                lastSelected = row;
+                firstSelected ??= row;
+            }
+
+            _playlistRangeCaretIndex = -1;
+            // 反転でキャレット行が非選択になっても末尾へ飛ばない。近い選択行を残す。
+            var nextCaret = ResolveCaretAfterPlaylistInvert(files, caretIndex, firstSelected, lastSelected);
+            if (nextCaret is not null)
+            {
+                SyncPlaylistCaretToGrid(nextCaret);
+            }
+
+            if (firstSelected is not null)
+            {
+                SetPlaylistAnchorToRow(firstSelected);
+            }
+
             PinSelectionCurrent();
         }
         finally
@@ -3757,6 +4067,43 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         FocusList();
+    }
+
+    /// <summary>
+    /// 反転後のキャレット。元位置がまだ選ばれていればそれ、なければ近い選択行（末尾固定にしない）。
+    /// </summary>
+    private static LibraryFileRow? ResolveCaretAfterPlaylistInvert(
+        IReadOnlyList<LibraryFileRow> files,
+        int caretIndex,
+        LibraryFileRow? firstSelected,
+        LibraryFileRow? lastSelected)
+    {
+        if (caretIndex >= 0
+            && caretIndex < files.Count
+            && files[caretIndex].IsPlaylistSelected)
+        {
+            return files[caretIndex];
+        }
+
+        if (caretIndex >= 0 && files.Count > 0)
+        {
+            for (var distance = 1; distance < files.Count; distance++)
+            {
+                var left = caretIndex - distance;
+                if (left >= 0 && files[left].IsPlaylistSelected)
+                {
+                    return files[left];
+                }
+
+                var right = caretIndex + distance;
+                if (right < files.Count && files[right].IsPlaylistSelected)
+                {
+                    return files[right];
+                }
+            }
+        }
+
+        return firstSelected ?? lastSelected;
     }
 
     /// <summary>
@@ -3995,8 +4342,15 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
     }
 
-    public void UpdateSessionRow(DocumentSession session)
+    public void UpdateSessionRow(DocumentSession session, bool force = false)
     {
+        // force は「内容が同じでもオブジェクトを新しくする」用途。部分 Replace は帯を壊しやすいので全件載せ替え。
+        if (force)
+        {
+            RematerializeBoundPlaylistRows();
+            return;
+        }
+
         var next = CreateRowWithDefaults(session);
         for (var i = 0; i < _items.Count; i++)
         {
@@ -4024,7 +4378,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             BeginRowSync();
             try
             {
-                _items[i] = next;
+                ReplaceBoundPlaylistRowAt(i, next);
                 // Replace はグループ内の末尾へ付け替える。表示を _items 順へ戻す。
                 RefreshGroupedPlaylistView();
                 ApplyRowSelectionCore(session, preserve.Length > 0 ? preserve : [session]);
@@ -4034,6 +4388,7 @@ internal sealed partial class LibraryBrowserView : UserControl
                 EndRowSync();
             }
 
+            StabilizePlaylistSelectionAfterRowRewrite();
 
             if (keepFocus)
             {
@@ -4047,9 +4402,13 @@ internal sealed partial class LibraryBrowserView : UserControl
     }
 
     /// <summary>
-    /// 複数行をまとめて差し替え、グループ表示は最後に一度だけ _items 順へ戻す。
+    /// 複数行の内容更新。部分 Replace は使わず、常に <see cref="RematerializeBoundPlaylistRows"/> する。
+    /// （破壊編集を増やしても、ここか <c>RefreshViewsAfterHistoryPaste</c> 経由ならカーソルが壊れない。）
     /// </summary>
-    public void UpdateSessionRows(IReadOnlyList<DocumentSession> sessions)
+    /// <param name="force">
+    /// true なら SameContent でも載せ替える。false でも内容が1件でも変われば全件載せ替え。
+    /// </param>
+    public void UpdateSessionRows(IReadOnlyList<DocumentSession> sessions, bool force = false)
     {
         if (sessions.Count == 0)
         {
@@ -4058,19 +4417,14 @@ internal sealed partial class LibraryBrowserView : UserControl
 
         if (sessions.Count == 1)
         {
-            UpdateSessionRow(sessions[0]);
+            UpdateSessionRow(sessions[0], force);
             return;
         }
 
-        var touch = new HashSet<DocumentSession>(sessions);
-        var preserve = PlaylistBandSessions();
-        var active = SelectedSession;
-        var keepFocus = _restoreListFocus || _grid.IsKeyboardFocusWithin;
-        var changed = false;
-        var nextRows = _rows.ToArray();
-        BeginRowSync();
-        try
+        if (!force)
         {
+            var touch = new HashSet<DocumentSession>(sessions);
+            var anyChange = false;
             for (var i = 0; i < _items.Count; i++)
             {
                 if (_items[i].Tag is not DocumentSession session || !touch.Contains(session))
@@ -4080,50 +4434,113 @@ internal sealed partial class LibraryBrowserView : UserControl
 
                 var next = CreateRowWithDefaults(session);
                 next.GroupKey = LibraryFileList.GroupLabel(next, _group);
-                if (LibraryFileList.SameContent(_items[i], next))
+                if (!LibraryFileList.SameContent(_items[i], next))
                 {
-                    continue;
+                    anyChange = true;
+                    break;
                 }
-
-                for (var r = 0; r < nextRows.Length; r++)
-                {
-                    if (ReferenceEquals(nextRows[r].Tag, session))
-                    {
-                        nextRows[r] = next;
-                        break;
-                    }
-                }
-
-                _items[i] = next;
-                changed = true;
             }
 
-            if (changed)
+            if (!anyChange)
             {
-                _rows = nextRows;
-                RefreshGroupedPlaylistView();
-            }
-
-            if (preserve.Length > 0)
-            {
-                ApplyRowSelectionCore(active ?? preserve[0], preserve);
+                return;
             }
         }
-        finally
+
+        RematerializeBoundPlaylistRows();
+    }
+
+    /// <summary>
+    /// 束縛行を全件作り直して ItemsSource を張り直す。
+    /// 破壊編集・上書き保存・Undo 後の正規ルート。部分 Replace は使わない。
+    /// </summary>
+    internal void RematerializeBoundPlaylistRows()
+    {
+        if (_rows.Count == 0)
         {
-            EndRowSync();
+            return;
         }
 
+        CancelPlaylistLoudness(clearBusy: false);
+        var preserve = PlaylistBandSessions();
+        var active = SelectedSession;
+        var keepFocus = _restoreListFocus || _grid.IsKeyboardFocusWithin;
+        var nextRows = new LibraryFileRow[_rows.Count];
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            var row = _rows[i];
+            if (row.Tag is not DocumentSession session)
+            {
+                nextRows[i] = row;
+                continue;
+            }
+
+            var next = CreateRowWithDefaults(session);
+            next.GroupKey = LibraryFileList.GroupLabel(next, _group);
+            nextRows[i] = next;
+        }
+
+        _rows = nextRows;
+        _playlistFilesSnapshot = null;
+        _playlistRangeCaretIndex = -1;
+        ClearPlaylistRowSelectionFlags();
+        _playlistCaretRow = null;
+        BindRows(
+            active ?? (preserve.Length > 0 ? preserve[0] : null),
+            preserve.Length > 0 ? preserve : null);
+        StabilizePlaylistSelectionAfterRowRewrite();
         if (keepFocus)
         {
             EnsureListFocused();
         }
 
-        if (changed)
+        RefreshEffectiveColumns();
+        InvalidateGroupJackets();
+        SchedulePlaylistLoudness();
+    }
+
+    /// <summary>
+    /// 束縛行を差し替えつつ、シアン帯／キャレットを新しい行オブジェクトへ付け替える。
+    /// </summary>
+    private void ReplaceBoundPlaylistRowAt(int index, LibraryFileRow next)
+    {
+        var old = _items[index];
+        var selected = old.IsPlaylistSelected || _playlistSelectedRows.Contains(old);
+        var caret = ReferenceEquals(_playlistCaretRow, old);
+        if (selected)
         {
-            RefreshEffectiveColumns();
-            InvalidateGroupJackets();
+            _playlistSelectedRows.Remove(old);
+            old.IsPlaylistSelected = false;
         }
+
+        _items[index] = next;
+
+        if (selected)
+        {
+            SetPlaylistRowSelected(next, true);
+        }
+
+        if (caret)
+        {
+            _playlistCaretRow = next;
+        }
+    }
+
+    /// <summary>
+    /// 行差し替え後、DataGrid が SelectedItem を帯外へ寄せてもシアンを潰さないよう
+    /// <see cref="_deferActivate"/> を Idle まで延ばし、キャレットを再確定する。
+    /// </summary>
+    private void StabilizePlaylistSelectionAfterRowRewrite()
+    {
+        var moveGen = ++_playlistMoveDeferGeneration;
+        _deferActivate = true;
+        if (ResolvePlaylistCaretRow() is { } caret)
+        {
+            ReassertPlaylistCaretOnly(caret);
+            SchedulePlaylistCaretReassert(caret);
+        }
+
+        ScheduleEndPlaylistMoveDefer(moveGen);
     }
 
     /// <summary>
@@ -4833,7 +5250,11 @@ internal sealed partial class LibraryBrowserView : UserControl
                 }
 
                 ReassertPlaylistCaretOnly(bound);
-                if (!_grid.IsKeyboardFocusWithin)
+                // ヘッダ構造など他ペイン操作で選択だけ同期したときはフォーカスを奪わない。
+                if (!_grid.IsKeyboardFocusWithin
+                    && !IsHeaderStructureFocused
+                    && !IsExplorerFocused
+                    && !IsFavoritesFocused)
                 {
                     EnsureListFocused();
                 }
@@ -5131,6 +5552,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         if (IsPlaylistSelectionChrome(origin)
             || FindPlaylistRow(origin) is not { } row)
         {
+            // 余白・列ヘッダ・グループ見出しでもプレイリストをアクティブにする。
+            ActivatePlaylistPaneFromClick();
             return;
         }
 

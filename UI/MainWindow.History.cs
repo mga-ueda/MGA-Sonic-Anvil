@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -509,9 +510,11 @@ public partial class MainWindow
     /// <summary>
     /// エディタヘッダのチャンク帯。オフ時は解析しない（プレイヤーのヘッダOFFと同じ）。
     /// H オフでは幅高水位・選択も捨て、再表示は1行目＋内容フィットから。
+    /// 複数タブ選択時はチャンク和集合（プレイリストのヘッダ情報と同じ）。
     /// </summary>
     private void RefreshEditorHeaderChunks(bool show)
     {
+        EnsureEditorHeaderRepairWired();
         if (!show)
         {
             // 空でも高水位だけ残っていることがあるので、常に忘れる。
@@ -520,8 +523,440 @@ public partial class MainWindow
             return;
         }
 
+        if (_suppressEditorHeaderChunkRefresh)
+        {
+            RefreshEditorHeaderRepairTargets();
+            return;
+        }
+
         // Clear 後の再読込は Populate が1行目を選ぶ。配置 Sync は帯 Visible 後。
-        HeaderChunkStrip.LoadFromPath(_document?.SourcePath);
+        // 未保存のヘッダ作業コピーがあればそちらを表示する。
+        // 複数タブ選択時は和集合。選択なしはアクティブ1本。
+        var paths = CollectEditorHeaderRepairCandidatePaths();
+        if (paths.Count > 1)
+        {
+            HeaderChunkStrip.LoadUnionFromPaths(paths);
+        }
+        else if (paths.Count == 1)
+        {
+            HeaderChunkStrip.LoadFromPath(paths[0]);
+        }
+        else
+        {
+            HeaderChunkStrip.Clear();
+        }
+
+        RefreshEditorHeaderRepairTargets();
+    }
+
+    /// <summary>タブ選択変更からチャンク帯と修復ボタンを揃える。</summary>
+    private void RefreshEditorHeaderStructureFromTabSelection()
+    {
+        if (_tileMode || IsLibraryMaximized)
+        {
+            return;
+        }
+
+        RefreshEditorHeaderChunks(AppStorage.Settings.EditorShowHeaderStructure);
+        SyncEditorHeaderDetailPlacement();
+    }
+
+    private bool _editorHeaderRepairWired;
+    private int _editorHeaderRepairTicket;
+    /// <summary>和集合チャンク選択でタブを絞るとき、ツリーを作り直さない。</summary>
+    private bool _suppressEditorHeaderChunkRefresh;
+
+    private void EnsureEditorHeaderRepairWired()
+    {
+        if (_editorHeaderRepairWired)
+        {
+            return;
+        }
+
+        _editorHeaderRepairWired = true;
+        HeaderChunkStrip.RepairMessage += ShowCenterStatusToast;
+        HeaderChunkStrip.ApplyRepairEditAsync = ApplyEditorHeaderRepairEditAsync;
+        HeaderChunkStrip.ApplyChunkDeleteEditAsync = ApplyEditorChunkDeleteEditAsync;
+        HeaderChunkStrip.ApplyUnionChunkTabSelection = SelectTabsMatchingUnionChunks;
+    }
+
+    /// <summary>
+    /// 和集合のチャンク行（複数可）を選んだとき、いずれかのチャンクを持つタブを選択する。
+    /// 和集合ツリー自体は作り直さない。フォーカスはヘッダ側に残す。
+    /// </summary>
+    private void SelectTabsMatchingUnionChunks(IReadOnlyList<WaveStructureNode> nodes)
+    {
+        if (nodes.Count == 0)
+        {
+            return;
+        }
+
+        var pathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var node in nodes)
+        {
+            foreach (var member in node.MemberPaths)
+            {
+                if (PathUtil.TryGetFullPathTrimmed(member, out var full))
+                {
+                    pathSet.Add(full);
+                }
+                else if (!string.IsNullOrWhiteSpace(member))
+                {
+                    pathSet.Add(member);
+                }
+            }
+        }
+
+        if (pathSet.Count == 0)
+        {
+            return;
+        }
+
+        var selected = new List<DocumentSession>();
+        DocumentSession? caret = null;
+        foreach (var session in _sessions)
+        {
+            var path = session.Document.ResolveWaveContainerPath();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                path = session.Document.SourcePath;
+            }
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            var matched = PathUtil.TryGetFullPathTrimmed(path, out var full)
+                ? pathSet.Contains(full)
+                : pathSet.Contains(path);
+            if (!matched
+                && !string.IsNullOrWhiteSpace(session.Document.SourcePath)
+                && PathUtil.TryGetFullPathTrimmed(session.Document.SourcePath, out var sourceFull)
+                && pathSet.Contains(sourceFull))
+            {
+                matched = true;
+            }
+
+            if (!matched)
+            {
+                continue;
+            }
+
+            selected.Add(session);
+            caret ??= session;
+        }
+
+        if (selected.Count == 0 || caret is null)
+        {
+            return;
+        }
+
+        var keepTreeItem = HeaderChunkStrip.Tree.SelectedItem as TreeViewItem;
+        _suppressEditorHeaderChunkRefresh = true;
+        try
+        {
+            _selectedTabs.Clear();
+            foreach (var session in selected)
+            {
+                _selectedTabs.Add(session);
+            }
+
+            _tabSelectionAnchor = caret;
+            RefreshTabHeaders();
+            RefreshTileChrome();
+            SyncPlaylistSelectionLoudness();
+            RefreshTransportCommandsEnabled();
+            RefreshStatus();
+            // 修復ボタンだけは絞ったタブに合わせる（和集合ツリーは維持）。
+            RefreshEditorHeaderRepairTargets();
+        }
+        finally
+        {
+            _suppressEditorHeaderChunkRefresh = false;
+        }
+
+        if (keepTreeItem is not null)
+        {
+            keepTreeItem.Focus();
+        }
+    }
+
+    /// <summary>エディタ: ヘッダ修復を作業コピーへ。SourcePath は即時上書きしない。</summary>
+    private async Task<bool> ApplyEditorHeaderRepairEditAsync(IReadOnlyList<string> paths)
+    {
+        var changed = 0;
+        string? firstError = null;
+        foreach (var path in paths)
+        {
+            var session = FindSessionBySourceOrContainerPath(path);
+            if (session is null)
+            {
+                continue;
+            }
+
+            var document = session.Document;
+            var source = document.ResolveWaveContainerPath();
+            if (string.IsNullOrWhiteSpace(source) || !File.Exists(source))
+            {
+                firstError ??= UiStrings.WaveStructureFileMissing;
+                continue;
+            }
+
+            var dest = AppStorage.SessionFilePath("hdr-" + Guid.NewGuid().ToString("N") + ".wav");
+            var result = await Task.Run(() => WaveHeaderRepair.RepairTo(source, dest))
+                .ConfigureAwait(true);
+            if (!result.Success)
+            {
+                firstError ??= result.Error;
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            if (!result.Changed)
+            {
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            var before = document.WaveContainerPath;
+            var command = ProcessEdits.ReplaceWaveContainer(
+                document,
+                before,
+                dest,
+                "Repair Header");
+            if (command is null)
+            {
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            session.History.Do(document, command);
+            AudioCodec.ReloadEmbeddedMeta(document);
+            changed++;
+        }
+
+        if (changed == 0)
+        {
+            ShowCenterStatusToast(firstError ?? UiStrings.WaveHeaderRepairNoChange);
+            return false;
+        }
+
+        AfterEdit();
+        // プレイヤー復帰時にヘッダ／プレイリスト行を作業コピーへ合わせる。
+        MarkLibraryPlaylistStaleFromEditor();
+        HeaderChunkStrip.InvalidateLoadedCache();
+        RefreshEditorHeaderChunks(show: AppStorage.Settings.EditorShowHeaderStructure && !_tileMode);
+        SyncEditorHeaderDetailPlacement();
+        ShowCenterStatusToast(UiStrings.WaveHeaderRepairEdited);
+        return true;
+    }
+
+    /// <summary>エディタ: チャンク削除を作業コピーへ。SourcePath は即時上書きしない。</summary>
+    private async Task<bool> ApplyEditorChunkDeleteEditAsync(
+        IReadOnlyDictionary<string, IReadOnlyCollection<string>> pathToChunkIds,
+        int chunkKinds)
+    {
+        var changed = 0;
+        string? firstError = null;
+        foreach (var (path, ids) in pathToChunkIds)
+        {
+            var session = FindSessionBySourceOrContainerPath(path);
+            if (session is null)
+            {
+                continue;
+            }
+
+            var document = session.Document;
+            var source = document.ResolveWaveContainerPath();
+            if (string.IsNullOrWhiteSpace(source) || !File.Exists(source))
+            {
+                firstError ??= UiStrings.WaveStructureFileMissing;
+                continue;
+            }
+
+            var removable = ids
+                .Where(WaveChunkCleanPolicy.CanDelete)
+                .ToHashSet(StringComparer.Ordinal);
+            if (removable.Count == 0)
+            {
+                continue;
+            }
+
+            var dest = AppStorage.SessionFilePath("chk-" + Guid.NewGuid().ToString("N") + ".wav");
+            var result = await Task.Run(() => WaveChunkStripper.StripTo(source, dest, removable))
+                .ConfigureAwait(true);
+            if (!result.Success)
+            {
+                firstError ??= result.Error;
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            if (!result.Changed)
+            {
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            var before = document.WaveContainerPath;
+            var command = ProcessEdits.ReplaceWaveContainer(
+                document,
+                before,
+                dest,
+                "Delete Chunks");
+            if (command is null)
+            {
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            session.History.Do(document, command);
+            AudioCodec.ReloadEmbeddedMeta(document);
+            changed++;
+        }
+
+        if (changed == 0)
+        {
+            ShowCenterStatusToast(firstError ?? UiStrings.WaveChunkStripNoChange);
+            return false;
+        }
+
+        AfterEdit();
+        // プレイヤー復帰時にヘッダ／プレイリスト行を作業コピーへ合わせる。
+        MarkLibraryPlaylistStaleFromEditor();
+        HeaderChunkStrip.InvalidateLoadedCache();
+        RefreshEditorHeaderChunks(show: AppStorage.Settings.EditorShowHeaderStructure && !_tileMode);
+        SyncEditorHeaderDetailPlacement();
+        ShowCenterStatusToast(UiStrings.WaveChunkStripEdited(Math.Max(1, chunkKinds)));
+        return true;
+    }
+
+    private DocumentSession? FindSessionBySourceOrContainerPath(string path)
+    {
+        if (FindSessionByPath(path) is { } bySource)
+        {
+            return bySource;
+        }
+
+        foreach (var session in _sessions)
+        {
+            var container = session.Document.WaveContainerPath;
+            if (!string.IsNullOrWhiteSpace(container)
+                && string.Equals(container, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return session;
+            }
+
+            var resolved = session.Document.ResolveWaveContainerPath();
+            if (!string.IsNullOrWhiteSpace(resolved)
+                && string.Equals(resolved, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return session;
+            }
+        }
+
+        return null;
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    /// <summary>
+    /// 非タイル時のみ。選択タブ（なければアクティブ）から修復対象を集めて冒頭ボタンへ渡す。
+    /// </summary>
+    private void RefreshEditorHeaderRepairTargets()
+    {
+        EnsureEditorHeaderRepairWired();
+        if (_tileMode
+            || IsLibraryMaximized
+            || !AppStorage.Settings.EditorShowHeaderStructure)
+        {
+            HeaderChunkStrip.SetRepairTargets(Array.Empty<string>());
+            return;
+        }
+
+        var candidates = CollectEditorHeaderRepairCandidatePaths();
+        if (candidates.Count == 0)
+        {
+            HeaderChunkStrip.SetRepairTargets(Array.Empty<string>());
+            return;
+        }
+
+        if (candidates.Count == 1)
+        {
+            var only = candidates[0];
+            var targets = WaveHeaderRepair.NeedsRepair(WaveContainerStructure.TryRead(only))
+                ? new[] { only }
+                : Array.Empty<string>();
+            HeaderChunkStrip.SetRepairTargets(targets);
+            return;
+        }
+
+        var ticket = ++_editorHeaderRepairTicket;
+        _ = Task.Run(() => WaveHeaderRepair.CollectRepairTargets(candidates))
+            .ContinueWith(task =>
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (ticket != _editorHeaderRepairTicket
+                        || _tileMode
+                        || IsLibraryMaximized
+                        || !AppStorage.Settings.EditorShowHeaderStructure)
+                    {
+                        return;
+                    }
+
+                    if (task.IsFaulted || task.IsCanceled)
+                    {
+                        return;
+                    }
+
+                    HeaderChunkStrip.SetRepairTargets(task.Result);
+                    SyncEditorHeaderDetailPlacement();
+                });
+            });
+    }
+
+    private IReadOnlyList<string> CollectEditorHeaderRepairCandidatePaths()
+    {
+        var sessions = HasTabSelection
+            ? SelectedTabsInOrder()
+            : _activeSession is null
+                ? Array.Empty<DocumentSession>()
+                : new[] { _activeSession };
+        if (sessions.Length == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var paths = new List<string>(sessions.Length);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var session in sessions)
+        {
+            // 未保存の作業コピーがあればそちらを修復対象にする。
+            var path = session.Document.ResolveWaveContainerPath();
+            if (string.IsNullOrWhiteSpace(path) || !seen.Add(path))
+            {
+                continue;
+            }
+
+            paths.Add(path);
+        }
+
+        return paths;
     }
 
     private void HeaderChunkStrip_DetailChanged(object sender, EventArgs e) =>
@@ -1527,6 +1962,24 @@ public partial class MainWindow
             return;
         }
 
+        // 載せ替えは RefreshViewsAfterHistoryPaste 済み。プレイヤーでは上書き保存も行う。
+        if (IsLibraryMaximized)
+        {
+            var saveTargets = new List<DocumentSession>();
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                if (applied[i] > 0)
+                {
+                    saveTargets.Add(sessions[i]);
+                }
+            }
+
+            if (saveTargets.Count > 0)
+            {
+                await SaveSessionsInPlaceQuietAsync(saveTargets).ConfigureAwait(true);
+            }
+        }
+
         ShowEditAppliedToast("History Paste");
     }
 
@@ -1551,15 +2004,26 @@ public partial class MainWindow
         });
     }
 
+    /// <summary>
+    /// 破壊編集・履歴適用・Undo／Redo の共通出口。
+    /// プレイリストではここで必ず行を全件載せ替える（個別の UpdateSessionRow 連打は禁止）。
+    /// 新規の一括破壊編集も <see cref="TryRunBatchEdit"/>／本メソッド経由にすればカーソル破壊を避けられる。
+    /// </summary>
     private void RefreshViewsAfterHistoryPaste(IReadOnlyList<DocumentSession> sessions, IReadOnlyList<int> applied)
     {
         var activeApplied = 0;
+        var anyApplied = false;
         for (var i = 0; i < sessions.Count; i++)
         {
+            if (applied[i] <= 0)
+            {
+                continue;
+            }
+
+            anyApplied = true;
             if (ReferenceEquals(sessions[i], _activeSession))
             {
                 activeApplied = applied[i];
-                break;
             }
         }
 
@@ -1592,6 +2056,17 @@ public partial class MainWindow
         }
 
         RefreshTabHeaders();
+
+        // AfterEdit → SetSessions の部分パッチより後で全件張り直し、帯／キャレットを確定する。
+        if (anyApplied && IsLibraryMaximized)
+        {
+            LibraryBrowser.RematerializeBoundPlaylistRows();
+        }
+        else if (anyApplied)
+        {
+            // エディタ中の破壊編集。プレイヤー復帰時に行とヘッダ構造を取り直す。
+            MarkLibraryPlaylistStaleFromEditor();
+        }
     }
 
     /// <summary>1 セッションへレシピを順に適用する（画面の切替はしない）。</summary>

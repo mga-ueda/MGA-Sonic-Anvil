@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -30,7 +31,19 @@ internal sealed class EditorHeaderChunkStripView : Border
     private readonly TextBox _detail = new();
     private readonly ColumnDefinition _treeColumn = new();
     private readonly ColumnDefinition _detailColumn = new();
+    private readonly StackPanel _repairPanel = new();
+    private readonly RoundedButton _repairAskButton = new();
+    private readonly StackPanel _repairConfirmPanel = new();
+    private readonly TextBlock _repairPrompt = new();
+    private readonly RoundedButton _repairOverwriteButton = new();
+    private bool _repairConfirming;
+    private IReadOnlyList<string> _repairPaths = Array.Empty<string>();
     private string? _loadedPath;
+    private WaveStructureDocument? _loadedDocument;
+    private int _unionBuildTicket;
+    private string? _unionPendingKey;
+    private bool _chunkApplyDeferred;
+    private int _chunkApplyTicket;
     private string _detailText = string.Empty;
     private bool _inlineDetail;
     private double _treeFittedWidth = DesignMetrics.EditorHeaderChunkStripMinWidth;
@@ -39,8 +52,10 @@ internal sealed class EditorHeaderChunkStripView : Border
     private double _treeHeldWidth;
     /// <summary>情報列の高水位。自動では下げない。</summary>
     private double _detailHeldWidth;
-    /// <summary>Ctrl+A 全選択マーク中。通常の選択変更で外す。</summary>
-    private bool _selectAll;
+    /// <summary>複数選択（コピー用マーク）。Ctrl+A／Shift範囲／Ctrl個別。</summary>
+    private readonly HashSet<TreeViewItem> _multiSelected = [];
+    private TreeViewItem? _selectionAnchor;
+    private bool _rangeBusy;
 
     public EditorHeaderChunkStripView()
     {
@@ -79,11 +94,9 @@ internal sealed class EditorHeaderChunkStripView : Border
         ApplyAlwaysVisibleScrollBarStyle(_tree);
         ApplyTreeItemStyle();
         RebuildTreeContextMenu();
-        _tree.SelectedItemChanged += (_, _) =>
-        {
-            ClearSelectAllMarks();
-            RefreshSelectedDetail();
-        };
+        _tree.SelectedItemChanged += Tree_SelectedItemChanged;
+        _tree.PreviewMouseLeftButtonDown += Tree_PreviewMouseLeftButtonDown;
+        _tree.PreviewMouseRightButtonDown += Tree_PreviewMouseRightButtonDown;
         // 展開で深い行のキャプション幅が変わったとき取り直す。
         _tree.AddHandler(
             TreeViewItem.ExpandedEvent,
@@ -94,7 +107,13 @@ internal sealed class EditorHeaderChunkStripView : Border
             new RoutedEventHandler((_, _) => FitContentWidth()),
             handledEventsToo: true);
         _tree.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
-        _treeFrame.Child = _tree;
+        BuildRepairPanel();
+        // 帯が狭いので修復 UI はツリーの冒頭（上）へ。
+        var treePane = new DockPanel { Background = Brushes.Transparent };
+        DockPanel.SetDock(_repairPanel, Dock.Top);
+        treePane.Children.Add(_repairPanel);
+        treePane.Children.Add(_tree);
+        _treeFrame.Child = treePane;
         Grid.SetColumn(_treeFrame, 0);
         _body.Children.Add(_treeFrame);
 
@@ -166,6 +185,38 @@ internal sealed class EditorHeaderChunkStripView : Border
 
     public event EventHandler? DetailChanged;
 
+    /// <summary>修復結果などの短いステータス表示。</summary>
+    public event Action<string>? RepairMessage;
+
+    /// <summary>
+    /// エディタ編集: ヘッダ修復。即時上書きせず作業コピーへ。成功で true。
+    /// </summary>
+    public Func<IReadOnlyList<string>, Task<bool>>? ApplyRepairEditAsync { get; set; }
+
+    /// <summary>
+    /// エディタ編集: チャンク削除。即時上書きせず作業コピーへ。成功で true。
+    /// </summary>
+    public Func<IReadOnlyDictionary<string, IReadOnlyCollection<string>>, int, Task<bool>>?
+        ApplyChunkDeleteEditAsync
+    { get; set; }
+
+    /// <summary>
+    /// 和集合チャンク選択時。MemberPaths 付きノードを渡し、対応タブを選ばせる。
+    /// </summary>
+    public Action<IReadOnlyList<WaveStructureNode>>? ApplyUnionChunkTabSelection { get; set; }
+
+    /// <summary>テスト用。null なら実キー状態を見る。</summary>
+    internal Func<bool>? NavigationKeyHeldForTest { get; set; }
+
+    /// <summary>テスト用。読み込みキー（単一パス or \u0001union\u0001…）。</summary>
+    internal string? LoadedPath => _loadedPath;
+
+    /// <summary>テスト用。和集合ドキュメントか。</summary>
+    internal bool IsChunkUnion => _loadedDocument is { IsChunkUnion: true };
+
+    /// <summary>テスト用。キー離し待ちのチャンク→タブ同期が溜まっているか。</summary>
+    internal bool IsChunkApplyDeferred => _chunkApplyDeferred;
+
     private void ApplyAlwaysVisibleScrollBarStyle(Control host)
     {
         if (TryFindResource("EditorHeaderScrollBarStyle") is Style style)
@@ -183,7 +234,13 @@ internal sealed class EditorHeaderChunkStripView : Border
             return;
         }
 
+        // 進行中の和集合は破棄する。
+        _unionBuildTicket++;
+        _unionPendingKey = null;
+
         if (string.Equals(path, _loadedPath, StringComparison.OrdinalIgnoreCase)
+            && _loadedDocument is not null
+            && !_loadedDocument.IsChunkUnion
             && _tree.Items.Count > 0)
         {
             return;
@@ -191,7 +248,71 @@ internal sealed class EditorHeaderChunkStripView : Border
 
         _loadedPath = path;
         var document = WaveContainerStructure.TryRead(path);
+        _loadedDocument = document;
         Populate(document);
+    }
+
+    /// <summary>
+    /// 複数タブのチャンク和集合。ディスク走査は裏スレッド、TreeView 更新だけ UI。
+    /// </summary>
+    public void LoadUnionFromPaths(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            Clear();
+            return;
+        }
+
+        if (paths.Count == 1)
+        {
+            LoadFromPath(paths[0]);
+            return;
+        }
+
+        var cacheParts = new string[paths.Count];
+        for (var i = 0; i < paths.Count; i++)
+        {
+            cacheParts[i] = paths[i].ToUpperInvariant();
+        }
+
+        var cacheKey = "\u0001union\u0001" + string.Join('\u0001', cacheParts);
+        if (string.Equals(cacheKey, _loadedPath, StringComparison.Ordinal)
+            && _loadedDocument is { IsChunkUnion: true })
+        {
+            _unionPendingKey = null;
+            return;
+        }
+
+        if (string.Equals(cacheKey, _unionPendingKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _unionPendingKey = cacheKey;
+        var ticket = ++_unionBuildTicket;
+        var snapshot = paths.ToArray();
+        _ = Task.Run(() => WaveContainerStructure.BuildChunkUnion(snapshot))
+            .ContinueWith(task =>
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (ticket != _unionBuildTicket
+                        || !string.Equals(cacheKey, _unionPendingKey, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+
+                    if (task.IsFaulted || task.IsCanceled)
+                    {
+                        return;
+                    }
+
+                    _unionPendingKey = null;
+                    _loadedPath = cacheKey;
+                    _loadedDocument = task.Result;
+                    Populate(task.Result);
+                });
+            });
     }
 
     /// <summary>H トグル／エディタ退出用。中身と幅の高水位を忘れる。</summary>
@@ -207,16 +328,241 @@ internal sealed class EditorHeaderChunkStripView : Border
     /// <summary>解析結果だけ捨てる（Clear から呼ばれる）。</summary>
     private void DiscardContent()
     {
-        ClearSelectAllMarks();
+        _multiSelected.Clear();
+        _selectionAnchor = null;
+        _rangeBusy = false;
+        _chunkApplyDeferred = false;
+        _chunkApplyTicket++;
+        _unionBuildTicket++;
+        _unionPendingKey = null;
         _loadedPath = null;
+        _loadedDocument = null;
         _tree.Items.Clear();
         SelectedNode = null;
         SetDetailText(string.Empty);
+        SetRepairTargets(Array.Empty<string>());
         ApplyInlineDetailLayout();
+    }
+
+    private void Tree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (!_rangeBusy && e.NewValue is TreeViewItem selected)
+        {
+            var modifiers = Keyboard.Modifiers;
+            if ((modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0)
+            {
+                _selectionAnchor = selected;
+            }
+
+            // Preview で先にマーク済みでも、選択が確定したあとに帯の角を取り直す。
+            if ((modifiers & ModifierKeys.Control) == 0
+                && (modifiers & ModifierKeys.Shift) == 0)
+            {
+                if (!_multiSelected.Contains(selected))
+                {
+                    ClearMultiSelect();
+                    _multiSelected.Add(selected);
+                }
+
+                ApplyMultiSelectChrome();
+            }
+        }
+
+        RequestChunkSelectionApply();
+    }
+
+    private void Tree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject origin
+            || FindTreeViewItem(origin) is not { } item
+            || FindTreeExpandToggle(origin) is not null)
+        {
+            return;
+        }
+
+        var modifiers = Keyboard.Modifiers;
+        var control = (modifiers & ModifierKeys.Control) != 0;
+        var shift = (modifiers & ModifierKeys.Shift) != 0;
+        BeginPlainPress(item, control, shift);
+        if (control || shift)
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>右クリック行が未マークなら、その1行だけを対象にする（複数マーク中はそのまま）。</summary>
+    private void Tree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject origin
+            || FindTreeViewItem(origin) is not { } item
+            || FindTreeExpandToggle(origin) is not null)
+        {
+            return;
+        }
+
+        if (_multiSelected.Contains(item))
+        {
+            return;
+        }
+
+        BeginPlainPress(item, control: false, shift: false);
+    }
+
+    /// <summary>次回 LoadFromPath／LoadUnionFromPaths で必ず再解析する。</summary>
+    public void InvalidateLoadedCache()
+    {
+        _loadedPath = null;
+        _loadedDocument = null;
+        _unionPendingKey = null;
+        _unionBuildTicket++;
+    }
+
+    /// <summary>修復対象パスを差し替える。空ならボタンを隠す。</summary>
+    public void SetRepairTargets(IReadOnlyList<string> paths)
+    {
+        _repairPaths = paths.Count == 0 ? Array.Empty<string>() : paths.ToArray();
+        ResetRepairUi(show: _repairPaths.Count > 0);
+        FitContentWidth();
+    }
+
+    private void BuildRepairPanel()
+    {
+        _repairPanel.Orientation = Orientation.Vertical;
+        _repairPanel.Margin = new Thickness(2, 2, 2, 4);
+        _repairPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _repairPanel.Visibility = Visibility.Collapsed;
+
+        _repairAskButton.Content = UiStrings.WaveHeaderRepairButton;
+        _repairAskButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _repairAskButton.MinHeight = DesignMetrics.From96(22);
+        _repairAskButton.Padding = new Thickness(6, 2, 6, 2);
+        _repairAskButton.Margin = new Thickness(0);
+        _repairAskButton.FontSize = 11;
+        ActionButtonLooks.ApplyClear(_repairAskButton);
+        _repairAskButton.Click += (_, _) => ShowRepairConfirm();
+
+        _repairPrompt.Text = UiStrings.WaveHeaderRepairPrompt;
+        _repairPrompt.TextWrapping = TextWrapping.Wrap;
+        _repairPrompt.Margin = new Thickness(0, 0, 0, 4);
+        _repairPrompt.FontSize = 11;
+        _repairPrompt.SetResourceReference(TextBlock.ForegroundProperty, "PrimaryForeBrush");
+
+        // エディタは即時上書き／別名保存しない。編集として履歴へ載せるだけ。
+        _repairOverwriteButton.Content = UiStrings.WaveHeaderRepairApplyEdit;
+        _repairOverwriteButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _repairOverwriteButton.MinHeight = DesignMetrics.From96(22);
+        _repairOverwriteButton.Padding = new Thickness(6, 2, 6, 2);
+        _repairOverwriteButton.Margin = new Thickness(0);
+        _repairOverwriteButton.FontSize = 11;
+        ActionButtonLooks.ApplyOrange(_repairOverwriteButton);
+        _repairOverwriteButton.Click += (_, _) => _ = RepairAsEditAsync();
+
+        _repairConfirmPanel.Orientation = Orientation.Vertical;
+        _repairConfirmPanel.Visibility = Visibility.Collapsed;
+        _repairConfirmPanel.Children.Add(_repairPrompt);
+        _repairConfirmPanel.Children.Add(_repairOverwriteButton);
+
+        _repairPanel.Children.Add(_repairAskButton);
+        _repairPanel.Children.Add(_repairConfirmPanel);
+    }
+
+    private void ResetRepairUi(bool show)
+    {
+        _repairConfirming = false;
+        _repairAskButton.Visibility = Visibility.Visible;
+        _repairConfirmPanel.Visibility = Visibility.Collapsed;
+        _repairAskButton.IsEnabled = true;
+        _repairOverwriteButton.IsEnabled = true;
+        _repairAskButton.Content = UiStrings.WaveHeaderRepairButton;
+        _repairPrompt.Text = FormatRepairPrompt();
+        _repairOverwriteButton.Content = UiStrings.WaveHeaderRepairApplyEdit;
+        _repairPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private string FormatRepairPrompt() =>
+        _repairPaths.Count > 1
+            ? UiStrings.WaveHeaderRepairPromptMany(_repairPaths.Count)
+            : UiStrings.WaveHeaderRepairPrompt;
+
+    private void ShowRepairConfirm()
+    {
+        if (_repairPanel.Visibility != Visibility.Visible || _repairPaths.Count == 0)
+        {
+            return;
+        }
+
+        _repairConfirming = true;
+        _repairPrompt.Text = FormatRepairPrompt();
+        _repairAskButton.Visibility = Visibility.Collapsed;
+        _repairConfirmPanel.Visibility = Visibility.Visible;
+        FitContentWidth();
+    }
+
+    private async Task RepairAsEditAsync()
+    {
+        if (!_repairConfirming || _repairPaths.Count == 0)
+        {
+            return;
+        }
+
+        if (ApplyRepairEditAsync is null)
+        {
+            RepairMessage?.Invoke(UiStrings.WaveHeaderRepairFailed("unavailable"));
+            ResetRepairUi(show: true);
+            return;
+        }
+
+        var sources = _repairPaths.ToArray();
+        _repairOverwriteButton.IsEnabled = false;
+        try
+        {
+            var ok = await ApplyRepairEditAsync(sources).ConfigureAwait(true);
+            if (!ok)
+            {
+                ResetRepairUi(show: true);
+                ShowRepairConfirm();
+                return;
+            }
+
+            _repairPaths = Array.Empty<string>();
+            ResetRepairUi(show: false);
+        }
+        catch (Exception ex)
+        {
+            RepairMessage?.Invoke(UiStrings.WaveHeaderRepairFailed(ex.Message));
+            ResetRepairUi(show: true);
+            ShowRepairConfirm();
+        }
     }
 
     /// <summary>チャンクツリーにキーボードフォーカスがある。</summary>
     public bool IsTreeFocused => _tree.IsKeyboardFocusWithin;
+
+    internal TreeView Tree => _tree;
+
+    /// <summary>
+    /// メニューキー／Shift+F10。フォーカスを波形へ移さず、チャンクツリーのメニューを開く。
+    /// </summary>
+    public bool TryOpenKeyboardContextMenu()
+    {
+        if (_tree.ContextMenu is not { } menu)
+        {
+            return false;
+        }
+
+        var anchor = Keyboard.FocusedElement as FrameworkElement;
+        if (anchor is null
+            || (!ReferenceEquals(anchor, _tree) && !_tree.IsAncestorOf(anchor)))
+        {
+            // 詳細側フォーカスでもメニューはツリーに出す（プレイヤーのヘッダ構造と同じ）。
+            anchor = _tree;
+        }
+
+        menu.PlacementTarget = anchor;
+        menu.Placement = PlacementMode.Center;
+        menu.IsOpen = true;
+        return true;
+    }
 
     /// <summary>帯内のインライン詳細にキーボードフォーカスがある。</summary>
     public bool IsInlineDetailFocused => _detail.IsKeyboardFocusWithin;
@@ -252,7 +598,7 @@ internal sealed class EditorHeaderChunkStripView : Border
         return true;
     }
 
-    /// <summary>表示中のチャンク行をすべてマーク（コピー用）。</summary>
+    /// <summary>表示中のチャンク行をすべてマーク（コピー／和集合→タブ同期用）。</summary>
     public void SelectAllItems()
     {
         var items = FlattenVisibleItems();
@@ -261,20 +607,21 @@ internal sealed class EditorHeaderChunkStripView : Border
             return;
         }
 
-        _selectAll = true;
-        for (var i = 0; i < items.Count; i++)
+        _multiSelected.Clear();
+        foreach (var item in items)
         {
-            var item = items[i];
-            item.SetValue(LibraryBrowserView.TreeMarkedProperty, true);
-            item.SetValue(
-                LibraryBrowserView.SelectionBandEdgeProperty,
-                SelectionBandCorners.EdgeAt(i, items.Count));
+            _multiSelected.Add(item);
         }
+
+        _selectionAnchor = _tree.SelectedItem as TreeViewItem ?? items[0];
+        ApplyMultiSelectChrome();
 
         if (!_tree.IsKeyboardFocusWithin)
         {
             FocusTree();
         }
+
+        RequestChunkSelectionApply();
     }
 
     /// <summary>全選択中なら全行、そうでなければ選択行をタブ区切りでクリップボードへ。</summary>
@@ -289,7 +636,7 @@ internal sealed class EditorHeaderChunkStripView : Border
         SystemClipboard.TrySetText(text, Window.GetWindow(this));
     }
 
-    public void MoveSelection(int delta)
+    public void MoveSelection(int delta, bool extend = false)
     {
         if (delta == 0)
         {
@@ -302,18 +649,18 @@ internal sealed class EditorHeaderChunkStripView : Border
             return;
         }
 
-        var current = _tree.SelectedItem as TreeViewItem;
-        var index = current is null ? -1 : items.IndexOf(current);
+        var caret = _tree.SelectedItem as TreeViewItem;
+        var index = caret is null ? -1 : items.IndexOf(caret);
         if (index < 0)
         {
             index = delta > 0 ? -1 : items.Count;
         }
 
         var next = Math.Clamp(index + delta, 0, items.Count - 1);
-        SelectTreeItem(items[next]);
+        ApplyMoveSelection(items[next], caret, extend);
     }
 
-    public void MoveSelectionToEdge(int edge)
+    public void MoveSelectionToEdge(int edge, bool extend = false)
     {
         var items = FlattenVisibleItems();
         if (items.Count == 0)
@@ -321,7 +668,262 @@ internal sealed class EditorHeaderChunkStripView : Border
             return;
         }
 
-        SelectTreeItem(edge < 0 ? items[0] : items[^1]);
+        var caret = _tree.SelectedItem as TreeViewItem;
+        ApplyMoveSelection(edge < 0 ? items[0] : items[^1], caret, extend);
+    }
+
+    internal int MultiSelectedCount => _multiSelected.Count;
+
+    internal void BeginPlainPress(TreeViewItem item, bool control, bool shift = false)
+    {
+        if (shift)
+        {
+            ApplyShiftClick(item);
+            return;
+        }
+
+        if (control)
+        {
+            ToggleMultiSelect(item);
+            // SelectedItemChanged がアンカーを上書きしないよう握る。
+            _rangeBusy = true;
+            try
+            {
+                SelectTreeItem(item);
+            }
+            finally
+            {
+                _rangeBusy = false;
+            }
+
+            RequestChunkSelectionApply();
+            return;
+        }
+
+        ClearMultiSelect();
+        _multiSelected.Add(item);
+        _selectionAnchor = item;
+        ApplyMultiSelectChrome();
+        RequestChunkSelectionApply();
+    }
+
+    internal void ApplyShiftClick(TreeViewItem item) =>
+        ApplyMoveSelection(item, _tree.SelectedItem as TreeViewItem, extend: true);
+
+    private void ApplyMoveSelection(TreeViewItem current, TreeViewItem? caret, bool extend)
+    {
+        _rangeBusy = true;
+        try
+        {
+            if (!extend)
+            {
+                _selectionAnchor = current;
+                ClearMultiSelect();
+                _multiSelected.Add(current);
+                ApplyMultiSelectChrome();
+                SelectTreeItem(current);
+                return;
+            }
+
+            _selectionAnchor ??= caret ?? current;
+            SelectVisibleRange(_selectionAnchor, current);
+            SelectTreeItem(current);
+        }
+        finally
+        {
+            _rangeBusy = false;
+        }
+
+        RequestChunkSelectionApply();
+    }
+
+    private bool IsNavigationKeyHeld() =>
+        NavigationKeyHeldForTest?.Invoke()
+        ?? (Keyboard.IsKeyDown(Key.Up)
+            || Keyboard.IsKeyDown(Key.Down)
+            || Keyboard.IsKeyDown(Key.Home)
+            || Keyboard.IsKeyDown(Key.End)
+            || Keyboard.IsKeyDown(Key.PageUp)
+            || Keyboard.IsKeyDown(Key.PageDown));
+
+    /// <summary>
+    /// チャンク選択副作用。ナビキー押し中は保留し、離してから詳細／和集合→タブ同期する。
+    /// </summary>
+    private void RequestChunkSelectionApply()
+    {
+        if (IsNavigationKeyHeld())
+        {
+            ScheduleDeferredChunkApply();
+            return;
+        }
+
+        ApplyChunkSelectionNow();
+    }
+
+    private void ScheduleDeferredChunkApply()
+    {
+        _chunkApplyDeferred = true;
+        var ticket = ++_chunkApplyTicket;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (ticket != _chunkApplyTicket || !_chunkApplyDeferred)
+                {
+                    return;
+                }
+
+                if (IsNavigationKeyHeld())
+                {
+                    return;
+                }
+
+                FlushDeferredChunkApply();
+            },
+            DispatcherPriority.Background);
+    }
+
+    /// <summary>ナビキーを離したあと、溜めたチャンク選択を確定する。</summary>
+    internal void FlushDeferredChunkApply()
+    {
+        if (!_chunkApplyDeferred)
+        {
+            return;
+        }
+
+        if (IsNavigationKeyHeld())
+        {
+            return;
+        }
+
+        ApplyChunkSelectionNow();
+    }
+
+    private void ApplyChunkSelectionNow()
+    {
+        _chunkApplyDeferred = false;
+        _chunkApplyTicket++;
+
+        if (_loadedDocument is { IsChunkUnion: true })
+        {
+            SelectedNode = null;
+            SetDetailText(string.Empty, notify: false);
+            ApplyInlineDetailLayout();
+            FitContentWidth();
+            DetailChanged?.Invoke(this, EventArgs.Empty);
+            ApplyUnionChunkTabSelection?.Invoke(CollectUnionChunkSelectionNodes());
+            return;
+        }
+
+        RefreshSelectedDetail();
+    }
+
+    /// <summary>
+    /// 和集合ツリーのマーク行（無ければキャレット行）のチャンクノード。
+    /// </summary>
+    internal List<WaveStructureNode> CollectUnionChunkSelectionNodes()
+    {
+        var nodes = new List<WaveStructureNode>();
+        foreach (var item in FlattenVisibleItems())
+        {
+            if (!_multiSelected.Contains(item)
+                || item.Tag is not WaveStructureNode node)
+            {
+                continue;
+            }
+
+            nodes.Add(node);
+        }
+
+        if (nodes.Count == 0
+            && _tree.SelectedItem is TreeViewItem { Tag: WaveStructureNode selected })
+        {
+            nodes.Add(selected);
+        }
+
+        return nodes;
+    }
+
+    private void ToggleMultiSelect(TreeViewItem item)
+    {
+        if (!_multiSelected.Add(item))
+        {
+            _multiSelected.Remove(item);
+        }
+
+        ApplyMultiSelectChrome();
+    }
+
+    private void ClearMultiSelect()
+    {
+        if (_multiSelected.Count == 0)
+        {
+            return;
+        }
+
+        _multiSelected.Clear();
+        ApplyMultiSelectChrome();
+    }
+
+    private void ApplyMultiSelectChrome()
+    {
+        var run = new List<TreeViewItem>();
+        void Flush()
+        {
+            for (var i = 0; i < run.Count; i++)
+            {
+                run[i].SetValue(
+                    LibraryBrowserView.SelectionBandEdgeProperty,
+                    SelectionBandCorners.EdgeAt(i, run.Count));
+            }
+
+            run.Clear();
+        }
+
+        foreach (var item in FlattenVisibleItems())
+        {
+            var marked = _multiSelected.Contains(item);
+            item.SetValue(LibraryBrowserView.TreeMarkedProperty, marked);
+            // IsSelected は帯に入れない（Preview 中の前行選択と混ざると角が歪む）。
+            if (marked)
+            {
+                run.Add(item);
+            }
+            else
+            {
+                Flush();
+                item.SetValue(
+                    LibraryBrowserView.SelectionBandEdgeProperty,
+                    SelectionBandEdge.None);
+            }
+        }
+
+        Flush();
+    }
+
+    private void SelectVisibleRange(TreeViewItem from, TreeViewItem to)
+    {
+        var items = FlattenVisibleItems();
+        var start = items.IndexOf(from);
+        var end = items.IndexOf(to);
+        if (end < 0)
+        {
+            return;
+        }
+
+        if (start < 0)
+        {
+            start = end;
+        }
+
+        var lo = Math.Min(start, end);
+        var hi = Math.Max(start, end);
+        _multiSelected.Clear();
+        for (var i = lo; i <= hi; i++)
+        {
+            _multiSelected.Add(items[i]);
+        }
+
+        ApplyMultiSelectChrome();
     }
 
     /// <summary>
@@ -440,12 +1042,38 @@ internal sealed class EditorHeaderChunkStripView : Border
 
     private void Populate(WaveStructureDocument document)
     {
+        _multiSelected.Clear();
+        _selectionAnchor = null;
         _tree.Items.Clear();
         if (document.IsUnsupported || document.Roots.Count == 0)
         {
             SetDetailText(string.Empty);
             ApplyInlineDetailLayout();
             Width = DesignMetrics.EditorHeaderChunkStripMinWidth;
+            return;
+        }
+
+        if (document.IsChunkUnion)
+        {
+            var unionNameWidth = WaveStructureNode.NameFieldWidth(0);
+            var countWidth = 1;
+            foreach (var root in document.Roots)
+            {
+                countWidth = Math.Max(
+                    countWidth,
+                    root.Size.ToString("#,0", CultureInfo.InvariantCulture).Length);
+            }
+
+            foreach (var root in document.Roots)
+            {
+                _tree.Items.Add(
+                    CreateItem(root, depth: 0, unionNameWidth, countWidth, unionFileCounts: true));
+            }
+
+            // 複数タブは和集合一覧のみ。情報エリアは出さない。
+            SelectedNode = null;
+            SetDetailText(string.Empty);
+            FitContentWidth();
             return;
         }
 
@@ -524,8 +1152,25 @@ internal sealed class EditorHeaderChunkStripView : Border
             return;
         }
 
+        // 和集合は詳細を出さない。単一ファイル時だけ本文を読む。
+        if (_loadedDocument is { IsChunkUnion: true })
+        {
+            SelectedNode = null;
+            SetDetailText(string.Empty, notify: false);
+            ApplyInlineDetailLayout();
+            FitContentWidth();
+            if (notify)
+            {
+                DetailChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            return;
+        }
+
         // ファイル読込時はヘッダのみ。本文はチャンク選択で読む。
-        if (node.ContentPending && !string.IsNullOrWhiteSpace(_loadedPath))
+        if (node.ContentPending
+            && !string.IsNullOrWhiteSpace(_loadedPath)
+            && !_loadedPath.Contains('\u0001'))
         {
             node = WaveContainerStructure.EnsureContent(_loadedPath, node);
             item.Tag = node;
@@ -566,16 +1211,18 @@ internal sealed class EditorHeaderChunkStripView : Border
     private void FitContentWidth()
     {
         var treeNatural = MeasureTreeWidth();
-        if (_tree.Items.Count > 0)
+        var hasTreeOrRepair = _tree.Items.Count > 0
+            || _repairPanel.Visibility == Visibility.Visible;
+        if (hasTreeOrRepair)
         {
             _treeHeldWidth = Math.Max(_treeHeldWidth, treeNatural);
         }
 
-        _treeFittedWidth = _tree.Items.Count == 0
-            ? DesignMetrics.EditorHeaderChunkStripMinWidth
-            : Math.Max(_treeHeldWidth, treeNatural);
+        _treeFittedWidth = hasTreeOrRepair
+            ? Math.Max(_treeHeldWidth, treeNatural)
+            : DesignMetrics.EditorHeaderChunkStripMinWidth;
 
-        if (_tree.Items.Count == 0)
+        if (!hasTreeOrRepair)
         {
             Width = DesignMetrics.EditorHeaderChunkStripMinWidth;
             return;
@@ -605,11 +1252,6 @@ internal sealed class EditorHeaderChunkStripView : Border
 
     private double MeasureTreeWidth()
     {
-        if (_tree.Items.Count == 0)
-        {
-            return DesignMetrics.EditorHeaderChunkStripMinWidth;
-        }
-
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         if (dpi <= 0)
         {
@@ -617,20 +1259,51 @@ internal sealed class EditorHeaderChunkStripView : Border
         }
 
         var typeface = new Typeface(MonoFont, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
-        var content = LibraryBrowserView.MeasureStructureTreeWidth(
-            _tree.Items,
-            depth: 0,
-            childIndent: 0,
-            typeface,
-            fontSize: 11,
-            dpi,
-            expanderWidth: 16);
+        var content = _tree.Items.Count == 0
+            ? 0d
+            : LibraryBrowserView.MeasureStructureTreeWidth(
+                _tree.Items,
+                depth: 0,
+                childIndent: 0,
+                typeface,
+                fontSize: 11,
+                dpi,
+                expanderWidth: 16);
+
+        if (_repairPanel.Visibility == Visibility.Visible)
+        {
+            foreach (var text in new[]
+                     {
+                         UiStrings.WaveHeaderRepairButton,
+                         FormatRepairPrompt(),
+                         UiStrings.WaveHeaderRepairApplyEdit,
+                     })
+            {
+                var ft = new FormattedText(
+                    text,
+                    CultureInfo.CurrentUICulture,
+                    FlowDirection.LeftToRight,
+                    typeface,
+                    11,
+                    Brushes.Black,
+                    dpi);
+                content = Math.Max(content, ft.WidthIncludingTrailingWhitespace);
+            }
+        }
+
+        if (_tree.Items.Count == 0 && _repairPanel.Visibility != Visibility.Visible)
+        {
+            return DesignMetrics.EditorHeaderChunkStripMinWidth;
+        }
+
         var chrome = _treeFrame.BorderThickness.Left
             + _treeFrame.BorderThickness.Right
             + _treeFrame.Padding.Left
             + _treeFrame.Padding.Right
             + _tree.Padding.Left
             + _tree.Padding.Right
+            + _repairPanel.Margin.Left
+            + _repairPanel.Margin.Right
             + DesignMetrics.SettingsScrollBarWidth
             + DesignMetrics.From96(4);
         var needed = content + chrome;
@@ -691,16 +1364,11 @@ internal sealed class EditorHeaderChunkStripView : Border
         WaveStructureNode node,
         int depth,
         int nameFieldWidth,
-        int sizeFieldWidth)
+        int sizeFieldWidth,
+        bool unionFileCounts = false)
     {
-        // 空 FourCC は IsCustom にも当たるが、不正色（赤）を優先。
-        var brushKey = node.IsInvalid || WaveStructureNode.IsBlankFourCc(node.Id)
-            ? LibraryBrowserView.MissingRegisteredPathForeBrushKey
-            : node.IsCustom
-                ? LibraryBrowserView.WaveStructureCustomChunkForeBrushKey
-                : node.IsSpecialized
-                    ? LibraryBrowserView.WaveStructureSpecializedChunkForeBrushKey
-                    : "PrimaryForeBrush";
+        // 可=赤、注意=オレンジ、保護=シアン、不可=通常。不正／空 FourCC はエラー色。
+        var brushKey = WaveChunkCleanPolicy.ResolveForeBrushKey(node);
         var item = new TreeViewItem
         {
             Tag = node,
@@ -708,7 +1376,9 @@ internal sealed class EditorHeaderChunkStripView : Border
             IsExpanded = false,
             Header = new TextBlock
             {
-                Text = node.FormatTreeCaption(depth, nameFieldWidth, sizeFieldWidth),
+                Text = unionFileCounts
+                    ? node.FormatUnionTreeCaption(nameFieldWidth, sizeFieldWidth)
+                    : node.FormatTreeCaption(depth, nameFieldWidth, sizeFieldWidth),
                 FontFamily = MonoFont,
                 FontSize = 11,
                 FontWeight = FontWeights.Normal,
@@ -730,7 +1400,8 @@ internal sealed class EditorHeaderChunkStripView : Border
 
         foreach (var child in node.Children)
         {
-            item.Items.Add(CreateItem(child, depth + 1, nameFieldWidth, sizeFieldWidth));
+            item.Items.Add(
+                CreateItem(child, depth + 1, nameFieldWidth, sizeFieldWidth, unionFileCounts));
         }
 
         return item;
@@ -767,6 +1438,7 @@ internal sealed class EditorHeaderChunkStripView : Border
         {
             menu.Items.Clear();
             var hasRows = FlattenVisibleItems().Count > 0;
+            var selected = CollectDeleteTargets();
             var selectAll = new MenuItem
             {
                 Header = UiStrings.WaveMenuSelectAll,
@@ -781,25 +1453,120 @@ internal sealed class EditorHeaderChunkStripView : Border
                 IsEnabled = hasRows,
             };
             copy.Click += (_, _) => CopySelection();
+            var delete = new MenuItem
+            {
+                Header = selected.Count > 1
+                    ? UiStrings.WaveChunkDeleteMenuMany
+                    : UiStrings.WaveChunkDeleteMenu,
+                // 不可のみ（****／fmt／data 等）はグレー。和集合は MemberPaths 経由。
+                IsEnabled = selected.Count > 0
+                    && (_loadedDocument is { IsChunkUnion: true }
+                        || !string.IsNullOrWhiteSpace(_loadedPath))
+                    && WaveChunkDeleteUi.HasDeletableSelection(selected),
+            };
+            delete.Click += (_, _) => _ = DeleteChunksAsync();
             menu.Items.Add(selectAll);
             menu.Items.Add(copy);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(delete);
         };
         _tree.ContextMenu = menu;
     }
 
-    private string BuildCopyText()
+    private List<TreeViewItem> CollectDeleteTargets()
     {
-        if (_selectAll)
+        var list = new List<TreeViewItem>();
+        foreach (var item in FlattenVisibleItems())
         {
-            var lines = new List<string>();
-            foreach (var item in FlattenVisibleItems())
+            if (_multiSelected.Contains(item))
             {
-                if (ItemCopyLine(item) is { Length: > 0 } line)
-                {
-                    lines.Add(line);
-                }
+                list.Add(item);
+            }
+        }
+
+        if (list.Count > 0)
+        {
+            return list;
+        }
+
+        if (_tree.SelectedItem is TreeViewItem selected)
+        {
+            list.Add(selected);
+        }
+
+        return list;
+    }
+
+    private async Task DeleteChunksAsync()
+    {
+        if (_loadedDocument is null && string.IsNullOrWhiteSpace(_loadedPath))
+        {
+            return;
+        }
+
+        var targets = CollectDeleteTargets();
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        // 和集合は MemberPaths 必須。単一パスに union キャッシュキーを渡さない。
+        var singlePath = _loadedDocument?.IsChunkUnion == true
+            ? null
+            : _loadedPath;
+        var plan = WaveChunkDeleteUi.BuildPlan(targets, singlePath);
+        if (plan is null)
+        {
+            return;
+        }
+
+        var owner = Window.GetWindow(this);
+        if (!WaveChunkDeleteUi.Confirm(owner, plan.Value))
+        {
+            return;
+        }
+
+        if (plan.Value.PathToChunkIds.Count == 0)
+        {
+            RepairMessage?.Invoke(UiStrings.WaveChunkDeleteForbiddenOnly);
+            return;
+        }
+
+        if (ApplyChunkDeleteEditAsync is null)
+        {
+            RepairMessage?.Invoke(UiStrings.WaveChunkStripFailed("unavailable"));
+            return;
+        }
+
+        try
+        {
+            var kinds = plan.Value.Entries.Count(static e => e.Verdict != WaveChunkCleanVerdict.Forbidden);
+            _ = await ApplyChunkDeleteEditAsync(plan.Value.PathToChunkIds, kinds).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            RepairMessage?.Invoke(UiStrings.WaveChunkStripFailed(ex.Message));
+        }
+    }
+
+    internal string BuildCopyText()
+    {
+        var lines = new List<string>();
+        foreach (var item in FlattenVisibleItems())
+        {
+            if (!_multiSelected.Contains(item))
+            {
+                continue;
             }
 
+            if (ItemCopyLine(item) is { Length: > 0 } line)
+            {
+                lines.Add(line);
+            }
+        }
+
+        if (lines.Count > 0)
+        {
             return string.Join(Environment.NewLine, lines);
         }
 
@@ -811,7 +1578,7 @@ internal sealed class EditorHeaderChunkStripView : Border
         return string.Empty;
     }
 
-    private static string? ItemCopyLine(TreeViewItem item)
+    private string? ItemCopyLine(TreeViewItem item)
     {
         if (item.Tag is not WaveStructureNode node)
         {
@@ -827,6 +1594,13 @@ internal sealed class EditorHeaderChunkStripView : Border
         if (name.Length == 0)
         {
             name = WaveStructureNode.BlankFourCcListLabel;
+        }
+
+        if (_loadedDocument is { IsChunkUnion: true })
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{name}\t{node.Size:#,0}");
         }
 
         var depth = LibraryBrowserView.MeasureTreeIndentDepth(item);
@@ -852,21 +1626,6 @@ internal sealed class EditorHeaderChunkStripView : Border
         return text.Replace('\0', '?');
     }
 
-    private void ClearSelectAllMarks()
-    {
-        if (!_selectAll)
-        {
-            return;
-        }
-
-        _selectAll = false;
-        foreach (var item in FlattenVisibleItems())
-        {
-            item.SetValue(LibraryBrowserView.TreeMarkedProperty, false);
-            item.SetValue(LibraryBrowserView.SelectionBandEdgeProperty, SelectionBandEdge.None);
-        }
-    }
-
     private void SelectTreeItem(TreeViewItem item)
     {
         ExpandAncestors(item);
@@ -876,6 +1635,42 @@ internal sealed class EditorHeaderChunkStripView : Border
         {
             item.Focus();
         }
+    }
+
+    private static TreeViewItem? FindTreeViewItem(DependencyObject? origin)
+    {
+        while (origin is not null)
+        {
+            if (origin is TreeViewItem item)
+            {
+                return item;
+            }
+
+            origin = VisualTreeHelper.GetParent(origin);
+        }
+
+        return null;
+    }
+
+    private static ToggleButton? FindTreeExpandToggle(DependencyObject? origin)
+    {
+        while (origin is not null)
+        {
+            if (origin is ToggleButton toggle
+                && string.Equals(toggle.Name, "Expander", StringComparison.Ordinal))
+            {
+                return toggle;
+            }
+
+            if (origin is TreeViewItem)
+            {
+                return null;
+            }
+
+            origin = VisualTreeHelper.GetParent(origin);
+        }
+
+        return null;
     }
 
     private static void ExpandAncestors(TreeViewItem item)

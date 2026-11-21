@@ -109,6 +109,8 @@ public partial class MainWindow
                 RefreshTileChrome();
             }
 
+            // 複数選択解除後など、チャンク帯／修復対象をアクティブ1件へ戻す。
+            RefreshEditorHeaderStructureFromTabSelection();
             return;
         }
 
@@ -323,6 +325,7 @@ public partial class MainWindow
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
         RefreshStatus();
+        RefreshEditorHeaderStructureFromTabSelection();
     }
 
     /// <summary>
@@ -371,6 +374,7 @@ public partial class MainWindow
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
         RefreshStatus();
+        RefreshEditorHeaderStructureFromTabSelection();
     }
     /// <summary>開いているタブに色マーカー付きが1つでもあるときだけ同色選択できる。</summary>
     private bool CanSelectSameColorTabs()
@@ -448,6 +452,7 @@ public partial class MainWindow
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
         RefreshStatus();
+        RefreshEditorHeaderStructureFromTabSelection();
     }
 
     /// <summary>Shift+クリック。起点（前回操作したタブ、無ければアクティブ）から範囲選択。</summary>
@@ -478,6 +483,7 @@ public partial class MainWindow
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
         RefreshStatus();
+        RefreshEditorHeaderStructureFromTabSelection();
     }
 
     /// <summary>Esc から呼ぶ。解除したら true。</summary>
@@ -494,6 +500,7 @@ public partial class MainWindow
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
         RefreshStatus();
+        RefreshEditorHeaderStructureFromTabSelection();
         return true;
     }
     /// <summary>選択タブをタブバーの並び順で返す。</summary>
@@ -834,16 +841,23 @@ public partial class MainWindow
         bool includeMerge = false)
     {
         var selected = HasTabSelection ? SelectedTabsInOrder() : null;
-        var pathTargets = selected ?? [session];
+        // コピーはプレイヤー／エディタ共通の解決（プレイリスト複数選択を落とさない）。
+        var pathTargets = ResolvePathCopySessions();
+        if (pathTargets.Length == 0)
+        {
+            pathTargets = [session];
+        }
+
+        var multiPath = pathTargets.Length >= 2;
         menu.Items.Add(CreateTabMenuItem(
             UiStrings.TabMenuRenameFile,
             () => BeginFileNameEdit(session, SurfaceFromAnchor(anchor)),
             enabled: canMutate));
         menu.Items.Add(CreateTabMenuItem(
-            selected is null ? UiStrings.WaveMenuCopyFileName : UiStrings.WaveMenuCopyFileNameSelected,
+            multiPath ? UiStrings.WaveMenuCopyFileNameSelected : UiStrings.WaveMenuCopyFileName,
             () => CopySessionPathTexts(pathTargets, fullPath: false)));
         menu.Items.Add(CreateTabMenuItem(
-            selected is null ? UiStrings.WaveMenuCopyFilePath : UiStrings.WaveMenuCopyFilePathSelected,
+            multiPath ? UiStrings.WaveMenuCopyFilePathSelected : UiStrings.WaveMenuCopyFilePath,
             () => CopySessionPathTexts(pathTargets, fullPath: true)));
         menu.Items.Add(CreateTabMenuItem(
             selected is null ? UiStrings.TabMenuDuplicateFile : UiStrings.WaveMenuDuplicateFileSelected,

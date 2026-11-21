@@ -910,14 +910,12 @@ public partial class MainWindow
         RefreshStatus();
         if (IsLibraryMaximized)
         {
-            foreach (var job in jobs)
-            {
-                var session = _sessions.FirstOrDefault(item => ReferenceEquals(item.Document, job.Document));
-                if (session is not null)
-                {
-                    LibraryBrowser.UpdateSessionRow(session);
-                }
-            }
+            // 上書き後の日付／サイズを行へ載せ、ItemsSource を一度だけ張り直す。
+            LibraryBrowser.RematerializeBoundPlaylistRows();
+        }
+        else
+        {
+            MarkLibraryPlaylistStaleFromEditor();
         }
 
         if (failed > 0)
@@ -1467,9 +1465,11 @@ public partial class MainWindow
     private string UniqueCopyPath(string sourcePath)
     {
         var dir = Path.GetDirectoryName(sourcePath);
+        // 複製は "name_copy"（衝突時は name_copy 2 …）。既に _copy 付きなら重ねない。
+        var stem = LibraryFileTransfer.CopyStem(Path.GetFileNameWithoutExtension(sourcePath));
         return UniquePathInDirectory(
             dir,
-            Path.GetFileNameWithoutExtension(sourcePath),
+            stem,
             Path.GetExtension(sourcePath));
     }
 
