@@ -188,12 +188,24 @@ internal sealed class WaveStructureNode
         return !hasVisible;
     }
 
-    /// <summary>リスト用の空 FourCC 表示（4文字幅に揃える）。情報欄の本文は "(empty)" のまま。</summary>
-    internal const string BlankFourCcListLabel = "----";
+    /// <summary>
+    /// リスト用の不正／空 FourCC・修復対象の表示（4文字）。
+    /// 正規チャンク名に見えにくいよう <c>****</c>。情報欄の本文は "(empty)" のまま。
+    /// </summary>
+    internal const string BlankFourCcListLabel = "****";
 
-    /// <summary>ツリー／コピー用。空 FourCC は <see cref="BlankFourCcListLabel"/>。</summary>
+    /// <summary>
+    /// 和集合キー用。空 FourCC および修復対象 WAVE（切り詰め等）を <c>****</c> 行へ畳む。
+    /// </summary>
+    internal const string BlankFourCcCanonicalId = "\0\0\0\0";
+
+    /// <summary>ツリー／コピー用。空／不正 FourCC は <see cref="BlankFourCcListLabel"/>。</summary>
     internal string FormatDisplayFourCc() =>
         IsBlankFourCc(Id) ? BlankFourCcListLabel : FormatFourCc(Id);
+
+    /// <summary>和集合のマージキー。空／不正 FourCC はすべて <see cref="BlankFourCcCanonicalId"/>。</summary>
+    internal static string UnionChunkKey(string? id) =>
+        IsBlankFourCc(id) ? BlankFourCcCanonicalId : (id ?? string.Empty);
 
     /// <summary>
     /// インデント込みで名前欄を固定幅にし、区切りとサイズを縦揃えする。
@@ -786,6 +798,7 @@ internal static class WaveContainerStructure
     /// 複数ファイルのチャンク FourCC 和集合をフラット一覧にする。
     /// 非対応形式は飛ばし、親子構造は持たない。
     /// 各ノードの Size は「そのチャンクを持つファイル数」。
+    /// 修復が必要な WAVE（切り詰め・空 FourCC など）は先頭の <c>****</c> 行にも載せる。
     /// </summary>
     public static WaveStructureDocument BuildChunkUnion(IEnumerable<string> paths)
     {
@@ -797,14 +810,31 @@ internal static class WaveContainerStructure
                 continue;
             }
 
+            // プレイリスト選択との照合用にフルパスへ正規化（共有ドライブ等）。
+            var memberPath = PathUtil.TryGetFullPathTrimmed(path, out var full) ? full : path;
             var doc = TryRead(path);
-            if (doc.IsUnsupported || doc.Roots.Count == 0)
+            if (doc.IsUnsupported)
             {
                 continue;
             }
 
             var fileIds = new HashSet<string>(StringComparer.Ordinal);
-            CollectChunkIds(doc.Roots, fileIds);
+            if (doc.Roots.Count > 0)
+            {
+                CollectChunkIds(doc.Roots, fileIds);
+            }
+
+            // 切り詰め data などは FourCC が普通のままなので、修復対象を **** に集約する。
+            if (WaveHeaderRepair.NeedsRepair(doc))
+            {
+                fileIds.Add(WaveStructureNode.BlankFourCcCanonicalId);
+            }
+
+            if (fileIds.Count == 0)
+            {
+                continue;
+            }
+
             foreach (var id in fileIds)
             {
                 if (!members.TryGetValue(id, out var list))
@@ -813,23 +843,27 @@ internal static class WaveContainerStructure
                     members[id] = list;
                 }
 
-                list.Add(path);
+                list.Add(memberPath);
             }
         }
 
         var roots = new List<WaveStructureNode>(members.Count);
-        foreach (var id in members.Keys.OrderBy(static x => x, StringComparer.Ordinal))
+        // ****（修復／空 FourCC）を常に先頭。ほかは FourCC 昇順。
+        foreach (var id in members.Keys
+                     .OrderBy(static x => WaveStructureNode.IsBlankFourCc(x) ? 0 : 1)
+                     .ThenBy(static x => x, StringComparer.Ordinal))
         {
             var list = members[id];
+            var blank = WaveStructureNode.IsBlankFourCc(id);
             roots.Add(new WaveStructureNode(
                 id,
-                id,
+                blank ? WaveStructureNode.BlankFourCcListLabel : id,
                 offset: 0,
                 size: list.Count,
                 WaveStructureContentKind.Empty,
                 content: string.Empty,
                 contentTruncated: false,
-                isInvalid: false,
+                isInvalid: blank,
                 error: null,
                 memberPaths: list));
         }
@@ -846,7 +880,12 @@ internal static class WaveContainerStructure
     {
         foreach (var node in nodes)
         {
-            if (!string.IsNullOrEmpty(node.Id))
+            // 空／不正 FourCC（NUL・空白のみ等）は表示が同じなので1キーに畳む。
+            if (WaveStructureNode.IsBlankFourCc(node.Id))
+            {
+                ids.Add(WaveStructureNode.BlankFourCcCanonicalId);
+            }
+            else if (!string.IsNullOrEmpty(node.Id))
             {
                 ids.Add(node.Id);
             }

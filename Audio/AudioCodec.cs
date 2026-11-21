@@ -6,7 +6,7 @@ using NAudio.Wave;
 
 namespace MgaSonicAnvil.Audio;
 
-internal static class AudioCodec
+internal static partial class AudioCodec
 {
     private static readonly object MediaFoundationGate = new();
     private static bool _mediaFoundationStarted;
@@ -720,6 +720,42 @@ internal static class AudioCodec
         }
     }
 
+    /// <summary>
+    /// ソースファイルの埋め込みマーカー／リージョン／ループを文書へ再同期する。
+    /// チャンク削除やヘッダ上書き後、メモリ上の古い cue を残さない。
+    /// </summary>
+    internal static void ReloadEmbeddedMeta(AudioDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var path = document.ResolveWaveContainerPath();
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        var kind = DetectKind(path);
+        if (kind == AudioFileKind.Wave)
+        {
+            if (!WavEmbeddedMeta.TryRead(path, out var wave))
+            {
+                wave = EmbeddedAudioMeta.Empty;
+            }
+
+            wave.Sync(document);
+            return;
+        }
+
+        if (kind == AudioFileKind.Aiff)
+        {
+            if (!AiffEmbeddedMeta.TryRead(path, out var aiff))
+            {
+                aiff = EmbeddedAudioMeta.Empty;
+            }
+
+            aiff.Sync(document);
+        }
+    }
+
     private static WaveStream OpenReader(string path)
     {
         var kind = DetectKind(path);
@@ -814,6 +850,16 @@ internal static class AudioCodec
         bool embedMeta,
         IProgress<double>? progress = null)
     {
+        // 破壊編集の上書きでも、元 WAVE の未知チャンクを勝手に掃除しない。
+        if (embedMeta
+            && TryWriteWavePreservingChunks(document, path, bits, progress))
+        {
+            WavEmbeddedMeta.Write(path, document);
+            DeleteSoundForgeSidecars(path);
+            progress?.Report(1);
+            return;
+        }
+
         var channels = Math.Max(1, document.Channels);
         var sampleRate = Math.Max(1, document.SampleRate);
         var blockAlign = channels * (bits / 8);

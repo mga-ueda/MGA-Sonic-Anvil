@@ -199,6 +199,104 @@ public sealed class WaveContainerStructureTests
     }
 
     [Fact]
+    public void BuildChunkUnion_CollapsesDistinctBlankFourCcs()
+    {
+        // NUL×4 と空白×4 は表示が同じ **** なので和集合では1行にまとめる。
+        static byte[] WithBlank(byte[] blankId)
+        {
+            var body = Concat(
+                Encoding.ASCII.GetBytes("WAVE"),
+                RiffChunk("fmt ", FmtBody()),
+                RiffChunk("data", new byte[16]),
+                blankId,
+                BitConverter.GetBytes(0));
+            return Concat(
+                Encoding.ASCII.GetBytes("RIFF"),
+                BitConverter.GetBytes((uint)body.Length),
+                body);
+        }
+
+        var waveNul = WriteTemp("union-blank-nul.wav", WithBlank([0, 0, 0, 0]));
+        var waveSpc = WriteTemp("union-blank-spc.wav", WithBlank([(byte)' ', (byte)' ', (byte)' ', (byte)' ']));
+        try
+        {
+            var doc = WaveContainerStructure.BuildChunkUnion([waveNul, waveSpc]);
+            var blanks = doc.Roots.Where(static n => WaveStructureNode.IsBlankFourCc(n.Id)).ToArray();
+            var blank = Assert.Single(blanks);
+            Assert.Equal(WaveStructureNode.BlankFourCcCanonicalId, blank.Id);
+            Assert.Equal(2, blank.Size);
+            Assert.True(blank.IsInvalid);
+            Assert.Equal(
+                WaveStructureNode.BlankFourCcListLabel + " - 2",
+                blank.FormatUnionTreeCaption(4, 1));
+            Assert.Equal(2, blank.MemberPaths.Count);
+            Assert.Equal(
+                WaveStructureNode.BlankFourCcCanonicalId,
+                WaveStructureNode.UnionChunkKey("    "));
+            Assert.Equal(
+                WaveStructureNode.BlankFourCcCanonicalId,
+                WaveStructureNode.UnionChunkKey("\0\0\0\0"));
+        }
+        finally
+        {
+            File.Delete(waveNul);
+            File.Delete(waveSpc);
+        }
+    }
+
+    [Fact]
+    public void BuildChunkUnion_PutsTruncatedRepairTargetsUnderBlankRow()
+    {
+        // 切り詰め data は FourCC が "data" のままなので、修復対象として先頭 **** にも載せる。
+        var truncated = new List<byte>();
+        truncated.AddRange(Encoding.ASCII.GetBytes("RIFF"));
+        truncated.AddRange(BitConverter.GetBytes(100u));
+        truncated.AddRange(Encoding.ASCII.GetBytes("WAVE"));
+        truncated.AddRange(Encoding.ASCII.GetBytes("fmt "));
+        truncated.AddRange(BitConverter.GetBytes(16u));
+        truncated.AddRange(FmtBody());
+        truncated.AddRange(Encoding.ASCII.GetBytes("data"));
+        truncated.AddRange(BitConverter.GetBytes(5000u));
+        truncated.AddRange(new byte[8]);
+
+        var bad = WriteTemp("union-trunc.wav", truncated.ToArray());
+        var good = WriteTemp("union-ok.wav", BuildPcmWave(new byte[64], sampleRate: 44100, channels: 1, bits: 16));
+        try
+        {
+            Assert.True(WaveHeaderRepair.NeedsRepair(WaveContainerStructure.TryRead(bad)));
+            Assert.False(WaveHeaderRepair.NeedsRepair(WaveContainerStructure.TryRead(good)));
+
+            var doc = WaveContainerStructure.BuildChunkUnion([bad, good]);
+            Assert.Equal(WaveStructureNode.BlankFourCcListLabel, "****");
+            Assert.True(WaveStructureNode.IsBlankFourCc(doc.Roots[0].Id));
+            var blank = Assert.Single(doc.Roots, static n => WaveStructureNode.IsBlankFourCc(n.Id));
+            Assert.Same(doc.Roots[0], blank);
+            Assert.Equal(1, blank.Size);
+            Assert.True(blank.IsInvalid);
+            Assert.Equal(
+                WaveStructureNode.BlankFourCcListLabel + " - 1",
+                blank.FormatUnionTreeCaption(4, 1));
+            Assert.Contains(
+                Path.GetFullPath(bad),
+                blank.MemberPaths.Select(Path.GetFullPath),
+                StringComparer.OrdinalIgnoreCase);
+            Assert.DoesNotContain(
+                Path.GetFullPath(good),
+                blank.MemberPaths.Select(Path.GetFullPath),
+                StringComparer.OrdinalIgnoreCase);
+
+            // 通常の data 行には両方載る。
+            var data = Assert.Single(doc.Roots, static n => n.Id == "data");
+            Assert.Equal(2, data.Size);
+        }
+        finally
+        {
+            File.Delete(bad);
+            File.Delete(good);
+        }
+    }
+
+    [Fact]
     public void FormatHexDump_GroupsSixteenBytes()
     {
         var text = WaveContainerStructure.FormatHexDump(new byte[] { 0x52, 0x49, 0x46, 0x46 }, 0);

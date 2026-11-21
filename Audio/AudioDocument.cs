@@ -163,6 +163,33 @@ internal sealed partial class AudioDocument
 
     public string? SourcePath { get; set; }
 
+    /// <summary>
+    /// WAVE ヘッダの作業コピー（修復／チャンク削除の未保存結果）。
+    /// 保存の雛形とチャンク表示に使い、無ければ <see cref="SourcePath"/>。
+    /// </summary>
+    public string? WaveContainerPath { get; private set; }
+
+    /// <summary>チャンク表示／保存雛形に使う WAVE パス。</summary>
+    public string? ResolveWaveContainerPath()
+    {
+        if (!string.IsNullOrWhiteSpace(WaveContainerPath) && File.Exists(WaveContainerPath))
+        {
+            return WaveContainerPath;
+        }
+
+        return string.IsNullOrWhiteSpace(SourcePath) ? null : SourcePath;
+    }
+
+    /// <summary>ヘッダ作業コピーを差し替える。null で SourcePath 参照に戻す。</summary>
+    public void SetWaveContainerPath(string? path, bool markDirty = true)
+    {
+        WaveContainerPath = string.IsNullOrWhiteSpace(path) ? null : path;
+        if (markDirty)
+        {
+            IsDirty = true;
+        }
+    }
+
     /// <summary>MP3 の ID3 APIC / M4A の covr。WAVE 等は持たない（表示はプレースホルダ）。</summary>
     public byte[]? Artwork { get; private set; }
 
@@ -285,6 +312,7 @@ internal sealed partial class AudioDocument
     {
         SourcePath = path;
         SourceKind = kind;
+        WaveContainerPath = null;
         IsDirty = false;
         CanContinueRecording = false;
         RefreshFileBytes();

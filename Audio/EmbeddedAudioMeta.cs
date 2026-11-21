@@ -36,35 +36,50 @@ internal sealed class EmbeddedAudioMeta
 
     public bool IsEmpty => Markers.Count == 0 && SampleLoop is null && Regions.Count == 0;
 
+    /// <summary>初回読み込み用。空なら何もしない（既存を消さない）。</summary>
     public void Apply(AudioDocument document)
     {
-        if (Markers.Count > 0)
+        if (IsEmpty)
         {
-            var snapshots = new MarkerSnapshot[Markers.Count];
-            for (var i = 0; i < Markers.Count; i++)
-            {
-                snapshots[i] = new MarkerSnapshot(Markers[i].Frame, Markers[i].Comment);
-            }
-
-            document.ReplaceMarkers(snapshots, markDirty: false, normalizeComments: false);
+            return;
         }
+
+        Sync(document);
+    }
+
+    /// <summary>
+    /// ディスク上の cue / smpl / adtl に文書を合わせる。
+    /// 空ならマーカー／リージョン／ループを消す（チャンク削除後の再同期用）。
+    /// </summary>
+    public void Sync(AudioDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        var snapshots = new MarkerSnapshot[Markers.Count];
+        for (var i = 0; i < Markers.Count; i++)
+        {
+            snapshots[i] = new MarkerSnapshot(Markers[i].Frame, Markers[i].Comment);
+        }
+
+        document.ReplaceMarkers(snapshots, markDirty: false, normalizeComments: false);
 
         if (SampleLoop is { } loop)
         {
             document.SetSampleLoop(new WaveSelection(loop.StartFrame, loop.EndFrame), markDirty: false);
         }
-
-        if (Regions.Count > 0)
+        else
         {
-            var ranges = new WaveRegion[Regions.Count];
-            for (var i = 0; i < Regions.Count; i++)
-            {
-                ranges[i] = new WaveRegion(
-                    new WaveSelection(Regions[i].StartFrame, Regions[i].EndFrame),
-                    Regions[i].Name);
-            }
-
-            document.SetRegions(ranges, markDirty: false);
+            document.SetSampleLoop(WaveSelection.Empty, markDirty: false);
         }
+
+        var ranges = new WaveRegion[Regions.Count];
+        for (var i = 0; i < Regions.Count; i++)
+        {
+            ranges[i] = new WaveRegion(
+                new WaveSelection(Regions[i].StartFrame, Regions[i].EndFrame),
+                Regions[i].Name);
+        }
+
+        document.SetRegions(ranges, markDirty: false);
     }
 }
