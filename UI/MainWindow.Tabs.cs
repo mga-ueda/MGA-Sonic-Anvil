@@ -318,10 +318,11 @@ public partial class MainWindow
             }
         }
 
-        RebuildTabBar();
+        RefreshTabHeaders();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
+        RefreshStatus();
     }
 
     /// <summary>
@@ -365,12 +366,12 @@ public partial class MainWindow
             _tabSelectionAnchor = first;
         }
 
-        RebuildTabBar();
+        RefreshTabHeaders();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
+        RefreshStatus();
     }
-
     /// <summary>開いているタブに色マーカー付きが1つでもあるときだけ同色選択できる。</summary>
     private bool CanSelectSameColorTabs()
     {
@@ -421,19 +422,32 @@ public partial class MainWindow
         ActivateSession(session);
     }
 
-    /// <summary>Ctrl+クリック。選択に個別追加／解除する（アクティブ化はしない）。</summary>
+    /// <summary>
+    /// Ctrl+クリック。選択に個別追加／解除する（アクティブ化はしない）。
+    /// 選択が空のとき別タブを足す場合は、今のアクティブも一緒に入れて複数選択を始める
+    /// （1 件目だけだとハイライトがそちらへ移り、追加できていないように見える）。
+    /// </summary>
     private void ToggleTabSelection(DocumentSession session)
     {
+        if (_selectedTabs.Count == 0
+            && _activeSession is not null
+            && !ReferenceEquals(_activeSession, session))
+        {
+            _selectedTabs.Add(_activeSession);
+        }
+
         if (!_selectedTabs.Add(session))
         {
             _selectedTabs.Remove(session);
         }
 
         _tabSelectionAnchor = session;
-        RebuildTabBar();
+        // 選択ハイライトだけなら作り直し不要（クリック中のタブ破棄を避ける）。
+        RefreshTabHeaders();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
+        RefreshStatus();
     }
 
     /// <summary>Shift+クリック。起点（前回操作したタブ、無ければアクティブ）から範囲選択。</summary>
@@ -459,10 +473,11 @@ public partial class MainWindow
             _selectedTabs.Add(_sessions[i]);
         }
 
-        RebuildTabBar();
+        RefreshTabHeaders();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
+        RefreshStatus();
     }
 
     /// <summary>Esc から呼ぶ。解除したら true。</summary>
@@ -474,13 +489,13 @@ public partial class MainWindow
         }
 
         _selectedTabs.Clear();
-        RebuildTabBar();
+        RefreshTabHeaders();
         RefreshTileChrome();
         SyncPlaylistSelectionLoudness();
         RefreshTransportCommandsEnabled();
+        RefreshStatus();
         return true;
     }
-
     /// <summary>選択タブをタブバーの並び順で返す。</summary>
     private DocumentSession[] SelectedTabsInOrder() =>
         _sessions.Where(_selectedTabs.Contains).ToArray();
