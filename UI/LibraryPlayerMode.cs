@@ -69,6 +69,7 @@ internal static class LibraryPlayerMode
             or WaveMenuCommand.AutoPlayNext
             or WaveMenuCommand.AutoPlay
             or WaveMenuCommand.CheckSelectMode
+            or WaveMenuCommand.InvertPlaylistSelection
             or WaveMenuCommand.SelectByGroupUp
             or WaveMenuCommand.SelectByGroupDown
             or WaveMenuCommand.SelectSameColor
@@ -250,7 +251,8 @@ internal static class LibraryPlayerMode
 
         return (key, modifiers) switch
         {
-            (Key.Space, ModifierKeys.None or ModifierKeys.Control or ModifierKeys.Shift) => true,
+            (Key.Space, ModifierKeys.None or ModifierKeys.Control or ModifierKeys.Shift
+                or (ModifierKeys.Control | ModifierKeys.Shift)) => true,
             // 振幅ズーム（エディタ／プレイヤー波形）。旧キャレット移動用ではない。
             (Key.Up or Key.Down, ModifierKeys.Control | ModifierKeys.Shift) => true,
             (Key.Enter, ModifierKeys.None or ModifierKeys.Alt or ModifierKeys.Shift
@@ -708,6 +710,10 @@ internal static class LibraryPlayerMode
     /// <summary>Shift+Space。プレイリストのチェック選択モードをトグル（ツリーは折りたたみのまま）。</summary>
     public static bool IsCheckSelectModeToggle(Key key, ModifierKeys modifiers) =>
         key == Key.Space && modifiers == ModifierKeys.Shift;
+
+    /// <summary>Ctrl+Shift+Space。プレイリストの選択反転（チェックモード中はチェック、オフ時は帯）。</summary>
+    public static bool IsInvertPlaylistSelection(Key key, ModifierKeys modifiers) =>
+        key == Key.Space && modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
 
     /// <summary>Shift+C。プレイリスト／タブ／タイルでキャレットと同じ色のファイルを全選択。</summary>
     public static bool IsSelectSameColor(Key key, ModifierKeys modifiers) =>
@@ -2504,6 +2510,7 @@ internal static class LibraryPlayerMode
     /// <summary>
     /// パス／ファイル名だけでプレイリスト順が決まるか。
     /// true ならフォルダ名順で流した時点で冒頭が確定し、タグ待ちなしで再生できる。
+    /// 種類／サイズ／日付は収集順（フォルダ名→ファイル名）と一致しないので含めない。
     /// </summary>
     public static bool CanResolvePlaylistOrderFromPaths(
         LibraryFileGroup group,
@@ -2517,10 +2524,7 @@ internal static class LibraryPlayerMode
         return sortColumn is null
             or LibraryFileColumn.Name
             or LibraryFileColumn.ParentFolder
-            or LibraryFileColumn.Folder
-            or LibraryFileColumn.Kind
-            or LibraryFileColumn.Size
-            or LibraryFileColumn.Date;
+            or LibraryFileColumn.Folder;
     }
 
     /// <summary>

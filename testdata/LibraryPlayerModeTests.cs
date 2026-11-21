@@ -603,6 +603,10 @@ public sealed class LibraryPlayerModeTests
         Assert.True(LibraryPlayerMode.AllowsKey(Key.Space, ModifierKeys.Shift));
         Assert.True(LibraryPlayerMode.IsCheckSelectModeToggle(Key.Space, ModifierKeys.Shift));
         Assert.False(LibraryPlayerMode.IsCheckSelectModeToggle(Key.F4, ModifierKeys.None));
+        Assert.True(LibraryPlayerMode.AllowsKey(Key.Space, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.True(LibraryPlayerMode.IsInvertPlaylistSelection(Key.Space, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.IsInvertPlaylistSelection(Key.Space, ModifierKeys.Shift));
+        Assert.False(LibraryPlayerMode.BlocksWaveMenu(WaveMenuCommand.InvertPlaylistSelection));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Up, ModifierKeys.None));
         Assert.False(LibraryPlayerMode.AllowsKey(Key.Delete, ModifierKeys.None));
         Assert.True(LibraryPlayerMode.AllowsKey(Key.C, ModifierKeys.Control));
@@ -1958,6 +1962,12 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
             LibraryFileGroup.Folder,
             LibraryFileColumn.Album));
+        Assert.False(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
+            LibraryFileGroup.Folder,
+            LibraryFileColumn.Kind));
+        Assert.False(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
+            LibraryFileGroup.Folder,
+            LibraryFileColumn.Date));
         Assert.False(LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
             LibraryFileGroup.Artist,
             LibraryFileColumn.Name));

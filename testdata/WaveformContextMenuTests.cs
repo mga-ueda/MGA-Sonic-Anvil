@@ -299,6 +299,10 @@ public sealed class WaveformContextMenuTests
             Assert.Contains(WaveMenuCommand.CheckSelectMode, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal("Shift+Space", Find(tree, WaveMenuCommand.CheckSelectMode)?.Gesture);
             Assert.True(Find(tree, WaveMenuCommand.CheckSelectMode)?.Checkable);
+            Assert.Contains(WaveMenuCommand.InvertPlaylistSelection, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
+            Assert.Equal(
+                MenuGestures.InvertPlaylistSelection,
+                Find(tree, WaveMenuCommand.InvertPlaylistSelection)?.Gesture);
             Assert.Contains(WaveMenuCommand.SelectByGroupUp, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));
             Assert.Equal(MenuGestures.SelectByGroupUp, Find(tree, WaveMenuCommand.SelectByGroupUp)?.Gesture);
             Assert.Contains(WaveMenuCommand.SelectByGroupDown, CommandsIn(tree, UiStrings.WaveMenuCatPlayback));

@@ -269,6 +269,14 @@ public partial class MainWindow
             case WaveMenuCommand.CheckSelectMode:
                 LibraryBrowser.ToggleCheckSelectMode();
                 break;
+            case WaveMenuCommand.InvertPlaylistSelection:
+                if (!LibraryPlayerMode.BlocksPlaylistMutationWhileChromeHidden(
+                        _playlistVideoChromeVisible))
+                {
+                    LibraryBrowser.InvertPlaylistSelection();
+                }
+
+                break;
             case WaveMenuCommand.SelectByGroupUp:
                 if (IsLibraryMaximized)
                 {

@@ -128,6 +128,8 @@ internal static partial class UiStrings
     public static string WaveMenuAutoPlay => Get("追加時に自動再生(_I)", "Auto Play on Add (_I)");
     /// <summary>プレイリストサブメニュー。録音(C) と階層が違うので C。ショートカット表示は Shift+Space。</summary>
     public static string WaveMenuCheckSelectMode => Get("チェックボックス表示(_C)", "Show _Checkboxes");
+    /// <summary>プレイリストサブメニュー。選択反転。チェック(C)・グループ(G/W)・同色(Y)と重ならない V。ショートカットは Ctrl+Shift+Space。</summary>
+    public static string WaveMenuInvertPlaylistSelection => Get("選択を反転(_V)", "_Invert Selection");
     /// <summary>プレイリストサブメニュー。グループ単位の範囲選択。ショートカットは Ctrl+Shift+↑↓（エディタの振幅ズームとは別）。頭出し(D) と重ならないよう下は W。</summary>
     public static string WaveMenuSelectByGroupUp => Get("グループごとに選択（上）(_G)", "Select by _Group Up");
     public static string WaveMenuSelectByGroupDown => Get("グループごとに選択（下）(_W)", "Select by Group Do_wn");

@@ -219,6 +219,8 @@ public partial class MainWindow : Window
         // この時点ではまだ _playTimer が無い。
         LibraryBrowser.HeaderStructureVisible = AppStorage.Settings.LibraryShowHeaderStructure;
         LibraryBrowser.HeaderStructureVisibleChanged += LibraryBrowser_HeaderStructureVisibleChanged;
+        LibraryBrowser.HeaderRepairedAsCopy += LibraryBrowser_HeaderRepairedAsCopy;
+        LibraryBrowser.HeaderRepairedInPlace += LibraryBrowser_HeaderRepairedInPlace;
         LibraryBrowser.CheckSelectModeChanged += LibraryBrowser_CheckSelectModeChanged;
         LibraryBrowser.ExplorerReplacePlaylistRequested += (_, _) => ReplaceLibraryFromExplorerFolder();
         LibraryBrowser.ClearPlaylistRequested += LibraryBrowser_ClearPlaylistRequested;

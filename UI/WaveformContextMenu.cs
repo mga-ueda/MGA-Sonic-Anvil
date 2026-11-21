@@ -78,6 +78,7 @@ internal enum WaveMenuCommand
     AutoPlayNext,
     AutoPlay,
     CheckSelectMode,
+    InvertPlaylistSelection,
     SelectByGroupUp,
     SelectByGroupDown,
     SelectSameColor,
@@ -304,6 +305,7 @@ internal sealed class WaveformContextMenuModel
     public static WaveformContextMenuModel AllEnabledForTests(bool hasSelectedTabs = false) => new()
     {
         HasSelectedTabs = hasSelectedTabs,
+        HasMultipleSelectedTabs = hasSelectedTabs,
         SelectedTabsHaveMarkers = hasSelectedTabs,
         SelectedTabsHaveRegions = hasSelectedTabs,
         SelectedTabsHaveSampleLoop = hasSelectedTabs,
@@ -1100,6 +1102,11 @@ internal static class WaveformContextMenuBuilder
             "Shift+Space",
             m.CheckSelectMode,
             m.LibraryMaximized && !m.IsBusy),
+        Cmd(
+            UiStrings.WaveMenuInvertPlaylistSelection,
+            WaveMenuCommand.InvertPlaylistSelection,
+            MenuGestures.InvertPlaylistSelection,
+            m.LibraryMaximized && m.CanStepPlaylist && !m.IsBusy),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
             UiStrings.WaveMenuSelectByGroupUp,
@@ -1249,11 +1256,11 @@ internal static class WaveformContextMenuBuilder
         Cmd(m.HasSelectedTabs ? UiStrings.WaveMenuSaveAsSelected : UiStrings.WaveMenuSaveAs, WaveMenuCommand.SaveAs, "Ctrl+Shift+S", m.HasDocument && !m.IsBusy && !m.IsRecording),
         WaveMenuSeparatorEntry.Instance,
         Cmd(
-            m.HasSelectedTabs ? UiStrings.WaveMenuCopyFileNameSelected : UiStrings.WaveMenuCopyFileName,
+            m.HasMultipleSelectedTabs ? UiStrings.WaveMenuCopyFileNameSelected : UiStrings.WaveMenuCopyFileName,
             WaveMenuCommand.CopyFileName,
             enabled: m.HasDocument),
         Cmd(
-            m.HasSelectedTabs ? UiStrings.WaveMenuCopyFilePathSelected : UiStrings.WaveMenuCopyFilePath,
+            m.HasMultipleSelectedTabs ? UiStrings.WaveMenuCopyFilePathSelected : UiStrings.WaveMenuCopyFilePath,
             WaveMenuCommand.CopyFilePath,
             enabled: m.HasDocument),
         Cmd(
