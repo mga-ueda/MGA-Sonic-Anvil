@@ -1142,7 +1142,7 @@ internal static partial class UiStrings
 
     public static string DialogPitchConstantTitle => Get("ピッチシフト（一括）", "Pitch Shift (Batch)");
 
-    // --- 音量カーブ。ブラシ／ポイント／追加／形状／リセットのラベルはピッチカーブ側を共有。
+    // --- 音量カーブ。ブラシ／ポイント／シークバー／追加／形状／リセットのラベルはピッチカーブ側を共有。
     /// <summary>音量カーブエディタの数値欄ラベル。Alt+N でフォーカス。</summary>
     public static string LabelVolumeCurveGainValue => Get("音量(_N)", "Volume (_N)");
 

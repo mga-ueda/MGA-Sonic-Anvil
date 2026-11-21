@@ -25,6 +25,8 @@ internal sealed class VolumeCurveEditLayer : Control
     {
         Brush,
         Points,
+        /// <summary>編集せず波形へクリックを通し、シークできるようにする。</summary>
+        SeekBar,
     }
 
     /// <summary>0 dB は軸の中央。上下それぞれの 70% が ±40 dB の均等帯。</summary>
@@ -117,8 +119,13 @@ internal sealed class VolumeCurveEditLayer : Control
             }
 
             _tool = value;
-            Cursor = value == EditTool.Brush ? Cursors.Pen : Cursors.Cross;
-            if (value == EditTool.Brush && _dragPoint >= 0)
+            Cursor = value switch
+            {
+                EditTool.Brush => Cursors.Pen,
+                EditTool.SeekBar => Cursors.IBeam,
+                _ => Cursors.Cross,
+            };
+            if ((value == EditTool.Brush || value == EditTool.SeekBar) && _dragPoint >= 0)
             {
                 _dragPoint = -1;
                 SelectionChanged?.Invoke();
@@ -244,10 +251,16 @@ internal sealed class VolumeCurveEditLayer : Control
 
     /// <summary>
     /// ポイント／セグメント／ブラシ以外はヒットしない → 下の波形へクリックが届く。
+    /// シークバーモードは常に透過（カーブ上でもシークできる）。
     /// </summary>
     protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters)
     {
         if (!IsHitTestVisible || Visibility != Visibility.Visible || _target is null || _range.IsEmpty)
+        {
+            return null;
+        }
+
+        if (_tool == EditTool.SeekBar)
         {
             return null;
         }
@@ -1783,6 +1796,12 @@ internal sealed class VolumeCurveEditLayer : Control
 
     private void UpdateHoverCursor(Point pos)
     {
+        if (_tool == EditTool.SeekBar)
+        {
+            Cursor = Cursors.IBeam;
+            return;
+        }
+
         if (_tool == EditTool.Brush || pos.X < ContentX || _range.IsEmpty)
         {
             Cursor = _tool == EditTool.Brush ? Cursors.Pen : Cursors.Cross;

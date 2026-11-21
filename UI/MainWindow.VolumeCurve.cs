@@ -361,10 +361,14 @@ public partial class MainWindow
             return;
         }
 
-        VolumeCurveEditLayer.Tool = tool == VolumeCurveBarTool.Brush
-            ? VolumeCurveEditLayer.EditTool.Brush
-            : VolumeCurveEditLayer.EditTool.Points;
-        VolumeCurveBar.SetPointsModeEnabled(tool == VolumeCurveBarTool.Points);
+        var next = tool switch
+        {
+            VolumeCurveBarTool.Brush => VolumeCurveEditLayer.EditTool.Brush,
+            VolumeCurveBarTool.SeekBar => VolumeCurveEditLayer.EditTool.SeekBar,
+            _ => VolumeCurveEditLayer.EditTool.Points,
+        };
+        VolumeCurveEditLayer.Tool = next;
+        VolumeCurveBar.SetPointsModeEnabled(next == VolumeCurveEditLayer.EditTool.Points);
     }
 
     private void OnVolumeCurveShapeSelected(FadeShape shape)
@@ -897,6 +901,16 @@ public partial class MainWindow
         if (key == Key.A && (modifiers & ModifierKeys.Alt) != 0 && (modifiers & (ModifierKeys.Control | ModifierKeys.Windows)) == 0)
         {
             VolumeCurveAddPointAtPlayhead();
+            return true;
+        }
+
+        // Alt+F: シークバーモード（波形クリックでシーク）。
+        if (key == Key.F
+            && (modifiers & ModifierKeys.Alt) != 0
+            && (modifiers & (ModifierKeys.Control | ModifierKeys.Windows)) == 0)
+        {
+            VolumeCurveBar.Tool = VolumeCurveBarTool.SeekBar;
+            OnVolumeCurveToolChanged(VolumeCurveBarTool.SeekBar);
             return true;
         }
 

@@ -15,6 +15,8 @@ internal enum VolumeCurveBarTool
 {
     Points,
     Brush,
+    /// <summary>カーブ編集せず、波形クリックでシークする。</summary>
+    SeekBar,
 }
 
 internal enum VolumeCurveGainCommitKind
@@ -39,6 +41,7 @@ internal sealed class VolumeCurveBar : UserControl
     private readonly TextBox _gainBox;
     private readonly RadioButton _pointsRadio;
     private readonly RadioButton _brushRadio;
+    private readonly RadioButton _seekBarRadio;
     private readonly Panel _shapeButtons;
     private readonly RoundedButton _addPointButton;
     private readonly RoundedButton _resetButton;
@@ -58,13 +61,21 @@ internal sealed class VolumeCurveBar : UserControl
 
     public VolumeCurveBarTool Tool
     {
-        get => _brushRadio.IsChecked == true ? VolumeCurveBarTool.Brush : VolumeCurveBarTool.Points;
+        get => _seekBarRadio.IsChecked == true
+            ? VolumeCurveBarTool.SeekBar
+            : _brushRadio.IsChecked == true
+                ? VolumeCurveBarTool.Brush
+                : VolumeCurveBarTool.Points;
         set
         {
             _suppressToolEvent = true;
             try
             {
-                if (value == VolumeCurveBarTool.Brush)
+                if (value == VolumeCurveBarTool.SeekBar)
+                {
+                    _seekBarRadio.IsChecked = true;
+                }
+                else if (value == VolumeCurveBarTool.Brush)
                 {
                     _brushRadio.IsChecked = true;
                 }
@@ -91,6 +102,7 @@ internal sealed class VolumeCurveBar : UserControl
 
         _pointsRadio = CreateRadio(UiStrings.LabelPitchCurvePoints, isChecked: true, "volumeBarTool");
         _brushRadio = CreateRadio(UiStrings.LabelPitchCurveBrush, isChecked: false, "volumeBarTool");
+        _seekBarRadio = CreateRadio(UiStrings.LabelPitchCurveSeekBar, isChecked: false, "volumeBarTool");
         _pointsRadio.Checked += (_, _) =>
         {
             RefreshPointModeControls();
@@ -105,6 +117,14 @@ internal sealed class VolumeCurveBar : UserControl
             if (!_suppressToolEvent)
             {
                 ToolChanged?.Invoke(VolumeCurveBarTool.Brush);
+            }
+        };
+        _seekBarRadio.Checked += (_, _) =>
+        {
+            RefreshPointModeControls();
+            if (!_suppressToolEvent)
+            {
+                ToolChanged?.Invoke(VolumeCurveBarTool.SeekBar);
             }
         };
 
@@ -166,6 +186,7 @@ internal sealed class VolumeCurveBar : UserControl
 
         _pointsRadio.Margin = new Thickness(12, 0, 0, 0);
         _brushRadio.Margin = new Thickness(8, 0, 0, 0);
+        _seekBarRadio.Margin = new Thickness(8, 0, 0, 0);
 
         _resetButton = CreateChromeButton(UiStrings.LabelPitchCurveReset);
         _resetButton.Click += (_, _) => Reset?.Invoke();
@@ -206,6 +227,7 @@ internal sealed class VolumeCurveBar : UserControl
         root.Children.Add(CreateLabel(UiStrings.LabelDb, margin: new Thickness(6, 0, 0, 0)));
         root.Children.Add(_pointsRadio);
         root.Children.Add(_brushRadio);
+        root.Children.Add(_seekBarRadio);
         root.Children.Add(CreateLabel(
             UiStrings.LabelPitchCurveShape,
             margin: new Thickness(16, 0, 6, 0)));

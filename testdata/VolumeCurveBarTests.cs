@@ -43,6 +43,12 @@ public sealed class VolumeCurveBarTests
             Assert.True(bar.IsShapeButtonsEnabled);
             Assert.Equal(1, bar.ShapeButtonsOpacity);
 
+            bar.Tool = VolumeCurveBarTool.SeekBar;
+            Assert.Null(raised);
+            Assert.Equal(VolumeCurveBarTool.SeekBar, bar.Tool);
+            Assert.False(bar.IsShapeButtonsEnabled);
+            Assert.True(bar.ShapeButtonsOpacity < 0.5);
+
             // 内部 TextBox が未レイアウトでも書き込みが例外を投げないことだけ確認。
             bar.WriteGainDb(-3f);
             bar.WriteGainDb(0f);
