@@ -256,9 +256,18 @@ public partial class MainWindow
 
         var completed = true;
         var pasted = new List<string>();
+        var overwriteAll = false;
+        var alternateAll = false;
+        var offerBatchChoices = paths.Length > 1;
         foreach (var source in paths)
         {
-            if (!TransferLibraryPath(source, folder, move))
+            if (!TransferLibraryPath(
+                    source,
+                    folder,
+                    move,
+                    ref overwriteAll,
+                    ref alternateAll,
+                    offerBatchChoices))
             {
                 completed = false;
                 break;
@@ -316,7 +325,13 @@ public partial class MainWindow
             placeByCurrentSort: true);
     }
 
-    private bool TransferLibraryPath(string source, string destinationDirectory, bool move)
+    private bool TransferLibraryPath(
+        string source,
+        string destinationDirectory,
+        bool move,
+        ref bool overwriteAll,
+        ref bool alternateAll,
+        bool offerBatchChoices)
     {
         string full;
         try
@@ -360,22 +375,44 @@ public partial class MainWindow
         var overwrite = false;
         if (occupied || LibraryFileTransfer.SameFullPath(full, dest))
         {
-            var choice = ConfirmChoiceWindow.Show(
-                this,
-                UiStrings.LibraryNameConflict(name),
-                UiStrings.AppName,
-                MessageBoxButton.YesNoCancel,
-                MessageBoxResult.No,
-                UiStrings.LibraryOverwrite,
-                UiStrings.LibraryRename,
-                UiStrings.LibraryCancel);
+            MessageBoxResult choice;
+            if (overwriteAll)
+            {
+                choice = MessageBoxResult.Yes;
+            }
+            else if (alternateAll)
+            {
+                choice = MessageBoxResult.No;
+            }
+            else
+            {
+                var showBatch = offerBatchChoices;
+                choice = ConfirmChoiceWindow.Show(
+                    this,
+                    UiStrings.LibraryNameConflict(name, showBatch),
+                    UiStrings.AppName,
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxResult.No,
+                    UiStrings.LibraryOverwrite,
+                    UiStrings.LibraryAlternate,
+                    UiStrings.LibraryCancel,
+                    orangeNo: false,
+                    extraOkText: showBatch ? UiStrings.LibraryOverwriteAll : null,
+                    extraNoneText: showBatch ? UiStrings.LibraryAlternateAll : null);
+            }
+
             if (choice == MessageBoxResult.Cancel)
             {
                 return false;
             }
 
-            if (choice == MessageBoxResult.Yes)
+            if (choice is MessageBoxResult.Yes or MessageBoxResult.OK)
             {
+                if (choice == MessageBoxResult.OK)
+                {
+                    overwriteAll = true;
+                }
+
                 if (LibraryFileTransfer.SameFullPath(full, dest)
                     || LibraryFileTransfer.IsSameOrUnder(full, dest)
                     || LibraryFileTransfer.IsSameOrUnder(dest, full))
@@ -388,6 +425,12 @@ public partial class MainWindow
             }
             else
             {
+                // No＝別名、None＝全て別名。
+                if (choice == MessageBoxResult.None)
+                {
+                    alternateAll = true;
+                }
+
                 try
                 {
                     dest = LibraryFileTransfer.UniquePath(destinationDirectory, name, isDirectory);
@@ -564,11 +607,7 @@ public partial class MainWindow
 
         if (!LibraryBrowser.PlaylistSortActive)
         {
-            foreach (var session in changed)
-            {
-                LibraryBrowser.UpdateSessionRow(session);
-            }
-
+            LibraryBrowser.RematerializeBoundPlaylistRows();
             return;
         }
 

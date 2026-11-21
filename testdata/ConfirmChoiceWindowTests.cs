@@ -120,4 +120,54 @@ public sealed class ConfirmChoiceWindowTests
     {
         Assert.Equal(expected, ConfirmChoiceWindow.ChoiceForAltKey(key, buttons));
     }
+
+    [Fact]
+    public void ChoiceForAltKey_ExtraButtons_MapOverwriteAllAndAlternateAll()
+    {
+        Assert.Equal(
+            MessageBoxResult.OK,
+            ConfirmChoiceWindow.ChoiceForAltKey(
+                Key.A, MessageBoxButton.YesNoCancel, hasExtraOk: true, hasExtraNone: true));
+        Assert.Equal(
+            MessageBoxResult.None,
+            ConfirmChoiceWindow.ChoiceForAltKey(
+                Key.B, MessageBoxButton.YesNoCancel, hasExtraOk: true, hasExtraNone: true));
+        Assert.Null(ConfirmChoiceWindow.ChoiceForAltKey(Key.A, MessageBoxButton.YesNoCancel));
+        Assert.Null(ConfirmChoiceWindow.ChoiceForAltKey(Key.B, MessageBoxButton.YesNoCancel));
+        Assert.Equal(
+            MessageBoxResult.Yes,
+            ConfirmChoiceWindow.ChoiceForAltKey(
+                Key.Y, MessageBoxButton.YesNoCancel, hasExtraOk: true, hasExtraNone: true));
+    }
+
+    [Fact]
+    public void LibraryConflictChoices_HaveAccessKeysInBothLanguages()
+    {
+        var previous = UiStrings.Language;
+        try
+        {
+            UiStrings.SetLanguage(UiLanguage.Japanese);
+            Assert.Contains("(_A)", UiStrings.LibraryOverwriteAll, StringComparison.Ordinal);
+            Assert.Contains("全て上書き", UiStrings.LibraryOverwriteAll, StringComparison.Ordinal);
+            Assert.Equal("別名(_N)", UiStrings.LibraryAlternate);
+            Assert.Contains("(_B)", UiStrings.LibraryAlternateAll, StringComparison.Ordinal);
+            Assert.Contains("全て別名", UiStrings.LibraryAlternateAll, StringComparison.Ordinal);
+            Assert.Contains("全て別名", UiStrings.LibraryNameConflict("a.wav", offerBatchChoices: true), StringComparison.Ordinal);
+            Assert.DoesNotContain("リネーム", UiStrings.LibraryAlternate, StringComparison.Ordinal);
+            Assert.DoesNotContain("全て上書き", UiStrings.LibraryNameConflict("a.wav"), StringComparison.Ordinal);
+
+            UiStrings.SetLanguage(UiLanguage.English);
+            Assert.Contains("_All", UiStrings.LibraryOverwriteAll, StringComparison.Ordinal);
+            Assert.Contains("Another Name", UiStrings.LibraryAlternate, StringComparison.Ordinal);
+            Assert.Contains("All Another Names", UiStrings.LibraryAlternateAll, StringComparison.Ordinal);
+            Assert.Contains(
+                "all another names",
+                UiStrings.LibraryNameConflict("a.wav", offerBatchChoices: true),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            UiStrings.SetLanguage(previous);
+        }
+    }
 }

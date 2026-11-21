@@ -98,7 +98,7 @@ internal static class LibraryFileTransfer
         return true;
     }
 
-    /// <summary>既存のファイル複製と同じく「名前 2」「名前 3」。</summary>
+    /// <summary>複製・衝突リネームは「名前_copy」、衝突時は「名前_copy 2」…。既に _copy 付きなら重ねない。</summary>
     public static string UniquePath(string directory, string fileName, bool directoryName)
     {
         var stem = directoryName ? fileName : Path.GetFileNameWithoutExtension(fileName);
@@ -109,9 +109,12 @@ internal static class LibraryFileTransfer
             ext = string.Empty;
         }
 
-        for (var n = 2; n < 10000; n++)
+        stem = CopyStem(stem);
+        for (var n = 1; n < 10000; n++)
         {
-            var candidate = Path.Combine(directory, stem + " " + n + ext);
+            var candidate = Path.Combine(
+                directory,
+                n == 1 ? stem + ext : stem + " " + n + ext);
             if (!File.Exists(candidate) && !Directory.Exists(candidate))
             {
                 return candidate;
@@ -119,6 +122,54 @@ internal static class LibraryFileTransfer
         }
 
         throw new IOException();
+    }
+
+    /// <summary>末尾の <c>_copy</c> / <c>_copy N</c> を除き、複製用の <c>名前_copy</c> を返す。</summary>
+    public static string CopyStem(string stem)
+    {
+        var baseStem = StripTrailingCopySuffix(stem);
+        return string.IsNullOrEmpty(baseStem) ? "copy" : baseStem + "_copy";
+    }
+
+    /// <summary>末尾の <c>_copy</c> と <c>_copy N</c> を繰り返し取り除く。</summary>
+    public static string StripTrailingCopySuffix(string stem)
+    {
+        var current = stem;
+        while (true)
+        {
+            if (current.EndsWith("_copy", StringComparison.Ordinal))
+            {
+                current = current[..^"_copy".Length];
+                continue;
+            }
+
+            var marker = "_copy ";
+            var index = current.LastIndexOf(marker, StringComparison.Ordinal);
+            if (index > 0)
+            {
+                var number = current[(index + marker.Length)..];
+                if (number.Length > 0 && IsAsciiDigits(number))
+                {
+                    current = current[..index];
+                    continue;
+                }
+            }
+
+            return current;
+        }
+    }
+
+    private static bool IsAsciiDigits(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (value[i] is < '0' or > '9')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static bool TryAcceptName(

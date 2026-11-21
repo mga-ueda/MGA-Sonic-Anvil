@@ -228,8 +228,7 @@ public partial class MainWindow
     /// Shift 付き追加は再生も停止もしない。
     /// ツリーの Enter（クリア追加）は Auto Play のオン／オフに関わらず、載せ終わったあとプレイリストへフォーカスする。
     /// 大量追加はフォルダ名を先に集めて見出し順に並べ、フォルダごとにファイル名スタブを流す。
-    /// パスだけで順が決まる（親フォルダグループ＋名前など）ときは先頭フラッシュで即再生し、
-    /// タグ／列は後追い。タグ依存ソートは全タグ後に並び確定してから再生する。
+    /// タグ／列は後追いし、並び確定後の表示冒頭だけを Auto Play する（読み込み中の仮順では鳴らさない）。
     /// 検索中のツリーは見えているフォルダだけ。ファイル名ヒットはそのファイル、フォルダ名ヒットは配下すべて。
     /// お気に入りは検索フィルタを掛けない。
     /// </summary>
@@ -312,12 +311,6 @@ public partial class MainWindow
         var batchSessions = new List<DocumentSession>();
         var enrichTasks = new List<Task>();
         var flushClock = Stopwatch.StartNew();
-        // パスだけで順が決まるときは、先頭フォルダの先頭曲をタグ待ちせず鳴らす。
-        var pathOrder = !placeByCurrentSort
-            && LibraryPlayerMode.CanResolvePlaylistOrderFromPaths(
-                LibraryBrowser.CurrentGroup,
-                LibraryBrowser.CurrentSortColumn);
-        var playedEarly = false;
 
         bool Alive() => generation == _libraryFolderShowGeneration && IsLibraryMaximized;
 
@@ -432,27 +425,8 @@ public partial class MainWindow
                 SetOpenStatus(loaded, Math.Max(planned, loaded), name);
             }
 
-            // 行を描画してから次の受信へ進む。再生の await でチャネルを止めない。
+            // 行を描画してから次の受信へ進む。再生は並び確定後のみ（途中の仮順で鳴らさない）。
             await Dispatcher.Yield(DispatcherPriority.Render);
-
-            // パス順が確定しているなら、冒頭を並行再生（ロードループは止めない）。
-            if (pathOrder
-                && playFirst
-                && first
-                && !playedEarly
-                && Alive())
-            {
-                var earlyHead = LibraryBrowser.FirstPlaylistSession ?? head;
-                _libraryFolderPlaySession = earlyHead;
-                if (ShouldRestoreFolderPlaySelection(LibraryBrowser.SelectedSession, earlyHead))
-                {
-                    LibraryBrowser.SelectSessionQuiet(earlyHead);
-                }
-
-                playedEarly = true;
-                var playGeneration = generation;
-                _ = PlayLibraryFolderHeadEarlyAsync(earlyHead, playGeneration);
-            }
 
             firstHandled = true;
             pending.Clear();
@@ -554,10 +528,15 @@ public partial class MainWindow
                 DocumentSession? playlistHead = null;
                 if (firstHandled && !placeByCurrentSort && batchSessions.Count > 0)
                 {
-                    // タグを行へ一度だけ載せ、現行ソートで確定する。
+                    // タグを行へ一度だけ載せ、現行ソートで表示を確定する。冒頭＝FirstPlaylistSession。
                     LibraryBrowser.UpdateSessionRows(batchSessions);
                     await Dispatcher.Yield(DispatcherPriority.Render);
-                    playlistHead = LibraryBrowser.LockPlaylistOrder();
+                    var preserve = _libraryFolderPlaySession
+                        ?? LibraryBrowser.SelectedSession
+                        ?? _activeSession;
+                    playlistHead = LibraryBrowser.LockPlaylistOrder(
+                        preserve,
+                        preserve is null ? null : [preserve]);
                     SyncSessionsToPlaylistOrder();
                     playlistHead = LibraryBrowser.FirstPlaylistSession ?? playlistHead;
                 }
@@ -609,18 +588,10 @@ public partial class MainWindow
                 {
                     if (playFirst && playlistHead is { } first)
                     {
-                        var selected = LibraryBrowser.SelectedSession;
-                        if (ShouldRestoreFolderPlaySelection(selected, first))
-                        {
-                            LibraryBrowser.SelectSessionQuiet(first);
-                        }
-
+                        // 最終表示冒頭を選んで再生し続ける。
+                        LibraryBrowser.SelectSessionQuiet(first);
                         QueuePendingLibraryWash(first, artPrepare, artHadArt);
-                        // 早期再生済みで冒頭が変わっていなければ聞き直ししない。
-                        var alreadyPlayingHead = playedEarly
-                            && ReferenceEquals(_libraryFolderPlaySession, first)
-                            && ReferenceEquals(_activeSession, first);
-                        if (!alreadyPlayingHead)
+                        if (!ReferenceEquals(_activeSession, first))
                         {
                             await PlayLibrarySessionAsync(first, keepAmbientGlow: true)
                                 .ConfigureAwait(true);
@@ -700,25 +671,6 @@ public partial class MainWindow
                 // キャンセルで途中終了しても、載っている曲があればここで 1 回 Apply に乗る。
                 await FlushPendingLibraryWashAsync().ConfigureAwait(true);
             }
-        }
-    }
-
-    /// <summary>
-    /// フォルダ追加の冒頭再生。ロードループ（チャネル読み）とは独立して走らせる。
-    /// </summary>
-    private async Task PlayLibraryFolderHeadEarlyAsync(DocumentSession head, int generation)
-    {
-        try
-        {
-            await PlayLibrarySessionAsync(head, keepAmbientGlow: true).ConfigureAwait(true);
-            if (LibraryPlayerMode.OwnsPlaylistBatchCompletion(generation, _libraryFolderShowGeneration)
-                && IsLibraryMaximized)
-            {
-                LibraryBrowser.RequestListFocus();
-            }
-        }
-        catch (Exception)
-        {
         }
     }
 
@@ -1004,7 +956,7 @@ public partial class MainWindow
 
     /// <summary>
     /// 表示冒頭が音声なら即再生してよいか（動画／PDF は Open と競合しやすい）。
-    /// フォルダ大量追加の Auto Play は並び確定後に再生するため、ここでは使わない。
+    /// フォルダ大量追加の Auto Play は並び確定後の表示冒頭を再生するため、ここでは使わない。
     /// </summary>
     internal static bool ShouldPlayFolderFirstImmediately(string? path) =>
         !string.IsNullOrWhiteSpace(path) && !LibraryPlaylistDocuments.IsDocument(path);

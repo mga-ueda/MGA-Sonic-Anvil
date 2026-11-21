@@ -26,15 +26,25 @@ internal static partial class UiStrings
         "同じ場所なのでできません。",
         "This is the same location, so it cannot be done.");
 
-    public static string LibraryNameConflict(string name) => Format(
-        "「{0}」と同じ名前があります。上書き、リネーム、キャンセルのどれにしますか？",
-        "\"{0}\" already exists. Overwrite, rename, or cancel?",
-        name);
+    public static string LibraryNameConflict(string name, bool offerBatchChoices = false) =>
+        offerBatchChoices
+            ? Format(
+                "「{0}」と同じ名前があります。上書き、全て上書き、別名、全て別名、キャンセルのどれにしますか？",
+                "\"{0}\" already exists. Overwrite, overwrite all, another name, all another names, or cancel?",
+                name)
+            : Format(
+                "「{0}」と同じ名前があります。上書き、別名、キャンセルのどれにしますか？",
+                "\"{0}\" already exists. Overwrite, another name, or cancel?",
+                name);
 
     /// <summary>名衝突確認の Yes 相当。Y アクセスキー（Alt+Y）。</summary>
     public static string LibraryOverwrite => Get("上書き(_Y)", "Overwrite(_Y)");
+    /// <summary>名衝突確認の OK 相当（複数ペースト）。A アクセスキー（Alt+A）。</summary>
+    public static string LibraryOverwriteAll => Get("全て上書き(_A)", "Overwrite _All");
     /// <summary>名衝突確認の No 相当。N アクセスキー（Alt+N）。</summary>
-    public static string LibraryRename => Get("リネーム(_N)", "Rename(_N)");
+    public static string LibraryAlternate => Get("別名(_N)", "Another Name(_N)");
+    /// <summary>名衝突確認の None 相当（複数ペースト）。B アクセスキー（Alt+B）。</summary>
+    public static string LibraryAlternateAll => Get("全て別名(_B)", "All Another Names(_B)");
     /// <summary>名衝突確認の Cancel。C アクセスキー（Alt+C）。</summary>
     public static string LibraryCancel => Get("キャンセル(_C)", "_Cancel");
     public static string LibraryRenameTitle => Get("名前の変更", "Rename");

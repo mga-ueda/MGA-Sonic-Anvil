@@ -34,7 +34,7 @@ public sealed class LibraryFileTransferTests
     }
 
     [Fact]
-    public void UniquePath_UsesSpaceAndNumber()
+    public void UniquePath_UsesCopySuffix()
     {
         var dir = Path.Combine(Path.GetTempPath(), "mga-transfer-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -43,21 +43,45 @@ public sealed class LibraryFileTransferTests
             var first = Path.Combine(dir, "Album");
             Directory.CreateDirectory(first);
             var next = LibraryFileTransfer.UniquePath(dir, "Album", directoryName: true);
-            Assert.Equal(Path.Combine(dir, "Album 2"), next);
+            Assert.Equal(Path.Combine(dir, "Album_copy"), next);
             Directory.CreateDirectory(next);
             var third = LibraryFileTransfer.UniquePath(dir, "Album", directoryName: true);
-            Assert.Equal(Path.Combine(dir, "Album 3"), third);
+            Assert.Equal(Path.Combine(dir, "Album_copy 2"), third);
 
             var file = Path.Combine(dir, "song.wav");
             File.WriteAllBytes(file, [0]);
             Assert.Equal(
-                Path.Combine(dir, "song 2.wav"),
+                Path.Combine(dir, "song_copy.wav"),
                 LibraryFileTransfer.UniquePath(dir, "song.wav", directoryName: false));
+
+            File.WriteAllBytes(Path.Combine(dir, "song_copy.wav"), [0]);
+            Assert.Equal(
+                Path.Combine(dir, "song_copy 2.wav"),
+                LibraryFileTransfer.UniquePath(dir, "song_copy.wav", directoryName: false));
+            File.WriteAllBytes(Path.Combine(dir, "song_copy 2.wav"), [0]);
+            Assert.Equal(
+                Path.Combine(dir, "song_copy 3.wav"),
+                LibraryFileTransfer.UniquePath(dir, "song_copy 2.wav", directoryName: false));
+            Assert.Equal(
+                Path.Combine(dir, "song_copy 3.wav"),
+                LibraryFileTransfer.UniquePath(dir, "song_copy_copy.wav", directoryName: false));
         }
         finally
         {
             Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [Theory]
+    [InlineData("song", "song")]
+    [InlineData("song_copy", "song")]
+    [InlineData("song_copy 2", "song")]
+    [InlineData("song_copy_copy", "song")]
+    [InlineData("my_copy_notes", "my_copy_notes")]
+    public void StripTrailingCopySuffix_OnlyTrailing(string input, string expected)
+    {
+        Assert.Equal(expected, LibraryFileTransfer.StripTrailingCopySuffix(input));
+        Assert.Equal(expected + "_copy", LibraryFileTransfer.CopyStem(input));
     }
 
     [Fact]

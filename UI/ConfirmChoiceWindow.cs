@@ -11,6 +11,8 @@ internal sealed class ConfirmChoiceWindow : Window
 {
     private readonly Dictionary<MessageBoxResult, Button> _choiceButtons = [];
     private readonly MessageBoxButton _buttons;
+    private readonly bool _hasExtraOk;
+    private readonly bool _hasExtraNone;
 
     public MessageBoxResult Result { get; private set; }
 
@@ -23,10 +25,21 @@ internal sealed class ConfirmChoiceWindow : Window
         string? yesText = null,
         string? noText = null,
         string? cancelText = null,
-        bool orangeNo = false)
+        bool orangeNo = false,
+        string? extraOkText = null,
+        string? extraNoneText = null)
     {
         var dialog = new ConfirmChoiceWindow(
-            text, caption, buttons, defaultResult, yesText, noText, cancelText, orangeNo);
+            text,
+            caption,
+            buttons,
+            defaultResult,
+            yesText,
+            noText,
+            cancelText,
+            orangeNo,
+            extraOkText,
+            extraNoneText);
         if (owner is not null)
         {
             // 起動クローク中の本体を Owner にすると、ダイアログも見えず操作不能になる。
@@ -72,12 +85,20 @@ internal sealed class ConfirmChoiceWindow : Window
     }
 
     /// <summary>
-    /// Alt+O／Y／N／C の割当。
+    /// Alt+O／Y／N／C／A／B の割当。
     /// OK 系は O、Yes は Y（および OK ラベル時の O）、No は N、Cancel は C（YesNo の Cancel ラベル No 含む）。
+    /// <paramref name="hasExtraOk"/> 時の追加ボタン（全て上書き）は A → OK。
+    /// <paramref name="hasExtraNone"/> 時の追加ボタン（全て別名）は B → None。
     /// </summary>
-    internal static MessageBoxResult? ChoiceForAltKey(Key key, MessageBoxButton buttons) =>
+    internal static MessageBoxResult? ChoiceForAltKey(
+        Key key,
+        MessageBoxButton buttons,
+        bool hasExtraOk = false,
+        bool hasExtraNone = false) =>
         key switch
         {
+            Key.A when hasExtraOk && buttons == MessageBoxButton.YesNoCancel => MessageBoxResult.OK,
+            Key.B when hasExtraNone && buttons == MessageBoxButton.YesNoCancel => MessageBoxResult.None,
             Key.O when buttons is MessageBoxButton.OK or MessageBoxButton.OKCancel => MessageBoxResult.OK,
             Key.O when buttons is MessageBoxButton.YesNo or MessageBoxButton.YesNoCancel => MessageBoxResult.Yes,
             Key.Y when buttons is MessageBoxButton.YesNo or MessageBoxButton.YesNoCancel => MessageBoxResult.Yes,
@@ -96,9 +117,15 @@ internal sealed class ConfirmChoiceWindow : Window
         string? yesText = null,
         string? noText = null,
         string? cancelText = null,
-        bool orangeNo = false)
+        bool orangeNo = false,
+        string? extraOkText = null,
+        string? extraNoneText = null)
     {
         _buttons = buttons;
+        _hasExtraOk = buttons == MessageBoxButton.YesNoCancel
+            && !string.IsNullOrEmpty(extraOkText);
+        _hasExtraNone = buttons == MessageBoxButton.YesNoCancel
+            && !string.IsNullOrEmpty(extraNoneText);
         Result = DismissResult(buttons);
         Title = caption;
         Foreground = (Brush)FindResource("PrimaryForeBrush");
@@ -148,17 +175,33 @@ internal sealed class ConfirmChoiceWindow : Window
         }
         else
         {
-            // 3択は OK／No／Cancel（中間の Discard／Skip 相当は No）。
+            // Yes／No／Cancel。extraOk＝全て上書き、extraNone＝全て別名。
             row.Children.Add(CreateButton(
                 string.IsNullOrEmpty(yesText) ? UiStrings.ButtonOkMnemonic : yesText,
                 MessageBoxResult.Yes,
                 accent: true,
                 isDefault: IsDefaultChoice(MessageBoxResult.Yes, defaultResult, buttons)));
+            if (_hasExtraOk)
+            {
+                row.Children.Add(CreateButton(
+                    extraOkText!,
+                    MessageBoxResult.OK,
+                    isDefault: defaultResult == MessageBoxResult.OK));
+            }
+
             row.Children.Add(CreateButton(
                 string.IsNullOrEmpty(noText) ? UiStrings.ButtonNoMnemonic : noText,
                 MessageBoxResult.No,
                 orange: orangeNo,
                 isDefault: IsDefaultChoice(MessageBoxResult.No, defaultResult, buttons)));
+            if (_hasExtraNone)
+            {
+                row.Children.Add(CreateButton(
+                    extraNoneText!,
+                    MessageBoxResult.None,
+                    isDefault: defaultResult == MessageBoxResult.None));
+            }
+
             row.Children.Add(CreateButton(
                 string.IsNullOrEmpty(cancelText) ? UiStrings.ButtonCancelMnemonic : cancelText,
                 MessageBoxResult.Cancel,
@@ -169,7 +212,7 @@ internal sealed class ConfirmChoiceWindow : Window
         root.Children.Add(message);
         root.Children.Add(row);
         AcrylicDialogChrome.SetBody(this, root, DesignMetrics.AudioPad);
-        // Esc では閉じない。Alt+O／Y／N／C は下で結果ボタンへ。
+        // Esc では閉じない。Alt+O／Y／N／C／A／B は下で結果ボタンへ。
         AppDialogKeys.Attach(
             this,
             onCancel: () => { },
@@ -182,13 +225,13 @@ internal sealed class ConfirmChoiceWindow : Window
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
-        if (key is not (Key.O or Key.Y or Key.N or Key.C)
+        if (key is not (Key.O or Key.Y or Key.N or Key.C or Key.A or Key.B)
             || !AppDialogKeys.IsAltLetter(key, modifiers, key))
         {
             return;
         }
 
-        var choice = ChoiceForAltKey(key, _buttons);
+        var choice = ChoiceForAltKey(key, _buttons, _hasExtraOk, _hasExtraNone);
         if (choice is null || !TryClickChoice(choice.Value))
         {
             return;
