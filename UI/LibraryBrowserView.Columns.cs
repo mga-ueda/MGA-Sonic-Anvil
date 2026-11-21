@@ -661,6 +661,10 @@ internal sealed partial class LibraryBrowserView
         box.SetBinding(
             ToggleButton.IsCheckedProperty,
             new Binding(nameof(LibraryFileRow.IsChecked)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+        // ユーザーのクリックだけ通知（Space／一括代入は別経路）。ステータス和集合とヘッダ用。
+        box.AddHandler(
+            ButtonBase.ClickEvent,
+            new RoutedEventHandler((_, _) => NotePlaylistSelectionChanged()));
         var cell = new DataTemplate(typeof(LibraryFileRow)) { VisualTree = box };
         _checkColumn = new DataGridTemplateColumn
         {

@@ -883,8 +883,8 @@
       <article class="part" id="layout-status">
         <h3>ステータスバー</h3>
         <ul>
-          <li><strong>ファイル位置</strong> …… 2 ファイル以上開いているときは、冒頭に <code>1 / 10 Files</code> のように表示します。プレイヤーで複数行を選択しているときは<strong>選択件数／リスト全体</strong>、単一選択時は<strong>現在の曲の位置／全体</strong>です。番号は列ソートとグループ表示を反映したリストの表示順に従います。</li>
-          <li><strong>ファイル情報</strong> …… サンプリングレートなど（名前はタブ側）。レート／ビット深度／チャンネルを変換すると、該当項目が保存まで赤になります。MP3／M4A はビットレートも表示します。容量は MB（MiB / B）。変換や範囲削除で変わると推測サイズが赤になります。</li>
+          <li><strong>ファイル位置</strong> …… 2 ファイル以上開いているときは、冒頭に <code>1 / 10 Files</code> のように<strong>カーソル位置／全体</strong>を出します（プレイヤーは列ソートとグループ表示を反映したリストの表示順）。複数選択中は位置の代わりに <code>Selected 10 / 70</code> のように<strong>選択件数／全体</strong>だけ出します（プレイヤーはプレイリスト選択、エディタはタブ選択）。</li>
+          <li><strong>ファイル情報</strong> …… サンプリングレートなど（名前はタブ側）。レート／ビット深度／チャンネルを変換すると、該当項目が保存まで赤になります。MP3／M4A はビットレートも表示します。容量は MB（MiB / B）。変換や範囲削除で変わると推測サイズが赤になります。複数選択中はレート／ビット深度／チャンネル／種別／ビットレートを<strong>和集合</strong>（異なる値は <code>+</code> でつなぐ）、容量は <code>Total</code> 付きの<strong>合計</strong>です。</li>
           <li><strong>Center Lock／Marker Click／Silent Skip／Single Loop／Always on Top</strong> …… NOW POS の左からこの順のラッチボタン（チェックボックスではありません）。スピーカーアイコンの手前。Center Lock は <kbd>Z</kbd>（またはテンキー <kbd>.</kbd>）、Marker Click は <kbd>Q</kbd>、Silent Skip は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>、<span class="ui">Single Loop</span> は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>、Always on Top は <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>。プレイヤーでは Center Lock と Marker Click の 2 つは隠し、残りだけ出します。Silent Skip は無音を飛ばして再生し、録音ではしきい値超だけ書きます（しきい値は設定）。Single Loop の動作は <a href="#layout-single-loop">Single Loop</a>。</li>
           <li><strong>スピーカー</strong> …… スピーカーアイコンの右の一覧で配置を切り替えます。一覧は表示項目タブと同じです。今使っている定義は外しても、切り替えるまで残ります。自動スピーカー選択がオンなら、ファイルの本数に合う定義へ切り替えます。既定オフ。</li>
           <li><strong>時間</strong> …… 現在時間／選択開始／選択範囲／選択終了／トータル。トータル以外は入力・ホイール／↑↓で調整します。時間は 1 秒／Shift 10 秒／Ctrl 1 分／Ctrl+Shift 10 分、サンプルは 1／Shift 10／Ctrl 100／Ctrl+Shift 1000。右クリックで時間とサンプル数を切り替えます（次回起動でも残ります。編集履歴の左の大きな現在位置タイムコードも同じ切替に追従し、そちらの右クリックでも切り替えられます）。</li>

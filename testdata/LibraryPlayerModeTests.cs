@@ -1116,10 +1116,19 @@ public sealed class LibraryPlayerModeTests
             chromeHidden: true, isVisual: true, trackCount: 1));
         Assert.Equal("2 / 5", LibraryPlayerMode.FormatPlaylistTrackLabel(1, 5));
         Assert.Equal("1 / 2", LibraryPlayerMode.FormatCurrentOfTotalLabel(0, 2));
-        Assert.Equal(3, LibraryPlayerMode.ResolveStatusFileNumber(playerMode: true, selectedCount: 3, position1Based: 1));
-        Assert.Equal(1, LibraryPlayerMode.ResolveStatusFileNumber(playerMode: true, selectedCount: 1, position1Based: 1));
-        Assert.Equal(7, LibraryPlayerMode.ResolveStatusFileNumber(playerMode: false, selectedCount: 3, position1Based: 7));
         Assert.Equal("3 / 10 Files", LibraryPlayerMode.FormatStatusFileCount(3, 10));
+        Assert.Equal("Selected 10 / 70", LibraryPlayerMode.FormatStatusSelectionCount(10, 70));
+        Assert.Null(LibraryPlayerMode.FormatStatusSelectionCount(1, 70));
+        Assert.Null(LibraryPlayerMode.FormatStatusSelectionCount(0, 70));
+        Assert.Equal(
+            "44.1kHz+48kHz",
+            LibraryPlayerMode.FormatStatusUnionSorted([48_000, 44_100, 48_000], UiStrings.FormatSampleRate));
+        Assert.Equal("WAVE+MP3", LibraryPlayerMode.FormatStatusUnion(["WAVE", "MP3", "WAVE"]));
+        Assert.Equal("MP3", LibraryPlayerMode.FormatStatusSourceKind(AudioFileKind.Mp3));
+        Assert.Equal(300L, LibraryPlayerMode.SumStatusFileBytes([100, 200, -5]));
+        Assert.Equal(
+            "Total " + UiStrings.FormatFileBytes(300),
+            LibraryPlayerMode.FormatStatusTotalFileBytes(300));
         Assert.Equal(
             LibraryPlayerMode.PdfPageNumberToastHoldSeconds,
             LibraryPlayerMode.PlaylistTrackIndexToastHoldSeconds);

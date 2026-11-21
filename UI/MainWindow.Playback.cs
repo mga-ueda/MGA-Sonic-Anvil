@@ -3034,6 +3034,12 @@ public partial class MainWindow
             // プレイヤー離脱の Bind は、まだライブラリ中なのでメーターの文書を外す。
             // エディタの停止中表示は、モードが戻ってから付け直す。
             LoudnessMeter.Document = _document;
+            // プレイヤー複数選択の Selected 表示は、アクティブが同じだと BindWorkspace が
+            // 走らず残る。モード確定後にエディタ用（位置／タブ選択）へ描き直す。
+            if (wasLibrary)
+            {
+                RefreshStatus();
+            }
         }
 
         SyncPlaylistSelectionLoudness();

@@ -1992,17 +1992,84 @@ internal static class LibraryPlayerMode
     public static string FormatPlaylistTrackLabel(int trackIndex0Based, int trackCount) =>
         FormatCurrentOfTotalLabel(trackIndex0Based, trackCount);
 
+    /// <summary>ステータスバー冒頭の「位置 / 全体 Files」（常にカーソル位置。1 始まり）。</summary>
+    public static string FormatStatusFileCount(int position1Based, int fileCount) =>
+        string.Create(CultureInfo.InvariantCulture, $"{position1Based} / {fileCount} Files");
+
     /// <summary>
-    /// ステータスバー「n / m Files」の n。
-    /// プレイヤーで複数選択中は選択件数、それ以外は現在位置（1 始まり）。
+    /// 複数選択時の「Selected 選択数 / 全体」。1 以下は出さない（そのときは位置表示を使う）。
     /// </summary>
-    public static int ResolveStatusFileNumber(bool playerMode, int selectedCount, int position1Based) =>
-        playerMode && selectedCount > 1 ? selectedCount : position1Based;
+    public static string? FormatStatusSelectionCount(int selectedCount, int fileCount) =>
+        selectedCount > 1
+            ? string.Create(CultureInfo.InvariantCulture, $"Selected {selectedCount} / {Math.Max(selectedCount, fileCount)}")
+            : null;
 
-    /// <summary>ステータスバー冒頭の「n / m Files」。</summary>
-    public static string FormatStatusFileCount(int number, int fileCount) =>
-        string.Create(CultureInfo.InvariantCulture, $"{number} / {fileCount} Files");
+    /// <summary>重複を除いた表示を + でつなぐ（ステータス情報の和集合）。</summary>
+    public static string FormatStatusUnion(IEnumerable<string> parts)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        List<string>? list = null;
+        foreach (var part in parts)
+        {
+            if (string.IsNullOrEmpty(part) || !seen.Add(part))
+            {
+                continue;
+            }
 
+            list ??= [];
+            list.Add(part);
+        }
+
+        return list is null ? string.Empty : string.Join('+', list);
+    }
+
+    /// <summary>数値の和集合。昇順に並べてから整形する。</summary>
+    public static string FormatStatusUnionSorted<T>(IEnumerable<T> values, Func<T, string> format)
+        where T : IComparable<T>
+    {
+        var unique = new SortedSet<T>();
+        foreach (var value in values)
+        {
+            unique.Add(value);
+        }
+
+        if (unique.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        if (unique.Count == 1)
+        {
+            return format(unique.Min!);
+        }
+
+        return string.Join('+', unique.Select(format));
+    }
+
+    /// <summary>複数選択時の容量合計（負は 0 扱い）。</summary>
+    public static long SumStatusFileBytes(IEnumerable<long> bytes)
+    {
+        long sum = 0;
+        foreach (var value in bytes)
+        {
+            sum += value < 0 ? 0 : value;
+        }
+
+        return sum;
+    }
+
+    /// <summary>複数選択時の合計容量表示（「Total 」＋通常の容量表記）。</summary>
+    public static string FormatStatusTotalFileBytes(long bytes) =>
+        "Total " + UiStrings.FormatFileBytes(bytes);
+
+    /// <summary>ステータスバーのソース種別ラベル。</summary>
+    public static string FormatStatusSourceKind(AudioFileKind kind) => kind switch
+    {
+        AudioFileKind.Mp3 => "MP3",
+        AudioFileKind.M4a => "M4A",
+        AudioFileKind.Aiff => "AIFF",
+        _ => "WAVE",
+    };
     /// <summary>
     /// PDF ページ番号の桁送り（キーボード上段のみ。1 始まり。二桁可）。
     /// 0 単体は 1 と同じ（1 ページへ）。pending があるときの 0 は 10／20… 用。

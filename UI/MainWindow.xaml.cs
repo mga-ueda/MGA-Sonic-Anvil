@@ -1068,18 +1068,77 @@ public partial class MainWindow : Window
             return;
         }
 
-        var kind = _document.SourceKind switch
-        {
-            AudioFileKind.Mp3 => "MP3",
-            AudioFileKind.M4a => "M4A",
-            AudioFileKind.Aiff => "AIFF",
-            _ => "WAVE",
-        };
         var normal = WpfControlHelpers.FrozenBrush(Theme.Get("StatusBarDetailForeBrush"));
         var edited = WpfControlHelpers.FrozenBrush(Theme.Get("StatusBarErrorDetailForeBrush"));
-        var rate = _document.SampleRate;
-        var bits = _document.BitsPerSample;
-        var channels = _document.Channels;
+
+        // 冒頭: 複数選択中は「Selected n / m」（位置は動かないので省略）。
+        // 単一選択時だけ「位置 / 全体 Files」（プレイヤーは表示順）。
+        var fileCount = IsLibraryMaximized ? DisplayedPlaylistCount() : _sessions.Count;
+        var statusSelection = ResolveStatusSelectionSessions();
+        if (statusSelection.Length >= 2)
+        {
+            var selectionLabel = LibraryPlayerMode.FormatStatusSelectionCount(
+                statusSelection.Length,
+                fileCount);
+            if (selectionLabel is not null)
+            {
+                AppendStatusRun(selectionLabel, edited: false, normal, edited);
+            }
+        }
+        else if (fileCount >= 2)
+        {
+            var index = IsLibraryMaximized
+                ? DisplayedPlaylistIndex(_activeSession)
+                : _activeSession is null ? -1 : _sessions.IndexOf(_activeSession);
+            var position = index < 0 ? 0 : index + 1;
+            AppendStatusRun(
+                LibraryPlayerMode.FormatStatusFileCount(position, fileCount),
+                edited: false,
+                normal,
+                edited);
+        }
+
+        if (statusSelection.Length >= 2)
+        {
+            AppendStatusSelectionUnion(statusSelection, normal, edited);
+        }
+        else
+        {
+            AppendStatusActiveDocument(normal, edited);
+        }
+
+        RefreshExportEnabled();
+        SyncTransportPosition();
+        RefreshTitle();
+    }
+
+    /// <summary>
+    /// ステータスの複数選択対象。プレイヤーはプレイリスト選択、エディタはタブ選択。
+    /// 2 件未満なら空（アクティブ 1 件表示へ）。
+    /// </summary>
+    private DocumentSession[] ResolveStatusSelectionSessions()
+    {
+        if (IsLibraryMaximized)
+        {
+            var selected = LibraryBrowser.SelectedSessions;
+            return selected.Length >= 2 ? selected : [];
+        }
+
+        return HasMultipleTabSelection ? SelectedTabsInOrder() : [];
+    }
+
+    private void AppendStatusActiveDocument(Brush normal, Brush edited)
+    {
+        var document = _document;
+        if (document is null)
+        {
+            return;
+        }
+
+        var kind = LibraryPlayerMode.FormatStatusSourceKind(document.SourceKind);
+        var rate = document.SampleRate;
+        var bits = document.BitsPerSample;
+        var channels = document.Channels;
         if (_formatSizePreview is { } preview)
         {
             switch (preview.Kind)
@@ -1096,38 +1155,17 @@ public partial class MainWindow : Window
             }
         }
 
-        var estimatedBytes = _document.EstimateFileBytesFor(rate, bits, channels);
-        var sizeEdited = estimatedBytes != _document.CommittedFileBytes;
+        var estimatedBytes = document.EstimateFileBytesFor(rate, bits, channels);
+        var sizeEdited = estimatedBytes != document.CommittedFileBytes;
 
-        // 複数ファイルを開いているときだけ、冒頭に「n / m Files」を出す。
-        // プレイヤーは列ソートとグループの表示順。セッション配列の順ではない。
-        // プレイヤーで複数選択中は「選択数 / 全体」、単一選択時は「現在位置 / 全体」。
-        var fileCount = IsLibraryMaximized ? DisplayedPlaylistCount() : _sessions.Count;
-        if (fileCount >= 2)
-        {
-            var index = IsLibraryMaximized
-                ? DisplayedPlaylistIndex(_activeSession)
-                : _activeSession is null ? -1 : _sessions.IndexOf(_activeSession);
-            var position = index < 0 ? 0 : index + 1;
-            var number = LibraryPlayerMode.ResolveStatusFileNumber(
-                IsLibraryMaximized,
-                LibraryBrowser.PlaylistSelectedCount,
-                position);
-            AppendStatusRun(
-                LibraryPlayerMode.FormatStatusFileCount(number, fileCount),
-                edited: false,
-                normal,
-                edited);
-        }
-
-        AppendStatusRun(UiStrings.FormatSampleRate(rate), rate != _document.CommittedSampleRate, normal, edited);
-        AppendStatusRun(UiStrings.FormatBitDepth(bits), bits != _document.CommittedBitsPerSample, normal, edited);
-        AppendStatusRun(UiStrings.FormatChannels(channels), channels != _document.CommittedChannels, normal, edited);
+        AppendStatusRun(UiStrings.FormatSampleRate(rate), rate != document.CommittedSampleRate, normal, edited);
+        AppendStatusRun(UiStrings.FormatBitDepth(bits), bits != document.CommittedBitsPerSample, normal, edited);
+        AppendStatusRun(UiStrings.FormatChannels(channels), channels != document.CommittedChannels, normal, edited);
         AppendStatusRun(kind, edited: false, normal, edited);
-        if (_document.SourceKind is AudioFileKind.Mp3 or AudioFileKind.M4a)
+        if (document.SourceKind is AudioFileKind.Mp3 or AudioFileKind.M4a)
         {
-            AudioTagProbe.Ensure(_document);
-            var bitRate = UiStrings.FormatBitRate(_document.CompressedBitRateKbps);
+            AudioTagProbe.Ensure(document);
+            var bitRate = UiStrings.FormatBitRate(document.CompressedBitRateKbps);
             if (bitRate.Length > 0)
             {
                 AppendStatusRun(bitRate, edited: false, normal, edited);
@@ -1135,16 +1173,77 @@ public partial class MainWindow : Window
         }
 
         AppendStatusRun(
-            UiStrings.FormatFileBytes(sizeEdited ? estimatedBytes : _document.FileBytes),
+            UiStrings.FormatFileBytes(sizeEdited ? estimatedBytes : document.FileBytes),
             sizeEdited,
             normal,
             edited);
-
-        RefreshExportEnabled();
-        SyncTransportPosition();
-        RefreshTitle();
     }
+    /// <summary>
+    /// 複数選択時のステータス。レート／ビット／ch／種別／ビットレートは和集合、容量は合計。
+    /// </summary>
+    private void AppendStatusSelectionUnion(
+        IReadOnlyList<DocumentSession> sessions,
+        Brush normal,
+        Brush edited)
+    {
+        var rates = new int[sessions.Count];
+        var bits = new int[sessions.Count];
+        var channels = new int[sessions.Count];
+        var kinds = new List<string>(sessions.Count);
+        var bitRates = new List<string>(sessions.Count);
+        var byteValues = new long[sessions.Count];
+        for (var i = 0; i < sessions.Count; i++)
+        {
+            var document = sessions[i].Document;
+            rates[i] = document.SampleRate;
+            bits[i] = document.BitsPerSample;
+            channels[i] = document.Channels;
+            kinds.Add(LibraryPlayerMode.FormatStatusSourceKind(document.SourceKind));
+            byteValues[i] = document.FileBytes;
+            if (document.SourceKind is AudioFileKind.Mp3 or AudioFileKind.M4a)
+            {
+                AudioTagProbe.Ensure(document);
+                var bitRate = UiStrings.FormatBitRate(document.CompressedBitRateKbps);
+                if (bitRate.Length > 0)
+                {
+                    bitRates.Add(bitRate);
+                }
+            }
+        }
 
+        AppendStatusRun(
+            LibraryPlayerMode.FormatStatusUnionSorted(rates, UiStrings.FormatSampleRate),
+            edited: false,
+            normal,
+            edited);
+        AppendStatusRun(
+            LibraryPlayerMode.FormatStatusUnionSorted(bits, UiStrings.FormatBitDepth),
+            edited: false,
+            normal,
+            edited);
+        AppendStatusRun(
+            LibraryPlayerMode.FormatStatusUnionSorted(channels, UiStrings.FormatChannels),
+            edited: false,
+            normal,
+            edited);
+        AppendStatusRun(
+            LibraryPlayerMode.FormatStatusUnion(kinds),
+            edited: false,
+            normal,
+            edited);
+        var bitRateUnion = LibraryPlayerMode.FormatStatusUnion(bitRates);
+        if (bitRateUnion.Length > 0)
+        {
+            AppendStatusRun(bitRateUnion, edited: false, normal, edited);
+        }
+
+        AppendStatusRun(
+            LibraryPlayerMode.FormatStatusTotalFileBytes(
+                LibraryPlayerMode.SumStatusFileBytes(byteValues)),
+            edited: false,
+            normal,
+            edited);
+    }
     private void AppendStatusRun(string text, bool edited, Brush normal, Brush highlight)
     {
         if (StatusMeta.Inlines.Count > 0)

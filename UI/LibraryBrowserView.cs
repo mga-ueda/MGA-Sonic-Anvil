@@ -1215,9 +1215,10 @@ internal sealed partial class LibraryBrowserView : UserControl
                 row.IsChecked = next;
             }
 
+            // チェック変更は帯選択イベントを出さないので、和集合／ステータス用に明示通知。
+            NotePlaylistSelectionChanged();
             return;
         }
-
         // 単一／カーソル行はトグル（チェック済みなら外す）。
         var caret = ResolvePlaylistCaretRow();
         if (caret is null)
@@ -1233,8 +1234,9 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         EnsureRowVisible(caret);
+        // チェック変更は帯選択イベントを出さないので、和集合／ステータス用に明示通知。
+        NotePlaylistSelectionChanged();
     }
-
     private DocumentSession[] CheckedPlaylistSessions()
     {
         var result = new List<DocumentSession>();

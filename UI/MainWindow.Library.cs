@@ -2910,6 +2910,11 @@ public partial class MainWindow
     private void LibraryBrowser_CheckSelectModeChanged(object? sender, EventArgs e)
     {
         ShowOptionToggleToast(UiStrings.LabelLibraryCheckSelect, LibraryBrowser.CheckSelectMode);
+        // チェック対象が SelectedSessions になる／戻るのでステータス（Selected・和集合）を合わせる。
+        if (IsLibraryMaximized)
+        {
+            RefreshStatus();
+        }
     }
 
     private void LibraryBrowser_AutoPlayNextChanged(object? sender, EventArgs e)
