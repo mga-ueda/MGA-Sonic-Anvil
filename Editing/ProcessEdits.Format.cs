@@ -66,7 +66,10 @@ internal static partial class ProcessEdits
         return scaled;
     }
 
-    public static IEditCommand? ConvertBitDepth(AudioDocument document, int bits)
+    public static IEditCommand? ConvertBitDepth(
+        AudioDocument document,
+        int bits,
+        IProgress<double>? progress = null)
     {
         if (!FormatConvert.IsValidBitDepth(bits) || bits == document.BitsPerSample)
         {
@@ -74,7 +77,7 @@ internal static partial class ProcessEdits
         }
 
         var before = FormatSnapshot.Capture(document);
-        var samples = document.MaterializeFormat(document.SampleRate, bits, document.Channels);
+        var samples = document.MaterializeFormat(document.SampleRate, bits, document.Channels, progress);
         var after = before with { Samples = samples, BitsPerSample = bits, Selection = WaveSelection.Empty };
         var command = new ConvertFormatCommand(
             "Convert Bit Depth",
@@ -91,7 +94,10 @@ internal static partial class ProcessEdits
         return command;
     }
 
-    public static IEditCommand? ConvertChannels(AudioDocument document, int destChannels)
+    public static IEditCommand? ConvertChannels(
+        AudioDocument document,
+        int destChannels,
+        IProgress<double>? progress = null)
     {
         if (destChannels < 1 || destChannels == document.Channels)
         {
@@ -99,7 +105,11 @@ internal static partial class ProcessEdits
         }
 
         var before = FormatSnapshot.Capture(document);
-        var samples = document.MaterializeFormat(document.SampleRate, document.BitsPerSample, destChannels);
+        var samples = document.MaterializeFormat(
+            document.SampleRate,
+            document.BitsPerSample,
+            destChannels,
+            progress);
         var after = before with { Samples = samples, Channels = destChannels, Selection = WaveSelection.Empty };
         var command = new ConvertFormatCommand(
             "Convert Channels",

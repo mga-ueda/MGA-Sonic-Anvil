@@ -532,8 +532,8 @@ public partial class MainWindow
                 (session, progress) => kind switch
                 {
                     FormatConvertKind.SampleRate => ProcessEdits.ConvertSampleRate(session.Document, value, progress),
-                    FormatConvertKind.BitDepth => ProcessEdits.ConvertBitDepth(session.Document, value),
-                    FormatConvertKind.Channels => ProcessEdits.ConvertChannels(session.Document, value),
+                    FormatConvertKind.BitDepth => ProcessEdits.ConvertBitDepth(session.Document, value, progress),
+                    FormatConvertKind.Channels => ProcessEdits.ConvertChannels(session.Document, value, progress),
                     _ => null,
                 }))
         {

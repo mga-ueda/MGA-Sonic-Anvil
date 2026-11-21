@@ -227,10 +227,15 @@ internal static class FormatConvert
     /// 1 LSB の三角ディザをチャンネルごとにナイキストへ変調し、量子化誤差は可聴帯ではほぼ平坦でナイキスト付近だけ持ち上がる FIR で戻す。
     /// 種は固定なので、同じ入力はいつも同じ結果になる。
     /// </summary>
-    public static float[] Quantize(float[] samples, int bits, int channels = 1)
+    public static float[] Quantize(
+        float[] samples,
+        int bits,
+        int channels = 1,
+        IProgress<double>? progress = null)
     {
         if (bits >= 24 || samples.Length == 0)
         {
+            progress?.Report(1);
             return samples;
         }
 
@@ -251,6 +256,8 @@ internal static class FormatConvert
         }
 
         var dest = new float[samples.Length];
+        var reportEvery = Math.Max(1, samples.Length / 100);
+        progress?.Report(0);
         for (var i = 0; i < samples.Length; i++)
         {
             var ch = i % channels;
@@ -267,35 +274,54 @@ internal static class FormatConvert
             error2[ch] = error1[ch];
             error1[ch] = roundingError;
             dest[i] = (float)y;
+            if (progress is not null && ((i + 1) % reportEvery == 0 || i + 1 == samples.Length))
+            {
+                progress.Report((i + 1) / (double)samples.Length);
+            }
         }
 
+        progress?.Report(1);
         return dest;
     }
 
-    public static float[] Remix(float[] interleaved, int sourceChannels, int destChannels)
+    public static float[] Remix(
+        float[] interleaved,
+        int sourceChannels,
+        int destChannels,
+        IProgress<double>? progress = null)
     {
         sourceChannels = Math.Max(1, sourceChannels);
         destChannels = Math.Max(1, destChannels);
         if (destChannels == sourceChannels)
         {
+            progress?.Report(1);
             return interleaved;
         }
 
         var frames = interleaved.Length / sourceChannels;
         var dest = new float[frames * destChannels];
+        var reportEvery = Math.Max(1, frames / 100);
+        progress?.Report(0);
         for (var frame = 0; frame < frames; frame++)
         {
             ChannelMix.Downmix(interleaved, frame * sourceChannels, sourceChannels, out var left, out var right);
             if (destChannels == 1)
             {
                 dest[frame] = 0.5f * (left + right);
-                continue;
+            }
+            else
+            {
+                dest[frame * destChannels] = left;
+                dest[frame * destChannels + 1] = right;
             }
 
-            dest[frame * destChannels] = left;
-            dest[frame * destChannels + 1] = right;
+            if (progress is not null && ((frame + 1) % reportEvery == 0 || frame + 1 == frames))
+            {
+                progress.Report((frame + 1) / (double)frames);
+            }
         }
 
+        progress?.Report(1);
         return dest;
     }
 

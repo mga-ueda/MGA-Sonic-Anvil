@@ -110,23 +110,64 @@ internal sealed partial class AudioDocument
         var channels = Math.Max(1, _formatOriginChannels);
         destChannels = Math.Max(1, destChannels);
         destRate = Math.Max(1, destRate);
-        if (channels != destChannels)
+        var remix = channels != destChannels;
+        var resample = rate != destRate;
+        var quantize = destBits < _formatOriginBits;
+        if (!remix && !resample && !quantize)
         {
-            samples = FormatConvert.Remix(samples, channels, destChannels);
+            progress?.Report(1);
+            return samples;
+        }
+
+        // 重い順に区間を割る（リサンプルが大半、量子化／リミックスは短め）。
+        var remixEnd = remix ? (resample || quantize ? 0.12 : 1.0) : 0.0;
+        var resampleEnd = resample ? (quantize ? 0.88 : 1.0) : remixEnd;
+        if (remix)
+        {
+            progress?.Report(0);
+            samples = FormatConvert.Remix(
+                samples,
+                channels,
+                destChannels,
+                ScaleFormatProgress(progress, 0, remixEnd));
             channels = destChannels;
         }
 
-        if (rate != destRate)
+        if (resample)
         {
-            samples = FormatConvert.Resample(samples, channels, rate, destRate, progress);
+            samples = FormatConvert.Resample(
+                samples,
+                channels,
+                rate,
+                destRate,
+                ScaleFormatProgress(progress, remixEnd, resampleEnd));
         }
 
-        if (destBits < _formatOriginBits)
+        if (quantize)
         {
-            samples = FormatConvert.Quantize(samples, destBits, destChannels);
+            samples = FormatConvert.Quantize(
+                samples,
+                destBits,
+                destChannels,
+                ScaleFormatProgress(progress, resampleEnd, 1));
         }
 
+        progress?.Report(1);
         return samples;
+    }
+
+    private static IProgress<double>? ScaleFormatProgress(IProgress<double>? inner, double start, double end) =>
+        inner is null || end <= start
+            ? null
+            : new FormatPhaseProgress(inner, start, end);
+
+    private sealed class FormatPhaseProgress(IProgress<double> inner, double start, double end) : IProgress<double>
+    {
+        public void Report(double value)
+        {
+            var t = Math.Clamp(value, 0, 1);
+            inner.Report(start + ((end - start) * t));
+        }
     }
 
 }
