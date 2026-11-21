@@ -90,4 +90,21 @@ public sealed class VolumeCurveTests
         Assert.Equal(1d, curve.Points[2].T);
         Assert.Equal(0, curve.RemovePointsBetween(0.6, 0.6));
     }
+
+    [Fact]
+    public void SampleAt_InterpolatesDenseBrushStylePoints()
+    {
+        var points = new List<VolumeCurvePoint>(257);
+        for (var i = 0; i <= 256; i++)
+        {
+            var t = i / 256d;
+            points.Add(new VolumeCurvePoint(t, (float)(-12d * t)));
+        }
+
+        var curve = new VolumeCurve(points, Enumerable.Repeat(FadeShape.Linear, 256));
+        Assert.Equal(0f, curve.SampleAt(0), 3);
+        Assert.Equal(-6f, curve.SampleAt(0.5), 3);
+        Assert.Equal(-12f, curve.SampleAt(1), 3);
+        Assert.Equal(-3f, curve.SampleAt(0.25), 3);
+    }
 }

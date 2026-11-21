@@ -30,6 +30,11 @@ public partial class MainWindow
     private readonly List<VolumeCurveEditSnapshot> _volumeCurveRedo = [];
     private const int MaxVolumeCurveUndo = 64;
     private const int VolumeCurveLoudnessDebounceMs = 280;
+    /// <summary>
+    /// これ以下ならドラッグ中も波形を全描画する。超えた点のドラッグ中だけ延滞する。
+    /// 48 に特別な根拠は無い（実測や画面幅からの導出ではない。感覚値で、変えてよい）。
+    /// </summary>
+    private const int VolumeCurveLivePreviewPointBudget = 48;
     private DispatcherTimer? _volumeCurveLoudnessTimer;
 
     /// <summary>音量カーブ編集モード中か。フェード調整中と同様、他モード切替・破壊編集をロックする。</summary>
@@ -240,10 +245,17 @@ public partial class MainWindow
             return;
         }
 
+        // 点が多いドラッグ中に抑止していた波形プレビューをここで描き直す。
+        PrimaryWaveform.SetPreviewGain(VolumeCurveGainAt);
         _volumeCurveLoudnessTimer ??= CreateVolumeCurveLoudnessTimer();
         _volumeCurveLoudnessTimer.Stop();
         _volumeCurveLoudnessTimer.Start();
     }
+
+    /// <summary>点が多いときのドラッグ中だけ延滞。ブラシ／ポイントとも、点が少なければ即時全描画。</summary>
+    private bool ShouldLiveRefreshVolumeCurveWaveformPreview() =>
+        _volumeCurve.Points.Count <= VolumeCurveLivePreviewPointBudget
+        || !VolumeCurveEditLayer.IsGestureActive;
 
     private DispatcherTimer CreateVolumeCurveLoudnessTimer()
     {
@@ -310,8 +322,13 @@ public partial class MainWindow
         }
 
         VolumeCurveEditLayer.InvalidateCurve();
-        PrimaryWaveform.SetPreviewGain(VolumeCurveGainAt);
         SyncVolumeCurvePlaybackGain();
+        // 点が多いドラッグ中だけ延滞。それ以外（ブラシ／ポイント／点少）は全描画。
+        if (ShouldLiveRefreshVolumeCurveWaveformPreview())
+        {
+            PrimaryWaveform.SetPreviewGain(VolumeCurveGainAt);
+        }
+
         if (_volumeCurve.IsConstant(out var gainDb))
         {
             _volumeCurveGainOffsetDb = gainDb;

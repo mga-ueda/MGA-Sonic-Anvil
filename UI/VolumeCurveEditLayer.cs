@@ -49,6 +49,11 @@ internal sealed class VolumeCurveEditLayer : Control
     private const double TimelineSnapPx = 8;
     private const int TimeNudgeRepeatDelayMs = 400;
     private const int TimeNudgeRepeatIntervalMs = 50;
+    /// <summary>
+    /// これ以下なら全制御点に dB ラベルを付ける。超えたら選択中（なければ端点）だけ。
+    /// 48 に特別な根拠は無い（MainWindow 側のライブ波形予算と同じ丸め値）。
+    /// </summary>
+    private const int LivePointLabelBudget = 48;
 
     private WaveformView? _target;
     private VolumeCurve _curve = VolumeCurve.Flat(0);
@@ -104,6 +109,9 @@ internal sealed class VolumeCurveEditLayer : Control
     public event Action? DiscardPointEditCapture;
 
     public int SelectedPointIndex => _dragPoint;
+
+    /// <summary>ブラシ／ポイント／全体シフトなど、マウスジェスチャ中か。</summary>
+    public bool IsGestureActive => _dragging;
 
     /// <summary>ホイールズーム等を委譲する対象波形（MainWindow 側のオリジン探索用）。</summary>
     public WaveformView? TargetWaveform => _target;
@@ -1286,7 +1294,11 @@ internal sealed class VolumeCurveEditLayer : Control
             dc.DrawLine(_timeGuidePen, new Point(snappedX, top), new Point(snappedX, bottom));
         }
 
-        for (var i = 0; i < _curve.Points.Count; i++)
+        // 点数が少ないときは全点にラベル。多いときは FormattedText が重いので
+        // マーカーは全点、ラベルは選択中（なければ端点）だけ。
+        var pointCount = _curve.Points.Count;
+        var labelAll = pointCount <= LivePointLabelBudget;
+        for (var i = 0; i < pointCount; i++)
         {
             var point = _curve.Points[i];
             var frame = _range.StartFrame + point.T * Math.Max(0, _range.Length - 1);
@@ -1295,6 +1307,14 @@ internal sealed class VolumeCurveEditLayer : Control
             var selected = i == _dragPoint;
             var radius = selected ? 6.5 : 4.5;
             dc.DrawEllipse(_pointFill, selected ? _selectedPointPen : _curvePen, new Point(x, y), radius, radius);
+
+            var drawLabel = labelAll
+                || selected
+                || (_dragPoint < 0 && (i == 0 || i == pointCount - 1));
+            if (!drawLabel)
+            {
+                continue;
+            }
 
             var label = FormatPointGainLabel(point.GainDb);
             var text = WpfControlHelpers.MonoRegularText(

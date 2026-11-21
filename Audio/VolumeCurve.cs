@@ -622,31 +622,37 @@ internal sealed class VolumeCurve
             return _points[^1].GainDb;
         }
 
-        for (var i = 0; i < _points.Count - 1; i++)
+        // ブラシ後は点が密になり得るので線形探索ではなく二分探索。
+        var lo = 0;
+        var hi = _points.Count - 1;
+        while (hi - lo > 1)
         {
-            var a = _points[i];
-            var b = _points[i + 1];
-            if (t > b.T)
+            var mid = (lo + hi) >> 1;
+            if (_points[mid].T <= t)
             {
-                continue;
+                lo = mid;
             }
-
-            var span = b.T - a.T;
-            if (span <= 1e-12)
+            else
             {
-                return b.GainDb;
+                hi = mid;
             }
-
-            var local = (t - a.T) / span;
-            var shape = i < _shapes.Count ? _shapes[i] : DefaultShape;
-            var rising = FadeCurves.Apply01(shape, local);
-            // -∞ を含む区間は有限フロアで補間し、フロア以下なら -∞ に戻す。
-            var fa = ToFiniteGainDb(a.GainDb);
-            var fb = ToFiniteGainDb(b.GainDb);
-            return FromFiniteGainDb(fa + rising * (fb - fa));
         }
 
-        return _points[^1].GainDb;
+        var a = _points[lo];
+        var b = _points[hi];
+        var span = b.T - a.T;
+        if (span <= 1e-12)
+        {
+            return b.GainDb;
+        }
+
+        var local = (t - a.T) / span;
+        var shape = lo < _shapes.Count ? _shapes[lo] : DefaultShape;
+        var rising = FadeCurves.Apply01(shape, local);
+        // -∞ を含む区間は有限フロアで補間し、フロア以下なら -∞ に戻す。
+        var fa = ToFiniteGainDb(a.GainDb);
+        var fb = ToFiniteGainDb(b.GainDb);
+        return FromFiniteGainDb(fa + rising * (fb - fa));
     }
 
     public float[] BuildGainDbTable(int frameCount)
@@ -767,6 +773,7 @@ internal sealed class VolumeCurve
         return ids;
     }
 
+    /// <summary>Douglas–Peucker。密なブラシ点でもスタックを食わないよう反復で間引く。</summary>
     private void SimplifyRange(int first, int last, float tolerance, bool[] keep)
     {
         if (last <= first + 1)
@@ -774,33 +781,46 @@ internal sealed class VolumeCurve
             return;
         }
 
-        var a = _points[first];
-        var b = _points[last];
-        var span = b.T - a.T;
-        var maxDev = 0f;
-        var maxIndex = -1;
-        for (var i = first + 1; i < last; i++)
+        var stack = new Stack<(int First, int Last)>();
+        stack.Push((first, last));
+        while (stack.Count > 0)
         {
-            var p = _points[i];
-            var expected = span <= 1e-12
-                ? a.GainDb
-                : a.GainDb + (float)((p.T - a.T) / span) * (b.GainDb - a.GainDb);
-            var dev = Math.Abs(p.GainDb - expected);
-            if (dev > maxDev)
+            (first, last) = stack.Pop();
+            if (last <= first + 1)
             {
-                maxDev = dev;
-                maxIndex = i;
+                continue;
             }
-        }
 
-        if (maxIndex < 0 || maxDev < tolerance)
-        {
-            return;
-        }
+            var a = _points[first];
+            var b = _points[last];
+            var span = b.T - a.T;
+            var fa = ToFiniteGainDb(a.GainDb);
+            var fb = ToFiniteGainDb(b.GainDb);
+            var maxDev = 0f;
+            var maxIndex = -1;
+            for (var i = first + 1; i < last; i++)
+            {
+                var p = _points[i];
+                var expected = span <= 1e-12
+                    ? fa
+                    : fa + (float)((p.T - a.T) / span) * (fb - fa);
+                var dev = Math.Abs(ToFiniteGainDb(p.GainDb) - expected);
+                if (dev > maxDev)
+                {
+                    maxDev = dev;
+                    maxIndex = i;
+                }
+            }
 
-        keep[maxIndex] = true;
-        SimplifyRange(first, maxIndex, tolerance, keep);
-        SimplifyRange(maxIndex, last, tolerance, keep);
+            if (maxIndex < 0 || maxDev < tolerance)
+            {
+                continue;
+            }
+
+            keep[maxIndex] = true;
+            stack.Push((first, maxIndex));
+            stack.Push((maxIndex, last));
+        }
     }
 
     private void DeduplicateByT()

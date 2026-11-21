@@ -963,6 +963,7 @@
         <li><strong>Brush</strong> — Drag to draw the curve. Add Point and the curve-shape icons gray out while Brush is active.</li>
         <li><strong>Seek Bar</strong> (<kbd>Alt</kbd>+<kbd>F</kbd>) — Non-edit mode for clicking the waveform to seek.</li>
         <li><strong>Gain box</strong> (<kbd>Alt</kbd>+<kbd>N</kbd>) — On a flat curve, sets the constant gain. With points, the delta shifts the whole curve. You can type −∞. ↑↓ / wheel also work.</li>
+        <li><strong>Dense-point preview</strong> — While dragging with roughly more than 48 control points, live full redraw of the waveform is deferred and applied when you release the mouse (Brush and Points alike; at 48 or fewer, redraw stays live during the drag). Point dB labels use the same cutoff: when denser, only the selected point is labeled (or the endpoints if none is selected). 48 is an arbitrary round number for load control, not a measured optimum.</li>
         <li><strong>Curve shape</strong> — Same 1–9 as fades; applies to the selected outgoing segment. Digit keys work in Points mode.</li>
         <li><strong>Clip marks</strong> — Where preview gain would exceed 0 dBFS, a red horizontal capsule appears at the waveform tip (Color settings → Preview · clip).</li>
         <li><strong>Playback</strong> (<kbd>Space</kbd>) — Normal play/stop with the live curve preview applied.</li>
