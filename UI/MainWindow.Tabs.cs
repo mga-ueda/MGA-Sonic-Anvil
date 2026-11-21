@@ -1291,10 +1291,10 @@ public partial class MainWindow
         if (dock.Parent is Border host)
         {
             host.Background = backBrush;
-            // 全選択時は上線の代わりにアクティブタブへ白 1px 枠（dirty も同色）。
+            // 複数選択中は選択ハイライトが並ぶので、アクティブだけ 1px 枠で区別する（dirty も同色）。
             // BorderThickness はタイトル幅を削るので 0 のまま、Brush だけで描画する。
             host.BorderThickness = new Thickness(0);
-            host.BorderBrush = AllTabsSelected && ReferenceEquals(session, _activeSession)
+            host.BorderBrush = HasMultipleTabSelection && ReferenceEquals(session, _activeSession)
                 ? (Brush)FindResource("DocumentTabSelectedForeBrush")
                 : null;
             Panel.SetZIndex(host, highlighted ? 1 : 0);

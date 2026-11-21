@@ -820,7 +820,8 @@ public partial class MainWindow
         };
         var headerBody = new DockPanel();
         headerBody.Children.Add(titleRow);
-        var header = new Border
+        // タブと同じ DocumentTabChrome（複数選択時のアクティブ 1px 枠用）。
+        var header = new DocumentTabChrome
         {
             Height = DesignMetrics.DocumentTabBarHeight,
             Child = headerBody,
@@ -1062,6 +1063,13 @@ public partial class MainWindow
                 ? (Brush)FindResource(
                     dirty ? "DocumentTabSelectedDirtyBackBrush" : "DocumentTabSelectedBackBrush")
                 : Brushes.Transparent;
+            // タブと同じく、複数選択中はアクティブ帯だけ 1px 枠。
+            pane.Header.BorderThickness = new Thickness(0);
+            pane.Header.BorderBrush = HasMultipleTabSelection
+                && ReferenceEquals(pane.Session, _activeSession)
+                    ? (Brush)FindResource("DocumentTabSelectedForeBrush")
+                    : null;
+            pane.Header.InvalidateVisual();
             // アクティブ以外はシアンのシークバーを出さない。
             pane.View.ShowPlayhead = ReferenceEquals(pane.Session, _activeSession);
         }
