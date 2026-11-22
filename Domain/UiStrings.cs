@@ -1827,8 +1827,6 @@ internal static partial class UiStrings
             "…more follows (showing first {0:#,0} of {1:#,0} bytes; the rest is not read)",
             shown,
             total);
-    public static string WaveStructureNoSelection =>
-        "Select a playlist file to inspect its header structure.";
     public static string WaveStructureSelectNode =>
         "Select a chunk in the tree to view its contents.";
     public static string WaveHeaderRepairButton => Get("ヘッダを修復", "Repair Header");
@@ -1901,7 +1899,6 @@ internal static partial class UiStrings
     public static string LabelChannelLayoutCustom => Get("カスタム", "Custom");
     public static string LabelChannelLayoutUnspecified => Get("未指定", "Unspecified");
     public static string LabelChannelLayoutMask => Get("マスク", "Mask");
-    public static string LabelChannelLayoutSpeakers => Get("スピーカー", "Speakers");
     public static string LabelChannelLayoutChannelAssign => Get(
         "チャンネル割り当て",
         "Channel assignment");
@@ -1924,9 +1921,6 @@ internal static partial class UiStrings
     public static string WaveChannelLayoutIncompleteWarning => Get(
         "すべてのチャンネルにスピーカーを選んでください。未指定にする場合は「未指定に戻す」を使います。",
         "Assign a speaker to every channel, or use Unspecified to clear the mask.");
-    public static string WaveChannelLayoutMaskMismatchWarning => Get(
-        "セットされたビット数とファイルのチャンネル数が一致しないファイルがあります。そのまま書き込めます。",
-        "Some files have a different channel count than set bits. You can still write the mask.");
     public static string WaveChannelLayoutNoTargets => Get(
         "WAVE / AIFF の対象ファイルがありません。",
         "No WAVE / AIFF target files.");

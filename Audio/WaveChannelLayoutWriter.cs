@@ -16,7 +16,6 @@ internal static class WaveChannelLayoutWriter
         int Succeeded,
         int Changed,
         int Failed,
-        int Skipped,
         string? FirstError,
         IReadOnlyList<string> WrittenPaths);
 
@@ -79,14 +78,13 @@ internal static class WaveChannelLayoutWriter
     {
         if (paths.Count == 0)
         {
-            return new BatchResult(0, 0, 0, 0, null, Array.Empty<string>());
+            return new BatchResult(0, 0, 0, null, Array.Empty<string>());
         }
 
         var written = new List<string>(paths.Count);
         var succeeded = 0;
         var changed = 0;
         var failed = 0;
-        var skipped = 0;
         string? firstError = null;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -99,7 +97,6 @@ internal static class WaveChannelLayoutWriter
 
             if (!IsSupportedPath(path))
             {
-                skipped++;
                 continue;
             }
 
@@ -119,7 +116,7 @@ internal static class WaveChannelLayoutWriter
             }
         }
 
-        return new BatchResult(succeeded, changed, failed, skipped, firstError, written);
+        return new BatchResult(succeeded, changed, failed, firstError, written);
     }
 
     public static Result ApplyTo(string sourcePath, string destinationPath, int channelMask)
