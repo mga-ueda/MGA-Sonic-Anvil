@@ -18,6 +18,13 @@ public sealed class SurroundScopeEngineTests
     [InlineData("R", 30)]
     [InlineData("Ls", -110)]
     [InlineData("Rs", 110)]
+    [InlineData("FC", 0)]
+    [InlineData("FL", -30)]
+    [InlineData("FR", 30)]
+    [InlineData("SL", -90)]
+    [InlineData("SR", 90)]
+    [InlineData("BL", -110)]
+    [InlineData("BR", 110)]
     public void TryAzimuthDegrees_UsesIuFrontZero(string label, double expected)
     {
         Assert.True(SurroundScopeEngine.TryAzimuthDegrees(label, out var degrees));
@@ -29,6 +36,31 @@ public sealed class SurroundScopeEngineTests
     {
         Assert.False(SurroundScopeEngine.TryAzimuthDegrees("LFE", out _));
         Assert.True(SurroundScopeEngine.IsLfeLabel("LFE"));
+    }
+
+    [Fact]
+    public void CustomWaveLabels_PlaceLikeFiveOneSide()
+    {
+        // カスタム設定で使う FL/FC/FR/SL/SR/LFE 並び。
+        var layout = new ChannelLayout("custom:test", 6, ["FL", "FC", "FR", "SL", "SR", "LFE"]);
+        var levels = new float[6];
+        levels[1] = 1f; // FC
+        var envelope = new float[SurroundScopeEngine.EnvelopeSteps];
+        SurroundScopeEngine.FillEnvelope(levels, layout, envelope);
+        var peak = 0;
+        for (var i = 1; i < envelope.Length; i++)
+        {
+            if (envelope[i] > envelope[peak])
+            {
+                peak = i;
+            }
+        }
+
+        Assert.True(envelope[peak] > 0.5f);
+        Assert.Equal(0, SurroundScopeEngine.StepAzimuth(peak, envelope.Length), 6);
+        Assert.Equal(0f, SurroundScopeEngine.LfeLevel(levels, layout));
+        levels[5] = 0.8f;
+        Assert.Equal(0.8f, SurroundScopeEngine.LfeLevel(levels, layout));
     }
 
     [Theory]

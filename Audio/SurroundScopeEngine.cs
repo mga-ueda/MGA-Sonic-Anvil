@@ -38,28 +38,72 @@ internal static class SurroundScopeEngine
         return i * 360d / n;
     }
 
-    /// <summary>正面を 0°、右回りを正。LFE と未知ラベルは false。</summary>
+    /// <summary>
+    /// 正面を 0°、右回りを正。LFE と未知ラベルは false。
+    /// ChannelLayout（L/R/C）と WAVE マスク名（FL/FR/FC/SL…）の両方を受け付ける。
+    /// </summary>
     public static bool TryAzimuthDegrees(string label, out double degrees)
     {
-        degrees = label switch
+        degrees = CanonicalAzimuthLabel(label) switch
         {
             "M" or "C" => 0,
-            "S" or "Cs" or "Bc" => 180,
-            "L" or "Tfl" => -30,
-            "R" or "Tfr" => 30,
-            "Lc" or "Flc" => -15,
-            "Rc" or "Frc" => 15,
-            "Lw" => -60,
-            "Rw" => 60,
-            "Sl" or "Tsl" => -90,
-            "Sr" or "Tsr" => 90,
-            "Ls" => -110,
-            "Rs" => 110,
-            "Lsr" or "Lb" or "Tbl" => -135,
-            "Rsr" or "Rb" or "Tbr" => 135,
+            "S" or "CS" or "BC" => 180,
+            "L" or "TFL" => -30,
+            "R" or "TFR" => 30,
+            "LC" or "FLC" => -15,
+            "RC" or "FRC" => 15,
+            "LW" => -60,
+            "RW" => 60,
+            "SL" or "TSL" => -90,
+            "SR" or "TSR" => 90,
+            "LS" or "BL" => -110,
+            "RS" or "BR" => 110,
+            "LSR" or "LB" or "TBL" => -135,
+            "RSR" or "RB" or "TBR" => 135,
             _ => double.NaN,
         };
         return double.IsFinite(degrees);
+    }
+
+    /// <summary>WAVE 名を配置ラベルへ寄せてから大文字化。LFE は "LFE"。</summary>
+    private static string CanonicalAzimuthLabel(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = label.Trim();
+        if (IsLfeLabel(trimmed))
+        {
+            return "LFE";
+        }
+
+        // FL/FR/FC/SL… と L/R/C/Sl… を同じ方位キーへ。
+        var bit = ChannelMaskBits.BitForLabel(trimmed);
+        return bit switch
+        {
+            0x1 => "L",
+            0x2 => "R",
+            0x4 => "C",
+            0x8 => "LFE",
+            0x10 => "LS",
+            0x20 => "RS",
+            0x40 => "LC",
+            0x80 => "RC",
+            0x100 => "BC",
+            0x200 => "SL",
+            0x400 => "SR",
+            0x800 => "TFL",
+            0x1000 => "TFC",
+            0x2000 => "TFR",
+            0x4000 => "TBL",
+            0x8000 => "TBC",
+            0x10000 => "TBR",
+            0x20000 => "TSL",
+            0x40000 => "TSR",
+            _ => trimmed.ToUpperInvariant(),
+        };
     }
 
     /// <summary>リニア振幅とメーター dB 半径の中間（0..1）。</summary>
