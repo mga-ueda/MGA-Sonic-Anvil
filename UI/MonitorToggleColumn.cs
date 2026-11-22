@@ -15,12 +15,6 @@ namespace MgaSonicAnvil.UI;
 /// </summary>
 internal sealed class MonitorToggleColumn : StackPanel
 {
-    private static readonly Color MonoOn = Color.FromRgb(0x3D, 0x8E, 0xE8);
-    private static readonly Color DimOn = Color.FromRgb(0xE2, 0x4B, 0x4A);
-    private static readonly Color LowCutOn = Color.FromRgb(0xE0, 0x8A, 0x2E);
-    /// <summary>BPM オン時のラッチ色（MONO 青・LC オレンジと区別するティール）。</summary>
-    private static readonly Color BpmOn = Color.FromRgb(0x2E, 0xB8, 0xA0);
-
     private readonly BpmDisplayLock _bpmLock = new();
     private readonly DispatcherTimer _tickTimer;
     private readonly DispatcherTimer _displayTimer;
@@ -52,19 +46,23 @@ internal sealed class MonitorToggleColumn : StackPanel
             Margin = new Thickness(0, 0, 0, 1),
             IsHitTestVisible = false,
         };
-        _bpm = CreateButton("BPM", BpmOn, UiStrings.TooltipMonitorBpm, Bpm_Click);
+        _bpm = CreateButton("BPM", "MonitorLatchBpmOnBrush", UiStrings.TooltipMonitorBpm, Bpm_Click);
         _bpm.Margin = new Thickness(0, 0, 0, DesignMetrics.TransportButtonGap);
 
-        _mono = CreateButton(UiStrings.LabelMonitorMono, MonoOn, UiStrings.TooltipMonitorMono, Mono_Click);
+        _mono = CreateButton(
+            UiStrings.LabelMonitorMono,
+            "MonitorLatchMonoOnBrush",
+            UiStrings.TooltipMonitorMono,
+            Mono_Click);
         _dim = CreateButton(
             UiStrings.LabelMonitorDim,
-            DimOn,
+            "MonitorLatchDimOnBrush",
             UiStrings.TooltipMonitorDim(AppStorage.Settings.ResolvedMonitorDimDb()),
             Dim_Click);
         _dim.Margin = new Thickness(0, DesignMetrics.TransportButtonGap, 0, 0);
         _lowCut = CreateButton(
             UiStrings.LabelMonitorLowCut,
-            LowCutOn,
+            "MonitorLatchLowCutOnBrush",
             UiStrings.TooltipMonitorLowCut(AppStorage.Settings.ResolvedMonitorLowCutHz()),
             LowCut_Click);
         _lowCut.Margin = new Thickness(0, DesignMetrics.TransportButtonGap, 0, 0);
@@ -158,14 +156,23 @@ internal sealed class MonitorToggleColumn : StackPanel
         RefreshAppearance();
     }
 
-    /// <summary>配色変更時の再描画（オフ面の LatchToggle 色など）。</summary>
+    /// <summary>配色変更時の再描画（オフ面の LatchToggle 色・オン面アクセントなど）。</summary>
     public void RefreshAppearance()
     {
+        ApplyLatchColors();
         ApplyBpmChrome();
         _bpm.RefreshAppearance();
         _mono.RefreshAppearance();
         _dim.RefreshAppearance();
         _lowCut.RefreshAppearance();
+    }
+
+    private void ApplyLatchColors()
+    {
+        _bpm.LatchColor = Theme.Get("MonitorLatchBpmOnBrush");
+        _mono.LatchColor = Theme.Get("MonitorLatchMonoOnBrush");
+        _dim.LatchColor = Theme.Get("MonitorLatchDimOnBrush");
+        _lowCut.LatchColor = Theme.Get("MonitorLatchLowCutOnBrush");
     }
 
     public void StopTicks()
@@ -194,14 +201,14 @@ internal sealed class MonitorToggleColumn : StackPanel
 
     private static MonitorLatchButton CreateButton(
         string label,
-        Color latchColor,
+        string latchBrushKey,
         string tooltip,
         RoutedEventHandler click)
     {
         var button = new MonitorLatchButton
         {
             LatchLabel = label,
-            LatchColor = latchColor,
+            LatchColor = Theme.Get(latchBrushKey),
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         TransportToolTip.Attach(button, tooltip);
@@ -350,17 +357,21 @@ internal sealed class MonitorToggleColumn : StackPanel
         var on = _bpmMode == BpmMonitorMode.On;
         _bpm.LatchLabel = "BPM";
         _bpm.IsLatched = on;
-        _bpm.LatchColor = BpmOn;
+        _bpm.LatchColor = Theme.Get("MonitorLatchBpmOnBrush");
         _bpm.RefreshAppearance();
 
         Color valueColor;
         if (_videoOverlayLabels)
         {
-            valueColor = on ? Colors.White : LibraryPlayerMode.VideoOverlayLabelColor;
+            valueColor = on
+                ? Theme.Get("ChannelLabelOnTintForeBrush")
+                : LibraryPlayerMode.VideoOverlayLabelColor;
         }
         else
         {
-            valueColor = on ? BpmOn : Theme.Get("MutedForeBrush");
+            valueColor = on
+                ? Theme.Get("MonitorLatchBpmOnBrush")
+                : Theme.Get("MutedForeBrush");
         }
 
         _bpmValue.Foreground = WpfControlHelpers.FrozenBrush(valueColor);

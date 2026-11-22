@@ -17,6 +17,7 @@ public sealed class ColorDevCatalogTests
     [InlineData("MenuDisabledForeBrush", "Shared")]
     [InlineData("PlayerVideoOverlayForeBrush", "Player")]
     [InlineData("PlayerVideoSeekTrackBrush", "Player")]
+    [InlineData("MonitorLatchBpmOnBrush", "Transport")]
     [InlineData("MainMenuBarBackBrush", "Shared")]
     [InlineData("MenuListBackBrush", "Shared")]
     [InlineData("MenuPopupBackBrush", "Shared")]

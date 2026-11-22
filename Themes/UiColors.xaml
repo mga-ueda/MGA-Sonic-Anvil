@@ -167,6 +167,11 @@
     <SolidColorBrush x:Key="TransportToolbarSectionSeparatorBrush" Color="#40EBEBEB" />
     <SolidColorBrush x:Key="TransportForeBrush" Color="#FFEBEBEB" />
     <SolidColorBrush x:Key="RecordLatchForeBrush" Color="#FFE24B4A" />
+    <!-- モニター列 BPM／MONO／DIM／LC のオン面アクセント。 -->
+    <SolidColorBrush x:Key="MonitorLatchBpmOnBrush" Color="#FF2EB8A0" />
+    <SolidColorBrush x:Key="MonitorLatchMonoOnBrush" Color="#FF3D8EE8" />
+    <SolidColorBrush x:Key="MonitorLatchDimOnBrush" Color="#FFE24B4A" />
+    <SolidColorBrush x:Key="MonitorLatchLowCutOnBrush" Color="#FFE08A2E" />
     <SolidColorBrush x:Key="TransportDisabledForeBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="TransportHoverBackBrush" Color="#98686870" />
     <SolidColorBrush x:Key="TransportPressedBackBrush" Color="#B07A7A82" />
