@@ -306,7 +306,9 @@ internal sealed class RoundedButton : Button
 
         var textColor = IsEnabled
             ? Foreground is SolidColorBrush solid ? solid.Color : Theme.Get("PrimaryForeBrush")
-            : DisabledForeColor;
+            : DisabledForeColor == DisabledForeBootstrap
+                ? Theme.Get("MutedForeBrush")
+                : DisabledForeColor;
         var brush = WpfControlHelpers.FrozenBrush(textColor);
         var innerW = Math.Max(1d, ActualWidth - Padding.Left - Padding.Right - stroke * 2d);
         var typeface = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
@@ -423,11 +425,17 @@ internal sealed class RoundedButton : Button
         return new string(chars, 0, n);
     }
 
+    private static readonly Color DisabledBackBootstrap = Color.FromRgb(0x1A, 0x1B, 0x26);
+    private static readonly Color DisabledForeBootstrap = Color.FromRgb(0x96, 0x96, 0x96);
+
     private Color ResolveFillColor()
     {
         if (!IsEnabled)
         {
-            return DisabledBackColor;
+            // 型既定のままなら色設定のクローム背景を使う（ActionButtonLooks で上書きしたものは優先）。
+            return DisabledBackColor == DisabledBackBootstrap
+                ? Theme.Get("ChromeBackBrush")
+                : DisabledBackColor;
         }
 
         if ((_pressed || IsPressed) && PressedBackColor is Color pressed)

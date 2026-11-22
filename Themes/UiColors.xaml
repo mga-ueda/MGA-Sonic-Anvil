@@ -179,6 +179,10 @@
     <SolidColorBrush x:Key="MonitorLatchMonoOnBrush" Color="#FF3D8EE8" />
     <SolidColorBrush x:Key="MonitorLatchDimOnBrush" Color="#FFE24B4A" />
     <SolidColorBrush x:Key="MonitorLatchLowCutOnBrush" Color="#FFE08A2E" />
+    <!-- ツールバー「色」アイコンの三原色記号。 -->
+    <SolidColorBrush x:Key="TransportColorPaletteRedBrush" Color="#FFFF4D4D" />
+    <SolidColorBrush x:Key="TransportColorPaletteGreenBrush" Color="#FF4DE05A" />
+    <SolidColorBrush x:Key="TransportColorPaletteBlueBrush" Color="#FF4D8EFF" />
     <SolidColorBrush x:Key="TransportDisabledForeBrush" Color="#FF5B5B5B" />
     <SolidColorBrush x:Key="TransportHoverBackBrush" Color="#98686870" />
     <SolidColorBrush x:Key="TransportPressedBackBrush" Color="#B07A7A82" />

@@ -140,7 +140,7 @@ internal sealed partial class WaveformView
             return;
         }
 
-        var whiteText = WpfControlHelpers.FrozenBrush(Colors.White);
+        var whiteText = WpfControlHelpers.FrozenBrush(Theme.Get("ChannelLabelOnTintForeBrush"));
 
         void Flag(long frame, string label, bool growLeft, Color flagColor, CrossfadeDragPart part)
         {

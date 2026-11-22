@@ -6452,8 +6452,8 @@ internal sealed partial class WaveformView : Grid
         // 旗の塗りが明るい／濃いに合わせて、ラベルは常にコントラストの高い色にする。
         var fill = Theme.Get(brushKey);
         var fore = fill.R * 0.299 + fill.G * 0.587 + fill.B * 0.114 >= 140
-            ? Color.FromRgb(0x1A, 0x12, 0x08)
-            : Colors.White;
+            ? Theme.Get("MarkerLabelForeBrush")
+            : Theme.Get("ChannelLabelOnTintForeBrush");
         var formatted = new FormattedText(
             text,
             CultureInfo.InvariantCulture,

@@ -1294,7 +1294,12 @@ internal static class TransportIconDrawing
         double cx,
         double cy)
     {
-        var colors = new[] { PaletteRed, PaletteGreen, PaletteBlue };
+        var colors = new[]
+        {
+            Theme.Get("TransportColorPaletteRedBrush"),
+            Theme.Get("TransportColorPaletteGreenBrush"),
+            Theme.Get("TransportColorPaletteBlueBrush"),
+        };
         for (var i = 0; i < 3; i++)
         {
             var y = cy + (i - 1) * 6.2;
@@ -1500,10 +1505,6 @@ internal static class TransportIconDrawing
         dc.Pop();
     }
 
-    private static readonly Color PaletteRed = Color.FromRgb(0xFF, 0x4D, 0x4D);
-    private static readonly Color PaletteGreen = Color.FromRgb(0x4D, 0xE0, 0x5A);
-    private static readonly Color PaletteBlue = Color.FromRgb(0x4D, 0x8E, 0xFF);
-
     private static void DrawPaletteCircle(DrawingContext dc, Color color, Point center, double radius)
     {
         var tint = WpfControlHelpers.FrozenBrush(Color.FromArgb(0xB4, color.R, color.G, color.B));
@@ -1530,11 +1531,11 @@ internal static class TransportIconDrawing
 
         if (accent)
         {
-            // RGB は「色そのもの」の記号なので、テーマ色ではなく固定の三原色。
+            // RGB は「色そのもの」の記号。色設定の三原色キーを参照する。
             // 塗りを先に全部敷き、白線を上に重ねて重なりの境界を見せる。
-            DrawPaletteCircle(dc, PaletteRed, top, radius);
-            DrawPaletteCircle(dc, PaletteGreen, left, radius);
-            DrawPaletteCircle(dc, PaletteBlue, right, radius);
+            DrawPaletteCircle(dc, Theme.Get("TransportColorPaletteRedBrush"), top, radius);
+            DrawPaletteCircle(dc, Theme.Get("TransportColorPaletteGreenBrush"), left, radius);
+            DrawPaletteCircle(dc, Theme.Get("TransportColorPaletteBlueBrush"), right, radius);
             var rim = OutlinePen(pen, 1.2);
             dc.DrawEllipse(null, rim, top, radius, radius);
             dc.DrawEllipse(null, rim, left, radius, radius);
