@@ -33,6 +33,9 @@ internal sealed class VectorScopeView : FrameworkElement
     private Color SurroundHullStroke =>
         PlayerMeterChrome.Grid("SurroundHullStrokeBrush", WashThrough);
 
+    private Color SurroundLfeRim =>
+        PlayerMeterChrome.Grid("SurroundLfeRimBrush", WashThrough);
+
     private readonly DispatcherTimer _timer;
     private readonly float[] _left = new float[LevelMeterEngine.WindowFrames];
     private readonly float[] _right = new float[LevelMeterEngine.WindowFrames];
@@ -1144,9 +1147,16 @@ internal sealed class VectorScopeView : FrameworkElement
         var r = radius * SurroundScopeEngine.LfeRadius * level;
         var fillScale = persist ? 1.15 : 1;
         var fill = (byte)Math.Clamp((int)Math.Round(150 * fade * fillScale), 0, 255);
+        // 塗りはレーン色のまま。枠色は色設定 SurroundLfeRimBrush。
+        var rim = SurroundLfeRim;
+        var rimAlpha = (byte)Math.Clamp((int)Math.Round(rim.A / 255d * 220 * fade), 0, 255);
+        var pen = new Pen(
+            WpfControlHelpers.FrozenBrush(Color.FromArgb(rimAlpha, rim.R, rim.G, rim.B)),
+            1);
+        pen.Freeze();
         dc.DrawEllipse(
             WpfControlHelpers.FrozenBrush(Color.FromArgb(fill, color.R, color.G, color.B)),
-            null,
+            pen,
             new Point(cx, cy),
             r,
             r);

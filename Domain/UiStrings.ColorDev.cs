@@ -188,6 +188,7 @@ internal static partial class UiStrings
             "LevelMeterClipOn" => Get("クリップ点灯", "Clip on"),
             "LevelMeterClipOnOverlay" => Get("クリップ点灯の重ね", "Clip on · overlay"),
             "SurroundHullStroke" => Get("サラウンド RMS 枠", "Surround RMS hull"),
+            "SurroundLfeRim" => Get("サラウンド LFE 枠", "Surround LFE rim"),
             "LevelGradFloor" => Get("バー色・暗い端", "Bar · dark end"),
             "LevelGradLow" => Get("バー色・暗い中間", "Bar · dark mid"),
             "LevelGradMid" => Get("バー色・中間", "Bar · mid"),

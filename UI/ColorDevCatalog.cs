@@ -148,6 +148,7 @@ internal static class ColorDevCatalog
             ("LevelMeterClipOnBrush", ColorDevGroup.Meter),
             ("LevelMeterClipOnOverlayBrush", ColorDevGroup.Meter),
             ("SurroundHullStrokeBrush", ColorDevGroup.Meter),
+            ("SurroundLfeRimBrush", ColorDevGroup.Meter),
 
             ("VectorScopeBackBrush", ColorDevGroup.VectorScope),
             ("VectorScopeTraceBrush", ColorDevGroup.VectorScope),
