@@ -815,9 +815,8 @@ internal static partial class UiStrings
     public static string LabelWallpaperOpacity => Get("壁紙の不透明度", "Wallpaper opacity");
     /// <summary>設定・一般。ジャケット由来の動的背景色の動き。</summary>
     public static string LabelEnableBackgroundAnimation => Get(
-        "背景色アニメーション(_B)",
-        "Background color _animation");
-    public static string LabelBackgroundAnimationSpeed => Get("速度", "Speed");
+        "背景アニメーション速度(_B)",
+        "Background animation _speed");
     public static string LabelControlCornerRadius => Get("GUI の角の丸み", "GUI corner radius");
     public static string ButtonWallpaperClear => Get("クリア", "Clear");
     public static string FilterWallpaperImage => Get(

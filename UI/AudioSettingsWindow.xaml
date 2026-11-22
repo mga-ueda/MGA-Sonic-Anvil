@@ -169,110 +169,123 @@
           <ScrollViewer VerticalScrollBarVisibility="Auto"
                         HorizontalScrollBarVisibility="Disabled"
                         Style="{StaticResource SettingsColumnScrollViewerStyle}">
-            <!-- プリセット1行（波形〜既定に戻す）が SettingsPanelWidth より広いので MaxWidth は付けない。 -->
+            <!-- プリセット行が SettingsPanelWidth より広いので MaxWidth は付けない。 -->
             <StackPanel HorizontalAlignment="Left">
-              <StackPanel Orientation="Horizontal"
-                          HorizontalAlignment="Left"
-                          Margin="0,0,0,8">
-                <CheckBox x:Name="ShowMainMenuBarBox"
-                          Style="{StaticResource DarkCheckBoxStyle}"
-                          Content="{x:Static domain:UiStrings.LabelShowMainMenuBar}"
-                          VerticalAlignment="Center"
-                          Margin="0,0,12,0" />
-                <TextBlock Text="{x:Static domain:UiStrings.LabelMainMenuBarAlign}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0" />
-                <ComboBox x:Name="MainMenuBarAlignCombo"
-                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                          Padding="6,1"
-                          FontSize="11.333"
-                          VerticalContentAlignment="Center"
-                          VerticalAlignment="Center"
-                          MinWidth="72" />
-              </StackPanel>
-              <StackPanel Orientation="Horizontal"
-                          HorizontalAlignment="Left"
-                          Margin="0,0,0,8">
-                <CheckBox x:Name="ShowTransportToolbarBox"
-                          Style="{StaticResource DarkCheckBoxStyle}"
-                          Content="{x:Static domain:UiStrings.LabelShowTransportToolbar}"
-                          VerticalAlignment="Center"
-                          Margin="0,0,12,0" />
-                <TextBlock x:Name="TransportToolbarIconScaleLabel"
-                           Text="{x:Static domain:UiStrings.LabelTransportToolbarIconScale}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0" />
-                <ComboBox x:Name="TransportToolbarIconScaleCombo"
-                          Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                          Padding="6,1"
-                          FontSize="11.333"
-                          VerticalContentAlignment="Center"
-                          VerticalAlignment="Center"
-                          MinWidth="72"
-                          Margin="0,0,12,0" />
-                <ui:RoundedButton x:Name="TransportToolbarCustomizeButton"
-                                  Content="{x:Static domain:UiStrings.ButtonTransportToolbarCustomize}"
-                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                  MinWidth="160"
-                                  Padding="12,0"
-                                  VerticalAlignment="Center"
-                                  Click="TransportToolbarCustomizeButton_Click" />
-              </StackPanel>
-              <StackPanel Orientation="Horizontal"
-                          HorizontalAlignment="Left"
-                          Margin="0,0,0,16">
-                <CheckBox x:Name="EnableBackgroundAnimationBox"
-                          Style="{StaticResource DarkCheckBoxStyle}"
-                          Content="{x:Static domain:UiStrings.LabelEnableBackgroundAnimation}"
-                          VerticalAlignment="Center"
-                          Margin="0,0,12,0" />
-                <TextBlock x:Name="BackgroundAnimationSpeedLabel"
-                           Text="{x:Static domain:UiStrings.LabelBackgroundAnimationSpeed}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0" />
-                <Slider x:Name="BackgroundAnimationSpeedSlider"
-                        Style="{StaticResource SilenceDetectRiseSliderStyle}"
-                        SmallChange="5"
-                        LargeChange="25"
-                        TickFrequency="5"
-                        IsSnapToTickEnabled="True"
-                        IsMoveToPointEnabled="True"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Left"
-                        FocusVisualStyle="{x:Null}"
-                        Cursor="Hand" />
-                <TextBlock x:Name="BackgroundAnimationSpeedValueText"
-                           MinWidth="44"
-                           VerticalAlignment="Center"
-                           Margin="8,0,0,0"
-                           TextAlignment="Right" />
-                <ui:RoundedButton x:Name="BackgroundAnimationSpeedResetButton"
-                                  Content="{x:Static domain:UiStrings.ButtonTransportToolbarResetLayout}"
-                                  Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
-                                  MinWidth="88"
-                                  Padding="12,0"
-                                  Margin="8,0,0,0"
-                                  VerticalAlignment="Center"
-                                  Click="BackgroundAnimationSpeedResetButton_Click" />
-              </StackPanel>
-              <Grid Margin="0,0,0,16">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+              <!-- 6行のラベル列（チェック／壁紙／角丸）を SharedSize で揃える。 -->
+              <Grid Grid.IsSharedSizeScope="True"
+                    Margin="0,0,0,20">
                 <Grid.RowDefinitions>
                   <RowDefinition Height="Auto" />
                   <RowDefinition Height="Auto" />
                   <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="LayoutChromeLabel" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox x:Name="ShowMainMenuBarBox"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelShowMainMenuBar}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,12,8" />
+                <StackPanel Grid.Column="1"
+                            Grid.ColumnSpan="3"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,0,8">
+                  <TextBlock Text="{x:Static domain:UiStrings.LabelMainMenuBarAlign}"
+                             VerticalAlignment="Center"
+                             Margin="0,0,8,0" />
+                  <ComboBox x:Name="MainMenuBarAlignCombo"
+                            Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                            Padding="6,1"
+                            FontSize="11.333"
+                            VerticalContentAlignment="Center"
+                            VerticalAlignment="Center"
+                            MinWidth="72" />
+                </StackPanel>
+                <CheckBox x:Name="ShowTransportToolbarBox"
+                          Grid.Row="1"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelShowTransportToolbar}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,12,8" />
+                <StackPanel Grid.Row="1"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="3"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,0,8">
+                  <TextBlock x:Name="TransportToolbarIconScaleLabel"
+                             Text="{x:Static domain:UiStrings.LabelTransportToolbarIconScale}"
+                             VerticalAlignment="Center"
+                             Margin="0,0,8,0" />
+                  <ComboBox x:Name="TransportToolbarIconScaleCombo"
+                            Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                            Padding="6,1"
+                            FontSize="11.333"
+                            VerticalContentAlignment="Center"
+                            VerticalAlignment="Center"
+                            MinWidth="72"
+                            Margin="0,0,12,0" />
+                  <ui:RoundedButton x:Name="TransportToolbarCustomizeButton"
+                                    Content="{x:Static domain:UiStrings.ButtonTransportToolbarCustomize}"
+                                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                    MinWidth="160"
+                                    Padding="12,0"
+                                    VerticalAlignment="Center"
+                                    Click="TransportToolbarCustomizeButton_Click" />
+                </StackPanel>
+                <CheckBox x:Name="EnableBackgroundAnimationBox"
+                          Grid.Row="2"
+                          Style="{StaticResource DarkCheckBoxStyle}"
+                          Content="{x:Static domain:UiStrings.LabelEnableBackgroundAnimation}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,12,8" />
+                <StackPanel Grid.Row="2"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="3"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,0,8">
+                  <Slider x:Name="BackgroundAnimationSpeedSlider"
+                          Style="{StaticResource SilenceDetectRiseSliderStyle}"
+                          SmallChange="5"
+                          LargeChange="25"
+                          TickFrequency="5"
+                          IsSnapToTickEnabled="True"
+                          IsMoveToPointEnabled="True"
+                          VerticalAlignment="Center"
+                          HorizontalAlignment="Left"
+                          FocusVisualStyle="{x:Null}"
+                          Cursor="Hand" />
+                  <TextBlock x:Name="BackgroundAnimationSpeedValueText"
+                             MinWidth="44"
+                             VerticalAlignment="Center"
+                             Margin="8,0,0,0"
+                             TextAlignment="Right" />
+                  <ui:RoundedButton x:Name="BackgroundAnimationSpeedResetButton"
+                                    Content="{x:Static domain:UiStrings.ButtonTransportToolbarResetLayout}"
+                                    Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
+                                    MinWidth="88"
+                                    Padding="12,0"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Click="BackgroundAnimationSpeedResetButton_Click" />
+                </StackPanel>
                 <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperPath}"
+                           Grid.Row="3"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Right"
-                           Margin="0,0,8,4" />
-                <ui:StretchSlot Grid.Column="1"
-                                Margin="0,0,0,4">
+                           Margin="0,0,12,8" />
+                <ui:StretchSlot Grid.Row="3"
+                                Grid.Column="1"
+                                Margin="0,0,0,8">
                   <TextBox x:Name="WallpaperPathBox"
                            Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                            Style="{StaticResource DarkTextBoxStyle}"
@@ -281,29 +294,32 @@
                            VerticalContentAlignment="Center" />
                 </ui:StretchSlot>
                 <ui:RoundedButton x:Name="WallpaperBrowseButton"
+                                  Grid.Row="3"
                                   Grid.Column="2"
                                   Content="{x:Static domain:UiStrings.ButtonBrowse}"
                                   Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                                   MinWidth="64"
-                                  Margin="8,0,0,4"
+                                  Margin="8,0,0,8"
                                   Click="WallpaperBrowseButton_Click" />
                 <ui:RoundedButton x:Name="WallpaperClearButton"
+                                  Grid.Row="3"
                                   Grid.Column="3"
                                   Content="{x:Static domain:UiStrings.ButtonWallpaperClear}"
                                   Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                                   MinWidth="64"
-                                  Margin="8,0,0,4"
+                                  Margin="8,0,0,8"
                                   Click="WallpaperClearButton_Click" />
                 <TextBlock Text="{x:Static domain:UiStrings.LabelWallpaperOpacity}"
-                           Grid.Row="1"
+                           Grid.Row="4"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Right"
-                           Margin="0,4,8,4" />
-                <StackPanel Grid.Row="1"
+                           Margin="0,0,12,8" />
+                <StackPanel Grid.Row="4"
                             Grid.Column="1"
+                            Grid.ColumnSpan="3"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,4,0,4">
+                            Margin="0,0,0,8">
                   <Slider x:Name="WallpaperOpacitySlider"
                           Style="{StaticResource SilenceDetectRiseSliderStyle}"
                           Minimum="0"
@@ -324,17 +340,16 @@
                              TextAlignment="Right" />
                 </StackPanel>
                 <TextBlock x:Name="ControlCornerRadiusLabel"
-                           Grid.Row="2"
+                           Grid.Row="5"
                            Text="{x:Static domain:UiStrings.LabelControlCornerRadius}"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Right"
-                           Margin="0,8,8,0" />
-                <StackPanel Grid.Row="2"
+                           Margin="0,0,12,0" />
+                <StackPanel Grid.Row="5"
                             Grid.Column="1"
                             Grid.ColumnSpan="3"
                             Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="0,8,0,0">
+                            VerticalAlignment="Center">
                   <Slider x:Name="ControlCornerRadiusSlider"
                           Style="{StaticResource SilenceDetectRiseSliderStyle}"
                           SmallChange="1"
@@ -687,14 +702,7 @@
                           VerticalContentAlignment="Center" />
               </Grid>
 
-              <CheckBox x:Name="AutoSpeakerSelectBox"
-                        Style="{StaticResource DarkCheckBoxStyle}"
-                        Content="{x:Static domain:UiStrings.LabelAutoSpeakerSelect}"
-                        ToolTip="{x:Static domain:UiStrings.TipAutoSpeakerSelect}"
-                        Margin="0,0,0,14"
-                        VerticalAlignment="Center"
-                        VerticalContentAlignment="Center" />
-
+              <!-- 既定 Wave → モニター → スピーカーと入出力（自動選択含む）の順。 -->
               <TextBlock x:Name="MonitorHeader"
                          Text="{x:Static domain:UiStrings.LabelMonitor}"
                          FontWeight="Bold"
@@ -755,8 +763,12 @@
                          FontWeight="Bold"
                          FontSize="11.333"
                          Margin="0,0,0,6" />
-              <Grid Margin="0,0,0,10">
+              <Grid HorizontalAlignment="Left" Margin="0,0,0,10">
                 <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
@@ -772,21 +784,13 @@
                           FontSize="11.333"
                           VerticalContentAlignment="Center"
                           SelectionChanged="SpeakerCombo_SelectionChanged" />
-              </Grid>
-
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
                 <TextBlock x:Name="ApiLabel"
+                           Grid.Column="2"
                            Text="{x:Static domain:UiStrings.LabelAudioApi}"
                            VerticalAlignment="Center"
-                           Margin="0,0,8,0" />
+                           Margin="16,0,8,0" />
                 <ComboBox x:Name="ApiCombo"
-                          Grid.Column="1"
+                          Grid.Column="3"
                           HorizontalAlignment="Left"
                           Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                           Padding="6,1"
@@ -794,12 +798,12 @@
                           VerticalContentAlignment="Center"
                           SelectionChanged="ApiCombo_SelectionChanged" />
                 <TextBlock x:Name="DeviceLabel"
-                           Grid.Column="2"
+                           Grid.Column="4"
                            Text="{x:Static domain:UiStrings.LabelAudioDevice}"
                            VerticalAlignment="Center"
                            Margin="16,0,8,0" />
                 <ComboBox x:Name="DeviceCombo"
-                          Grid.Column="3"
+                          Grid.Column="5"
                           HorizontalAlignment="Left"
                           Height="{x:Static ui:DesignMetrics.AudioInputHeight}"
                           Padding="6,1"
@@ -807,6 +811,13 @@
                           VerticalContentAlignment="Center"
                           SelectionChanged="DeviceCombo_SelectionChanged" />
               </Grid>
+
+              <CheckBox x:Name="AutoSpeakerSelectBox"
+                        Style="{StaticResource DarkCheckBoxStyle}"
+                        Content="{x:Static domain:UiStrings.LabelAutoSpeakerSelect}"
+                        ToolTip="{x:Static domain:UiStrings.TipAutoSpeakerSelect}"
+                        VerticalAlignment="Center"
+                        VerticalContentAlignment="Center" />
             </StackPanel>
 
             <Grid Grid.Row="1">
@@ -822,8 +833,8 @@
                              Text="{x:Static domain:UiStrings.LabelSettingsInput}"
                              FontWeight="Bold"
                              FontSize="11.333"
-                             Margin="0,0,0,6" />
-
+                             Margin="0,0,0,6"
+                             VerticalAlignment="Center" />
                   <StackPanel x:Name="RecordInputHost" Margin="0,0,0,6" />
                   <TextBlock x:Name="InputStatus"
                              FontSize="11"
@@ -840,8 +851,8 @@
                              Text="{x:Static domain:UiStrings.LabelSettingsOutput}"
                              FontWeight="Bold"
                              FontSize="11.333"
-                             Margin="0,0,0,6" />
-
+                             Margin="0,0,0,6"
+                             VerticalAlignment="Center" />
                   <StackPanel x:Name="PlaybackOutputHost" />
                 </StackPanel>
               </ScrollViewer>

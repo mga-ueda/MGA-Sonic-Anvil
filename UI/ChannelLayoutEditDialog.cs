@@ -19,8 +19,7 @@ internal sealed class ChannelLayoutEditDialog : Window
     {
         TextWrapping = TextWrapping.Wrap,
         Margin = new Thickness(0, 8, 0, 0),
-        MinHeight = DesignMetrics.From96(48),
-        Visibility = Visibility.Hidden,
+        Visibility = Visibility.Collapsed,
     };
     private readonly ComboBox[] _channelCombos;
     private readonly RoundedButton _okButton;
@@ -66,7 +65,8 @@ internal sealed class ChannelLayoutEditDialog : Window
         _channelCombos = new ComboBox[_channels];
         Title = UiStrings.DialogChannelLayoutEditTitle;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        MinWidth = DesignMetrics.From96(440);
+        // ボタン行（未指定に戻す / OK / Cancel）が下限。余分な横余白は出さない。
+        MinWidth = DesignMetrics.From96(320);
         Foreground = (Brush)FindResource("PrimaryForeBrush");
         AcrylicDialogChrome.Prepare(this);
         _warning.SetResourceReference(TextBlock.ForegroundProperty, "MutedForeBrush");
@@ -86,10 +86,13 @@ internal sealed class ChannelLayoutEditDialog : Window
         buttons.Children.Add(_okButton);
         buttons.Children.Add(cancel);
 
+        _presetCombo.HorizontalAlignment = HorizontalAlignment.Left;
+        _maskLabel.VerticalAlignment = VerticalAlignment.Center;
         var root = new StackPanel();
+        Grid.SetIsSharedSizeScope(root, true);
         root.Children.Add(BuildTargetsBlock());
-        root.Children.Add(Labeled(_presetCombo, UiStrings.LabelChannelLayoutPreset));
-        root.Children.Add(Labeled(_maskLabel, UiStrings.LabelChannelLayoutMask));
+        root.Children.Add(FormRow(UiStrings.LabelChannelLayoutPreset, _presetCombo));
+        root.Children.Add(FormRow(UiStrings.LabelChannelLayoutMask, _maskLabel));
         root.Children.Add(BuildChannelAssignPanel());
         root.Children.Add(_warning);
         root.Children.Add(buttons);
@@ -108,10 +111,38 @@ internal sealed class ChannelLayoutEditDialog : Window
         }
 
         _sizeLocked = true;
+        // SizeToContent の実測幅を採用（MinWidth で引き延ばさない）。
         SizeToContent = SizeToContent.Manual;
-        Width = Math.Max(ActualWidth, MinWidth);
+        var width = Math.Max(ActualWidth, MinWidth);
+        if (Content is FrameworkElement root)
+        {
+            root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            width = Math.Max(Math.Ceiling(root.DesiredSize.Width), MinWidth);
+        }
+
+        Width = width;
         Height = ActualHeight;
         MinHeight = ActualHeight;
+        MinWidth = width;
+    }
+
+    private void FitHeightToContent()
+    {
+        if (!_sizeLocked || Content is not FrameworkElement root)
+        {
+            return;
+        }
+
+        // 警告の出し入れで高さが足りなく／余らないよう、キャプション込みで測り直す。
+        root.Measure(new Size(Width, double.PositiveInfinity));
+        var needed = Math.Ceiling(root.DesiredSize.Height);
+        if (needed <= 0)
+        {
+            return;
+        }
+
+        Height = needed;
+        MinHeight = needed;
     }
 
     private UIElement BuildTargetsBlock()
@@ -150,7 +181,12 @@ internal sealed class ChannelLayoutEditDialog : Window
 
     private UIElement BuildChannelAssignPanel()
     {
-        var rows = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
+        var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = UiStrings.LabelChannelLayoutChannelAssign,
+            Margin = new Thickness(0, 0, 0, 4),
+        });
         Style? comboStyle = TryFindResource("DarkComboBoxStyle") as Style;
         for (var i = 0; i < _channels; i++)
         {
@@ -158,6 +194,7 @@ internal sealed class ChannelLayoutEditDialog : Window
             {
                 MinWidth = DesignMetrics.From96(120),
                 MinHeight = DesignMetrics.AudioInputHeight,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalContentAlignment = VerticalAlignment.Center,
                 Tag = i,
             };
@@ -183,24 +220,10 @@ internal sealed class ChannelLayoutEditDialog : Window
             var channelIndex = i;
             combo.SelectionChanged += (_, _) => OnChannelSelectionChanged(channelIndex);
             _channelCombos[i] = combo;
-
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var label = new TextBlock
-            {
-                Text = UiStrings.LabelChannelLayoutChannelRow(i + 1),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 12, 0),
-            };
-            Grid.SetColumn(label, 0);
-            Grid.SetColumn(combo, 1);
-            row.Children.Add(label);
-            row.Children.Add(combo);
-            rows.Children.Add(row);
+            panel.Children.Add(FormRow(UiStrings.LabelChannelLayoutChannelRow(i + 1), combo, topMargin: 0, bottomMargin: 6));
         }
 
-        return Labeled(rows, UiStrings.LabelChannelLayoutChannelAssign);
+        return panel;
     }
 
     private void BuildPresetCombo()
@@ -362,8 +385,16 @@ internal sealed class ChannelLayoutEditDialog : Window
             ? UiStrings.LabelChannelLayoutUnspecified
             : $"0x{_mask.ToString("X", CultureInfo.InvariantCulture)}";
 
+        var warningVisible = warning is not null;
+        var warningChanged = (_warning.Visibility == Visibility.Visible) != warningVisible
+            || !string.Equals(_warning.Text, warning ?? string.Empty, StringComparison.Ordinal);
         _warning.Text = warning ?? string.Empty;
-        _warning.Visibility = warning is null ? Visibility.Hidden : Visibility.Visible;
+        _warning.Visibility = warningVisible ? Visibility.Visible : Visibility.Collapsed;
+        if (warningChanged)
+        {
+            FitHeightToContent();
+        }
+
         _okButton.IsEnabled = canOk;
         // 並びがビット昇順と違う／未確定のときはカスタムを維持（プリセット一致でコンボを上書きしない）。
         var presetMask = unset == _channels
@@ -438,12 +469,30 @@ internal sealed class ChannelLayoutEditDialog : Window
         combo.SelectedIndex = 0;
     }
 
-    private static StackPanel Labeled(UIElement child, string label)
+    private static Grid FormRow(
+        string label,
+        UIElement child,
+        double topMargin = 8,
+        double bottomMargin = 0)
     {
-        var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
-        panel.Children.Add(new TextBlock { Text = label, Margin = new Thickness(0, 0, 0, 4) });
-        panel.Children.Add(child);
-        return panel;
+        var row = new Grid { Margin = new Thickness(0, topMargin, 0, bottomMargin) };
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+            SharedSizeGroup = "ChannelLayoutLabel",
+        });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var labelBlock = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 12, 0),
+        };
+        Grid.SetColumn(labelBlock, 0);
+        Grid.SetColumn(child, 1);
+        row.Children.Add(labelBlock);
+        row.Children.Add(child);
+        return row;
     }
 
     private RoundedButton CreateButton(

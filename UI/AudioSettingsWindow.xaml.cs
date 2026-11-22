@@ -2937,7 +2937,6 @@ internal partial class AudioSettingsWindow : Window
     private void SyncBackgroundAnimationSpeedEnabled()
     {
         var on = EnableBackgroundAnimationBox.IsChecked != false;
-        BackgroundAnimationSpeedLabel.IsEnabled = on;
         BackgroundAnimationSpeedSlider.IsEnabled = on;
         BackgroundAnimationSpeedValueText.IsEnabled = on;
         BackgroundAnimationSpeedResetButton.IsEnabled = on;
@@ -3152,11 +3151,12 @@ internal partial class AudioSettingsWindow : Window
 
     private double AudioTabContentWidth()
     {
-        var speaker = LabeledComboWidth(SpeakerLabel, SpeakerCombo);
-        var device = LabeledComboWidth(ApiLabel, ApiCombo)
+        // スピーカー / API / デバイスは1行。
+        var speakerIo = LabeledComboWidth(SpeakerLabel, SpeakerCombo)
+            + 16
+            + LabeledComboWidth(ApiLabel, ApiCombo)
             + 16
             + LabeledComboWidth(DeviceLabel, DeviceCombo);
-        var top = Math.Max(speaker, device);
         var gutter = DesignMetrics.SettingsScrollBarGap + DesignMetrics.SettingsScrollBarWidth;
         var record = Max(
             LabelWidth(InputHeader),
@@ -3165,7 +3165,7 @@ internal partial class AudioSettingsWindow : Window
             LabelWidth(OutputHeader),
             _outputEditor.FittedRowWidth) + gutter;
         var columns = record + DesignMetrics.SettingsColumnGap + play;
-        return Math.Max(top, columns);
+        return Math.Max(speakerIo, columns);
     }
 
     private double LayoutsTabContentWidth()
@@ -3279,7 +3279,7 @@ internal partial class AudioSettingsWindow : Window
             + 8 + 120 + 8
             + ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutFullscreenToggleStart, 11.333)
             + 8 + 100;
-        // チェック行：波形・レベル・ステータス・アナライザー・位置・既定に戻す。
+        // 表示・配置行：波形・レベル・ステータス・アナライザー・位置・ツールバー・既定に戻す。
         double CheckWidth(string label) => ComboBoxFit.MeasureText(this, label, 11.333) + 28;
         var checksRow = CheckWidth(UiStrings.LabelLayoutShowWaveform)
             + 12
@@ -3291,14 +3291,11 @@ internal partial class AudioSettingsWindow : Window
             + 12
             + ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutAnalyzerDock, 11.333)
             + 8 + 100 + 12
-            + ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutPresetReset, 11.333)
-            + 24;
-        // チェック行＋ツールバー位置・横配置（各モード共通幅）。
-        var checksWithToolbar = checksRow
-            + 12
             + ComboBoxFit.MeasureText(this, UiStrings.LabelTransportToolbarDock, 11.333)
             + 8 + 140
-            + 8 + 60;
+            + 8 + 60 + 12
+            + ComboBoxFit.MeasureText(this, UiStrings.LabelLayoutPresetReset, 11.333)
+            + 24;
         var mainMenuBarRow = MeasureCheckBoxContentWidth(ShowMainMenuBarBox)
             + 12
             + ComboBoxFit.MeasureText(this, UiStrings.LabelMainMenuBarAlign, 11.333)
@@ -3313,7 +3310,7 @@ internal partial class AudioSettingsWindow : Window
             mainMenuBarRow,
             toolbarRow,
             fullscreenRow,
-            checksWithToolbar) + gutter;
+            checksRow) + gutter;
     }
 
     private double SettingsTabBarWidth()
@@ -4142,40 +4139,14 @@ internal partial class AudioSettingsWindow : Window
             CheckBox? waveform = null;
             if (WindowLayoutPreset.IsPlayerLayoutSlot(slot))
             {
-                waveform = new CheckBox
-                {
-                    Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
-                    Content = UiStrings.LabelLayoutShowWaveform,
-                    IsChecked = preset.ShowWaveform,
-                    Margin = new Thickness(0, 2, 12, 2),
-                    VerticalAlignment = VerticalAlignment.Center,
-                };
+                waveform = CreateLayoutCheckBox(UiStrings.LabelLayoutShowWaveform, preset.ShowWaveform);
             }
 
-            var levelMeter = new CheckBox
-            {
-                Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
-                Content = UiStrings.LabelLayoutLevelMeter,
-                IsChecked = preset.ShowLevelMeter,
-                Margin = new Thickness(0, 2, 12, 2),
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            var statusBar = new CheckBox
-            {
-                Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
-                Content = UiStrings.LabelLayoutStatusBar,
-                IsChecked = preset.ResolvedShowStatusBar(slot),
-                Margin = new Thickness(0, 2, 0, 2),
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            var analyzer = new CheckBox
-            {
-                Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
-                Content = UiStrings.LabelLayoutAnalyzerArea,
-                IsChecked = preset.ShowAnalyzerArea,
-                Margin = new Thickness(12, 2, 0, 2),
-                VerticalAlignment = VerticalAlignment.Center,
-            };
+            var levelMeter = CreateLayoutCheckBox(UiStrings.LabelLayoutLevelMeter, preset.ShowLevelMeter);
+            var statusBar = CreateLayoutCheckBox(
+                UiStrings.LabelLayoutStatusBar,
+                preset.ResolvedShowStatusBar(slot));
+            var analyzer = CreateLayoutCheckBox(UiStrings.LabelLayoutAnalyzerArea, preset.ShowAnalyzerArea);
             var analyzerDock = CreateLayoutCombo(new Thickness(8, 0, 0, 0));
             analyzerDock.Items.Add(new NamedDockItem(LayoutAnalyzerDock.Bottom, UiStrings.LabelLayoutAnalyzerDockBottom));
             analyzerDock.Items.Add(new NamedDockItem(LayoutAnalyzerDock.Top, UiStrings.LabelLayoutAnalyzerDockTop));
@@ -4274,6 +4245,7 @@ internal partial class AudioSettingsWindow : Window
             AppDialogKeys.PrepareActionButton(resetButton);
             resetButton.Click += (_, _) => editor.ResetToDefaults();
 
+            // 内容は2行：全画面行／表示・配置行（既定に戻すは配置行の末尾）。
             var root = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
             root.Children.Add(new TextBlock
             {
@@ -4283,7 +4255,12 @@ internal partial class AudioSettingsWindow : Window
                 Margin = new Thickness(0, 0, 0, 6),
                 VerticalAlignment = VerticalAlignment.Center,
             });
-            var fullscreenRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+
+            var fullscreenRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 2),
+            };
             fullscreenRow.Children.Add(new TextBlock
             {
                 Text = UiStrings.LabelLayoutFullscreen,
@@ -4306,9 +4283,14 @@ internal partial class AudioSettingsWindow : Window
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 0, 0, 2),
             };
+            // エディタは波形チェック無し。幅だけ空けて後続の列位置をプレイヤーと揃える。
             if (waveform is not null)
             {
                 checksRow.Children.Add(waveform);
+            }
+            else
+            {
+                checksRow.Children.Add(CreateWaveformCheckSpacer());
             }
 
             checksRow.Children.Add(levelMeter);
@@ -4446,6 +4428,29 @@ internal partial class AudioSettingsWindow : Window
                 Padding = new Thickness(6, 1, 6, 1),
                 FontSize = 11.333,
                 VerticalContentAlignment = VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+
+        private static CheckBox CreateLayoutCheckBox(string content, bool isChecked) =>
+            new()
+            {
+                Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
+                Content = content,
+                IsChecked = isChecked,
+                Margin = new Thickness(0, 2, 12, 2),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+
+        /// <summary>エディタ行で波形チェックのぶんだけ幅を確保する（非表示・操作不可）。</summary>
+        private static CheckBox CreateWaveformCheckSpacer() =>
+            new()
+            {
+                Style = (Style)Application.Current.FindResource("DarkCheckBoxStyle"),
+                Content = UiStrings.LabelLayoutShowWaveform,
+                Visibility = Visibility.Hidden,
+                IsHitTestVisible = false,
+                Focusable = false,
+                Margin = new Thickness(0, 2, 12, 2),
                 VerticalAlignment = VerticalAlignment.Center,
             };
 
