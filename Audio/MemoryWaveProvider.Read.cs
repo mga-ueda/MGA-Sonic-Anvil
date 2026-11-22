@@ -2498,28 +2498,42 @@ internal sealed partial class PlaybackSampleProvider
     }
 
     /// <summary>
-    /// 処理後の interleaved 出力をメーターへ。ダイレクトルートはポートから論理 ch へ戻す。
+    /// 処理後の interleaved 出力をメーターへ。
+    /// ダイレクトルートはポート→論理スピーカーへ戻したあと、FileChannelMap で
+    /// 波形レーン順へ散らす（色・ラベル・VectorScope の ForFile と揃える）。
     /// </summary>
     private void PushMeterFromOutput(float[] source, int offset, int count)
     {
         var channels = Math.Max(1, _outputChannels);
         var frames = count / channels;
-        var direct = _directRoute;
-        var routeMap = _routeMap;
         lock (_monitorGate)
         {
+            var direct = _directRoute;
+            var routeMap = _routeMap;
+            var fileMap = _fileMap;
+            var fileChannels = Math.Clamp(Math.Max(1, _channels), 1, ChannelLayout.MaxChannels);
             if (direct && routeMap.Length > 0)
             {
                 var logical = Math.Min(routeMap.Length, ChannelLayout.MaxChannels);
-                Span<float> frame = stackalloc float[ChannelLayout.MaxChannels];
-                var dest = frame[..logical];
+                Span<float> speaker = stackalloc float[ChannelLayout.MaxChannels];
+                var speakerFrame = speaker[..logical];
+                Span<float> file = stackalloc float[ChannelLayout.MaxChannels];
+                var fileFrame = file[..fileChannels];
                 for (var i = 0; i < frames; i++)
                 {
                     ChannelRouter.Gather(
                         source.AsSpan(offset + i * channels, channels),
-                        dest,
+                        speakerFrame,
                         routeMap);
-                    WriteSourceMeterNoLock(dest);
+                    if (fileMap.Length > 0)
+                    {
+                        ChannelRouter.Scatter(speakerFrame, fileFrame, fileMap);
+                        WriteSourceMeterNoLock(fileFrame);
+                    }
+                    else
+                    {
+                        WriteSourceMeterNoLock(speakerFrame);
+                    }
                 }
 
                 return;

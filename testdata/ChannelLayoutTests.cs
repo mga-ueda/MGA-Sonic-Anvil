@@ -359,6 +359,43 @@ public sealed class ChannelLayoutTests
     }
 
     [Fact]
+    public void MeterPeaks_FollowFileLaneOrderNotSpeakerOrder()
+    {
+        // 5.1 で LFE をレーン1へ：map = L→1, R→2, C→3, LFE→0, Ls→4, Rs→5
+        // 波形ラベルは LFE,L,R,C,Ls,Rs。メーターも同じレーン順であること。
+        var fileMap = new[] { 1, 2, 3, 0, 4, 5 };
+        Assert.Equal(
+            ["LFE", "L", "R", "C", "Ls", "Rs"],
+            ChannelLayout.ForFile(6, ChannelLayout.Parse("5.1"), fileMap).Labels);
+
+        var frames = 8;
+        var samples = new float[frames * 6];
+        for (var i = 0; i < frames; i++)
+        {
+            samples[i * 6] = 0.55f; // ファイルレーン0 = LFE
+        }
+
+        var document = new AudioDocument(samples, 48000, 6, 16, AudioFileKind.Wave, null);
+        var provider = new PlaybackSampleProvider();
+        provider.ConfigureOutput(6, [0, 1, 2, 3, 4, 5], fileMap, speakerChannels: 6);
+        provider.Bind(document, 0, null, loop: false);
+
+        var buffer = new float[frames * 6];
+        Assert.Equal(buffer.Length, provider.Read(buffer, 0, buffer.Length));
+
+        Span<float> peaks = stackalloc float[ChannelLayout.MaxChannels];
+        Span<float> rms = stackalloc float[ChannelLayout.MaxChannels];
+        Assert.True(provider.TakeMeterInterval(peaks, rms, out var meterChannels));
+        Assert.Equal(6, meterChannels);
+        Assert.True(peaks[0] > 0.4f);
+        Assert.True(peaks[3] < 0.05f);
+        for (var ch = 1; ch < 6; ch++)
+        {
+            Assert.True(peaks[ch] < 0.05f, $"lane {ch} should be quiet, was {peaks[ch]}");
+        }
+    }
+
+    [Fact]
     public void Playback_KeepsDeviceRateWhenDocumentDiffers()
     {
         var document = new AudioDocument(new float[8820], 44100, 2, 16, AudioFileKind.Wave, null);
