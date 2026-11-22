@@ -15,6 +15,7 @@ public sealed class ColorDevCatalogTests
     [InlineData("TypeaheadHitForeBrush", "Shared")]
     [InlineData("UiDropShadowBrush", "Shared")]
     [InlineData("MenuDisabledForeBrush", "Shared")]
+    [InlineData("PitchCurveGridBrush", "Waveform")]
     [InlineData("PlayerVideoOverlayForeBrush", "Player")]
     [InlineData("PlayerVideoSeekTrackBrush", "Player")]
     [InlineData("MonitorLatchBpmOnBrush", "Transport")]

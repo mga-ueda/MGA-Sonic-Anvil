@@ -1179,8 +1179,7 @@ internal sealed class PitchCurveEditLayer : Control
         var padX = DesignMetrics.From96(3);
         var padY = DesignMetrics.From96(1);
         var radius = DesignMetrics.From96(2);
-        var bg = new SolidColorBrush(Color.FromArgb(0xB0, 0x00, 0x00, 0x00));
-        bg.Freeze();
+        var bg = WpfControlHelpers.FrozenBrush(Theme.Get("PitchCurveLabelBackBrush"));
         dc.DrawRoundedRectangle(
             bg,
             null,
@@ -1211,13 +1210,9 @@ internal sealed class PitchCurveEditLayer : Control
         var height = ContentHeight;
         var bottom = top + height;
         // 純白／純黒より一段落ち着かせる（背景や枠とのコントラストを保ちつつ眩しさを抑える）。
-        var white = new SolidColorBrush(Color.FromRgb(0xC4, 0xC4, 0xC4));
-        var black = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A));
-        var border = new SolidColorBrush(Color.FromArgb(0x55, 0x00, 0x00, 0x00));
-        white.Freeze();
-        black.Freeze();
-        border.Freeze();
-        var borderPen = new Pen(border, 0.6);
+        var white = WpfControlHelpers.FrozenBrush(Theme.Get("PitchCurveKeyWhiteBrush"));
+        var black = WpfControlHelpers.FrozenBrush(Theme.Get("PitchCurveKeyBlackBrush"));
+        var borderPen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("PitchCurveKeyBorderBrush")), 0.6);
         borderPen.Freeze();
 
         var keyGap = DesignMetrics.From96(1.4);
@@ -1254,7 +1249,7 @@ internal sealed class PitchCurveEditLayer : Control
         }
 
         dc.DrawLine(
-            new Pen(border, 1),
+            new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("PitchCurveKeyBorderBrush")), 1),
             new Point(gutter - 0.5, top),
             new Point(gutter - 0.5, bottom));
     }
@@ -2034,9 +2029,7 @@ internal sealed class PitchCurveEditLayer : Control
     private static Pen CreatePitchGridPen()
     {
         // 音量カーブの dB グリッドより一段暗く（半音線）。
-        var brush = new SolidColorBrush(Color.FromArgb(0x40, 0x90, 0x90, 0x90));
-        brush.Freeze();
-        var pen = new Pen(brush, 1.0);
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("PitchCurveGridBrush")), 1.0);
         pen.Freeze();
         return pen;
     }
@@ -2044,9 +2037,7 @@ internal sealed class PitchCurveEditLayer : Control
     private static Pen CreatePitchOctaveGridPen()
     {
         // オクターブ線も同様に抑えめ（ゼロ線含む）。
-        var brush = new SolidColorBrush(Color.FromArgb(0x58, 0xA8, 0xA8, 0xA8));
-        brush.Freeze();
-        var pen = new Pen(brush, 1.4);
+        var pen = new Pen(WpfControlHelpers.FrozenBrush(Theme.Get("PitchCurveOctaveGridBrush")), 1.4);
         pen.Freeze();
         return pen;
     }
