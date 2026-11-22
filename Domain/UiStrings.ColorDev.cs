@@ -84,6 +84,7 @@ internal static partial class UiStrings
             "MenuHighlightBack" => Get("メニューハイライト", "Menu highlight"),
             "TypeaheadHitBack" => Get("タイプアヘッド・一致背景", "Typeahead · match background"),
             "TypeaheadHitFore" => Get("タイプアヘッド・一致文字", "Typeahead · match text"),
+            "UiDropShadow" => Get("ドロップシャドウ", "Drop shadow"),
             "MenuDisabledFore" => Get("メニュー無効文字", "Menu disabled text"),
             "MainMenuBarBack" => Get("メニューバー背景", "Menu bar background"),
             "MenuListBack" => Get("メニューのリスト背景", "Menu list background"),
@@ -175,6 +176,10 @@ internal static partial class UiStrings
             "PlayerFormatMismatchFore" => Get(
                 "既定 Wave フォーマットと違う文字",
                 "Text differing from default Wave format"),
+            "PlayerVideoOverlayFore" => Get("動画オーバーレイ文字", "Video overlay text"),
+            "PlayerVideoOverlayShadow" => Get("動画オーバーレイ影", "Video overlay shadow"),
+            "PlayerVideoSeekTrack" => Get("動画シーク・トラック", "Video seek · track"),
+            "PlayerVideoSeekPlayed" => Get("動画シーク・再生済み", "Video seek · played"),
             "PlayerWaveSelectionEmpty" => Get("波形・選択の空き", "Waveform · selection empty"),
             "PlayerLevelMeterTrackBorder" => Get("トラック枠", "Track border"),
             "PlayerLevelMeterTick" => Get("目盛", "Ticks"),

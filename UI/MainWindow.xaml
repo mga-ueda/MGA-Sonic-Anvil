@@ -500,7 +500,7 @@
                  TextAlignment="Center"
                  TextTrimming="CharacterEllipsis"
                  TextWrapping="NoWrap"
-                 Foreground="#FF000000" />
+                 Foreground="{DynamicResource PlayerVideoOverlayShadowBrush}" />
       <TextBlock x:Name="PlaylistVideoFileNameText"
                  Grid.Column="1"
                  Height="{x:Static ui:DesignMetrics.PlaylistVideoFileNameLineHeight}"
@@ -509,7 +509,7 @@
                  TextAlignment="Center"
                  TextTrimming="CharacterEllipsis"
                  TextWrapping="NoWrap"
-                 Foreground="#F5F5F5" />
+                 Foreground="{DynamicResource PlayerVideoOverlayForeBrush}" />
     </Grid>
     <!-- タイムコード／トースト系すりガラスは AcrylicGlassPopup／AcrylicToastHost（メニューと同じ DWM Acrylic）。 -->
   </Grid>

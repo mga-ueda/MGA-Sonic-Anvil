@@ -13,9 +13,7 @@ namespace MgaSonicAnvil.UI;
 /// </summary>
 internal sealed class PlaylistVideoSeekBar : Grid
 {
-    private static readonly Brush TrackBrush = WpfControlHelpers.FrozenBrush(Color.FromArgb(0x66, 0xF5, 0xF5, 0xF5));
-    private static readonly Brush PlayedBrush = WpfControlHelpers.FrozenBrush(Color.FromArgb(0xCC, 0xF5, 0xF5, 0xF5));
-
+    private readonly Border _shadow;
     private readonly TrackMark _track = new();
 
     private double _ratio;
@@ -29,12 +27,11 @@ internal sealed class PlaylistVideoSeekBar : Grid
         UseLayoutRounding = true;
         Background = Brushes.Transparent;
         Cursor = Cursors.Hand;
-        Children.Add(new Border
+        _shadow = new Border
         {
             IsHitTestVisible = false,
             VerticalAlignment = VerticalAlignment.Center,
             Height = DesignMetrics.PlaylistVideoSimpleSeekTrackHeight,
-            Background = Brushes.Black,
             Opacity = 0.55,
             Effect = new BlurEffect
             {
@@ -42,8 +39,17 @@ internal sealed class PlaylistVideoSeekBar : Grid
                 KernelType = KernelType.Gaussian,
                 RenderingBias = RenderingBias.Quality,
             },
-        });
+        };
+        Children.Add(_shadow);
         Children.Add(_track);
+        RefreshAppearance();
+    }
+
+    /// <summary>配色変更時。トラック／影をテーマから取り直す。</summary>
+    public void RefreshAppearance()
+    {
+        _shadow.Background = WpfControlHelpers.FrozenBrush(Theme.Get("UiDropShadowBrush"));
+        _track.InvalidateVisual();
     }
 
     /// <summary>再生位置（0〜1）。ドラッグ中はポインタ側を優先する。</summary>
@@ -159,15 +165,17 @@ internal sealed class PlaylistVideoSeekBar : Grid
                 return;
             }
 
+            var track = WpfControlHelpers.FrozenBrush(Theme.Get("PlayerVideoSeekTrackBrush"));
+            var playedBrush = WpfControlHelpers.FrozenBrush(Theme.Get("PlayerVideoSeekPlayedBrush"));
             var trackHeight = Math.Min(DesignMetrics.PlaylistVideoSimpleSeekTrackHeight, height);
             var y = (height - trackHeight) * 0.5;
             var radius = trackHeight * 0.5;
-            dc.DrawRoundedRectangle(TrackBrush, null, new Rect(0, y, width, trackHeight), radius, radius);
+            dc.DrawRoundedRectangle(track, null, new Rect(0, y, width, trackHeight), radius, radius);
             var played = width * _ratio;
             if (played > 0.5)
             {
                 dc.DrawRoundedRectangle(
-                    PlayedBrush,
+                    playedBrush,
                     null,
                     new Rect(0, y, Math.Min(width, played), trackHeight),
                     radius,

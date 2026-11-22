@@ -1366,7 +1366,8 @@ public sealed class LibraryPlayerModeTests
         Assert.False(LibraryPlayerMode.UsesVideoOverlayLabelFore(
             playerMaximized: true, visualShown: true, isVideo: false,
             chromeHidden: true, videoMini: false));
-        Assert.Equal(0xF5, LibraryPlayerMode.VideoOverlayLabelColor.R);
+        Assert.Equal("PlayerVideoOverlayForeBrush", LibraryPlayerMode.VideoOverlayForeBrushKey);
+        Assert.Equal(ColorDevGroup.Player, ColorDevCatalog.GroupOf(LibraryPlayerMode.VideoOverlayForeBrushKey));
         Assert.True(LibraryPlayerMode.IsPlaylistVideoHudContext(
             playerMaximized: true, visualShown: true, isVideo: true,
             visualPlaying: true, immersivePause: false, framePaused: false));

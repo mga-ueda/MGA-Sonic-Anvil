@@ -106,6 +106,7 @@ public partial class MainWindow
         AutoLoopLatch.RefreshAppearance();
         AlwaysOnTopLatch.RefreshAppearance();
         MonitorToggles.RefreshAppearance();
+        PlaylistVideoSimpleSeek.RefreshAppearance();
         WaapiBar.RefreshAppearance();
         RefreshTabHeaders();
         RefreshStatus();

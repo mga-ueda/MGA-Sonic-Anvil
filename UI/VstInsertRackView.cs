@@ -463,6 +463,7 @@ internal sealed class VstInsertRackView : Grid
 
     public void ApplyTheme()
     {
+        _dragGhostShadow.Color = Theme.Get("UiDropShadowBrush");
         Refresh();
         _presetCombo.ToolTip = UiStrings.TooltipVstInsertPreset;
         _presetSaveButton.Content = UiStrings.LabelVstInsertPresetSave;

@@ -1771,8 +1771,11 @@ internal static class LibraryPlayerMode
         bool videoMini) =>
         playerMaximized && visualShown && isVideo && (chromeHidden || videoMini);
 
-    /// <summary>ファイル名オーバーレイと同じ文字色（#F5F5F5）。</summary>
-    public static Color VideoOverlayLabelColor { get; } = Color.FromRgb(0xF5, 0xF5, 0xF5);
+    /// <summary>ファイル名オーバーレイと同じ文字色のブラシキー。</summary>
+    public const string VideoOverlayForeBrushKey = "PlayerVideoOverlayForeBrush";
+
+    /// <summary>ファイル名オーバーレイと同じ文字色（<see cref="VideoOverlayForeBrushKey"/>）。</summary>
+    public static Color VideoOverlayLabelColor => Theme.Get(VideoOverlayForeBrushKey);
 
     /// <summary>前面クロームが消えている本再生中だけ、タイムコードを出せる。</summary>
     public static bool ShowsPlaylistVideoTimecode(bool chromeHidden, bool timecodeOn, bool isVideo) =>
@@ -2352,7 +2355,7 @@ internal static class LibraryPlayerMode
             existing.BlurRadius = blurRadius;
             existing.ShadowDepth = 0;
             existing.Direction = 0;
-            existing.Color = Colors.Black;
+            existing.Color = Theme.Get("PlayerVideoOverlayShadowBrush");
             existing.Opacity = opacity;
             existing.RenderingBias = RenderingBias.Performance;
             return;
@@ -2363,7 +2366,7 @@ internal static class LibraryPlayerMode
             BlurRadius = blurRadius,
             ShadowDepth = 0,
             Direction = 0,
-            Color = Colors.Black,
+            Color = Theme.Get("PlayerVideoOverlayShadowBrush"),
             Opacity = opacity,
             RenderingBias = RenderingBias.Performance,
         };

@@ -22,6 +22,8 @@
     <!-- ライブラリ探索・VST ピッカーのタイプアヘッド一致ハイライト。 -->
     <SolidColorBrush x:Key="TypeaheadHitBackBrush" Color="#FFFFE04C" />
     <SolidColorBrush x:Key="TypeaheadHitForeBrush" Color="#FF000000" />
+    <!-- ドロップシャドウ等の汎用黒（動画オーバーレイ影・VST ドラッグゴーストなど）。 -->
+    <SolidColorBrush x:Key="UiDropShadowBrush" Color="#FF000000" />
     <!-- メニューのリスト面。α=1 はヒット用。完全透明だと行の空白がヒットしない。 -->
     <SolidColorBrush x:Key="MenuListBackBrush" Color="#01000000" />
     <!-- コンテキストメニューとコンボのリスト面。メニューバーと同じほぼ透明で、すりガラスを透かす。 -->
@@ -107,6 +109,12 @@
     <SolidColorBrush x:Key="PlayerComboDropBorderBrush" Color="#A8686870" />
     <SolidColorBrush x:Key="PlayerWaveFillBrush" Color="#94C6D9FF" />
     <SolidColorBrush x:Key="PlayerFormatMismatchForeBrush" Color="#FFFF8A1A" />
+    <!-- 動画本再生／ミニのファイル名・メーター等オーバーレイ文字と影。 -->
+    <SolidColorBrush x:Key="PlayerVideoOverlayForeBrush" Color="#FFF5F5F5" />
+    <SolidColorBrush x:Key="PlayerVideoOverlayShadowBrush" Color="#FF000000" />
+    <!-- 動画簡易シークバー（トラック／再生済み。影下地は UiDropShadowBrush）。 -->
+    <SolidColorBrush x:Key="PlayerVideoSeekTrackBrush" Color="#66F5F5F5" />
+    <SolidColorBrush x:Key="PlayerVideoSeekPlayedBrush" Color="#CCF5F5F5" />
     <SolidColorBrush x:Key="PlayerWaveSelectionEmptyBrush" Color="#FFC6D9FF" />
     <SolidColorBrush x:Key="PlayerLevelMeterTrackBorderBrush" Color="#FF5A605A" />
     <SolidColorBrush x:Key="PlayerLevelMeterTickBrush" Color="#60FFFFFF" />

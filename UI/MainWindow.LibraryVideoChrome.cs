@@ -1692,7 +1692,7 @@ public partial class MainWindow
         SyncPlaylistVideoHudLabelColors();
     }
 
-    /// <summary>動画本再生／ミニ限定。メーター文字をファイル名と同じ #F5F5F5 に。</summary>
+    /// <summary>動画本再生／ミニ限定。メーター文字をファイル名と同じオーバーレイ色に。</summary>
     private void SyncPlaylistVideoHudLabelColors()
     {
         var on = LibraryPlayerMode.UsesVideoOverlayLabelFore(
