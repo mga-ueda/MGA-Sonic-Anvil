@@ -200,6 +200,14 @@ internal sealed class EditorHeaderChunkStripView : Border
         ApplyChunkDeleteEditAsync
     { get; set; }
 
+    /// <summary>チャンネルレイアウト編集の対象パス（選択タブの作業コピー優先）。</summary>
+    public Func<IReadOnlyList<string>>? ResolveChannelLayoutPaths { get; set; }
+
+    /// <summary>
+    /// エディタ編集: チャンネルレイアウト。即時上書きせず作業コピーへ。成功で true。
+    /// </summary>
+    public Func<IReadOnlyList<string>, int, Task<bool>>? ApplyChannelLayoutEditAsync { get; set; }
+
     /// <summary>
     /// 和集合チャンク選択時。MemberPaths 付きノードを渡し、対応タブを選ばせる。
     /// </summary>
@@ -377,6 +385,8 @@ internal sealed class EditorHeaderChunkStripView : Border
             || FindTreeViewItem(origin) is not { } item
             || FindTreeExpandToggle(origin) is not null)
         {
+            // 余白クリックでもチャンクツリーをアクティブにする（先頭行の自動選択はしない）。
+            ActivateTreeFromEmptyClick();
             return;
         }
 
@@ -397,6 +407,7 @@ internal sealed class EditorHeaderChunkStripView : Border
             || FindTreeViewItem(origin) is not { } item
             || FindTreeExpandToggle(origin) is not null)
         {
+            ActivateTreeFromEmptyClick();
             return;
         }
 
@@ -406,6 +417,20 @@ internal sealed class EditorHeaderChunkStripView : Border
         }
 
         BeginPlainPress(item, control: false, shift: false);
+    }
+
+    private void ActivateTreeFromEmptyClick()
+    {
+        if (_tree.SelectedItem is TreeViewItem selected)
+        {
+            selected.Focus();
+        }
+        else
+        {
+            _tree.Focus();
+        }
+
+        SyncPaneFocusChrome();
     }
 
     /// <summary>次回 LoadFromPath／LoadUnionFromPaths で必ず再解析する。</summary>
@@ -1453,6 +1478,12 @@ internal sealed class EditorHeaderChunkStripView : Border
                 IsEnabled = hasRows,
             };
             copy.Click += (_, _) => CopySelection();
+            var layout = new MenuItem
+            {
+                Header = UiStrings.WaveChannelLayoutEditMenu,
+                IsEnabled = HasChannelLayoutTargets(),
+            };
+            layout.Click += (_, _) => _ = EditChannelLayoutAsync();
             var delete = new MenuItem
             {
                 Header = selected.Count > 1
@@ -1468,9 +1499,96 @@ internal sealed class EditorHeaderChunkStripView : Border
             menu.Items.Add(selectAll);
             menu.Items.Add(copy);
             menu.Items.Add(new Separator());
+            menu.Items.Add(layout);
             menu.Items.Add(delete);
         };
         _tree.ContextMenu = menu;
+    }
+
+    private bool HasChannelLayoutTargets()
+    {
+        foreach (var path in ResolveChannelLayoutTargetPaths())
+        {
+            if (WaveChannelLayoutWriter.IsSupportedPath(path))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private IReadOnlyList<string> ResolveChannelLayoutTargetPaths()
+    {
+        var fromHost = ResolveChannelLayoutPaths?.Invoke();
+        if (fromHost is { Count: > 0 })
+        {
+            return fromHost;
+        }
+
+        if (_loadedDocument is { IsChunkUnion: true })
+        {
+            var paths = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var node in _loadedDocument.Roots)
+            {
+                foreach (var member in node.MemberPaths)
+                {
+                    if (seen.Add(member))
+                    {
+                        paths.Add(member);
+                    }
+                }
+            }
+
+            return paths;
+        }
+
+        return string.IsNullOrWhiteSpace(_loadedPath)
+            ? Array.Empty<string>()
+            : new[] { _loadedPath };
+    }
+
+    private async Task EditChannelLayoutAsync()
+    {
+        if (ApplyChannelLayoutEditAsync is null)
+        {
+            return;
+        }
+
+        var paths = ResolveChannelLayoutTargetPaths();
+        var targets = new List<WaveChannelLayoutWriter.TargetInfo>();
+        foreach (var path in paths)
+        {
+            if (WaveChannelLayoutWriter.TryDescribe(path, out var info))
+            {
+                targets.Add(info);
+            }
+        }
+
+        if (targets.Count == 0)
+        {
+            RepairMessage?.Invoke(UiStrings.WaveChannelLayoutNoTargets);
+            return;
+        }
+
+        var owner = Window.GetWindow(this);
+        var mask = ChannelLayoutEditDialog.Show(owner, targets);
+        if (mask is null)
+        {
+            return;
+        }
+
+        var apply = WaveChannelLayoutWriter.FilterTargetsForMask(targets, mask.Value);
+        if (apply.Count == 0)
+        {
+            RepairMessage?.Invoke(UiStrings.WaveChannelLayoutNoTargets);
+            return;
+        }
+
+        _ = await ApplyChannelLayoutEditAsync(
+            apply.Select(static t => t.Path).ToArray(),
+            mask.Value).ConfigureAwait(true);
     }
 
     private List<TreeViewItem> CollectDeleteTargets()

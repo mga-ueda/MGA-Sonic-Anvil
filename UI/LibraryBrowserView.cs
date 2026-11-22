@@ -169,6 +169,8 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly TextBlock _structureLabel = new();
     private readonly TextBlock _structureDetailLabel = new();
     private readonly TreeView _structureTree = new();
+    /// <summary>ツリー＋修復パネルを包む。余白クリックはここに届く（StackPanel 内 TreeView は内容高さのみ）。</summary>
+    private ScrollViewer? _structureTreeScroll;
     private readonly TextBox _structureDetailBox = new();
     private readonly TreeView _structureXmlTree = new();
     private readonly TextBlock _structureDetailMeta = new();
@@ -842,9 +844,12 @@ internal sealed partial class LibraryBrowserView : UserControl
     public bool HasOpenContextMenu =>
         _folderTree.ContextMenu is { IsOpen: true }
         || _favoritesList.ContextMenu is { IsOpen: true }
-        || _structureTree.ContextMenu is { IsOpen: true }
+        || HeaderStructureContextMenu is { IsOpen: true }
         || _grid.ContextMenu is { IsOpen: true }
         || _columnHeaderMenu is { IsOpen: true };
+
+    private ContextMenu? HeaderStructureContextMenu =>
+        _structureTreeScroll?.ContextMenu ?? _structureTree.ContextMenu;
 
     /// <summary>
     /// 右クリックメニューが開いている間と、外側クリックで閉じた同じ左クリックが上がるまでは true。
@@ -2555,7 +2560,9 @@ internal sealed partial class LibraryBrowserView : UserControl
         // プレイリストより先。ここを落とすと Apps がリストメニューへ落ちる。
         if (IsHeaderStructureFocused)
         {
-            return OpenOwnedContextMenu(_structureTree);
+            return _structureTreeScroll is { } scroll
+                ? OpenOwnedContextMenu(scroll)
+                : OpenOwnedContextMenu(_structureTree);
         }
 
         if (IsListKeyboardFocused)
@@ -2577,7 +2584,7 @@ internal sealed partial class LibraryBrowserView : UserControl
                      {
                          _folderTree.ContextMenu,
                          _favoritesList.ContextMenu,
-                         _structureTree.ContextMenu,
+                         HeaderStructureContextMenu,
                          _grid.ContextMenu,
                          _columnHeaderMenu,
                      })
@@ -2604,7 +2611,7 @@ internal sealed partial class LibraryBrowserView : UserControl
             favorites.IsOpen = false;
         }
 
-        if (_structureTree.ContextMenu is { IsOpen: true } structure)
+        if (HeaderStructureContextMenu is { IsOpen: true } structure)
         {
             structure.IsOpen = false;
         }

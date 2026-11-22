@@ -577,6 +577,8 @@ public partial class MainWindow
         HeaderChunkStrip.RepairMessage += ShowCenterStatusToast;
         HeaderChunkStrip.ApplyRepairEditAsync = ApplyEditorHeaderRepairEditAsync;
         HeaderChunkStrip.ApplyChunkDeleteEditAsync = ApplyEditorChunkDeleteEditAsync;
+        HeaderChunkStrip.ResolveChannelLayoutPaths = CollectEditorHeaderRepairCandidatePaths;
+        HeaderChunkStrip.ApplyChannelLayoutEditAsync = ApplyEditorChannelLayoutEditAsync;
         HeaderChunkStrip.ApplyUnionChunkTabSelection = SelectTabsMatchingUnionChunks;
     }
 
@@ -749,6 +751,82 @@ public partial class MainWindow
         RefreshEditorHeaderChunks(show: AppStorage.Settings.EditorShowHeaderStructure && !_tileMode);
         SyncEditorHeaderDetailPlacement();
         ShowCenterStatusToast(UiStrings.WaveHeaderRepairEdited);
+        return true;
+    }
+
+    /// <summary>エディタ: チャンネルレイアウトを作業コピーへ。SourcePath は即時上書きしない。</summary>
+    private async Task<bool> ApplyEditorChannelLayoutEditAsync(IReadOnlyList<string> paths, int channelMask)
+    {
+        var changed = 0;
+        string? firstError = null;
+        foreach (var path in paths)
+        {
+            var session = FindSessionBySourceOrContainerPath(path);
+            if (session is null)
+            {
+                continue;
+            }
+
+            var document = session.Document;
+            var source = document.ResolveWaveContainerPath();
+            if (string.IsNullOrWhiteSpace(source) || !File.Exists(source))
+            {
+                firstError ??= UiStrings.WaveStructureFileMissing;
+                continue;
+            }
+
+            var ext = Path.GetExtension(source);
+            if (string.IsNullOrWhiteSpace(ext))
+            {
+                ext = ".wav";
+            }
+
+            var dest = AppStorage.SessionFilePath("chlayout-" + Guid.NewGuid().ToString("N") + ext);
+            var result = await Task.Run(() => WaveChannelLayoutWriter.ApplyTo(source, dest, channelMask))
+                .ConfigureAwait(true);
+            if (!result.Success)
+            {
+                firstError ??= result.Error;
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            if (!result.Changed)
+            {
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            var before = document.WaveContainerPath;
+            var command = ProcessEdits.ReplaceWaveContainer(
+                document,
+                before,
+                dest,
+                "Channel Layout");
+            if (command is null)
+            {
+                TryDeleteFile(dest);
+                continue;
+            }
+
+            session.History.Do(document, command);
+            document.SetChannelMask(channelMask);
+            AudioCodec.ReloadEmbeddedMeta(document);
+            changed++;
+        }
+
+        if (changed == 0)
+        {
+            ShowCenterStatusToast(firstError ?? UiStrings.WaveChannelLayoutNoChange);
+            return false;
+        }
+
+        AfterEdit();
+        MarkLibraryPlaylistStaleFromEditor();
+        HeaderChunkStrip.InvalidateLoadedCache();
+        RefreshEditorHeaderChunks(show: AppStorage.Settings.EditorShowHeaderStructure && !_tileMode);
+        SyncEditorHeaderDetailPlacement();
+        ShowCenterStatusToast(UiStrings.WaveChannelLayoutEdited);
         return true;
     }
 

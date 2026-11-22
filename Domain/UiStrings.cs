@@ -734,7 +734,32 @@ internal static partial class UiStrings
     public static string LabelSpeaker => Get("スピーカー", "Speakers");
     public static string LabelSpeakerIo => Get("スピーカーと入出力", "Speakers and I/O");
     public static string LabelSpeakerVisibility => Get("有効にするスピーカー定義", "Speaker definitions to enable");
+    public static string ButtonAddCustomSpeakerLayout => Get("カスタムを追加(_A)…", "Add _custom…");
+    public static string ButtonEditCustomSpeakerLayout => Get("編集(_E)…", "_Edit…");
+    public static string ButtonRemoveCustomSpeakerLayout => Get("削除(_D)", "_Delete");
+    public static string DialogCustomSpeakerLayoutAddTitle => Get(
+        "カスタムスピーカー配置",
+        "Custom speaker layout");
+    public static string DialogCustomSpeakerLayoutEditTitle => Get(
+        "カスタムスピーカー配置を編集",
+        "Edit custom speaker layout");
+    public static string LabelCustomSpeakerLayoutName => Get("名前", "Name");
+    public static string LabelCustomSpeakerLayoutChannels => Get("チャンネル数", "Channels");
+    public static string LabelCustomSpeakerLayoutDefaultName => Get("カスタム", "Custom");
+    public static string CustomSpeakerLayoutNameRequired => Get(
+        "名前を入力してください。",
+        "Enter a name.");
+    public static string ConfirmRemoveCustomSpeakerLayout(string name) => Format(
+        "カスタム配置「{0}」を削除しますか？",
+        "Delete custom layout \"{0}\"?",
+        name);
     public static string LabelAutoSpeakerSelect => Get("自動スピーカー選択(_S)", "Auto _speaker selection");
+    public static string TipAutoSpeakerSelect => Get(
+        "WAVE/AIFF のチャンネルマスクが有効なスピーカー配置（カスタム含む）に一致すれば、本数の推定より先にその配置へ切り替えます。",
+        "If the WAVE/AIFF channel mask matches an enabled speaker layout (including custom), that layout is chosen before falling back to channel-count matching.");
+    public static string TipSpeakerLayoutPreviewConflict => Get(
+        "ファイルのチャンネルマスク／本数と、いまのスピーカー設定が一致しません。必要な配置が無効だと切り替えられず、プレビューや再生の割り当てがずれることがあります。",
+        "The file’s channel mask or channel count does not match the current speaker layout. If the needed layout is disabled you cannot switch, and preview or playback routing may be wrong.");
     public static string ButtonSineMinusTwenty => Get("Sine -20 dB", "Sine -20 dB");
     public static string ButtonChannelVoice => Get("Voice", "Voice");
     public static string LabelPortOff => Get("なし", "Off");
@@ -1867,6 +1892,65 @@ internal static partial class UiStrings
         "Nothing needed repairing.");
     public static string WaveChunkDeleteMenu => Get("チャンクを削除(_D)", "_Delete Chunk");
     public static string WaveChunkDeleteMenuMany => Get("選択チャンクを削除(_D)", "_Delete Selected Chunks");
+    public static string WaveChannelLayoutEditMenu => Get(
+        "チャンネルレイアウトを編集(_L)…",
+        "Edit Channel _Layout…");
+    public static string DialogChannelLayoutEditTitle => Get(
+        "チャンネルレイアウト",
+        "Channel Layout");
+    public static string LabelChannelLayoutPreset => Get("プリセット", "Preset");
+    public static string LabelChannelLayoutCustom => Get("カスタム", "Custom");
+    public static string LabelChannelLayoutUnspecified => Get("未指定", "Unspecified");
+    public static string LabelChannelLayoutMask => Get("マスク", "Mask");
+    public static string LabelChannelLayoutSpeakers => Get("スピーカー", "Speakers");
+    public static string LabelChannelLayoutChannelAssign => Get(
+        "チャンネル割り当て",
+        "Channel assignment");
+    public static string LabelChannelLayoutChannelRow(int index) => Format(
+        "{0} 本目",
+        "Ch {0}",
+        index);
+    public static string LabelChannelLayoutTargets => Get("対象ファイル", "Target files");
+    public static string ButtonChannelLayoutClear => Get("未指定に戻す(_U)", "_Unspecified");
+    public static string LabelChannelLayoutSpeakerUnset => Get("（未選択）", "(unset)");
+    public static string WaveChannelLayoutMixedChannelCountWarning => Get(
+        "対象ファイルのチャンネル数が揃っていません。先頭ファイルの本数で割り当てます。本数が違うファイルには同じマスクを書けません。",
+        "Target files have different channel counts. Assignment uses the first file. Files with another count cannot take the same mask.");
+    public static string WaveChannelLayoutOrderNoteWarning => Get(
+        "選んだ並びはビット昇順（WAVE/AIFF の標準解釈）と違います。マスクにはスピーカーの集合だけが書かれます。他ソフトは FL→FR→FC… の順で読むことがあります。",
+        "This order differs from ascending speaker bits (the WAVE/AIFF default reading order). Only the speaker set is stored in the mask; other apps may read channels as FL→FR→FC…");
+    public static string WaveChannelLayoutDuplicateWarning => Get(
+        "同じスピーカーを複数のチャンネルに割り当てられません。",
+        "Each speaker can be assigned to only one channel.");
+    public static string WaveChannelLayoutIncompleteWarning => Get(
+        "すべてのチャンネルにスピーカーを選んでください。未指定にする場合は「未指定に戻す」を使います。",
+        "Assign a speaker to every channel, or use Unspecified to clear the mask.");
+    public static string WaveChannelLayoutMaskMismatchWarning => Get(
+        "セットされたビット数とファイルのチャンネル数が一致しないファイルがあります。そのまま書き込めます。",
+        "Some files have a different channel count than set bits. You can still write the mask.");
+    public static string WaveChannelLayoutNoTargets => Get(
+        "WAVE / AIFF の対象ファイルがありません。",
+        "No WAVE / AIFF target files.");
+    public static string WaveChannelLayoutEdited => Get(
+        "チャンネルレイアウトを更新しました（未保存）。",
+        "Updated channel layout (unsaved).");
+    public static string WaveChannelLayoutDone(int files) => Format(
+        "{0} ファイルのチャンネルレイアウトを更新しました。",
+        "Updated channel layout on {0} file(s).",
+        files);
+    public static string WaveChannelLayoutNoChange => Get(
+        "チャンネルレイアウトに変更はありませんでした。",
+        "Channel layout was already up to date.");
+    public static string WaveChannelLayoutFailed(string detail) => Format(
+        "チャンネルレイアウトの更新に失敗しました。{0}",
+        "Channel layout update failed. {0}",
+        detail);
+    public static string WaveChannelLayoutTargetLine(string name, int channels, int mask) => Format(
+        "{0}  ·  {1}ch  ·  {2}",
+        "{0}  ·  {1}ch  ·  {2}",
+        name,
+        channels,
+        mask == 0 ? LabelChannelLayoutUnspecified : $"0x{mask:X8}");
     public static string WaveChunkStripUnsupported => Get(
         "WAVE / AIFF 以外はチャンク削除できません。",
         "Chunk deletion is only supported for WAVE / AIFF.");
@@ -2232,6 +2316,7 @@ internal static partial class UiStrings
         "Convert Channels" => Get("チャンネル数", "Convert Channels"),
         "Repair Header" => Get("ヘッダ修復", "Repair Header"),
         "Delete Chunks" => Get("チャンク削除", "Delete Chunks"),
+        "Channel Layout" => Get("チャンネルレイアウト", "Channel Layout"),
         _ => name,
     };
 

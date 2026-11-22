@@ -1620,6 +1620,7 @@ public sealed class LibraryBrowserSelectionTests
                 [
                     UiStrings.WaveMenuSelectAll,
                     UiStrings.WaveMenuCopy,
+                    UiStrings.WaveChannelLayoutEditMenu,
                     UiStrings.WaveChunkDeleteMenu,
                 ],
                 view.OpenContextMenuItems.Select(item => (string)item.Header).ToArray());

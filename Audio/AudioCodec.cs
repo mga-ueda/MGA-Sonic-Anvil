@@ -700,7 +700,7 @@ internal static partial class AudioCodec
             DetectKind(path),
             path,
             buildPeaks);
-        document.SetChannelMask(DevicePortNames.ReadWaveFileChannelMask(path));
+        document.SetChannelMask(DevicePortNames.ReadFileChannelMask(path));
         ApplyEmbeddedMeta(document, path);
         return document;
     }
@@ -742,6 +742,7 @@ internal static partial class AudioCodec
             }
 
             wave.Sync(document);
+            document.SetChannelMask(DevicePortNames.ReadWaveFileChannelMask(path));
             return;
         }
 
@@ -753,6 +754,7 @@ internal static partial class AudioCodec
             }
 
             aiff.Sync(document);
+            document.SetChannelMask(DevicePortNames.ReadAiffFileChannelMask(path));
         }
     }
 
@@ -925,7 +927,8 @@ internal static partial class AudioCodec
             return;
         }
 
-        if (bits <= 16)
+        // マスク非 0 なら 16bit も WAVEFORMATEXTENSIBLE へ昇格。0 なら plain PCM に戻す。
+        if (bits <= 16 && channelMask == 0)
         {
             writer.Write(16);
             writer.Write((ushort)1);
@@ -938,8 +941,24 @@ internal static partial class AudioCodec
         }
 
         // 24-bit を 16 バイト PCM で書くと Sound Forge が raw 32 kHz として開く。
-        // スピーカーマスクは元ファイルの値だけ残す。無ければ 0（未指定）。推測して埋めない。
+        // スピーカーマスクは明示値のみ。無ければ 0（未指定）。推測して埋めない。
         WriteExtensibleFmt(writer, sampleRate, channels, bits, byteRate, blockAlign, channelMask, PcmSubFormat);
+    }
+
+    /// <summary>チャンネルレイアウト編集用。既存 fmt と同じ sampleRate/channels/bits で書き直す。</summary>
+    internal static void WriteFmtChunkForLayout(
+        BinaryWriter writer,
+        int sampleRate,
+        int channels,
+        int bits,
+        int channelMask)
+    {
+        channels = Math.Max(1, channels);
+        bits = Math.Max(1, bits);
+        sampleRate = Math.Max(1, sampleRate);
+        var blockAlign = channels * ((bits + 7) / 8);
+        var byteRate = sampleRate * blockAlign;
+        WriteFmtChunk(writer, sampleRate, channels, bits, byteRate, blockAlign, channelMask);
     }
 
     private static void WriteIeeeFloatFmt(

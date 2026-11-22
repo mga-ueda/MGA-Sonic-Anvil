@@ -1277,6 +1277,11 @@ internal static class WaveContainerStructure
             return DecodeAiffMark(reader, chunkOffset, size);
         }
 
+        if (id == "CHAN" && size >= 12)
+        {
+            return DecodeAiffChan(reader, chunkOffset, size);
+        }
+
         if (id is "SSND" or "APPL")
         {
             return DecodeBinaryPreview(reader, id, chunkOffset, size, label: id);
@@ -1339,6 +1344,22 @@ internal static class WaveContainerStructure
         }
 
         return TextNode("fmt ", chunkOffset, size, WaveStructureNode.FormatKeyValueTable(rows));
+    }
+
+    private static WaveStructureNode DecodeAiffChan(BinaryReader reader, long chunkOffset, uint size)
+    {
+        var tag = BinaryPrimitives.ReadUInt32BigEndian(reader.ReadBytes(4));
+        var bitmap = BinaryPrimitives.ReadUInt32BigEndian(reader.ReadBytes(4));
+        var descriptions = BinaryPrimitives.ReadUInt32BigEndian(reader.ReadBytes(4));
+        var rows = new List<(string, string)>
+        {
+            ("Layout tag", tag == ChannelMaskBits.UseChannelBitmapTag
+                ? $"0x{tag:X8} (UseChannelBitmap)"
+                : $"0x{tag:X8}"),
+            ("Channel bitmap", $"0x{bitmap:X8}"),
+            ("Descriptions", descriptions.ToString(CultureInfo.InvariantCulture)),
+        };
+        return TextNode("CHAN", chunkOffset, size, WaveStructureNode.FormatKeyValueTable(rows));
     }
 
     private static WaveStructureNode DecodeFact(BinaryReader reader, long chunkOffset, uint size)

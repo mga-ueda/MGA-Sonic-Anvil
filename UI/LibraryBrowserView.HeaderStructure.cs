@@ -137,6 +137,11 @@ internal sealed partial class LibraryBrowserView
             Focusable = false,
             Content = treeStack,
         };
+        // TreeView は内容高さだけなので、ビューポート余白のクリックは ScrollViewer 側で拾う。
+        treeScroll.PreviewMouseLeftButtonDown += StructureTreeScroll_PreviewMouseLeftButtonDown;
+        _structureTreeScroll = treeScroll;
+        // コンストラクタ前半の Rebuild 時点では Scroll 未作成なので、ここで載せ直す。
+        RebuildHeaderStructureTreeContextMenu();
         var treePane = new DockPanel { Background = Brushes.Transparent };
         DockPanel.SetDock(_structureLabel, Dock.Top);
         treePane.Children.Add(_structureLabel);
@@ -409,6 +414,29 @@ internal sealed partial class LibraryBrowserView
         }
     }
 
+    /// <summary>
+    /// ツリー行の下のビューポート余白。StackPanel だと TreeView に届かないので ScrollViewer で拾う。
+    /// </summary>
+    private void StructureTreeScroll_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject origin)
+        {
+            return;
+        }
+
+        if (FindTreeViewItem(origin) is not null || FindTreeExpandToggle(origin) is not null)
+        {
+            return;
+        }
+
+        if (FindAncestor<ButtonBase>(origin) is not null)
+        {
+            return;
+        }
+
+        ActivateHeaderStructureTreeFromClick();
+    }
+
     /// <summary>右クリック行が未マークなら、その1行だけを対象にする（複数マーク中はそのまま）。</summary>
     private void StructureTree_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -416,6 +444,7 @@ internal sealed partial class LibraryBrowserView
             || FindTreeViewItem(origin) is not { } item
             || FindTreeExpandToggle(origin) is not null)
         {
+            ActivateHeaderStructureTreeFromClick();
             return;
         }
 
@@ -1677,6 +1706,12 @@ internal sealed partial class LibraryBrowserView
                 IsEnabled = hasRows,
             };
             copy.Click += (_, _) => CopyHeaderStructureSelection();
+            var layout = new MenuItem
+            {
+                Header = UiStrings.WaveChannelLayoutEditMenu,
+                IsEnabled = HasHeaderStructureChannelLayoutTargets(),
+            };
+            layout.Click += (_, _) => _ = EditHeaderStructureChannelLayoutAsync();
             var delete = new MenuItem
             {
                 Header = selected.Count > 1
@@ -1690,10 +1725,109 @@ internal sealed partial class LibraryBrowserView
             menu.Items.Add(selectAll);
             menu.Items.Add(copy);
             menu.Items.Add(new Separator());
+            menu.Items.Add(layout);
             menu.Items.Add(delete);
         };
         ArmContextMenuDismissGuard(menu);
-        _structureTree.ContextMenu = menu;
+        // 余白（ScrollViewer）からも同じメニューを出す。TreeView は内容高さだけなので親へ載せる。
+        if (_structureTreeScroll is { } scroll)
+        {
+            scroll.ContextMenu = menu;
+            _structureTree.ContextMenu = null;
+        }
+        else
+        {
+            _structureTree.ContextMenu = menu;
+        }
+    }
+
+    private bool HasHeaderStructureChannelLayoutTargets()
+    {
+        foreach (var path in CollectHeaderStructureChannelLayoutPaths())
+        {
+            if (WaveChannelLayoutWriter.IsSupportedPath(path))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private IReadOnlyList<string> CollectHeaderStructureChannelLayoutPaths()
+    {
+        var paths = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var session in HeaderStructureSessions())
+        {
+            var path = session.Document.ResolveWaveContainerPath();
+            if (!string.IsNullOrWhiteSpace(path) && seen.Add(path))
+            {
+                paths.Add(path);
+            }
+        }
+
+        return paths;
+    }
+
+    private async Task EditHeaderStructureChannelLayoutAsync()
+    {
+        var paths = CollectHeaderStructureChannelLayoutPaths();
+        var targets = new List<WaveChannelLayoutWriter.TargetInfo>();
+        foreach (var path in paths)
+        {
+            if (WaveChannelLayoutWriter.TryDescribe(path, out var info))
+            {
+                targets.Add(info);
+            }
+        }
+
+        if (targets.Count == 0)
+        {
+            ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutNoTargets);
+            return;
+        }
+
+        var owner = Window.GetWindow(this);
+        var mask = ChannelLayoutEditDialog.Show(owner, targets);
+        if (mask is null)
+        {
+            return;
+        }
+
+        var apply = WaveChannelLayoutWriter.FilterTargetsForMask(targets, mask.Value);
+        if (apply.Count == 0)
+        {
+            ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutNoTargets);
+            return;
+        }
+
+        try
+        {
+            var targetPaths = apply.Select(static t => t.Path).ToArray();
+            var batch = await Task.Run(() => WaveChannelLayoutWriter.ApplyMany(targetPaths, mask.Value))
+                .ConfigureAwait(true);
+            if (batch.Succeeded == 0)
+            {
+                ShowHeaderStructureRepairToast(
+                    batch.FirstError ?? UiStrings.WaveChannelLayoutFailed("unknown"));
+                return;
+            }
+
+            if (batch.Changed == 0)
+            {
+                ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutNoChange);
+                return;
+            }
+
+            RefreshSessionsAfterHeaderRepairInPlace(batch.WrittenPaths);
+            HeaderRepairedInPlace?.Invoke(this, batch.WrittenPaths);
+            ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutDone(batch.Changed));
+        }
+        catch (Exception ex)
+        {
+            ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutFailed(ex.Message));
+        }
     }
 
     private List<TreeViewItem> CollectHeaderStructureDeleteTargets()

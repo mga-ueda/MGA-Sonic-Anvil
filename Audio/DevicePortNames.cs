@@ -8,28 +8,7 @@ namespace MgaSonicAnvil.Audio;
 /// <summary>デバイスが報告するポート名。取れなければ番号付きの予備。</summary>
 internal static class DevicePortNames
 {
-    private static readonly (int Mask, string Name)[] Speakers =
-    [
-        (0x1, "FL"),
-        (0x2, "FR"),
-        (0x4, "FC"),
-        (0x8, "LFE"),
-        (0x10, "BL"),
-        (0x20, "BR"),
-        (0x40, "FLC"),
-        (0x80, "FRC"),
-        (0x100, "BC"),
-        (0x200, "SL"),
-        (0x400, "SR"),
-        (0x800, "TFL"),
-        (0x1000, "TFC"),
-        (0x2000, "TFR"),
-        (0x4000, "TBL"),
-        (0x8000, "TBC"),
-        (0x10000, "TBR"),
-        (0x20000, "TSL"),
-        (0x40000, "TSR"),
-    ];
+    private static readonly (int Mask, string Name)[] Speakers = ChannelMaskBits.Speakers;
 
     private static readonly FieldInfo? ChannelMaskField =
         typeof(WaveFormatExtensible).GetField("dwChannelMask", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -100,6 +79,18 @@ internal static class DevicePortNames
         return ChannelMaskField.GetValue(extensible) is int mask ? mask : 0;
     }
 
+    /// <summary>WAVE fmt または AIFF CHAN から channel bitmap を読む。無ければ 0。推測しない。</summary>
+    public static int ReadFileChannelMask(string path)
+    {
+        var wave = ReadWaveFileChannelMask(path);
+        if (wave != 0)
+        {
+            return wave;
+        }
+
+        return ReadAiffFileChannelMask(path);
+    }
+
     /// <summary>ファイルの fmt から dwChannelMask を読む。無ければ 0。推測しない。</summary>
     public static int ReadWaveFileChannelMask(string path)
     {
@@ -145,6 +136,62 @@ internal static class DevicePortNames
         }
 
         return 0;
+    }
+
+    /// <summary>AIFF/AIFC の CHAN（UseChannelBitmap）から bitmap を読む。無ければ 0。</summary>
+    public static int ReadAiffFileChannelMask(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: false);
+            if (ReadFourCc(reader) != "FORM")
+            {
+                return 0;
+            }
+
+            _ = ReadUInt32Be(reader);
+            var form = ReadFourCc(reader);
+            if (form is not ("AIFF" or "AIFC"))
+            {
+                return 0;
+            }
+
+            while (stream.Position + 8 <= stream.Length)
+            {
+                var id = ReadFourCc(reader);
+                var size = ReadUInt32Be(reader);
+                var start = stream.Position;
+                if (id == "CHAN" && size >= 12)
+                {
+                    var tag = ReadUInt32Be(reader);
+                    var bitmap = (int)ReadUInt32Be(reader);
+                    if (tag == ChannelMaskBits.UseChannelBitmapTag)
+                    {
+                        return bitmap;
+                    }
+
+                    return 0;
+                }
+
+                stream.Position = start + size + (size & 1);
+            }
+        }
+        catch
+        {
+            return 0;
+        }
+
+        return 0;
+    }
+
+    private static uint ReadUInt32Be(BinaryReader reader)
+    {
+        var b0 = (uint)reader.ReadByte();
+        var b1 = (uint)reader.ReadByte();
+        var b2 = (uint)reader.ReadByte();
+        var b3 = (uint)reader.ReadByte();
+        return (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
     }
 
     private static string ReadFourCc(BinaryReader reader) =>
