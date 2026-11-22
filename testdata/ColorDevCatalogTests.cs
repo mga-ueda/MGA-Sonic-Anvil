@@ -11,6 +11,8 @@ public sealed class ColorDevCatalogTests
     [Theory]
     [InlineData("SurfaceBackBrush", "Shared")]
     [InlineData("MenuHighlightBackBrush", "Shared")]
+    [InlineData("TypeaheadHitBackBrush", "Shared")]
+    [InlineData("TypeaheadHitForeBrush", "Shared")]
     [InlineData("MenuDisabledForeBrush", "Shared")]
     [InlineData("MainMenuBarBackBrush", "Shared")]
     [InlineData("MenuListBackBrush", "Shared")]

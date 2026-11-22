@@ -82,6 +82,8 @@ internal static partial class UiStrings
                 "Silence detect · selection waveform"),
             "MenuSeparator" => Get("メニュー区切り", "Menu separator"),
             "MenuHighlightBack" => Get("メニューハイライト", "Menu highlight"),
+            "TypeaheadHitBack" => Get("タイプアヘッド・一致背景", "Typeahead · match background"),
+            "TypeaheadHitFore" => Get("タイプアヘッド・一致文字", "Typeahead · match text"),
             "MenuDisabledFore" => Get("メニュー無効文字", "Menu disabled text"),
             "MainMenuBarBack" => Get("メニューバー背景", "Menu bar background"),
             "MenuListBack" => Get("メニューのリスト背景", "Menu list background"),

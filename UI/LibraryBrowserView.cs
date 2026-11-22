@@ -292,8 +292,6 @@ internal sealed partial class LibraryBrowserView : UserControl
     private readonly AcrylicToastHost _explorerTypeaheadToast = new();
     private readonly HashSet<TreeViewItem> _explorerTypeaheadHighlighted = [];
     private DispatcherTimer? _explorerTypeaheadToastIdleTimer;
-    private static readonly SolidColorBrush ExplorerTypeaheadHitBack = CreateExplorerTypeaheadHitBack();
-    private static readonly SolidColorBrush ExplorerTypeaheadHitFore = CreateExplorerTypeaheadHitFore();
     private readonly StackPanel _playlistGroupHost = new() { Orientation = Orientation.Horizontal };
     private readonly DataGrid _grid = new();
     private readonly LibraryVisualStage _visualStage = new();

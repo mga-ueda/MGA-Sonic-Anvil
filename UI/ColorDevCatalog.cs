@@ -53,6 +53,8 @@ internal static class ColorDevCatalog
             ("ControlHoverBorderBrush", ColorDevGroup.Shared),
             ("MenuSeparatorBrush", ColorDevGroup.Shared),
             ("MenuHighlightBackBrush", ColorDevGroup.Shared),
+            ("TypeaheadHitBackBrush", ColorDevGroup.Shared),
+            ("TypeaheadHitForeBrush", ColorDevGroup.Shared),
             ("MenuDisabledForeBrush", ColorDevGroup.Shared),
             ("MainMenuBarBackBrush", ColorDevGroup.Shared),
             ("MenuListBackBrush", ColorDevGroup.Shared),

@@ -17,9 +17,6 @@ namespace MgaSonicAnvil.UI;
 /// </summary>
 internal sealed class VstInsertPluginPickerWindow : Window
 {
-    private static readonly SolidColorBrush TypeaheadHitBack = CreateHitBack();
-    private static readonly SolidColorBrush TypeaheadHitFore = CreateHitFore();
-
     private readonly IReadOnlyList<VstPickerEntry> _plugins;
     private readonly TreeView _tree = new();
     private readonly TextBox _searchBox = new();
@@ -1117,8 +1114,8 @@ internal sealed class VstInsertPluginPickerWindow : Window
             {
                 block.Inlines.Add(new Run(text)
                 {
-                    Background = TypeaheadHitBack,
-                    Foreground = TypeaheadHitFore,
+                    Background = WpfControlHelpers.FrozenBrush(Theme.Get("TypeaheadHitBackBrush")),
+                    Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("TypeaheadHitForeBrush")),
                 });
             }
             else
@@ -1172,8 +1169,8 @@ internal sealed class VstInsertPluginPickerWindow : Window
 
         block.Inlines.Add(new Run(name.Substring(start, length))
         {
-            Background = TypeaheadHitBack,
-            Foreground = TypeaheadHitFore,
+            Background = WpfControlHelpers.FrozenBrush(Theme.Get("TypeaheadHitBackBrush")),
+            Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("TypeaheadHitForeBrush")),
         });
         if (start + length < name.Length)
         {
@@ -1403,17 +1400,4 @@ internal sealed class VstInsertPluginPickerWindow : Window
         return fallback;
     }
 
-    private static SolidColorBrush CreateHitBack()
-    {
-        var brush = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x4C));
-        brush.Freeze();
-        return brush;
-    }
-
-    private static SolidColorBrush CreateHitFore()
-    {
-        var brush = new SolidColorBrush(Colors.Black);
-        brush.Freeze();
-        return brush;
-    }
 }

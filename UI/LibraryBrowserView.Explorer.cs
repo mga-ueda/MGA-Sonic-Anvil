@@ -219,8 +219,8 @@ internal sealed partial class LibraryBrowserView
 
         block.Inlines.Add(new Run(name.Substring(start, length))
         {
-            Background = ExplorerTypeaheadHitBack,
-            Foreground = ExplorerTypeaheadHitFore,
+            Background = WpfControlHelpers.FrozenBrush(Theme.Get("TypeaheadHitBackBrush")),
+            Foreground = WpfControlHelpers.FrozenBrush(Theme.Get("TypeaheadHitForeBrush")),
         });
         if (start + length < name.Length)
         {
@@ -239,20 +239,6 @@ internal sealed partial class LibraryBrowserView
         }
 
         ApplyFolderHeader(item, FolderHeaderText(item), LibraryExplorerPaths.IsMissing(path));
-    }
-
-    private static SolidColorBrush CreateExplorerTypeaheadHitBack()
-    {
-        var brush = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x4C));
-        brush.Freeze();
-        return brush;
-    }
-
-    private static SolidColorBrush CreateExplorerTypeaheadHitFore()
-    {
-        var brush = new SolidColorBrush(Colors.Black);
-        brush.Freeze();
-        return brush;
     }
 
     private bool TryCollectExplorerTypeahead(
