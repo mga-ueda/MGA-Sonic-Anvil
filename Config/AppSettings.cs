@@ -866,24 +866,6 @@ internal sealed class AppSettings
         return DefaultAudioFormat.Resolve(sampleRate, bitsPerSample, channelLayoutId, visible);
     }
 
-    public ChannelLayout[] ResolvedPickerLayouts()
-    {
-        EnsureSpeakerPresets();
-        var visible = new HashSet<string>(ResolvedVisibleSpeakerIds(), StringComparer.OrdinalIgnoreCase);
-        var list = new List<ChannelLayout>(DefaultAudioFormat.PickerLayouts(visible));
-        foreach (var preset in SpeakerPresets)
-        {
-            if (preset is null || !preset.IsCustom || !visible.Contains(preset.Id))
-            {
-                continue;
-            }
-
-            list.Add(preset.ToLayout());
-        }
-
-        return [.. list];
-    }
-
     public void RememberNewAudioFormat(DefaultAudioFormat.Spec format)
     {
         LastNewSampleRate = format.SampleRate;

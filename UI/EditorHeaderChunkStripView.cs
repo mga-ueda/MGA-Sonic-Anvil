@@ -222,9 +222,6 @@ internal sealed class EditorHeaderChunkStripView : Border
     /// <summary>テスト用。和集合ドキュメントか。</summary>
     internal bool IsChunkUnion => _loadedDocument is { IsChunkUnion: true };
 
-    /// <summary>テスト用。キー離し待ちのチャンク→タブ同期が溜まっているか。</summary>
-    internal bool IsChunkApplyDeferred => _chunkApplyDeferred;
-
     private void ApplyAlwaysVisibleScrollBarStyle(Control host)
     {
         if (TryFindResource("EditorHeaderScrollBarStyle") is Style style)

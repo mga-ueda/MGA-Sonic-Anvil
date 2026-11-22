@@ -1310,15 +1310,6 @@ internal sealed partial class LibraryBrowserView
     /// <summary>登録パスが見つからないときの文字色（エラー文字）。不正チャンクも同じ。</summary>
     internal const string MissingRegisteredPathForeBrushKey = "StatusBarErrorDetailForeBrush";
 
-    /// <summary>削除してよいチャンク（赤）。旧名互換。</summary>
-    internal const string WaveStructureCustomChunkForeBrushKey = WaveChunkCleanPolicy.RemovableForeBrushKey;
-
-    /// <summary>保護チャンク（シアン）。旧名互換。</summary>
-    internal const string WaveStructureSpecializedChunkForeBrushKey = WaveChunkCleanPolicy.ProtectedForeBrushKey;
-
-    /// <summary>注意チャンク（オレンジ）。</summary>
-    internal const string WaveStructureCautionChunkForeBrushKey = WaveChunkCleanPolicy.CautionForeBrushKey;
-
     /// <summary>
     /// 見出し TextBlock に色を載せる。TreeViewItem.Foreground だけだと ContentPresenter 経由で
     /// PrimaryFore に上書きされ、赤字にならないことがある。
