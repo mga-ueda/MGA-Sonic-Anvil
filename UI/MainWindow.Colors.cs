@@ -124,5 +124,7 @@ public partial class MainWindow
     {
         StatusTimes.UsePlayerComboFill(true);
         SpeakerMenu.SetResourceReference(FrameworkElement.StyleProperty, "LibraryComboBoxStyle");
+        // スタイル差し替えで Fill が戻るので、相違ハイライトを付け直す。
+        ApplySpeakerLayoutPreviewAlert();
     }
 }

@@ -8,6 +8,8 @@ namespace MgaSonicAnvil.UI;
 /// <summary>ステータスバーのスピーカーコンボ左。旧 SPEAKER 文字の代わり。</summary>
 internal sealed class StatusSpeakerIcon : FrameworkElement
 {
+    private bool _alert;
+
     public StatusSpeakerIcon()
     {
         Width = DesignMetrics.StatusSpeakerIconSide;
@@ -20,6 +22,22 @@ internal sealed class StatusSpeakerIcon : FrameworkElement
         AutomationProperties.SetName(this, UiStrings.LabelSpeaker);
         UiThemeService.Changed += OnThemeChanged;
         Unloaded += (_, _) => UiThemeService.Changed -= OnThemeChanged;
+    }
+
+    /// <summary>チャンネルマスク／配置の食い違いでプレビューが危ういとき true（赤表示）。</summary>
+    public bool Alert
+    {
+        get => _alert;
+        set
+        {
+            if (_alert == value)
+            {
+                return;
+            }
+
+            _alert = value;
+            InvalidateVisual();
+        }
     }
 
     private void OnThemeChanged(object? sender, EventArgs e) => InvalidateVisual();
@@ -39,7 +57,7 @@ internal sealed class StatusSpeakerIcon : FrameworkElement
             dc,
             TransportIcon.StudioSpeaker,
             bounds,
-            Theme.Get("PrimaryForeBrush"),
+            Theme.Get(_alert ? "LoudnessDangerBrush" : "PrimaryForeBrush"),
             isPlaying: false,
             UiThemeService.Current,
             accent: true);

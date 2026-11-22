@@ -39,7 +39,10 @@ internal sealed class AppSettings
     /// <summary>有効にするスピーカー定義。空は Stereo のみ。</summary>
     public string[] VisibleSpeakerPresetIds { get; set; } = [];
 
-    /// <summary>アクティブファイルの本数に合わせてスピーカー定義を選ぶ。既定オフ。</summary>
+    /// <summary>
+    /// アクティブファイルの本数／チャンネルマスクに合わせてスピーカー定義を選ぶ。既定オフ。
+    /// マスクが有効な配置（カスタム含む）に一致すれば本数より優先する。
+    /// </summary>
     public bool AutoSpeakerSelect { get; set; }
 
     /// <summary>新規録音などの既定サンプリングレート。既定 48000。</summary>
@@ -721,11 +724,17 @@ internal sealed class AppSettings
         return FindSpeaker(ActiveSpeakerPresetId) ?? SpeakerPresets[0];
     }
 
-    public string[] ResolvedVisibleSpeakerIds() =>
-        SpeakerPreset.NormalizeVisibleIds(VisibleSpeakerPresetIds);
+    public string[] ResolvedVisibleSpeakerIds()
+    {
+        EnsureSpeakerPresets();
+        return SpeakerPreset.NormalizeVisibleIds(VisibleSpeakerPresetIds, SpeakerPresets);
+    }
 
-    public void ApplyVisibleSpeakerIds(IEnumerable<string> ids) =>
-        VisibleSpeakerPresetIds = SpeakerPreset.NormalizeVisibleIds(ids);
+    public void ApplyVisibleSpeakerIds(IEnumerable<string> ids)
+    {
+        EnsureSpeakerPresets();
+        VisibleSpeakerPresetIds = SpeakerPreset.NormalizeVisibleIds(ids, SpeakerPresets);
+    }
 
     public SpeakerPreset[] MenuSpeakers()
     {
@@ -733,11 +742,9 @@ internal sealed class AppSettings
         return SpeakerPreset.FilterMenu(SpeakerPresets, ResolvedVisibleSpeakerIds(), ActiveSpeakerPresetId);
     }
 
-    public ChannelLayout ResolvedRecordLayout() =>
-        ChannelLayout.Parse(ResolvedSpeaker().Id);
+    public ChannelLayout ResolvedRecordLayout() => ResolvedSpeaker().ToLayout();
 
-    public ChannelLayout ResolvedPlaybackLayout() =>
-        ChannelLayout.Parse(ResolvedSpeaker().Id);
+    public ChannelLayout ResolvedPlaybackLayout() => ResolvedSpeaker().ToLayout();
 
     public int[] ResolvedRecordInputMap() => ResolvedSpeaker().RecordInputMap ?? [];
 
@@ -829,21 +836,53 @@ internal sealed class AppSettings
     public int ResolvedDefaultBitsPerSample() => DefaultAudioFormat.ClampBitDepth(DefaultBitsPerSample);
 
     public ChannelLayout ResolvedDefaultChannelLayout() =>
-        DefaultAudioFormat.ClampPickerLayout(DefaultChannelLayout, ResolvedVisibleSpeakerIds());
+        ResolveAudioFormatSpec(DefaultSampleRate, DefaultBitsPerSample, DefaultChannelLayout).Layout;
 
     public DefaultAudioFormat.Spec ResolvedDefaultAudioFormat() =>
-        DefaultAudioFormat.Resolve(
-            DefaultSampleRate,
-            DefaultBitsPerSample,
-            DefaultChannelLayout,
-            ResolvedVisibleSpeakerIds());
+        ResolveAudioFormatSpec(DefaultSampleRate, DefaultBitsPerSample, DefaultChannelLayout);
 
     public DefaultAudioFormat.Spec ResolvedLastNewAudioFormat() =>
-        DefaultAudioFormat.Resolve(
+        ResolveAudioFormatSpec(
             LastNewSampleRate == 0 ? DefaultSampleRate : LastNewSampleRate,
             LastNewBitsPerSample == 0 ? DefaultBitsPerSample : LastNewBitsPerSample,
-            string.IsNullOrWhiteSpace(LastNewChannelLayout) ? DefaultChannelLayout : LastNewChannelLayout,
-            ResolvedVisibleSpeakerIds());
+            string.IsNullOrWhiteSpace(LastNewChannelLayout) ? DefaultChannelLayout : LastNewChannelLayout);
+
+    public DefaultAudioFormat.Spec ResolveAudioFormatSpec(
+        int sampleRate,
+        int bitsPerSample,
+        string? channelLayoutId)
+    {
+        EnsureSpeakerPresets();
+        var visible = ResolvedVisibleSpeakerIds();
+        if (FindSpeaker(channelLayoutId) is { } preset
+            && visible.Contains(preset.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            return new(
+                DefaultAudioFormat.ClampSampleRate(sampleRate),
+                DefaultAudioFormat.ClampBitDepth(bitsPerSample),
+                preset.ToLayout());
+        }
+
+        return DefaultAudioFormat.Resolve(sampleRate, bitsPerSample, channelLayoutId, visible);
+    }
+
+    public ChannelLayout[] ResolvedPickerLayouts()
+    {
+        EnsureSpeakerPresets();
+        var visible = new HashSet<string>(ResolvedVisibleSpeakerIds(), StringComparer.OrdinalIgnoreCase);
+        var list = new List<ChannelLayout>(DefaultAudioFormat.PickerLayouts(visible));
+        foreach (var preset in SpeakerPresets)
+        {
+            if (preset is null || !preset.IsCustom || !visible.Contains(preset.Id))
+            {
+                continue;
+            }
+
+            list.Add(preset.ToLayout());
+        }
+
+        return [.. list];
+    }
 
     public void RememberNewAudioFormat(DefaultAudioFormat.Spec format)
     {

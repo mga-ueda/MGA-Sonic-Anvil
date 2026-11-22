@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using MgaSonicAnvil.Audio;
@@ -31,7 +32,8 @@ public partial class MainWindow
         var format = NewDocumentWindow.Show(
             this,
             settings.ResolvedLastNewAudioFormat(),
-            settings.ResolvedVisibleSpeakerIds());
+            settings.ResolvedVisibleSpeakerIds(),
+            settings.SpeakerPresets);
         if (format is null)
         {
             return;
@@ -2463,9 +2465,12 @@ public partial class MainWindow
     private void TryApplyAutoSpeaker()
     {
         var channels = _document?.Channels ?? 0;
+        var mask = _document?.ChannelMask ?? 0;
         if (channels < 1)
         {
             _autoSpeakerSeenChannels = int.MinValue;
+            _autoSpeakerSeenMask = int.MinValue;
+            ApplySpeakerLayoutPreviewAlert();
             return;
         }
 
@@ -2473,6 +2478,8 @@ public partial class MainWindow
         if (IsRecording || !settings.AutoSpeakerSelect)
         {
             _autoSpeakerSeenChannels = channels;
+            _autoSpeakerSeenMask = mask;
+            ApplySpeakerLayoutPreviewAlert();
             return;
         }
 
@@ -2480,19 +2487,59 @@ public partial class MainWindow
             channels,
             settings.SpeakerPresets,
             settings.ResolvedVisibleSpeakerIds(),
-            settings.ActiveSpeakerPresetId);
+            settings.ActiveSpeakerPresetId,
+            channelMask: mask);
         if (id is not null)
         {
             ApplySpeakerPreset(id, persist: true);
         }
+        else
+        {
+            ApplySpeakerLayoutPreviewAlert();
+        }
 
         _autoSpeakerSeenChannels = channels;
+        _autoSpeakerSeenMask = mask;
     }
 
     private void RefreshSpeakerMenu()
     {
         var settings = AppStorage.Settings;
         SetSpeakerMenu(settings.MenuSpeakers(), settings.ActiveSpeakerPresetId);
+        ApplySpeakerLayoutPreviewAlert();
+    }
+
+    private void ApplySpeakerLayoutPreviewAlert()
+    {
+        var settings = AppStorage.Settings;
+        var conflict = _document is not null
+            && SpeakerPreset.HasPreviewLayoutConflict(
+                _document.Channels,
+                _document.ChannelMask,
+                settings.ActiveSpeakerPresetId,
+                settings.SpeakerPresets);
+        SpeakerMenuIcon.Alert = conflict;
+        SpeakerMenu.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
+        SpeakerMenuFrame.BorderBrush = Brushes.Transparent;
+        ApplySpeakerMenuFillAlert(conflict);
+        SpeakerMenu.ToolTip = conflict ? UiStrings.TipSpeakerLayoutPreviewConflict : null;
+        SpeakerMenuFrame.ToolTip = SpeakerMenu.ToolTip;
+    }
+
+    private void ApplySpeakerMenuFillAlert(bool conflict)
+    {
+        SpeakerMenu.ApplyTemplate();
+        if (SpeakerMenu.Template?.FindName("Fill", SpeakerMenu) is not Border fill)
+        {
+            return;
+        }
+
+        fill.SetResourceReference(
+            Border.BackgroundProperty,
+            conflict ? "LoudnessDangerBrush" : "PlayerComboFillBrush");
+        fill.SetResourceReference(
+            Border.BorderBrushProperty,
+            conflict ? "LoudnessDangerBrush" : "PlayerComboFillBrush");
     }
 
     private void SetSpeakerMenu(IReadOnlyList<SpeakerPreset> presets, string activeId)

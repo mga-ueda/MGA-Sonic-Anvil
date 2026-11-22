@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -60,6 +61,34 @@ public sealed class ChannelLayoutTests
             ChannelLayout.Parse("5.1"),
             [ChannelRouter.Off, ChannelRouter.Off, ChannelRouter.Off, ChannelRouter.Off, ChannelRouter.Off, ChannelRouter.Off]);
         Assert.Equal(["1", "2", "3", "4", "5", "6"], unused.Labels);
+    }
+
+    [Fact]
+    public void ForFile_CustomOrder_MatchesFileLanesWithIdentityMap()
+    {
+        // 実ファイル並び FL→FC→FR→SL→SR→LFE。恒等マップならレーン順＝ラベル順。
+        var custom = new ChannelLayout(
+            "custom:test",
+            6,
+            ["FL", "FC", "FR", "SL", "SR", "LFE"]);
+        Assert.Equal(
+            ["FL", "FC", "FR", "SL", "SR", "LFE"],
+            ChannelLayout.ForFile(6, custom).Labels);
+
+        var canonical = new ChannelLayout(
+            "custom:test2",
+            6,
+            SpeakerPreset.NormalizeCustomLabels(["FL", "FC", "FR", "SL", "SR", "LFE"], 6));
+        Assert.Equal(["L", "C", "R", "Sl", "Sr", "LFE"], canonical.Labels);
+        Assert.Equal(["L", "C", "R", "Sl", "Sr", "LFE"], ChannelLayout.ForFile(6, canonical).Labels);
+
+        // 5.1-Side（ビット昇順）を同じファイルに当てると中央がズレる。
+        Assert.Equal(
+            ["L", "R", "C", "LFE", "Sl", "Sr"],
+            ChannelLayout.ForFile(6, ChannelLayout.Parse("5.1-Side")).Labels);
+        Assert.NotEqual(
+            ChannelLayout.ForFile(6, canonical).Labels,
+            ChannelLayout.ForFile(6, ChannelLayout.Parse("5.1-Side")).Labels);
     }
 
     [Fact]

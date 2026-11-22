@@ -287,8 +287,8 @@
         <h4>Audio</h4>
         <ul>
           <li><strong>Default Wave format</strong> — 48 kHz / 24-bit / Stereo by default. Used for new files. Channels are enabled speakers plus Mono, which is always available.</li>
-          <li><strong>Auto speaker selection</strong> — off by default. See <a href="#auto-speaker">details</a>.</li>
-          <li><strong>Speaker layout</strong> — mono through Atmos, including game-oriented variants such as Quad, LCRS, 2.1, and 5.1 Side. You do not add your own. The file itself stays numbered. Each speaker is assigned a file channel (Ch), and only those lanes show L / C / LFE and so on. The default is 1, 2, 3…. Switching layouts without OK asks whether to save the current one.</li>
+          <li><strong>Auto speaker selection</strong> — off by default. When on, a matching channel mask (including custom layouts) is preferred over channel-count matching. See <a href="#auto-speaker">details</a>.</li>
+          <li><strong>Speaker layout</strong> — mono through Atmos, including game-oriented variants such as Quad, LCRS, 2.1, and 5.1 Side, plus custom layouts you add. The file itself stays numbered. Each speaker is assigned a file channel (Ch), and only those lanes show L / C / LFE and so on. The default is 1, 2, 3…. Switching layouts without OK asks whether to save the current one.</li>
           <li><strong>API and device</strong> — WaveOut / WASAPI / ASIO, and the audio device.</li>
           <li><strong>Record / playback ports and Ch</strong> — speaker names come from the layout, port names from the device. Ch is shared by record and playback. Off leaves the speaker unused. Record has level meters.</li>
           <li><strong>Test tone</strong> — per-playback-port Sine -20 dB (1 kHz, or 80 Hz on LFE) plus an English spoken channel-name Voice (not on LFE).</li>
@@ -1169,10 +1169,10 @@
       </ul>
 
       <h3 id="auto-speaker">10-1. Auto speaker selection</h3>
-      <p>A checkbox on Settings → Audio, under Default Wave format. It is off by default. When on, the app switches to an enabled layout that matches the number of channels in the current file. It runs when you open a file, bring a tab to the front, create a new file, or convert the channel count. It looks at the count only; it does not guess 5.1 from the file type.</p>
+      <p>A checkbox on Settings → Audio, under Default Wave format. It is off by default. When on, if the WAVE Channel Mask or AIFF CHAN matches an enabled layout (including custom), that layout is chosen before falling back to channel-count matching. With no mask or no match, the count-based rules apply as before. It runs when you open a file, bring a tab to the front, create a new file, convert the channel count, or edit the channel mask.</p>
       <ul>
-        <li><strong>When it helps</strong> — 1–2 channels use Stereo. 6 channels pick 5.1 when that layout is enabled. If only one enabled layout has that count, it is used. With only Stereo enabled, a 6-channel file is left as-is.</li>
-        <li><strong>Watch out</strong> — If the current layout already has the same count, it stays. Switching stops playback and recording, and uses that layout’s device. If Stereo is headphones and 5.1 is another interface, the output jumps when you change tabs. Leave this off if you want to keep hearing a 6-channel file mixed down to Stereo.</li>
+        <li><strong>When it helps</strong> — 1–2 channels use Stereo. Six channels with a 5.1 Side mask pick Side; otherwise an enabled 5.1. If only one enabled layout has that count, it is used. With only Stereo enabled, a 6-channel file is left as-is.</li>
+        <li><strong>Watch out</strong> — With no mask, if the current layout already has the same count, it stays. Switching stops playback and recording, and uses that layout’s device. If Stereo is headphones and 5.1 is another interface, the output jumps when you change tabs. Leave this off if you want to keep hearing a 6-channel file mixed down to Stereo.</li>
       </ul>
 
       <h3 id="mp3-downmix">10-2. MP3 downmix</h3>

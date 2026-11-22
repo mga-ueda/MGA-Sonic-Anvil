@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -13,12 +14,17 @@ internal sealed class NewDocumentWindow : Window
     private readonly ComboBox _bitsCombo = CreateCombo();
     private readonly ComboBox _layoutCombo = CreateCombo();
     private readonly string[] _visibleIds;
+    private readonly SpeakerPreset[] _presets;
 
     public DefaultAudioFormat.Spec SelectedFormat { get; private set; }
 
-    public static DefaultAudioFormat.Spec? Show(Window owner, DefaultAudioFormat.Spec current, IEnumerable<string> visibleIds)
+    public static DefaultAudioFormat.Spec? Show(
+        Window owner,
+        DefaultAudioFormat.Spec current,
+        IEnumerable<string> visibleIds,
+        IEnumerable<SpeakerPreset>? presets = null)
     {
-        var dialog = new NewDocumentWindow(current, visibleIds)
+        var dialog = new NewDocumentWindow(current, visibleIds, presets)
         {
             Owner = owner,
         };
@@ -26,16 +32,20 @@ internal sealed class NewDocumentWindow : Window
         return AcrylicDialogChrome.ShowDialog(dialog) == true ? dialog.SelectedFormat : null;
     }
 
-    private NewDocumentWindow(DefaultAudioFormat.Spec current, IEnumerable<string> visibleIds)
+    private NewDocumentWindow(
+        DefaultAudioFormat.Spec current,
+        IEnumerable<string> visibleIds,
+        IEnumerable<SpeakerPreset>? presets)
     {
         _visibleIds = [.. visibleIds];
+        _presets = presets as SpeakerPreset[] ?? presets?.ToArray() ?? [];
         SelectedFormat = current;
         Title = UiStrings.DialogNewDocumentTitle;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Foreground = (Brush)FindResource("PrimaryForeBrush");
         AcrylicDialogChrome.Prepare(this);
-        AudioFormatComboFill.Fill(_rateCombo, _bitsCombo, _layoutCombo, current, _visibleIds);
-                        
+        AudioFormatComboFill.Fill(_rateCombo, _bitsCombo, _layoutCombo, current, _visibleIds, _presets);
+
         var ok = CreateButton(UiStrings.ButtonOkMnemonic, accept: true, accent: true, isDefault: true);
         var cancel = CreateButton(UiStrings.ButtonCancelMnemonic, accept: false);
         var buttons = new StackPanel
@@ -62,7 +72,7 @@ internal sealed class NewDocumentWindow : Window
 
     private void Accept()
     {
-        SelectedFormat = AudioFormatComboFill.Read(_rateCombo, _bitsCombo, _layoutCombo, _visibleIds);
+        SelectedFormat = AudioFormatComboFill.Read(_rateCombo, _bitsCombo, _layoutCombo, _visibleIds, _presets);
         DialogResult = true;
         Close();
     }
@@ -133,7 +143,7 @@ internal sealed class NewDocumentWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(left, 0, 8, 0),
         };
-                Grid.SetColumn(text, column);
+        Grid.SetColumn(text, column);
         Grid.SetColumn(combo, column + 1);
         grid.Children.Add(text);
         grid.Children.Add(combo);

@@ -1809,7 +1809,7 @@ internal partial class AudioSettingsWindow : Window
         FlushCurrentSpeaker();
         SelectedSettings = ReadOutputSettings();
         SelectedPresets = SpeakerPreset.CloneAll(_presets);
-        SelectedVisibleSpeakerIds = SpeakerPreset.NormalizeVisibleIds(_visibleIds);
+        SelectedVisibleSpeakerIds = SpeakerPreset.NormalizeVisibleIds(_visibleIds, _presets);
         SelectedLibraryExplorerRoots = LibraryExplorerRootsList.Items
             .OfType<LibraryExplorerRootItem>()
             .Select(item => item.Path)
@@ -1861,7 +1861,8 @@ internal partial class AudioSettingsWindow : Window
             DefaultSampleRateCombo,
             DefaultBitDepthCombo,
             DefaultChannelLayoutCombo,
-            _visibleIds);
+            _visibleIds,
+            _presets);
         SelectedDefaultSampleRate = format.SampleRate;
         SelectedDefaultBitsPerSample = format.BitsPerSample;
         SelectedDefaultChannelLayout = format.Layout.Id;
@@ -2069,11 +2070,10 @@ internal partial class AudioSettingsWindow : Window
 
     private void FillDefaultAudioFormat()
     {
-        var current = DefaultAudioFormat.Resolve(
+        var current = ResolveFormatSpec(
             SelectedDefaultSampleRate,
             SelectedDefaultBitsPerSample,
-            SelectedDefaultChannelLayout,
-            _visibleIds);
+            SelectedDefaultChannelLayout);
         SelectedDefaultSampleRate = current.SampleRate;
         SelectedDefaultBitsPerSample = current.BitsPerSample;
         SelectedDefaultChannelLayout = current.Layout.Id;
@@ -2082,7 +2082,22 @@ internal partial class AudioSettingsWindow : Window
             DefaultBitDepthCombo,
             DefaultChannelLayoutCombo,
             current,
-            _visibleIds);
+            _visibleIds,
+            _presets);
+    }
+
+    private DefaultAudioFormat.Spec ResolveFormatSpec(int sampleRate, int bits, string? layoutId)
+    {
+        if (FindPreset(layoutId) is { } preset
+            && _visibleIds.Contains(preset.Id))
+        {
+            return new(
+                DefaultAudioFormat.ClampSampleRate(sampleRate),
+                DefaultAudioFormat.ClampBitDepth(bits),
+                preset.ToLayout());
+        }
+
+        return DefaultAudioFormat.Resolve(sampleRate, bits, layoutId, _visibleIds);
     }
 
     private void FillWindowsBitRates(int currentKbps)
@@ -2482,7 +2497,7 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private ChannelLayout ReadRecordLayout() =>
-        ChannelLayout.Parse((_editingSpeaker ?? CurrentSpeaker())?.Id);
+        (_editingSpeaker ?? CurrentSpeaker())?.ToLayout() ?? ChannelLayout.Stereo;
 
     private ChannelLayout ReadPlaybackLayout() =>
         ReadRecordLayout();
@@ -3198,9 +3213,24 @@ internal partial class AudioSettingsWindow : Window
         var widest = 0d;
         foreach (var child in SpeakerVisibilityHost.Children)
         {
-            if (child is CheckBox box)
+            switch (child)
             {
-                widest = Math.Max(widest, MeasureCheckBoxContentWidth(box));
+                case CheckBox box:
+                    widest = Math.Max(widest, MeasureCheckBoxContentWidth(box));
+                    break;
+                case Grid row:
+                    foreach (var nested in row.Children)
+                    {
+                        if (nested is CheckBox nestedBox)
+                        {
+                            widest = Math.Max(widest, MeasureCheckBoxContentWidth(nestedBox) + DesignMetrics.From96(140));
+                        }
+                    }
+
+                    break;
+                case FrameworkElement element:
+                    widest = Math.Max(widest, ComboBoxFit.MeasureText(this, element is ContentControl c ? c.Content?.ToString() ?? string.Empty : string.Empty, 11.333) + 36);
+                    break;
             }
         }
 
@@ -3367,9 +3397,8 @@ internal partial class AudioSettingsWindow : Window
                     Content = CreateCheckAccessContent(
                         WithUniqueAccessKey(preset.DisplayName(), usedAccessKeys)),
                     IsChecked = _visibleIds.Contains(preset.Id),
-                    Margin = new Thickness(0, 0, 0, 6),
-                    Tag = preset.Id,
                     VerticalContentAlignment = VerticalAlignment.Center,
+                    Tag = preset.Id,
                 };
                 if (style is not null)
                 {
@@ -3378,13 +3407,173 @@ internal partial class AudioSettingsWindow : Window
 
                 box.Checked += SpeakerVisibility_Changed;
                 box.Unchecked += SpeakerVisibility_Changed;
-                                SpeakerVisibilityHost.Children.Add(box);
+
+                if (!preset.IsCustom)
+                {
+                    box.Margin = new Thickness(0, 0, 0, 6);
+                    SpeakerVisibilityHost.Children.Add(box);
+                    continue;
+                }
+
+                var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                Grid.SetColumn(box, 0);
+                row.Children.Add(box);
+
+                var edit = CreateSpeakerVisibilityActionButton(UiStrings.ButtonEditCustomSpeakerLayout);
+                edit.Click += (_, _) => EditCustomSpeakerLayout(preset.Id);
+                Grid.SetColumn(edit, 1);
+                row.Children.Add(edit);
+
+                var remove = CreateSpeakerVisibilityActionButton(UiStrings.ButtonRemoveCustomSpeakerLayout);
+                remove.Click += (_, _) => RemoveCustomSpeakerLayout(preset.Id);
+                Grid.SetColumn(remove, 2);
+                row.Children.Add(remove);
+
+                SpeakerVisibilityHost.Children.Add(row);
             }
+
+            var add = new RoundedButton
+            {
+                Content = UiStrings.ButtonAddCustomSpeakerLayout,
+                Height = DesignMetrics.AudioDialogButtonHeight,
+                Margin = new Thickness(0, 4, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Padding = new Thickness(10, 0, 10, 0),
+            };
+            ActionButtonLooks.ApplyClear(add);
+            add.Click += (_, _) => AddCustomSpeakerLayout();
+            SpeakerVisibilityHost.Children.Add(add);
         }
         finally
         {
             _syncingVisibility = false;
         }
+    }
+
+    private RoundedButton CreateSpeakerVisibilityActionButton(string content)
+    {
+        var button = new RoundedButton
+        {
+            Content = content,
+            Height = DesignMetrics.AudioDialogButtonHeight,
+            Margin = new Thickness(6, 0, 0, 0),
+            Padding = new Thickness(8, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        ActionButtonLooks.ApplyClear(button);
+        return button;
+    }
+
+    private void AddCustomSpeakerLayout()
+    {
+        var created = CustomSpeakerLayoutDialog.Show(this);
+        if (created is null)
+        {
+            return;
+        }
+
+        FlushCurrentSpeaker();
+        _presets.Add(created);
+        _visibleIds.Add(created.Id);
+        AfterCustomSpeakerLayoutsChanged(created.Id);
+    }
+
+    private void EditCustomSpeakerLayout(string id)
+    {
+        var existing = FindPreset(id);
+        if (existing is null || !existing.IsCustom)
+        {
+            return;
+        }
+
+        // オーディオタブで触った入出力マップを先にプリセットへ戻す。
+        if (SelectedActiveSpeakerId.Equals(id, StringComparison.OrdinalIgnoreCase)
+            || (_editingSpeaker?.Id.Equals(id, StringComparison.OrdinalIgnoreCase) ?? false))
+        {
+            FlushCurrentSpeaker();
+            existing = FindPreset(id) ?? existing;
+        }
+
+        var edited = CustomSpeakerLayoutDialog.Show(this, existing);
+        if (edited is null)
+        {
+            return;
+        }
+
+        edited.AudioApi = existing.AudioApi;
+        edited.AudioDeviceId = existing.AudioDeviceId;
+        edited.RecordInputMap = SpeakerPreset.SnapshotMap(existing.RecordInputMap, edited.Channels);
+        edited.PlaybackOutputMap = SpeakerPreset.SnapshotMap(existing.PlaybackOutputMap, edited.Channels);
+        edited.FileChannelMap = SpeakerPreset.SnapshotMap(existing.FileChannelMap, edited.Channels);
+
+        var index = _presets.FindIndex(p => p.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0)
+        {
+            _presets[index] = edited;
+        }
+
+        if (SelectedActiveSpeakerId.Equals(id, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedActiveSpeakerId = edited.Id;
+        }
+
+        AfterCustomSpeakerLayoutsChanged(edited.Id);
+    }
+
+    private void RemoveCustomSpeakerLayout(string id)
+    {
+        var existing = FindPreset(id);
+        if (existing is null || !existing.IsCustom)
+        {
+            return;
+        }
+
+        if (OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.ConfirmRemoveCustomSpeakerLayout(existing.DisplayName()),
+                UiStrings.DialogSettingsTitle,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        FlushCurrentSpeaker();
+        _presets.RemoveAll(p => p.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        _visibleIds.Remove(id);
+        if (_visibleIds.Count == 0)
+        {
+            _visibleIds.Add(SpeakerPreset.DefaultId);
+        }
+
+        if (SelectedActiveSpeakerId.Equals(id, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedActiveSpeakerId = _visibleIds.FirstOrDefault() ?? SpeakerPreset.DefaultId;
+        }
+
+        AfterCustomSpeakerLayoutsChanged(SelectedActiveSpeakerId);
+    }
+
+    private void AfterCustomSpeakerLayoutsChanged(string? selectSpeakerId)
+    {
+        FillSpeakerVisibility();
+        FillSpeakers(selectSpeakerId ?? SelectedActiveSpeakerId);
+        // FillSpeakers は SelectionChanged を抑止するため、入出力 UI を明示的に載せ直す。
+        var active = FindPreset(selectSpeakerId ?? SelectedActiveSpeakerId)
+            ?? (SpeakerCombo.SelectedItem is SpeakerItem item ? item.Preset : null)
+            ?? (_presets.Count > 0 ? _presets[0] : null);
+        if (active is not null)
+        {
+            LoadSpeakerEditors(active, releaseDevice: false);
+        }
+
+        FillDefaultAudioFormat();
+        ComboBoxFit.Apply(SpeakerCombo);
+        ComboBoxFit.Apply(DefaultChannelLayoutCombo);
+        FitSettingCombos();
     }
 
     private void SpeakerVisibility_Changed(object sender, RoutedEventArgs e)
@@ -3421,7 +3610,8 @@ internal partial class AudioSettingsWindow : Window
             DefaultSampleRateCombo,
             DefaultBitDepthCombo,
             DefaultChannelLayoutCombo,
-            _visibleIds);
+            _visibleIds,
+            _presets);
         SelectedDefaultSampleRate = format.SampleRate;
         SelectedDefaultBitsPerSample = format.BitsPerSample;
         SelectedDefaultChannelLayout = format.Layout.Id;
@@ -3438,13 +3628,36 @@ internal partial class AudioSettingsWindow : Window
         var n = 0;
         foreach (var child in SpeakerVisibilityHost.Children)
         {
-            if (child is CheckBox box && box.IsChecked == true)
+            foreach (var box in EnumerateVisibilityCheckBoxes(child))
             {
-                n++;
+                if (box.IsChecked == true)
+                {
+                    n++;
+                }
             }
         }
 
         return n;
+    }
+
+    private static IEnumerable<CheckBox> EnumerateVisibilityCheckBoxes(object child)
+    {
+        switch (child)
+        {
+            case CheckBox box:
+                yield return box;
+                break;
+            case Panel panel:
+                foreach (var nested in panel.Children)
+                {
+                    foreach (var box in EnumerateVisibilityCheckBoxes(nested))
+                    {
+                        yield return box;
+                    }
+                }
+
+                break;
+        }
     }
 
     private void LoadSpeakerEditors(SpeakerPreset speaker, bool releaseDevice)

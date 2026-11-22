@@ -90,16 +90,23 @@
                                  Margin="0,0,6,0"
                                  Click="AlwaysOnTopLatch_Click" />
           <ui:StatusSpeakerIcon x:Name="SpeakerMenuIcon" />
-          <ComboBox x:Name="SpeakerMenu"
-                    Style="{StaticResource StatusTimecodeComboStyle}"
-                    Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
-                    MinWidth="{x:Static ui:DesignMetrics.TransportSpeakerComboWidth}"
-                    MaxHeight="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
-                    Padding="6,1,6,1"
-                    FontSize="11"
-                    VerticalAlignment="Center"
-                    VerticalContentAlignment="Center"
-                    SelectionChanged="SpeakerMenu_SelectionChanged" />
+          <Border x:Name="SpeakerMenuFrame"
+                  BorderThickness="1"
+                  BorderBrush="Transparent"
+                  CornerRadius="{ui:ControlCorner}"
+                  VerticalAlignment="Center"
+                  SnapsToDevicePixels="True">
+            <ComboBox x:Name="SpeakerMenu"
+                      Style="{StaticResource StatusTimecodeComboStyle}"
+                      Height="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
+                      MinWidth="{x:Static ui:DesignMetrics.TransportSpeakerComboWidth}"
+                      MaxHeight="{x:Static ui:DesignMetrics.StatusTimecodeBoxHeight}"
+                      Padding="6,1,6,1"
+                      FontSize="11"
+                      VerticalAlignment="Center"
+                      VerticalContentAlignment="Center"
+                      SelectionChanged="SpeakerMenu_SelectionChanged" />
+          </Border>
         </StackPanel>
         <ui:StatusTimeStrip x:Name="StatusTimes"
                             Grid.Column="2"

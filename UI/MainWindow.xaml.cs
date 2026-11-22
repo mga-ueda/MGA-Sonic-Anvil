@@ -169,6 +169,7 @@ public partial class MainWindow : Window
     /// <summary>直前にトーストした位置キー（同じ曲では再フラッシュしない）。</summary>
     private string? _playlistTrackIndexToastKey;
     private int _autoSpeakerSeenChannels = int.MinValue;
+    private int _autoSpeakerSeenMask = int.MinValue;
     private TimeScrollBar TimeScroll => TimeScrollStrip.Bar;
     private WaveformView Waveform => _tileActiveView ?? PrimaryWaveform;
 

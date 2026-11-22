@@ -3547,7 +3547,8 @@ public partial class MainWindow
         RefreshHistoryStrip();
         RefreshLibraryBrowser();
         RefreshTransportCommandsEnabled();
-        if (_document.Channels != _autoSpeakerSeenChannels)
+        if (_document.Channels != _autoSpeakerSeenChannels
+            || _document.ChannelMask != _autoSpeakerSeenMask)
         {
             TryApplyAutoSpeaker();
         }

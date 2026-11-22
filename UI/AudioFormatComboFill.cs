@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
@@ -14,9 +15,14 @@ internal sealed record AudioBitDepthItem(int Bits)
     public override string ToString() => UiStrings.FormatBitDepth(Bits);
 }
 
-internal sealed record AudioLayoutItem(ChannelLayout Layout)
+internal sealed record AudioLayoutItem(ChannelLayout Layout, string Label)
 {
-    public override string ToString() => Layout.MenuLabel;
+    public AudioLayoutItem(ChannelLayout layout)
+        : this(layout, layout.MenuLabel)
+    {
+    }
+
+    public override string ToString() => Label;
 }
 
 /// <summary>設定と新規ダイアログで同じフォーマット一覧を出す。</summary>
@@ -27,18 +33,20 @@ internal static class AudioFormatComboFill
         ComboBox bitsCombo,
         ComboBox layoutCombo,
         DefaultAudioFormat.Spec current,
-        IEnumerable<string>? visibleIds)
+        IEnumerable<string>? visibleIds,
+        IEnumerable<SpeakerPreset>? presets = null)
     {
         FillRates(rateCombo, current.SampleRate);
         FillBits(bitsCombo, current.BitsPerSample);
-        FillLayouts(layoutCombo, current.Layout.Id, visibleIds);
+        FillLayouts(layoutCombo, current.Layout.Id, visibleIds, presets);
     }
 
     public static DefaultAudioFormat.Spec Read(
         ComboBox rateCombo,
         ComboBox bitsCombo,
         ComboBox layoutCombo,
-        IEnumerable<string>? visibleIds)
+        IEnumerable<string>? visibleIds,
+        IEnumerable<SpeakerPreset>? presets = null)
     {
         var rate = rateCombo.SelectedItem is AudioRateItem rateItem
             ? rateItem.Hertz
@@ -46,10 +54,15 @@ internal static class AudioFormatComboFill
         var bits = bitsCombo.SelectedItem is AudioBitDepthItem bitsItem
             ? bitsItem.Bits
             : DefaultAudioFormat.BitsPerSample;
-        var layoutId = layoutCombo.SelectedItem is AudioLayoutItem layoutItem
-            ? layoutItem.Layout.Id
-            : DefaultAudioFormat.ChannelLayoutId;
-        return DefaultAudioFormat.Resolve(rate, bits, layoutId, visibleIds);
+        if (layoutCombo.SelectedItem is AudioLayoutItem layoutItem)
+        {
+            return new(
+                DefaultAudioFormat.ClampSampleRate(rate),
+                DefaultAudioFormat.ClampBitDepth(bits),
+                layoutItem.Layout);
+        }
+
+        return DefaultAudioFormat.Resolve(rate, bits, DefaultAudioFormat.ChannelLayoutId, visibleIds);
     }
 
     private static void FillRates(ComboBox combo, int current)
@@ -99,12 +112,20 @@ internal static class AudioFormatComboFill
         combo.SelectedItem = selected ?? fallback ?? combo.Items[^1];
     }
 
-    private static void FillLayouts(ComboBox combo, string currentId, IEnumerable<string>? visibleIds)
+    private static void FillLayouts(
+        ComboBox combo,
+        string currentId,
+        IEnumerable<string>? visibleIds,
+        IEnumerable<SpeakerPreset>? presets)
     {
         combo.Items.Clear();
         AudioLayoutItem? selected = null;
         AudioLayoutItem? stereo = null;
-        foreach (var layout in DefaultAudioFormat.PickerLayouts(visibleIds))
+        var visible = new HashSet<string>(
+            SpeakerPreset.NormalizeVisibleIds(visibleIds, presets),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var layout in DefaultAudioFormat.PickerLayouts(visible))
         {
             var item = new AudioLayoutItem(layout);
             combo.Items.Add(item);
@@ -119,6 +140,24 @@ internal static class AudioFormatComboFill
             }
         }
 
-        combo.SelectedItem = selected ?? stereo ?? combo.Items[0];
+        if (presets is not null)
+        {
+            foreach (var preset in presets)
+            {
+                if (preset is null || !preset.IsCustom || !visible.Contains(preset.Id))
+                {
+                    continue;
+                }
+
+                var item = new AudioLayoutItem(preset.ToLayout(), preset.DisplayName());
+                combo.Items.Add(item);
+                if (preset.Id.Equals(currentId, StringComparison.OrdinalIgnoreCase))
+                {
+                    selected = item;
+                }
+            }
+        }
+
+        combo.SelectedItem = selected ?? stereo ?? (combo.Items.Count > 0 ? combo.Items[0] : null);
     }
 }

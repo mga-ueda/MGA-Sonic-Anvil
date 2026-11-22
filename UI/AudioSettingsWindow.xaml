@@ -690,6 +690,7 @@
               <CheckBox x:Name="AutoSpeakerSelectBox"
                         Style="{StaticResource DarkCheckBoxStyle}"
                         Content="{x:Static domain:UiStrings.LabelAutoSpeakerSelect}"
+                        ToolTip="{x:Static domain:UiStrings.TipAutoSpeakerSelect}"
                         Margin="0,0,0,14"
                         VerticalAlignment="Center"
                         VerticalContentAlignment="Center" />
