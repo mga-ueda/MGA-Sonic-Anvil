@@ -2521,6 +2521,60 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void Playlist_ShiftExtend_AfterQuietSync_KeepsBandWhenExtendingAgain()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[12];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                sessions[i] = Session($"{i:00}.mp3");
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 480,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetGroup(LibraryFileGroup.None);
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            for (var i = 0; i < 5; i++)
+            {
+                view.MoveSelection(1, extend: true);
+            }
+
+            Flush();
+            Assert.Equal(6, view.SelectedSessions.Length);
+            Assert.Same(sessions[5], view.SelectedSession);
+
+            // キー離し後のプレビュー／再生追従相当。帯は残すがアンカーをキャレットへ寄せがち。
+            view.SelectSessionQuiet(sessions[5]);
+            Flush();
+            view.FlushPlaylistMoveDefer();
+            Flush();
+            Assert.Equal(6, view.SelectedSessions.Length);
+
+            view.MoveSelection(1, extend: true);
+            Flush();
+            Assert.Equal(7, view.SelectedSessions.Length);
+            Assert.Same(sessions[6], view.SelectedSession);
+            Assert.Contains(sessions[0], view.SelectedSessions);
+            Assert.Contains(sessions[6], view.SelectedSessions);
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void Playlist_ShiftEndAndPage_ExtendsSelection()
     {
         RunSta(() =>

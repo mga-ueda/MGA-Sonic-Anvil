@@ -3287,12 +3287,8 @@ internal sealed partial class LibraryBrowserView : UserControl
             }
             else
             {
-                // アンカーが無い／表示順とずれたあとは、今のキャレットを起点にする。
-                if (_anchorIndex < 0 || _anchorIndex >= files.Count)
-                {
-                    var caret = PlaylistFileIndexOfSelected(files);
-                    _anchorIndex = caret >= 0 ? caret : index;
-                }
+                // アンカーが無い／帯維持中にキャレットへ寄ったあとも、連続帯の反対端から伸ばす。
+                _anchorIndex = ResolvePlaylistExtendAnchor(files, index);
 
                 // SelectPlaylistFileRange も _syncing を触るので、ネストではなく中身だけ使う。
                 ApplyPlaylistFileRangeCore(_anchorIndex, index, files);
@@ -5433,7 +5429,17 @@ internal sealed partial class LibraryBrowserView : UserControl
             try
             {
                 SyncPlaylistCaretToGrid(current);
-                SetPlaylistAnchorToRow(current);
+                // 複数帯を保つときは Shift 範囲の起点をキャレットへ寄せない
+                // （プレビュー読込や Quiet 同期のあと、追加の Shift 選択が帯ごと消えるのを防ぐ）。
+                if (keep.Count <= 1)
+                {
+                    SetPlaylistAnchorToRow(current);
+                }
+                else
+                {
+                    PreservePlaylistAnchorAfterMultiKeep(keep, current);
+                }
+
                 PinSelectionCurrent();
                 // 内容だけの差し替えではスクロールしない（Alt+↑／↓ の表示位置を守る）。
                 if (ensureVisible)
@@ -5518,6 +5524,141 @@ internal sealed partial class LibraryBrowserView : UserControl
     private void SetPlaylistAnchorToRow(LibraryFileRow? row)
     {
         _anchorIndex = PlaylistFileIndexOfRow(row);
+    }
+
+    /// <summary>
+    /// Shift+↑↓／Shift+クリックの範囲起点。連続帯がありキャレットが端なら反対端を使う。
+    /// Quiet 同期などでアンカーがキャレットへ寄っていても、追加選択で帯を消さない。
+    /// </summary>
+    private int ResolvePlaylistExtendAnchor(IReadOnlyList<LibraryFileRow> files, int targetIndex)
+    {
+        var caret = PlaylistFileIndexOfSelected(files);
+        if (TryGetContiguousPlaylistSelectionSpan(files, out var lo, out var hi)
+            && caret >= 0
+            && (caret == lo || caret == hi))
+        {
+            var far = caret == lo ? hi : lo;
+            // 既存アンカーが反対端ならそのまま。キャレットへ寄っていたら反対端へ戻す。
+            if (_anchorIndex == far)
+            {
+                return far;
+            }
+
+            if (_anchorIndex == caret || _anchorIndex < 0 || _anchorIndex >= files.Count)
+            {
+                return far;
+            }
+
+            // 帯の内側など意図した起点が残っていれば尊重する。
+            if (_anchorIndex >= lo && _anchorIndex <= hi)
+            {
+                return _anchorIndex;
+            }
+
+            return far;
+        }
+
+        if (_anchorIndex >= 0 && _anchorIndex < files.Count)
+        {
+            return _anchorIndex;
+        }
+
+        return caret >= 0 ? caret : targetIndex;
+    }
+
+    /// <summary>選択行がファイル表示順で途切れない帯ならその両端を返す。</summary>
+    private bool TryGetContiguousPlaylistSelectionSpan(
+        IReadOnlyList<LibraryFileRow> files,
+        out int lo,
+        out int hi)
+    {
+        lo = -1;
+        hi = -1;
+        if (_playlistSelectedRows.Count == 0 || files.Count == 0)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < files.Count; i++)
+        {
+            if (!_playlistSelectedRows.Contains(files[i]))
+            {
+                continue;
+            }
+
+            if (lo < 0)
+            {
+                lo = i;
+            }
+
+            hi = i;
+        }
+
+        return lo >= 0 && _playlistSelectedRows.Count == hi - lo + 1;
+    }
+
+    /// <summary>
+    /// 複数帯を保ったまま行を載せ替えたとき、有効な Shift 起点だけ残す。
+    /// キャレットへ寄っていたら連続帯の反対端へ戻す。
+    /// </summary>
+    private void PreservePlaylistAnchorAfterMultiKeep(
+        IReadOnlyList<DocumentSession> keep,
+        LibraryFileRow current)
+    {
+        var files = SnapshotPlaylistFiles();
+        var caret = PlaylistFileIndexOfRow(current);
+        if (TryGetContiguousPlaylistSelectionSpan(files, out var lo, out var hi)
+            && caret >= 0
+            && (caret == lo || caret == hi))
+        {
+            var far = caret == lo ? hi : lo;
+            if (_anchorIndex == far)
+            {
+                return;
+            }
+
+            if (_anchorIndex == caret || _anchorIndex < 0 || _anchorIndex >= files.Count)
+            {
+                _anchorIndex = far;
+                return;
+            }
+
+            if (_anchorIndex >= lo
+                && _anchorIndex <= hi
+                && files[_anchorIndex].Tag is DocumentSession inward
+                && KeepContainsSession(keep, inward))
+            {
+                return;
+            }
+
+            _anchorIndex = far;
+            return;
+        }
+
+        if (_anchorIndex >= 0
+            && _anchorIndex < files.Count
+            && files[_anchorIndex].Tag is DocumentSession anchored
+            && KeepContainsSession(keep, anchored))
+        {
+            return;
+        }
+
+        SetPlaylistAnchorToRow(current);
+    }
+
+    private static bool KeepContainsSession(
+        IReadOnlyList<DocumentSession> keep,
+        DocumentSession session)
+    {
+        for (var i = 0; i < keep.Count; i++)
+        {
+            if (ReferenceEquals(keep[i], session))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private int PlaylistFileIndexOfRow(LibraryFileRow? row)
@@ -5762,7 +5903,9 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        // 複数帯のキャレット追従ではアンカーを動かさない。素の単一選択のときだけ起点を更新。
         if ((Keyboard.Modifiers & ModifierKeys.Shift) == 0
+            && _playlistSelectedRows.Count <= 1
             && _grid.SelectedItem is LibraryFileRow selectedRow)
         {
             SetPlaylistAnchorToRow(selectedRow);
@@ -6026,7 +6169,8 @@ internal sealed partial class LibraryBrowserView : UserControl
 
             if (shift)
             {
-                var from = _anchorIndex >= 0 ? _anchorIndex : Math.Max(0, PlaylistFileIndexOfSelected(files));
+                var from = ResolvePlaylistExtendAnchor(files, index);
+                _anchorIndex = from;
                 SelectPlaylistFileRange(from, index, files);
             }
             else if (control)
