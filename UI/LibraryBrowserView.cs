@@ -3524,15 +3524,6 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>Page ジェスチャを開始する。リピート Flush でも lite を維持する。</summary>
     internal void ArmPlaylistPageNavLite() => _playlistPageNavLiteArmed = true;
 
-    private void ClearPlaylistLiteScrollSchedule()
-    {
-        _playlistLiteScrollTargetFileIndex = -1;
-        _playlistLiteScrollTargetOffset = null;
-        _playlistLiteScrollCatchUp = false;
-        _playlistLiteScrollChaseGeneration++;
-        _playlistLiteScrollChaseQueued = false;
-    }
-
     /// <summary>
     /// Page の目標 VerticalOffset（エクスプローラー相当）。
     /// いま見えている行への移動はスクロールしない。
@@ -4399,10 +4390,6 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     /// <summary>テスト用。グループ sticky の遅延通知が未 Flush か。</summary>
     internal bool IsPlaylistGroupViewportDirty => _playlistGroupViewportDirty;
-
-    /// <summary>テスト用。ホイール相当で Alt pin を外す。</summary>
-    internal void NotePlaylistViewportUserChangeForTest(bool releasePin) =>
-        NotePlaylistViewportUserChange(releasePin);
 
     private bool IsPlaylistAltScrollKeyHeld() =>
         PlaylistAltScrollKeyHeldForTest?.Invoke()
@@ -8049,8 +8036,6 @@ internal sealed class LibraryJacketReflectionView : Border
     }
 
     private static Brush? _cachedOpacityMask;
-
-    internal void RefreshMask() => OpacityMask = GetOpacityMask();
 
     internal static void InvalidateOpacityMaskCache() => _cachedOpacityMask = null;
 
