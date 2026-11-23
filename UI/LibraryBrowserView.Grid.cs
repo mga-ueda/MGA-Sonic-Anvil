@@ -125,6 +125,11 @@ internal sealed partial class LibraryBrowserView
         _grid.PreviewMouseLeftButtonDown += Grid_PreviewMouseLeftButtonDown;
         _grid.PreviewMouseWheel += Grid_PreviewMouseWheel;
         _grid.MouseDoubleClick += Grid_MouseDoubleClick;
+        // Alt+↑／↓ 後に選択行の BringIntoView がレイアウトでビューポートを戻すのを止める。
+        _grid.AddHandler(
+            FrameworkElement.RequestBringIntoViewEvent,
+            new RequestBringIntoViewEventHandler(Grid_RequestBringIntoView),
+            handledEventsToo: true);
         RebuildListContextMenu();
 
         var headerFactory = new FrameworkElementFactory(typeof(LibraryGroupHeader));

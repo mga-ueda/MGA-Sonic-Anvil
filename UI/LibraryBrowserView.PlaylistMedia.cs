@@ -749,6 +749,7 @@ internal sealed partial class LibraryBrowserView
         var keepFocus = _grid.IsKeyboardFocusWithin;
         var changed = false;
         var nextRows = _rows.ToArray();
+        var scroll = CapturePlaylistScroll();
         BeginRowSync();
         try
         {
@@ -787,7 +788,7 @@ internal sealed partial class LibraryBrowserView
 
             if (preserve.Length > 0)
             {
-                ApplyRowSelectionCore(active ?? preserve[0], preserve);
+                ApplyRowSelectionCore(active ?? preserve[0], preserve, ensureVisible: false);
             }
         }
         finally
@@ -798,6 +799,7 @@ internal sealed partial class LibraryBrowserView
         if (changed)
         {
             StabilizePlaylistSelectionAfterRowRewrite();
+            RestorePlaylistScrollAfterContentUpdate(scroll);
         }
 
         // フォーカスが外れたときだけ戻す。毎回 Ensure するとキー選択が阻害される。

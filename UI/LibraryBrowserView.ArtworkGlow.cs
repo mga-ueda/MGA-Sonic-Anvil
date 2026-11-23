@@ -264,16 +264,19 @@ internal sealed partial class LibraryBrowserView
         {
             var preserve = SelectedSessions;
             var active = SelectedSession;
+            var scroll = CapturePlaylistScroll();
             BeginRowSync();
             try
             {
                 ApplyGridStyles();
-                ApplyRowSelectionCore(active, preserve);
+                ApplyRowSelectionCore(active, preserve, ensureVisible: false);
             }
             finally
             {
                 EndRowSync();
             }
+
+            RestorePlaylistScrollAfterContentUpdate(scroll);
         }
     }
 

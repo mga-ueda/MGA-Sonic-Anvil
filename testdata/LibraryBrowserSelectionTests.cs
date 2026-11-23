@@ -6597,6 +6597,135 @@ public sealed class LibraryBrowserSelectionTests
         });
     }
 
+    [Fact]
+    public void ScrollPlaylistByRows_SurvivesLongDurationRowUpdate()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            // 画面に収まりきらない件数＋グループ化で、Alt スクロールと行差し替えが競合しうる状態にする。
+            var sessions = new DocumentSession[48];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var folder = i < 24 ? "Alpha" : "Radio";
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), folder, $"track-{i:D2}.mp3"));
+                document.ApplyTags(new AudioFileTags
+                {
+                    Probed = true,
+                    Title = $"Track {i:D2}",
+                    Artist = "K-ON",
+                    Album = folder,
+                    DurationSeconds = i == 30 ? 10 : 180,
+                });
+                sessions[i] = new DocumentSession(document);
+            }
+
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumns(LibraryColumnFilter.All);
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 420,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            window.UpdateLayout();
+            // BindRows 後の FitColumns（Background）まで消化してからスクロールする。
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            Flush();
+
+            var scroll = FindScroll(view.FileGrid);
+            Assert.NotNull(scroll);
+            Assert.True(scroll!.ScrollableHeight > 8, "precondition: playlist must be scrollable");
+
+            view.ScrollPlaylistByRows(3);
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Render);
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            Flush();
+            // グループ化 Item スクロールが y=3 付近で view を変えて戻しても、Repin で残ること。
+            Assert.True(
+                scroll.VerticalOffset > 2.5,
+                $"Alt scroll must stick near y=3 after layout repin, got {scroll.VerticalOffset}");
+
+            view.ScrollPlaylistByRows(9);
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+            // 選択行の BringIntoView／グループ見出し補正が走っても戻らないこと。
+            view.FocusList();
+            view.SelectSessionQuiet(sessions[0]);
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+            var offset = scroll.VerticalOffset;
+            Assert.True(offset > 4, $"Alt scroll must stick after FocusList/SelectSessionQuiet, got {offset}");
+
+            // 付近の超長尺曲のタグが後から着いたときの行差し替え。
+            sessions[30].Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Title = "Track 30",
+                Artist = "K-ON",
+                Album = "Radio",
+                DurationSeconds = 110 * 60 + 15.23,
+            });
+            view.UpdateSessionRow(sessions[30]);
+            // 差し替えの遅延復元より後のユーザー操作が勝つこと。
+            view.ScrollPlaylistByRows(3);
+            Flush();
+            var afterUser = scroll.VerticalOffset;
+            Assert.True(afterUser > offset, $"expected further Alt scroll, before={offset}, after={afterUser}");
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+
+            Assert.Equal(afterUser, scroll.VerticalOffset, 1);
+            Assert.Same(sessions[0], view.SelectedSession);
+
+            view.RematerializeBoundPlaylistRows();
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+
+            Assert.Equal(afterUser, scroll.VerticalOffset, 1);
+            Assert.Same(sessions[0], view.SelectedSession);
+
+            // 再帰読込末尾の並び確定相当。
+            view.LockPlaylistOrder(sessions[0], [sessions[0]]);
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+            Assert.Equal(afterUser, scroll.VerticalOffset, 1);
+
+            // 追加フラッシュ相当。選択は据え置きで末尾へ足す。
+            var extra = new DocumentSession(
+                AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), "Radio", "track-extra.mp3")));
+            extra.Document.ApplyTags(new AudioFileTags
+            {
+                Probed = true,
+                Title = "Extra",
+                Artist = "K-ON",
+                Album = "Radio",
+                DurationSeconds = 200,
+            });
+            view.AppendSessionsRaw([extra], select: null);
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+            Assert.Equal(afterUser, scroll.VerticalOffset, 1);
+
+            window.Close();
+        });
+    }
+
     private static int CountCyanInHeader(Window window, DataGridColumnHeader header)
     {
         window.UpdateLayout();
