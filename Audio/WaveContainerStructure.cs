@@ -1338,7 +1338,7 @@ internal static class WaveContainerStructure
                 var channelMask = reader.ReadUInt32();
                 var guid = reader.ReadBytes(16);
                 rows.Add(("Valid bits", validBits.ToString(CultureInfo.InvariantCulture)));
-                rows.Add(("Channel mask", $"0x{channelMask:X8}"));
+                rows.Add(("Channel mask", ChannelMaskBits.FormatMaskDisplay(unchecked((int)channelMask))));
                 rows.Add(("SubFormat", new Guid(guid).ToString()));
             }
         }
@@ -1356,7 +1356,7 @@ internal static class WaveContainerStructure
             ("Layout tag", tag == ChannelMaskBits.UseChannelBitmapTag
                 ? $"0x{tag:X8} (UseChannelBitmap)"
                 : $"0x{tag:X8}"),
-            ("Channel bitmap", $"0x{bitmap:X8}"),
+            ("Channel bitmap", ChannelMaskBits.FormatMaskDisplay(unchecked((int)bitmap))),
             ("Descriptions", descriptions.ToString(CultureInfo.InvariantCulture)),
         };
         return TextNode("CHAN", chunkOffset, size, WaveStructureNode.FormatKeyValueTable(rows));

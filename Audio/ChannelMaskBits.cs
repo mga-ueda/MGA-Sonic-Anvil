@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace MgaSonicAnvil.Audio;
 
 /// <summary>
@@ -44,6 +46,40 @@ internal static class ChannelMaskBits
         return count;
     }
 
+    /// <summary>
+    /// マスクのセットビットをアプリ略称で列挙（ビット昇順＝WAVE チャンネル順）。
+    /// 例: 0x3F → L/R/C/LFE/Ls/Rs、0x60F → L/R/C/LFE/Sl/Sr。0 は空文字。
+    /// </summary>
+    public static string FormatMaskLabels(int mask)
+    {
+        if (mask == 0)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>();
+        foreach (var (bit, name) in Speakers)
+        {
+            if ((mask & bit) == 0)
+            {
+                continue;
+            }
+
+            var label = CanonicalLayoutLabel(name);
+            parts.Add(string.IsNullOrEmpty(label) ? name : label);
+        }
+
+        return string.Join("/", parts);
+    }
+
+    /// <summary>ヘッダ情報向け。0x0000060F (L/R/C/LFE/Sl/Sr) 形式。</summary>
+    public static string FormatMaskDisplay(int mask)
+    {
+        var hex = string.Create(CultureInfo.InvariantCulture, $"0x{mask:X8}");
+        var labels = FormatMaskLabels(mask);
+        return string.IsNullOrEmpty(labels) ? hex : $"{hex} ({labels})";
+    }
+
     /// <summary>マスクのセットビットを昇順で最大 <paramref name="channels"/> 本返す。</summary>
     public static int[] BitsFromMask(int mask, int channels)
     {
@@ -67,6 +103,32 @@ internal static class ChannelMaskBits
             {
                 return bits;
             }
+        }
+
+        return bits;
+    }
+
+    /// <summary>
+    /// 配置ラベル順のスピーカービット。未対応ラベルが混ざると null。
+    /// Ls/Rs は Back（0x10/0x20）、Sl/Sr は Side（0x200/0x400）。
+    /// </summary>
+    public static int[]? BitsFromLabels(IReadOnlyList<string>? labels)
+    {
+        if (labels is null || labels.Count == 0)
+        {
+            return null;
+        }
+
+        var bits = new int[labels.Count];
+        for (var i = 0; i < labels.Count; i++)
+        {
+            var bit = BitForLabel(labels[i]);
+            if (bit == 0)
+            {
+                return null;
+            }
+
+            bits[i] = bit;
         }
 
         return bits;
