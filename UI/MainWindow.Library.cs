@@ -3022,8 +3022,12 @@ public partial class MainWindow
     }
 
     /// <summary>上書き修復後: 開いている文書の日付／サイズ／ラウドネスをディスクに合わせる。</summary>
-    private void LibraryBrowser_HeaderRepairedInPlace(object? sender, IReadOnlyList<string> paths) =>
-        RefreshSessionsAfterHeaderRepair(paths);
+    private void LibraryBrowser_HeaderRepairedInPlace(object? sender, IReadOnlyList<string> paths)
+    {
+        var speakerId = LibraryBrowser.PendingChannelLayoutSpeakerId;
+        LibraryBrowser.PendingChannelLayoutSpeakerId = null;
+        RefreshSessionsAfterHeaderRepair(paths, preferSpeakerId: speakerId);
+    }
 
     /// <summary>エディタ編集後、プレイヤー復帰時にプレイリストを載せ替える印。</summary>
     private void MarkLibraryPlaylistStaleFromEditor() => _libraryPlaylistStaleFromEditor = true;
@@ -3060,7 +3064,9 @@ public partial class MainWindow
     /// ヘッダ上書きで size/mtime が変わる。日付・サイズを取り直し、
     /// メモリ上のラウドネスは新スタンプで書き戻し、選択平均も取り直す。
     /// </summary>
-    private void RefreshSessionsAfterHeaderRepair(IReadOnlyList<string> paths)
+    private void RefreshSessionsAfterHeaderRepair(
+        IReadOnlyList<string> paths,
+        string? preferSpeakerId = null)
     {
         if (paths.Count == 0)
         {
@@ -3167,6 +3173,17 @@ public partial class MainWindow
                 Waveform.Refresh();
                 Overview.Refresh();
                 RefreshTransportCommandsEnabled();
+                if (!string.IsNullOrWhiteSpace(preferSpeakerId)
+                    && AppStorage.Settings.FindSpeaker(preferSpeakerId) is not null)
+                {
+                    ApplySpeakerPreset(preferSpeakerId, persist: true);
+                }
+                else
+                {
+                    TryApplyAutoSpeaker();
+                }
+
+                Waveform.Refresh();
             }
         }
 

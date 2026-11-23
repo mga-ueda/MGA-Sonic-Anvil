@@ -1583,6 +1583,12 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>ヘッダを上書き修復したあと（元パス）。ラウドネス再スタンプ用。</summary>
     public event EventHandler<IReadOnlyList<string>>? HeaderRepairedInPlace;
 
+    /// <summary>
+    /// チャンネルレイアウト編集で選んだスピーカー配置。
+    /// <see cref="HeaderRepairedInPlace"/> の直後に MainWindow が読んで消す。
+    /// </summary>
+    public string? PendingChannelLayoutSpeakerId { get; set; }
+
     public void ToggleHeaderStructureVisible(bool focusWhenShown = true) =>
         SetHeaderStructureVisible(!_headerStructureVisible, focusWhenShown);
 

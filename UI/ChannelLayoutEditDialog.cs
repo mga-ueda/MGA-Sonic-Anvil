@@ -4,13 +4,19 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.Config;
 using MgaSonicAnvil.Domain;
 
 namespace MgaSonicAnvil.UI;
 
+/// <summary>チャンネルレイアウト編集の結果。SpeakerPresetId はプリセットから選んだときだけ。</summary>
+internal readonly record struct ChannelLayoutEditResult(int Mask, string? SpeakerPresetId);
+
 /// <summary>WAVE fmt / AIFF CHAN の channel bitmap を編集する。</summary>
 internal sealed class ChannelLayoutEditDialog : Window
 {
+    private readonly record struct PresetChoice(string? SpeakerId, int? Mask, int[]? Bits);
+
     private readonly IReadOnlyList<WaveChannelLayoutWriter.TargetInfo> _targets;
     private readonly int _channels;
     private readonly ComboBox _presetCombo = new() { MinWidth = 180 };
@@ -26,10 +32,15 @@ internal sealed class ChannelLayoutEditDialog : Window
     private bool _syncing;
     private bool _sizeLocked;
     private int _mask;
+    private string? _speakerPresetId;
 
     public int SelectedMask => _mask;
 
-    public static int? Show(Window? owner, IReadOnlyList<WaveChannelLayoutWriter.TargetInfo> targets)
+    public string? SelectedSpeakerPresetId => _speakerPresetId;
+
+    public static ChannelLayoutEditResult? Show(
+        Window? owner,
+        IReadOnlyList<WaveChannelLayoutWriter.TargetInfo> targets)
     {
         if (targets.Count == 0)
         {
@@ -45,7 +56,9 @@ internal sealed class ChannelLayoutEditDialog : Window
             WindowPaintReveal.EnsureRevealedForDialog(owner);
         }
 
-        return AcrylicDialogChrome.ShowDialog(dialog) == true ? dialog.SelectedMask : null;
+        return AcrylicDialogChrome.ShowDialog(dialog) == true
+            ? new ChannelLayoutEditResult(dialog.SelectedMask, dialog.SelectedSpeakerPresetId)
+            : null;
     }
 
     private ChannelLayoutEditDialog(IReadOnlyList<WaveChannelLayoutWriter.TargetInfo> targets)
@@ -212,7 +225,8 @@ internal sealed class ChannelLayoutEditDialog : Window
             {
                 combo.Items.Add(new ComboBoxItem
                 {
-                    Content = name,
+                    // WAVE 名とエディタ略称を併記（BL=Ls / SL=Sl の取り違え防止）。
+                    Content = FormatSpeakerChoice(name),
                     Tag = bit,
                 });
             }
@@ -228,10 +242,46 @@ internal sealed class ChannelLayoutEditDialog : Window
 
     private void BuildPresetCombo()
     {
+        if (TryFindResource("DarkComboBoxStyle") is Style comboStyle)
+        {
+            _presetCombo.Style = comboStyle;
+        }
+
+        RebuildPresetComboItems();
+        _presetCombo.SelectionChanged += (_, _) =>
+        {
+            if (_syncing)
+            {
+                return;
+            }
+
+            if (_presetCombo.SelectedItem is not ComboBoxItem { Tag: PresetChoice choice })
+            {
+                return;
+            }
+
+            _speakerPresetId = choice.SpeakerId;
+            if (choice.Bits is { Length: > 0 } bits)
+            {
+                ApplyBitsToCombos(bits);
+                RefreshFromCombos();
+            }
+            else if (choice.Mask is int mask)
+            {
+                ApplyMaskToCombos(mask);
+                RefreshFromCombos();
+            }
+        };
+    }
+
+    private void RebuildPresetComboItems()
+    {
+        var previousSpeakerId = _speakerPresetId;
+        _presetCombo.Items.Clear();
         _presetCombo.Items.Add(new ComboBoxItem
         {
             Content = UiStrings.LabelChannelLayoutUnspecified,
-            Tag = 0,
+            Tag = new PresetChoice(null, Mask: 0, Bits: null),
         });
         foreach (var preset in ChannelLayoutMasks.KnownPresets)
         {
@@ -243,33 +293,56 @@ internal sealed class ChannelLayoutEditDialog : Window
             _presetCombo.Items.Add(new ComboBoxItem
             {
                 Content = preset.MenuLabel,
-                Tag = preset.Mask,
+                Tag = new PresetChoice(preset.Id, preset.Mask, Bits: null),
+            });
+        }
+
+        // 有効なカスタム配置も選べる（ラベル順でビットを当て、その集合をマスクとして書く）。
+        foreach (var preset in EnumerateCustomPresetsForChannels(_channels))
+        {
+            var bits = ChannelMaskBits.BitsFromLabels(preset.ToLayout().Labels);
+            if (bits is null || bits.Length != _channels)
+            {
+                continue;
+            }
+
+            _presetCombo.Items.Add(new ComboBoxItem
+            {
+                Content = preset.DisplayName(),
+                Tag = new PresetChoice(preset.Id, Mask: null, bits),
             });
         }
 
         _presetCombo.Items.Add(new ComboBoxItem
         {
             Content = UiStrings.LabelChannelLayoutCustom,
-            Tag = null,
+            Tag = new PresetChoice(null, Mask: null, Bits: null),
         });
-        if (TryFindResource("DarkComboBoxStyle") is Style comboStyle)
+
+        if (!string.IsNullOrWhiteSpace(previousSpeakerId))
         {
-            _presetCombo.Style = comboStyle;
+            SelectPresetChoiceBySpeakerId(previousSpeakerId);
         }
+    }
 
-        _presetCombo.SelectionChanged += (_, _) =>
+    private static IEnumerable<SpeakerPreset> EnumerateCustomPresetsForChannels(int channels)
+    {
+        var settings = AppStorage.Settings;
+        var visible = new HashSet<string>(
+            settings.ResolvedVisibleSpeakerIds(),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var preset in settings.SpeakerPresets)
         {
-            if (_syncing)
+            if (preset is null
+                || !preset.IsCustom
+                || preset.Channels != channels
+                || !visible.Contains(preset.Id))
             {
-                return;
+                continue;
             }
 
-            if (_presetCombo.SelectedItem is ComboBoxItem { Tag: int mask })
-            {
-                ApplyMaskToCombos(mask);
-                RefreshFromCombos();
-            }
-        };
+            yield return preset;
+        }
     }
 
     private void OnChannelSelectionChanged(int channelIndex)
@@ -314,15 +387,18 @@ internal sealed class ChannelLayoutEditDialog : Window
         RefreshFromCombos();
     }
 
-    private void ApplyMaskToCombos(int mask)
+    private void ApplyMaskToCombos(int mask) =>
+        ApplyBitsToCombos(ChannelMaskBits.BitsFromMask(mask, _channels));
+
+    private void ApplyBitsToCombos(IReadOnlyList<int> bits)
     {
         _syncing = true;
         try
         {
-            var bits = ChannelMaskBits.BitsFromMask(mask, _channels);
             for (var i = 0; i < _channelCombos.Length; i++)
             {
-                SelectComboBit(_channelCombos[i], bits[i]);
+                var bit = i < bits.Count ? bits[i] : 0;
+                SelectComboBit(_channelCombos[i], bit);
             }
         }
         finally
@@ -383,7 +459,7 @@ internal sealed class ChannelLayoutEditDialog : Window
 
         _maskLabel.Text = _mask == 0 && unset == _channels
             ? UiStrings.LabelChannelLayoutUnspecified
-            : $"0x{_mask.ToString("X", CultureInfo.InvariantCulture)}";
+            : ChannelMaskBits.FormatMaskDisplay(_mask);
 
         var warningVisible = warning is not null;
         var warningChanged = (_warning.Visibility == Visibility.Visible) != warningVisible
@@ -396,60 +472,148 @@ internal sealed class ChannelLayoutEditDialog : Window
         }
 
         _okButton.IsEnabled = canOk;
-        // 並びがビット昇順と違う／未確定のときはカスタムを維持（プリセット一致でコンボを上書きしない）。
+        // 未確定は freeform。非カノニカル並びでもスピーカーカスタムとの一致は見る。
         var presetMask = unset == _channels
             ? 0
-            : (!canOk || nonCanonicalOrder ? -1 : _mask);
-        SelectPresetForMask(presetMask);
+            : (!canOk ? -1 : _mask);
+        SelectPresetForMask(presetMask, preferSpeakerCustomOrder: nonCanonicalOrder);
     }
 
-    private void SelectPresetForMask(int mask)
+    private void SelectPresetChoiceBySpeakerId(string speakerId)
+    {
+        foreach (var item in _presetCombo.Items.OfType<ComboBoxItem>())
+        {
+            if (item.Tag is PresetChoice { SpeakerId: { } id }
+                && id.Equals(speakerId, StringComparison.OrdinalIgnoreCase))
+            {
+                _syncing = true;
+                try
+                {
+                    _presetCombo.SelectedItem = item;
+                    _speakerPresetId = speakerId;
+                }
+                finally
+                {
+                    _syncing = false;
+                }
+
+                if (item.Tag is PresetChoice { Bits: { Length: > 0 } bits })
+                {
+                    ApplyBitsToCombos(bits);
+                }
+
+                return;
+            }
+        }
+    }
+
+    private void SelectPresetForMask(int mask, bool preferSpeakerCustomOrder = false)
     {
         _syncing = true;
         try
         {
-            ComboBoxItem? custom = null;
+            ComboBoxItem? freeform = null;
             ComboBoxItem? match = null;
             ComboBoxItem? unspecified = null;
+            ComboBoxItem? speakerCustomMatch = null;
+            var currentBits = ReadCurrentBits();
             foreach (var item in _presetCombo.Items.OfType<ComboBoxItem>())
             {
-                if (item.Tag is null)
+                if (item.Tag is not PresetChoice choice)
                 {
-                    custom = item;
                     continue;
                 }
 
-                if (item.Tag is int value)
+                if (choice.Mask is null && choice.Bits is null && choice.SpeakerId is null)
                 {
-                    if (value == 0)
-                    {
-                        unspecified = item;
-                    }
+                    freeform = item;
+                    continue;
+                }
 
-                    if (mask >= 0 && value == mask)
-                    {
-                        match = item;
-                    }
+                if (choice.Mask == 0 && choice.Bits is null)
+                {
+                    unspecified = item;
+                }
+
+                if (choice.Bits is { Length: > 0 } itemBits && BitsEqual(itemBits, currentBits))
+                {
+                    speakerCustomMatch = item;
+                }
+                else if (mask >= 0 && choice.Mask == mask && choice.Bits is null)
+                {
+                    match = item;
                 }
             }
 
+            ComboBoxItem? selected;
             if (mask == 0)
             {
-                _presetCombo.SelectedItem = unspecified ?? _presetCombo.Items[0];
+                selected = unspecified ?? _presetCombo.Items.OfType<ComboBoxItem>().FirstOrDefault();
+            }
+            else if (speakerCustomMatch is not null
+                && (preferSpeakerCustomOrder || match is null))
+            {
+                selected = speakerCustomMatch;
             }
             else if (match is not null)
             {
-                _presetCombo.SelectedItem = match;
+                selected = match;
             }
             else
             {
-                _presetCombo.SelectedItem = custom ?? _presetCombo.Items[^1];
+                selected = freeform ?? _presetCombo.Items.OfType<ComboBoxItem>().LastOrDefault();
             }
+
+            _presetCombo.SelectedItem = selected;
+            _speakerPresetId = selected?.Tag is PresetChoice chosen ? chosen.SpeakerId : null;
         }
         finally
         {
             _syncing = false;
         }
+    }
+
+    private int[] ReadCurrentBits()
+    {
+        var bits = new int[_channels];
+        for (var i = 0; i < _channels; i++)
+        {
+            bits[i] = ReadComboBit(_channelCombos[i]);
+        }
+
+        return bits;
+    }
+
+    private static bool BitsEqual(IReadOnlyList<int> a, IReadOnlyList<int> b)
+    {
+        if (a.Count != b.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < a.Count; i++)
+        {
+            if (a[i] != b[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>WAVE 名にアプリ側略称を足す。FL→FL (L)、BL→BL (Ls)、SL→SL (Sl)。</summary>
+    internal static string FormatSpeakerChoice(string waveName)
+    {
+        var shortName = ChannelMaskBits.CanonicalLayoutLabel(waveName);
+        // SL と Sl は大小だけ違うが、Side 略称として併記する（IgnoreCase だと潰れる）。
+        if (string.IsNullOrEmpty(shortName)
+            || string.Equals(shortName, waveName, StringComparison.Ordinal))
+        {
+            return waveName;
+        }
+
+        return $"{waveName} ({shortName})";
     }
 
     private static int ReadComboBit(ComboBox combo) =>

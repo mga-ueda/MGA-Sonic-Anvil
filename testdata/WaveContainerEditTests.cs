@@ -49,6 +49,44 @@ public sealed class WaveContainerEditTests
         }
     }
 
+    [Fact]
+    public void ReplaceWaveContainer_RestoresChannelMaskOnUndo()
+    {
+        var source = Path.Combine(Path.GetTempPath(), "mga-wcedit-mask-src-" + Guid.NewGuid().ToString("N") + ".wav");
+        var working = Path.Combine(Path.GetTempPath(), "mga-wcedit-mask-work-" + Guid.NewGuid().ToString("N") + ".wav");
+        try
+        {
+            File.WriteAllBytes(source, BuildMinimalWave());
+            File.WriteAllBytes(working, BuildMinimalWave());
+            var document = AudioCodec.Load(source);
+            document.SetChannelMask(0x3F);
+
+            var history = new EditHistory();
+            var command = ProcessEdits.ReplaceWaveContainer(
+                document,
+                beforeContainerPath: null,
+                afterContainerPath: working,
+                "Channel Layout",
+                afterChannelMask: 0x60F);
+            Assert.NotNull(command);
+            history.Do(document, command);
+            Assert.Equal(0x60F, document.ChannelMask);
+
+            history.Undo(document);
+            Assert.Equal(0x3F, document.ChannelMask);
+            Assert.Null(document.WaveContainerPath);
+
+            history.Redo(document);
+            Assert.Equal(0x60F, document.ChannelMask);
+            Assert.Equal(working, document.WaveContainerPath);
+        }
+        finally
+        {
+            TryDelete(source);
+            TryDelete(working);
+        }
+    }
+
     private static byte[] BuildMinimalWave()
     {
         var pcm = new byte[8];

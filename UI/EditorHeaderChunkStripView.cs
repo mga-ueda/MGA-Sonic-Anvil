@@ -206,7 +206,7 @@ internal sealed class EditorHeaderChunkStripView : Border
     /// <summary>
     /// エディタ編集: チャンネルレイアウト。即時上書きせず作業コピーへ。成功で true。
     /// </summary>
-    public Func<IReadOnlyList<string>, int, Task<bool>>? ApplyChannelLayoutEditAsync { get; set; }
+    public Func<IReadOnlyList<string>, int, string?, Task<bool>>? ApplyChannelLayoutEditAsync { get; set; }
 
     /// <summary>
     /// 和集合チャンク選択時。MemberPaths 付きノードを渡し、対応タブを選ばせる。
@@ -1570,13 +1570,13 @@ internal sealed class EditorHeaderChunkStripView : Border
         }
 
         var owner = Window.GetWindow(this);
-        var mask = ChannelLayoutEditDialog.Show(owner, targets);
-        if (mask is null)
+        var result = ChannelLayoutEditDialog.Show(owner, targets);
+        if (result is null)
         {
             return;
         }
 
-        var apply = WaveChannelLayoutWriter.FilterTargetsForMask(targets, mask.Value);
+        var apply = WaveChannelLayoutWriter.FilterTargetsForMask(targets, result.Value.Mask);
         if (apply.Count == 0)
         {
             RepairMessage?.Invoke(UiStrings.WaveChannelLayoutNoTargets);
@@ -1585,7 +1585,8 @@ internal sealed class EditorHeaderChunkStripView : Border
 
         _ = await ApplyChannelLayoutEditAsync(
             apply.Select(static t => t.Path).ToArray(),
-            mask.Value).ConfigureAwait(true);
+            result.Value.Mask,
+            result.Value.SpeakerPresetId).ConfigureAwait(true);
     }
 
     private List<TreeViewItem> CollectDeleteTargets()

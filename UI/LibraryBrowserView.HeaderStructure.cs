@@ -1789,13 +1789,13 @@ internal sealed partial class LibraryBrowserView
         }
 
         var owner = Window.GetWindow(this);
-        var mask = ChannelLayoutEditDialog.Show(owner, targets);
-        if (mask is null)
+        var result = ChannelLayoutEditDialog.Show(owner, targets);
+        if (result is null)
         {
             return;
         }
 
-        var apply = WaveChannelLayoutWriter.FilterTargetsForMask(targets, mask.Value);
+        var apply = WaveChannelLayoutWriter.FilterTargetsForMask(targets, result.Value.Mask);
         if (apply.Count == 0)
         {
             ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutNoTargets);
@@ -1805,7 +1805,7 @@ internal sealed partial class LibraryBrowserView
         try
         {
             var targetPaths = apply.Select(static t => t.Path).ToArray();
-            var batch = await Task.Run(() => WaveChannelLayoutWriter.ApplyMany(targetPaths, mask.Value))
+            var batch = await Task.Run(() => WaveChannelLayoutWriter.ApplyMany(targetPaths, result.Value.Mask))
                 .ConfigureAwait(true);
             if (batch.Succeeded == 0)
             {
@@ -1816,10 +1816,21 @@ internal sealed partial class LibraryBrowserView
 
             if (batch.Changed == 0)
             {
+                // マスク値が同じでも、ダイアログで明示したスピーカーは当てる。
+                if (!string.IsNullOrWhiteSpace(result.Value.SpeakerPresetId))
+                {
+                    PendingChannelLayoutSpeakerId = result.Value.SpeakerPresetId;
+                    RefreshSessionsAfterHeaderRepairInPlace(batch.WrittenPaths);
+                    HeaderRepairedInPlace?.Invoke(this, batch.WrittenPaths);
+                    ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutSpeakerUpdated);
+                    return;
+                }
+
                 ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutNoChange);
                 return;
             }
 
+            PendingChannelLayoutSpeakerId = result.Value.SpeakerPresetId;
             RefreshSessionsAfterHeaderRepairInPlace(batch.WrittenPaths);
             HeaderRepairedInPlace?.Invoke(this, batch.WrittenPaths);
             ShowHeaderStructureRepairToast(UiStrings.WaveChannelLayoutDone(batch.Changed));

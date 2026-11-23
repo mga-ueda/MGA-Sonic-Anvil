@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Text;
 using MgaSonicAnvil.Audio;
+using MgaSonicAnvil.UI;
 using Xunit;
 
 namespace MgaSonicAnvil.Tests;
@@ -178,6 +179,47 @@ public sealed class WaveChannelLayoutWriterTests
         Assert.True(ChannelMaskBits.IsValidWaveChannelOrder([0x1, 0x2, 0x4]));
         Assert.False(ChannelMaskBits.IsValidWaveChannelOrder([0x4, 0x1]));
         Assert.False(ChannelMaskBits.IsValidWaveChannelOrder([0x1, 0x1]));
+    }
+
+    [Fact]
+    public void ChannelMaskBits_BackAndSideLabelsStayDistinct()
+    {
+        Assert.Equal(0x10, ChannelMaskBits.BitForLabel("Ls"));
+        Assert.Equal(0x10, ChannelMaskBits.BitForLabel("BL"));
+        Assert.Equal(0x200, ChannelMaskBits.BitForLabel("Sl"));
+        Assert.Equal(0x200, ChannelMaskBits.BitForLabel("SL"));
+        Assert.Equal("Ls", ChannelMaskBits.CanonicalLayoutLabel("BL"));
+        Assert.Equal("Sl", ChannelMaskBits.CanonicalLayoutLabel("SL"));
+        Assert.Equal(["L", "R", "C", "LFE", "Ls", "Rs"], ChannelLayout.Parse("5.1").Labels);
+        Assert.Equal(["L", "R", "C", "LFE", "Sl", "Sr"], ChannelLayout.Parse("5.1-Side").Labels);
+    }
+
+    [Fact]
+    public void ChannelMaskBits_FormatMaskDisplay_AppendsLabels()
+    {
+        Assert.Equal("L/R/C/LFE/Ls/Rs", ChannelMaskBits.FormatMaskLabels(0x3F));
+        Assert.Equal("L/R/C/LFE/Sl/Sr", ChannelMaskBits.FormatMaskLabels(0x60F));
+        Assert.Equal("0x0000003F (L/R/C/LFE/Ls/Rs)", ChannelMaskBits.FormatMaskDisplay(0x3F));
+        Assert.Equal("0x0000060F (L/R/C/LFE/Sl/Sr)", ChannelMaskBits.FormatMaskDisplay(0x60F));
+        Assert.Equal("0x00000000", ChannelMaskBits.FormatMaskDisplay(0));
+    }
+
+    [Fact]
+    public void ChannelMaskBits_BitsFromLabels_UsesLabelOrderForCustomMask()
+    {
+        var bits = ChannelMaskBits.BitsFromLabels(["LFE", "L", "R", "C", "Ls", "Rs"]);
+        Assert.NotNull(bits);
+        Assert.Equal([0x8, 0x1, 0x2, 0x4, 0x10, 0x20], bits);
+        Assert.Equal(0x3F, ChannelMaskBits.MaskFromBits(bits));
+        Assert.False(ChannelMaskBits.IsValidWaveChannelOrder(bits));
+    }
+
+    [Fact]
+    public void ChannelLayoutEditDialog_FormatSpeakerChoice_ShowsAppAlias()
+    {
+        Assert.Equal("BL (Ls)", ChannelLayoutEditDialog.FormatSpeakerChoice("BL"));
+        Assert.Equal("SL (Sl)", ChannelLayoutEditDialog.FormatSpeakerChoice("SL"));
+        Assert.Equal("LFE", ChannelLayoutEditDialog.FormatSpeakerChoice("LFE"));
     }
 
     [Fact]

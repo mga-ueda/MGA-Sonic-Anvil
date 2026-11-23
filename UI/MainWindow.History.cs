@@ -755,7 +755,10 @@ public partial class MainWindow
     }
 
     /// <summary>エディタ: チャンネルレイアウトを作業コピーへ。SourcePath は即時上書きしない。</summary>
-    private async Task<bool> ApplyEditorChannelLayoutEditAsync(IReadOnlyList<string> paths, int channelMask)
+    private async Task<bool> ApplyEditorChannelLayoutEditAsync(
+        IReadOnlyList<string> paths,
+        int channelMask,
+        string? speakerPresetId)
     {
         var changed = 0;
         string? firstError = null;
@@ -802,7 +805,8 @@ public partial class MainWindow
                 document,
                 before,
                 dest,
-                "Channel Layout");
+                "Channel Layout",
+                afterChannelMask: channelMask);
             if (command is null)
             {
                 TryDeleteFile(dest);
@@ -810,24 +814,61 @@ public partial class MainWindow
             }
 
             session.History.Do(document, command);
-            document.SetChannelMask(channelMask);
             AudioCodec.ReloadEmbeddedMeta(document);
             changed++;
         }
 
         if (changed == 0)
         {
-            ShowCenterStatusToast(firstError ?? UiStrings.WaveChannelLayoutNoChange);
+            // マスク値そのものが同じでも、ダイアログで明示したスピーカーは当てる。
+            if (firstError is not null)
+            {
+                ShowCenterStatusToast(firstError);
+                return false;
+            }
+
+            var hadExplicitSpeaker = !string.IsNullOrWhiteSpace(speakerPresetId)
+                && AppStorage.Settings.FindSpeaker(speakerPresetId) is not null;
+            if (hadExplicitSpeaker)
+            {
+                ApplySpeakerAfterChannelLayoutEdit(speakerPresetId);
+                AfterChannelLayoutUiRefresh();
+                ShowCenterStatusToast(UiStrings.WaveChannelLayoutSpeakerUpdated);
+                return true;
+            }
+
+            ShowCenterStatusToast(UiStrings.WaveChannelLayoutNoChange);
             return false;
         }
 
         AfterEdit();
+        ApplySpeakerAfterChannelLayoutEdit(speakerPresetId);
+        AfterChannelLayoutUiRefresh();
+        ShowCenterStatusToast(UiStrings.WaveChannelLayoutEdited);
+        return true;
+    }
+
+    private void ApplySpeakerAfterChannelLayoutEdit(string? speakerPresetId)
+    {
+        if (!string.IsNullOrWhiteSpace(speakerPresetId)
+            && AppStorage.Settings.FindSpeaker(speakerPresetId) is not null)
+        {
+            ApplySpeakerPreset(speakerPresetId, persist: true);
+        }
+        else
+        {
+            TryApplyAutoSpeaker();
+        }
+    }
+
+    private void AfterChannelLayoutUiRefresh()
+    {
+        Waveform.Refresh();
         MarkLibraryPlaylistStaleFromEditor();
         HeaderChunkStrip.InvalidateLoadedCache();
         RefreshEditorHeaderChunks(show: AppStorage.Settings.EditorShowHeaderStructure && !_tileMode);
+        HeaderChunkStrip.SelectFirstRowDetail();
         SyncEditorHeaderDetailPlacement();
-        ShowCenterStatusToast(UiStrings.WaveChannelLayoutEdited);
-        return true;
     }
 
     /// <summary>エディタ: チャンク削除を作業コピーへ。SourcePath は即時上書きしない。</summary>

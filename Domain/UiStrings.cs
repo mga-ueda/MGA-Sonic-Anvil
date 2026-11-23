@@ -1934,6 +1934,9 @@ internal static partial class UiStrings
     public static string WaveChannelLayoutNoChange => Get(
         "チャンネルレイアウトに変更はありませんでした。",
         "Channel layout was already up to date.");
+    public static string WaveChannelLayoutSpeakerUpdated => Get(
+        "チャンネルマスクは同じでした。スピーカー配置を更新しました。",
+        "Channel mask was unchanged. Speaker layout updated.");
     public static string WaveChannelLayoutFailed(string detail) => Format(
         "チャンネルレイアウトの更新に失敗しました。{0}",
         "Channel layout update failed. {0}",
