@@ -245,9 +245,39 @@ internal sealed class LibraryFileRow : INotifyPropertyChanged
 
     public string ParentFolder { get; init; } = string.Empty;
 
-    public bool HasArtwork { get; init; }
+    private bool _hasArtwork;
+    private string _jacketText = string.Empty;
 
-    public string JacketText { get; init; } = string.Empty;
+    public bool HasArtwork
+    {
+        get => _hasArtwork;
+        set
+        {
+            if (_hasArtwork == value)
+            {
+                return;
+            }
+
+            _hasArtwork = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasArtwork)));
+        }
+    }
+
+    public string JacketText
+    {
+        get => _jacketText;
+        set
+        {
+            value ??= string.Empty;
+            if (_jacketText == value)
+            {
+                return;
+            }
+
+            _jacketText = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(JacketText)));
+        }
+    }
 
     public int VideoWidth { get; init; }
 

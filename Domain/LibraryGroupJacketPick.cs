@@ -4,38 +4,22 @@ namespace MgaSonicAnvil.Domain;
 
 /// <summary>
 /// グループ左のジャケット。行ごとには出さず、グループにつき1枚。
-/// 既定はグループ内で最初にジャケットがある曲。アクティブ行が同じグループならその曲。
+/// グループ内で最初にジャケットがある曲（選択行には追従しない）。
 /// </summary>
 internal static class LibraryGroupJacketPick
 {
-    public static LibraryFileRow? Resolve(IEnumerable items, LibraryFileRow? active)
+    public static LibraryFileRow? Resolve(IEnumerable items, LibraryFileRow? active = null)
     {
-        LibraryFileRow? firstArt = null;
-        LibraryFileRow? matched = null;
+        _ = active;
         foreach (var item in items)
         {
-            if (item is not LibraryFileRow row)
+            if (item is LibraryFileRow { HasArtwork: true } row)
             {
-                continue;
-            }
-
-            if (matched is null && IsSameRow(row, active))
-            {
-                matched = row;
-            }
-
-            if (firstArt is null && row.HasArtwork)
-            {
-                firstArt = row;
-            }
-
-            if (matched is not null && firstArt is not null)
-            {
-                break;
+                return row;
             }
         }
 
-        return matched ?? firstArt;
+        return null;
     }
 
     public static bool ContainsActive(IEnumerable items, LibraryFileRow? active)

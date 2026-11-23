@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -1206,6 +1207,10 @@ internal sealed partial class LibraryBrowserView
         }
     }
 
+    /// <summary>
+    /// グループ枠は先頭ジャケット固定。キャッシュにあれば返すだけ。
+    /// スクロール中は新規デコードしない（読込完了時の Warm に任せる）。
+    /// </summary>
     internal BitmapSource? ArtworkForGroup(CollectionViewGroup? group)
     {
         if (_group == LibraryFileGroup.None || group?.Name is not { } name)
@@ -1219,40 +1224,179 @@ internal sealed partial class LibraryBrowserView
         }
 
         var key = name.ToString() ?? string.Empty;
-        var active = _grid.SelectedItem as LibraryFileRow;
-        var activeInGroup = LibraryGroupJacketPick.ContainsActive(group.Items, active);
-        if (!activeInGroup && _groupJackets.TryGetValue(key, out var cached))
+        if (_groupJackets.TryGetValue(key, out var cached))
         {
             return cached;
         }
 
-        if (!_groupJackets.ContainsKey(key))
+        // スクロール中は触らない。未ウォームなら空のまま。
+        if (_playlistAltScrollChromeActive || _playlistJacketLiteChrome)
         {
-            var first = LibraryGroupJacketPick.Resolve(group.Items, active: null);
-            _groupJackets[key] = BitmapForGroupRow(first);
+            return null;
         }
 
-        if (activeInGroup)
-        {
-            return BitmapForGroupRow(LibraryGroupJacketPick.Resolve(group.Items, active));
-        }
-
-        return _groupJackets[key];
+        var first = LibraryGroupJacketPick.Resolve(group.Items)
+            ?? ResolveGroupRowWithDocumentArt(group.Items);
+        var decoded = DecodeGroupJacket(first, key, allowDecode: true);
+        _groupJackets[key] = decoded;
+        return decoded;
     }
 
-    private BitmapSource? BitmapForGroupRow(LibraryFileRow? row)
+    private static LibraryFileRow? ResolveGroupRowWithDocumentArt(IEnumerable items)
     {
-        if (row?.Tag is DocumentSession session
-            && session.Document.Artwork is { Length: > 0 } bytes)
+        foreach (var item in items)
         {
-            var decoded = TryCreateBitmap(bytes, ArtworkDecodeMaxEdge);
-            if (decoded is not null)
+            if (item is LibraryFileRow { Tag: DocumentSession session } row
+                && session.Document.Artwork is { Length: > 0 })
             {
-                return decoded;
+                return row;
             }
         }
 
         return null;
+    }
+
+    private BitmapSource? DecodeGroupJacket(LibraryFileRow? row, string? cacheKey, bool allowDecode)
+    {
+        if (row?.Tag is not DocumentSession session
+            || session.Document.Artwork is not { Length: > 0 } bytes)
+        {
+            return null;
+        }
+
+        if (_groupJacketDecodeByBytes.TryGetValue(bytes, out var cached))
+        {
+            return cached;
+        }
+
+        if (!allowDecode)
+        {
+            return null;
+        }
+
+        var decoded = TryCreateBitmap(bytes, GroupJacketDecodeMaxEdge);
+        _groupJacketDecodeByBytes[bytes] = decoded;
+
+        return decoded;
+    }
+
+    /// <summary>
+    /// 読込完了後に全グループの先頭ジャケットを裏でデコードし、スクロール中は何もしない。
+    /// </summary>
+    private void WarmAllGroupJacketBitmaps()
+    {
+        if (_group == LibraryFileGroup.None || _rows.Count == 0)
+        {
+            return;
+        }
+
+        var jobs = new List<(string Key, byte[] Bytes)>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var row in _rows)
+        {
+            var key = row.GroupKey;
+            if (string.IsNullOrEmpty(key) || !seen.Add(key))
+            {
+                continue;
+            }
+
+            if (_groupJackets.TryGetValue(key, out var existing) && existing is not null)
+            {
+                continue;
+            }
+
+            var bytes = FindFirstArtworkBytes(key);
+            if (bytes is null)
+            {
+                _groupJackets[key] = null;
+                continue;
+            }
+
+            if (_groupJacketDecodeByBytes.TryGetValue(bytes, out var hit))
+            {
+                _groupJackets[key] = hit;
+                continue;
+            }
+
+            jobs.Add((key, bytes));
+        }
+
+        if (jobs.Count == 0)
+        {
+            QueueGroupArtworkChanged();
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            var results = new List<(string Key, byte[] Bytes, BitmapSource? Decoded)>(jobs.Count);
+            foreach (var (key, bytes) in jobs)
+            {
+                BitmapSource? decoded = null;
+                try
+                {
+                    decoded = TryCreateBitmap(bytes, GroupJacketDecodeMaxEdge);
+                }
+                catch (Exception)
+                {
+                    decoded = null;
+                }
+
+                results.Add((key, bytes, decoded));
+            }
+
+            Dispatcher.BeginInvoke(
+                () =>
+                {
+                    foreach (var (key, bytes, decoded) in results)
+                    {
+                        _groupJacketDecodeByBytes[bytes] = decoded;
+                        _groupJackets[key] = decoded;
+                    }
+
+                    QueueGroupArtworkChanged();
+                },
+                DispatcherPriority.Background);
+        });
+    }
+
+    private byte[]? FindFirstArtworkBytes(string groupKey)
+    {
+        foreach (var row in _rows)
+        {
+            if (!string.Equals(row.GroupKey, groupKey, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (row.Tag is DocumentSession session
+                && session.Document.Artwork is { Length: > 0 } bytes)
+            {
+                return bytes;
+            }
+        }
+
+        return null;
+    }
+
+    private void FlushDeferredGroupJacketDecodes()
+    {
+        if (!_groupArtworkNotifyDeferred)
+        {
+            return;
+        }
+
+        _groupArtworkNotifyDeferred = false;
+        // キー離しでは Background 待ちせず同期で張り直す。
+        // 遅延 Invoke だと ScrollChanged で dirty が再点灯したままアサート／見た目が残る。
+        _groupJacketsInvalidateQueued = false;
+        if (_playlistAltScrollChromeActive || _playlistJacketLiteChrome)
+        {
+            _groupArtworkNotifyDeferred = true;
+            return;
+        }
+
+        GroupArtworkChanged?.Invoke();
     }
 
     internal static bool GroupShowsRowVideoJackets(CollectionViewGroup group) =>
@@ -1292,6 +1436,49 @@ internal sealed partial class LibraryBrowserView
     private void InvalidateGroupJackets()
     {
         _groupJackets.Clear();
+        // デコード本体は残す。テーマ差し替え等でも同じ bytes なら張り直しだけ。
+        QueueGroupArtworkChanged();
+    }
+
+    /// <summary>
+    /// 埋め込みアート到着時。行差し替えはせず、グループ先頭キャッシュだけ更新する。
+    /// </summary>
+    private void OnEmbeddedArtworkReady(DocumentSession session)
+    {
+        LibraryFileRow? patchedRow = null;
+        foreach (var row in _rows)
+        {
+            if (!ReferenceEquals(row.Tag, session))
+            {
+                continue;
+            }
+
+            row.HasArtwork = true;
+            row.JacketText = UiStrings.LibraryJacketMark;
+            patchedRow = row;
+            break;
+        }
+
+        // 初回だけ枠を出す。以後の到着ではレイアウトを触らない。
+        if (patchedRow is not null
+            && _group != LibraryFileGroup.None
+            && _groupSpacer.Visibility != Visibility.Visible)
+        {
+            SyncGroupChrome();
+        }
+
+        // デコードは EnsureGroupArtworkAsync 末尾の Warm に任せる（到着のたびに同期デコードしない）。
+        QueueGroupArtworkChanged();
+    }
+
+    private void QueueGroupArtworkChanged()
+    {
+        if (_playlistAltScrollChromeActive || _playlistJacketLiteChrome)
+        {
+            _groupArtworkNotifyDeferred = true;
+            return;
+        }
+
         if (_groupJacketsInvalidateQueued)
         {
             return;
@@ -1301,19 +1488,19 @@ internal sealed partial class LibraryBrowserView
         Dispatcher.BeginInvoke(() =>
         {
             _groupJacketsInvalidateQueued = false;
+            if (_playlistAltScrollChromeActive || _playlistJacketLiteChrome)
+            {
+                _groupArtworkNotifyDeferred = true;
+                return;
+            }
+
             GroupArtworkChanged?.Invoke();
         }, DispatcherPriority.Background);
     }
 
-    /// <summary>選択行のジャケットへグループ枠を付け替える。1曲目のキャッシュは残す。</summary>
+    /// <summary>選択変更時。グループ枠は先頭固定なので触らず、右の大ジャケット用だけ読む。</summary>
     private void RefreshGroupJacketsForActiveRow()
     {
-        if (_group == LibraryFileGroup.None)
-        {
-            return;
-        }
-
-        GroupArtworkChanged?.Invoke();
         _ = EnsureSessionArtworkAsync(SelectedSession, generation: null);
     }
 
@@ -1356,6 +1543,14 @@ internal sealed partial class LibraryBrowserView
 
             await ApplyEmbeddedArtworkAsync(session, path, gen).ConfigureAwait(true);
         }
+
+        if (gen != _groupArtLoad)
+        {
+            return;
+        }
+
+        // 再帰読込完了相当: 全グループ分を先にデコードし、以降のスクロールでは触らない。
+        WarmAllGroupJacketBitmaps();
     }
 
     private Task EnsureSessionArtworkAsync(DocumentSession? session, int? generation)
@@ -1415,7 +1610,8 @@ internal sealed partial class LibraryBrowserView
         }
 
         session.Document.SetArtwork(bytes);
-        UpdateSessionRow(session);
+        // UpdateSessionRow は全ジャケットキャッシュ破棄＋行差し替えでスクロールを止める。
+        OnEmbeddedArtworkReady(session);
         if (ReferenceEquals(session, SelectedSession))
         {
             SetArtwork(session.Document);

@@ -6,20 +6,20 @@ namespace MgaSonicAnvil.Tests;
 public sealed class LibraryGroupJacketPickTests
 {
     [Fact]
-    public void Resolve_WithoutActive_UsesFirstArtworkInGroup()
+    public void Resolve_UsesFirstArtworkInGroup()
     {
         var first = Row("a.mp3", art: false);
         var second = Row("b.mp3", art: true);
         var third = Row("c.mp3", art: true);
-        Assert.Same(second, LibraryGroupJacketPick.Resolve(new LibraryFileRow[] { first, second, third }, active: null));
+        Assert.Same(second, LibraryGroupJacketPick.Resolve(new LibraryFileRow[] { first, second, third }));
     }
 
     [Fact]
-    public void Resolve_ActiveInGroup_PrefersActiveEvenWithoutArtwork()
+    public void Resolve_IgnoresActive_KeepsFirstArtwork()
     {
         var first = Row("a.mp3", art: true);
         var second = Row("b.mp3", art: false);
-        Assert.Same(second, LibraryGroupJacketPick.Resolve(new LibraryFileRow[] { first, second }, second));
+        Assert.Same(first, LibraryGroupJacketPick.Resolve(new LibraryFileRow[] { first, second }, second));
     }
 
     [Fact]
@@ -35,12 +35,10 @@ public sealed class LibraryGroupJacketPickTests
     }
 
     [Fact]
-    public void Resolve_MatchesActiveByTag()
+    public void Resolve_NoArtwork_ReturnsNull()
     {
-        var tag = new object();
-        var listed = Row("a.mp3", art: false, tag: tag);
-        var selected = Row("a-copy.mp3", art: false, tag: tag);
-        Assert.Same(listed, LibraryGroupJacketPick.Resolve(new LibraryFileRow[] { listed }, selected));
+        var listed = Row("a.mp3", art: false);
+        Assert.Null(LibraryGroupJacketPick.Resolve(new LibraryFileRow[] { listed }, listed));
     }
 
     private static LibraryFileRow Row(string name, bool art, object? tag = null) =>
