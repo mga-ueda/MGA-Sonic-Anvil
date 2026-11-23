@@ -314,4 +314,59 @@ public sealed class LibraryPlaylistDocumentsTests
         Assert.Equal(10, LibraryPlaylistDocuments.ResolveDisplayDurationSeconds(document), 3);
         Assert.True(document.DurationSeconds > 10);
     }
+
+    [Fact]
+    public void ResolveDisplayAudioFormat_DeferredMp3_UsesTagsNotPlaceholder()
+    {
+        // CreateDeferred は 48kHz/1ch のプレースホルダ。ステータス和集合に混ぜない。
+        var deferred = AudioDocument.CreateDeferred(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp3"));
+        deferred.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            SampleRate = 44100,
+            Channels = 2,
+            BitsPerSample = 16,
+        });
+        Assert.Equal(48000, deferred.SampleRate);
+        Assert.Equal(1, deferred.Channels);
+
+        LibraryPlaylistDocuments.ResolveDisplayAudioFormat(
+            deferred,
+            out var rate,
+            out var bits,
+            out var channels);
+        Assert.Equal(44100, rate);
+        Assert.Equal(16, bits);
+        Assert.Equal(2, channels);
+
+        var activated = AudioDocument.CreateDeferred(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".mp3"));
+        activated.ApplyTags(new AudioFileTags
+        {
+            Probed = true,
+            SampleRate = 44100,
+            Channels = 2,
+            BitsPerSample = 16,
+        });
+        activated.ActivateStreamPlayback(44100, 2, 16, 44100);
+        LibraryPlaylistDocuments.ResolveDisplayAudioFormat(
+            activated,
+            out var liveRate,
+            out var liveBits,
+            out var liveChannels);
+        Assert.Equal(44100, liveRate);
+        Assert.Equal(16, liveBits);
+        Assert.Equal(2, liveChannels);
+
+        // 遅延＋再生済みを和集合しても 44.1kHz / 2ch だけ。
+        Assert.Equal(
+            "44.1kHz",
+            LibraryPlayerMode.FormatStatusUnionSorted(
+                [rate, liveRate],
+                UiStrings.FormatSampleRate));
+        Assert.Equal(
+            "2ch",
+            LibraryPlayerMode.FormatStatusUnionSorted(
+                [channels, liveChannels],
+                UiStrings.FormatChannels));
+    }
 }

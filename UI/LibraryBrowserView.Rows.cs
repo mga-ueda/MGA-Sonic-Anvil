@@ -45,36 +45,25 @@ internal sealed partial class LibraryBrowserView
         var path = document.SourcePath;
         // ディスクキャッシュがあれば行生成時に載せる（非同期1件ずつ差し替えで選択を壊さない）。
         var tags = HydrateIntegratedLufsFromCache(document);
-        var deferred = document.IsDeferredLoad;
         // 時間列はプレイリスト表示尺と同じ（遅延読込はタグ、Wave/AIFF 読込済みは実 PCM）。
         var duration = LibraryPlaylistDocuments.ResolveDisplayDurationSeconds(document);
-        var tagRateOk = AudioCodec.IsPlausibleAudioSampleRate(tags.SampleRate);
-        var hideAudioFormat = LibraryPlaylistDocuments.IsVisual(document) && !tagRateOk;
-        // PDF と音声の無い動画の 48kHz/16bit は再生時計用ダミー。列には出さない。
-        // 動画はタグの音声フォーマットを優先（ホバー時の MF プローブで列が 0.001kHz 等に跳ねない）。
-        var preferTagFormat = deferred || LibraryPlaylistDocuments.IsVideo(document);
+        LibraryPlaylistDocuments.ResolveDisplayAudioFormat(
+            document,
+            out var sampleRate,
+            out var bits,
+            out var channels);
         // MP3 / M4A にビット深度は無い（デコード仮定の 16bit を列に出さない）。ビットレートは出す。
         // 動画は非圧縮 PCM 音声（ipcm 等）だけビット深度を出す。圧縮・不明は空欄。
         var hideBitDepth = document.SourceKind is AudioFileKind.Mp3 or AudioFileKind.M4a
             || (LibraryPlaylistDocuments.IsVideo(document)
                 && !VideoCodecProbe.IsUncompressedAudio(tags.AudioCodec));
+        if (hideBitDepth)
+        {
+            bits = 0;
+        }
+
         // WAVE / AIFF の「ビットレート」は PCM から機械的に出るだけなので列は空欄。圧縮音声だけ出す。
         var hideBitRate = document.SourceKind is AudioFileKind.Wave or AudioFileKind.Aiff;
-        var sampleRate = hideAudioFormat
-            ? 0
-            : preferTagFormat && tagRateOk
-                ? tags.SampleRate
-                : deferred ? 0 : document.SampleRate;
-        var bits = hideAudioFormat || hideBitDepth
-            ? 0
-            : preferTagFormat && tags.BitsPerSample > 0
-                ? tags.BitsPerSample
-                : deferred ? 0 : document.BitsPerSample;
-        var channels = hideAudioFormat
-            ? 0
-            : preferTagFormat && tags.Channels > 0
-                ? tags.Channels
-                : deferred ? 0 : document.Channels;
         var bitRate = hideBitRate ? 0 : tags.BitRateKbps;
         if (!hideBitRate && bitRate <= 0 && sampleRate > 0 && channels > 0 && bits > 0)
         {

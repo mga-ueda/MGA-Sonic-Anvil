@@ -189,4 +189,41 @@ internal static class LibraryPlaylistDocuments
 
         return deferred ? 0 : document.DurationSeconds;
     }
+
+    /// <summary>
+    /// リスト／ステータス用の表示フォーマット。
+    /// 遅延読込の 48kHz/1ch プレースホルダや、動画の再生時計用ダミーはタグを優先する。
+    /// 不明なら 0（呼び出し側で空欄にする）。
+    /// </summary>
+    public static void ResolveDisplayAudioFormat(
+        AudioDocument document,
+        out int sampleRate,
+        out int bitsPerSample,
+        out int channels)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var tags = document.Tags;
+        var deferred = document.IsDeferredLoad;
+        var tagRateOk = AudioCodec.IsPlausibleAudioSampleRate(tags.SampleRate);
+        // PDF と音声の無い動画の 48kHz/16bit は再生時計用ダミー。表示には出さない。
+        // 動画はタグの音声フォーマットを優先（ホバー時の MF プローブで列が 0.001kHz 等に跳ねない）。
+        if (IsVisual(document) && !tagRateOk)
+        {
+            sampleRate = 0;
+            bitsPerSample = 0;
+            channels = 0;
+            return;
+        }
+
+        var preferTagFormat = deferred || IsVideo(document);
+        sampleRate = preferTagFormat && tagRateOk
+            ? tags.SampleRate
+            : deferred ? 0 : document.SampleRate;
+        bitsPerSample = preferTagFormat && tags.BitsPerSample > 0
+            ? tags.BitsPerSample
+            : deferred ? 0 : document.BitsPerSample;
+        channels = preferTagFormat && tags.Channels > 0
+            ? tags.Channels
+            : deferred ? 0 : document.Channels;
+    }
 }

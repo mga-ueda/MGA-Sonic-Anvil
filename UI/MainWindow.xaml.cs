@@ -1138,10 +1138,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 遅延読込のプレースホルダ（48kHz/1ch）や動画ダミーをステータスに出さない。
+        AudioTagProbe.Ensure(document);
+        LibraryPlaylistDocuments.ResolveDisplayAudioFormat(
+            document,
+            out var rate,
+            out var bits,
+            out var channels);
+        // プレースホルダ／タグ表示中は「編集中」色にしない（Committed はダミーのまま）。
+        var compareCommitted = !document.IsDeferredLoad
+            && !LibraryPlaylistDocuments.IsVideo(document);
         var kind = LibraryPlayerMode.FormatStatusSourceKind(document.SourceKind);
-        var rate = document.SampleRate;
-        var bits = document.BitsPerSample;
-        var channels = document.Channels;
         if (_formatSizePreview is { } preview)
         {
             switch (preview.Kind)
@@ -1158,16 +1165,42 @@ public partial class MainWindow : Window
             }
         }
 
-        var estimatedBytes = document.EstimateFileBytesFor(rate, bits, channels);
+        var estimatedBytes = document.EstimateFileBytesFor(
+            rate > 0 ? rate : document.SampleRate,
+            bits > 0 ? bits : document.BitsPerSample,
+            channels > 0 ? channels : document.Channels);
         var sizeEdited = estimatedBytes != document.CommittedFileBytes;
 
-        AppendStatusRun(UiStrings.FormatSampleRate(rate), rate != document.CommittedSampleRate, normal, edited);
-        AppendStatusRun(UiStrings.FormatBitDepth(bits), bits != document.CommittedBitsPerSample, normal, edited);
-        AppendStatusRun(UiStrings.FormatChannels(channels), channels != document.CommittedChannels, normal, edited);
+        if (rate > 0)
+        {
+            AppendStatusRun(
+                UiStrings.FormatSampleRate(rate),
+                compareCommitted && rate != document.CommittedSampleRate,
+                normal,
+                edited);
+        }
+
+        if (bits > 0)
+        {
+            AppendStatusRun(
+                UiStrings.FormatBitDepth(bits),
+                compareCommitted && bits != document.CommittedBitsPerSample,
+                normal,
+                edited);
+        }
+
+        if (channels > 0)
+        {
+            AppendStatusRun(
+                UiStrings.FormatChannels(channels),
+                compareCommitted && channels != document.CommittedChannels,
+                normal,
+                edited);
+        }
+
         AppendStatusRun(kind, edited: false, normal, edited);
         if (document.SourceKind is AudioFileKind.Mp3 or AudioFileKind.M4a)
         {
-            AudioTagProbe.Ensure(document);
             var bitRate = UiStrings.FormatBitRate(document.CompressedBitRateKbps);
             if (bitRate.Length > 0)
             {
@@ -1189,23 +1222,41 @@ public partial class MainWindow : Window
         Brush normal,
         Brush edited)
     {
-        var rates = new int[sessions.Count];
-        var bits = new int[sessions.Count];
-        var channels = new int[sessions.Count];
+        var rates = new List<int>(sessions.Count);
+        var bits = new List<int>(sessions.Count);
+        var channels = new List<int>(sessions.Count);
         var kinds = new List<string>(sessions.Count);
         var bitRates = new List<string>(sessions.Count);
         var byteValues = new long[sessions.Count];
         for (var i = 0; i < sessions.Count; i++)
         {
             var document = sessions[i].Document;
-            rates[i] = document.SampleRate;
-            bits[i] = document.BitsPerSample;
-            channels[i] = document.Channels;
+            // 遅延のままの 48kHz/1ch と、再生済みの実フォーマットが混ざるのを防ぐ。
+            AudioTagProbe.Ensure(document);
+            LibraryPlaylistDocuments.ResolveDisplayAudioFormat(
+                document,
+                out var rate,
+                out var depth,
+                out var ch);
+            if (AudioCodec.IsPlausibleAudioSampleRate(rate))
+            {
+                rates.Add(rate);
+            }
+
+            if (depth > 0)
+            {
+                bits.Add(depth);
+            }
+
+            if (ch > 0)
+            {
+                channels.Add(ch);
+            }
+
             kinds.Add(LibraryPlayerMode.FormatStatusSourceKind(document.SourceKind));
             byteValues[i] = document.FileBytes;
             if (document.SourceKind is AudioFileKind.Mp3 or AudioFileKind.M4a)
             {
-                AudioTagProbe.Ensure(document);
                 var bitRate = UiStrings.FormatBitRate(document.CompressedBitRateKbps);
                 if (bitRate.Length > 0)
                 {
@@ -1214,38 +1265,42 @@ public partial class MainWindow : Window
             }
         }
 
-        AppendStatusRun(
+        AppendStatusUnionRun(
             LibraryPlayerMode.FormatStatusUnionSorted(rates, UiStrings.FormatSampleRate),
-            edited: false,
             normal,
             edited);
-        AppendStatusRun(
+        AppendStatusUnionRun(
             LibraryPlayerMode.FormatStatusUnionSorted(bits, UiStrings.FormatBitDepth),
-            edited: false,
             normal,
             edited);
-        AppendStatusRun(
+        AppendStatusUnionRun(
             LibraryPlayerMode.FormatStatusUnionSorted(channels, UiStrings.FormatChannels),
-            edited: false,
             normal,
             edited);
-        AppendStatusRun(
+        AppendStatusUnionRun(
             LibraryPlayerMode.FormatStatusUnion(kinds),
-            edited: false,
             normal,
             edited);
-        var bitRateUnion = LibraryPlayerMode.FormatStatusUnion(bitRates);
-        if (bitRateUnion.Length > 0)
-        {
-            AppendStatusRun(bitRateUnion, edited: false, normal, edited);
-        }
-
+        AppendStatusUnionRun(
+            LibraryPlayerMode.FormatStatusUnion(bitRates),
+            normal,
+            edited);
         AppendStatusRun(
             LibraryPlayerMode.FormatStatusTotalFileBytes(
                 LibraryPlayerMode.SumStatusFileBytes(byteValues)),
             edited: false,
             normal,
             edited);
+    }
+
+    private void AppendStatusUnionRun(string text, Brush normal, Brush edited)
+    {
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        AppendStatusRun(text, edited: false, normal, edited);
     }
     private void AppendStatusRun(string text, bool edited, Brush normal, Brush highlight)
     {
