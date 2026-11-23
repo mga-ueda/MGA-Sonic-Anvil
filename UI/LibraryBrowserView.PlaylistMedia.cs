@@ -735,8 +735,9 @@ internal sealed partial class LibraryBrowserView
 
     /// <summary>
     /// ラウドネス列だけ更新。列再計算や EnsureListFocused はしない（Shift+上下の選択を壊さない）。
+    /// SessionActivated は起こさない（再生中の曲頭やり直しを防ぐ）。
     /// </summary>
-    private void RefreshLoudnessRows(IReadOnlyList<DocumentSession> sessions)
+    internal void RefreshLoudnessRows(IReadOnlyList<DocumentSession> sessions)
     {
         if (sessions.Count == 0)
         {
@@ -798,7 +799,7 @@ internal sealed partial class LibraryBrowserView
 
         if (changed)
         {
-            StabilizePlaylistSelectionAfterRowRewrite();
+            StabilizePlaylistSelectionAfterRowRewrite(notifyActivate: false);
             RestorePlaylistScrollAfterContentUpdate(scroll);
         }
 

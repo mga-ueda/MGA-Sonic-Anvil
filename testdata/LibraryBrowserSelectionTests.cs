@@ -286,6 +286,33 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void RefreshLoudnessRows_DoesNotRaiseSessionActivated()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var first = Session("aaa.wav");
+            var second = Session("bbb.wav");
+            var view = new LibraryBrowserView();
+            var activations = 0;
+            view.SessionActivated += (_, _) => activations++;
+            view.SetSessions([first, second], second, [second]);
+            Flush();
+            activations = 0;
+
+            second.Document.ApplyTags(
+                second.Document.Tags.WithFileLoudness(
+                    new FileLoudness(-12f, -16f, -9f, 4f, -1f)));
+            view.RefreshLoudnessRows([second]);
+            Flush();
+
+            Assert.Same(second, view.SelectedSession);
+            // ラウドネス列だけの差し替えは再生やり直しの元になる SessionActivated を起こさない。
+            Assert.Equal(0, activations);
+        });
+    }
+
+    [Fact]
     public void UpdateSessionRow_KeepsPlaylistKeyboardFocus()
     {
         RunSta(() =>

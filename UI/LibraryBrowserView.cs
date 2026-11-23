@@ -372,6 +372,11 @@ internal sealed partial class LibraryBrowserView : UserControl
     private int _playlistScrollRevealSelectionStamp = int.MinValue;
     private bool _deferActivate;
     /// <summary>
+    /// <see cref="CompletePlaylistMoveDefer"/> で <see cref="SessionActivated"/> を起こすか。
+    /// ラウドネス列だけの差し替えでは false（再生中の曲頭やり直しを防ぐ）。
+    /// </summary>
+    private bool _playlistDeferNotifyActivate = true;
+    /// <summary>
     /// <see cref="ApplyMoveSelectionFile"/> が延ばした <see cref="_deferActivate"/> の世代。
     /// ScrollIntoView 後の仮想化が SelectedItem を寄せるあいだシアンを守る。
     /// </summary>
@@ -3459,6 +3464,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         // lite は Page 押しっぱなし専用。↑↓ に使うとキー離しの再 Ensure でセンターロック感になる。
         var liteScroll = !extend && IsPlaylistPageNavigationKeyHeld();
         _deferActivate = true;
+        _playlistDeferNotifyActivate = true;
         _syncing = true;
         SuspendPlaylistSelectionNotify();
         try
@@ -4035,14 +4041,17 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         var wasDeferred = _deferActivate;
+        var notifyActivate = _playlistDeferNotifyActivate;
         _deferActivate = false;
+        _playlistDeferNotifyActivate = true;
         if (!wasDeferred)
         {
             return;
         }
 
         // 遅延中に飛ばした SessionActivated を、今のキャレットへ一度だけ通す。
-        if (!_syncing && SelectedSession is { } session)
+        // ラウドネス等のメタ差し替え（notifyActivate=false）では起こさない。
+        if (notifyActivate && !_syncing && SelectedSession is { } session)
         {
             RefreshGroupJacketsForActiveRow();
             SessionActivated?.Invoke(this, session);
@@ -5749,10 +5758,15 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// 行差し替え後、DataGrid が SelectedItem を帯外へ寄せてもシアンを潰さないよう
     /// <see cref="_deferActivate"/> を Idle まで延ばし、キャレットを再確定する。
     /// </summary>
-    private void StabilizePlaylistSelectionAfterRowRewrite()
+    /// <param name="notifyActivate">
+    /// true なら Idle 解除で <see cref="SessionActivated"/> を起こす（移動・内容更新）。
+    /// false はラウドネス列だけの差し替え用（選択は変わっていない）。
+    /// </param>
+    private void StabilizePlaylistSelectionAfterRowRewrite(bool notifyActivate = true)
     {
         var moveGen = ++_playlistMoveDeferGeneration;
         _deferActivate = true;
+        _playlistDeferNotifyActivate = notifyActivate;
         if (ResolvePlaylistCaretRow() is { } caret)
         {
             ReassertPlaylistCaretOnly(caret);
