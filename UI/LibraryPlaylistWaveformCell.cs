@@ -25,9 +25,26 @@ internal static class LibraryPlaylistWaveform
 
     public static event Action? EffectiveSizeChanged;
 
+    /// <summary>形式プリセットの波形オン／オフが変わったとき。セルが空表示へ切り替える。</summary>
+    public static event Action? DisplayPolicyChanged;
+
     public static event Action<string>? BarsUpdated;
 
+    private static Func<LibraryFileRow, bool>? _rowDisplayFilter;
+
     public static int BarCount => LibraryPlaylistWaveformSizes.BarCount(_effectiveSize);
+
+    /// <summary>形式ごとの列設定を守る行フィルタ。null のときはすべて許可。</summary>
+    public static void SetRowDisplayFilter(Func<LibraryFileRow, bool>? filter)
+    {
+        _rowDisplayFilter = filter;
+        NotifyDisplayPolicyChanged();
+    }
+
+    public static void NotifyDisplayPolicyChanged() => DisplayPolicyChanged?.Invoke();
+
+    public static bool AllowsRowDisplay(LibraryFileRow? row) =>
+        row is null || _rowDisplayFilter is null || _rowDisplayFilter(row);
 
     public static double ContentWidth => (BarCount * (BarThickness + BarGap)) - BarGap;
 
@@ -185,12 +202,14 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
         {
             LibraryPlaylistWaveform.BarsUpdated += OnBarsUpdated;
             LibraryPlaylistWaveform.EffectiveSizeChanged += OnEffectiveSizeChanged;
+            LibraryPlaylistWaveform.DisplayPolicyChanged += OnDisplayPolicyChanged;
             BindRow();
         };
         Unloaded += (_, _) =>
         {
             LibraryPlaylistWaveform.BarsUpdated -= OnBarsUpdated;
             LibraryPlaylistWaveform.EffectiveSizeChanged -= OnEffectiveSizeChanged;
+            LibraryPlaylistWaveform.DisplayPolicyChanged -= OnDisplayPolicyChanged;
         };
     }
 
@@ -223,6 +242,14 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
 
     private void OnEffectiveSizeChangedCore() => BindRow();
 
+    private void OnDisplayPolicyChanged()
+    {
+        if (!TryInvokeOnUi(BindRow))
+        {
+            return;
+        }
+    }
+
     private void OnBarsUpdated(string path)
     {
         if (!TryInvokeOnUi(() => OnBarsUpdatedCore(path)))
@@ -233,11 +260,28 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
 
     private void OnBarsUpdatedCore(string path)
     {
-        if (!string.Equals(_path, path, StringComparison.OrdinalIgnoreCase))
+        if (DataContext is not LibraryFileRow row || !LibraryPlaylistWaveform.AllowsRowDisplay(row))
+        {
+            if (_bars is not null || _path is not null)
+            {
+                _path = null;
+                _bars = null;
+                RedrawVisual();
+            }
+
+            return;
+        }
+
+        if (!string.Equals(_path, path, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(
+                (row.Tag as DocumentSession)?.Document.SourcePath,
+                path,
+                StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
+        _path = path;
         if (LibraryPlaylistWaveform.TryGet(path, LibraryPlaylistWaveform.BarCount, out var bars))
         {
             _bars = bars;
@@ -284,7 +328,9 @@ internal sealed class LibraryPlaylistWaveformCell : FrameworkElement
     {
         _path = null;
         _bars = null;
-        if (DataContext is LibraryFileRow { Tag: DocumentSession session }
+        if (DataContext is LibraryFileRow row
+            && LibraryPlaylistWaveform.AllowsRowDisplay(row)
+            && row.Tag is DocumentSession session
             && session.Document.SourcePath is { Length: > 0 } path)
         {
             _path = path;

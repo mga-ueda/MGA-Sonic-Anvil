@@ -81,6 +81,25 @@ internal sealed partial class LibraryBrowserView
             CurrentUsedColumns());
     }
 
+    /// <summary>形式ごとの列設定で波形がオンか。混在でも Wave / MP3 / Video を個別に守る。</summary>
+    internal bool AllowsPlaylistWaveform(LibraryFileRow row) =>
+        LibraryColumnFilter.PresetAllowsWaveform(row, _waveColumns, _mp3Columns, _videoColumns);
+
+    private bool AllowsPlaylistWaveformForPath(string path)
+    {
+        var kind = LibraryColumnFilter.KindFromFileName(path);
+        if (kind is null)
+        {
+            return false;
+        }
+
+        return LibraryColumnFilter.PresetAllowsWaveform(
+            kind,
+            _waveColumns,
+            _mp3Columns,
+            _videoColumns);
+    }
+
     /// <summary>設定の Wave / MP3 それぞれの S/M/L を反映する。</summary>
     public void SetPlaylistWaveformOptions(
         LibraryPlaylistWaveformSize waveSize,
@@ -118,7 +137,7 @@ internal sealed partial class LibraryBrowserView
 
     public void ApplyCompletedPlaylistWaveform(string path, PeakPyramid peaks)
     {
-        if (!IsWaveformColumnEffectivelyVisible())
+        if (!IsWaveformColumnEffectivelyVisible() || !AllowsPlaylistWaveformForPath(path))
         {
             return;
         }
@@ -150,7 +169,8 @@ internal sealed partial class LibraryBrowserView
             foreach (var row in _items)
             {
                 if (row.Tag is not DocumentSession session
-                    || session.Document.SourcePath is not { Length: > 0 } path)
+                    || session.Document.SourcePath is not { Length: > 0 } path
+                    || !AllowsPlaylistWaveform(row))
                 {
                     continue;
                 }

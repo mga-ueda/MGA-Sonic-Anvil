@@ -677,6 +677,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         _visualStage.OpenFailed += (_, message) => PlaylistVisualOpenFailed?.Invoke(this, message);
         ConfigureGrid();
         ConfigureGroupCombo();
+        LibraryPlaylistWaveform.SetRowDisplayFilter(AllowsPlaylistWaveform);
         ApplyActiveColumnVisibility(notify: false);
         ApplyLocalizedText();
         ApplyGridStyles();
@@ -2088,13 +2089,14 @@ internal sealed partial class LibraryBrowserView : UserControl
         return true;
     }
 
-    private static void SyncPlaylistWaveformsFromDocuments(IReadOnlyList<DocumentSession> sessions)
+    private void SyncPlaylistWaveformsFromDocuments(IReadOnlyList<DocumentSession> sessions)
     {
         var barCount = LibraryPlaylistWaveform.BarCount;
         foreach (var session in sessions)
         {
             var path = session.Document.SourcePath;
             if (string.IsNullOrWhiteSpace(path)
+                || !AllowsPlaylistWaveformForPath(path)
                 || !PeakPyramid.CanBuildPlaylistBarsFromPeaks(session.Document.Peaks))
             {
                 continue;

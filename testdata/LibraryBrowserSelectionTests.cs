@@ -5924,6 +5924,37 @@ public sealed class LibraryBrowserSelectionTests
     }
 
     [Fact]
+    public void MixedPlaylist_WaveformColumn_RespectsFamilyPresetsPerRow()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var wave = Session("kick.wav");
+            var mp3 = Session("song.mp3");
+            mp3.Document.ApplyTags(new AudioFileTags { Probed = true, Title = "Song" });
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumnPresets(
+                LibraryColumnFilter.WaveDefaults,
+                LibraryColumnFilter.Mp3Defaults);
+            view.SetSessions([wave, mp3], wave, [wave, mp3]);
+            Assert.Equal(Visibility.Visible, view.ColumnVisibility(LibraryFileColumn.Waveform));
+
+            var waveRow = new LibraryFileRow { Name = "kick.wav", Kind = "WAVE", Tag = wave };
+            var mp3Row = new LibraryFileRow { Name = "song.mp3", Kind = "MP3", Tag = mp3 };
+            Assert.True(view.AllowsPlaylistWaveform(waveRow));
+            Assert.False(view.AllowsPlaylistWaveform(mp3Row));
+            Assert.False(LibraryPlaylistWaveform.AllowsRowDisplay(mp3Row));
+            Assert.True(LibraryPlaylistWaveform.AllowsRowDisplay(waveRow));
+
+            view.SetVisibleColumnPresets(
+                LibraryColumnFilter.WaveDefaults,
+                [.. LibraryColumnFilter.Mp3Defaults, LibraryFileColumn.Waveform]);
+            Assert.True(view.AllowsPlaylistWaveform(mp3Row));
+            Assert.True(LibraryPlaylistWaveform.AllowsRowDisplay(mp3Row));
+        });
+    }
+
+    [Fact]
     public void Mp3Only_WaveformColumnOn_ShowsWaveform()
     {
         RunSta(() =>

@@ -175,6 +175,8 @@ internal sealed partial class LibraryBrowserView
         SyncGroupChrome();
         if (!_columnChromeFadingOut)
         {
+            // 形式プリセット変更をセルへ伝え、オフの行は空表示にする。
+            LibraryPlaylistWaveform.NotifyDisplayPolicyChanged();
             RefreshPlaylistWaveformSize(reschedule: true);
             SchedulePlaylistLoudness();
         }
