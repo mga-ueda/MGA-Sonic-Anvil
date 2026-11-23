@@ -253,6 +253,37 @@ internal sealed class AudioPlayer : IDisposable
         _speakerChannels = speakerChannels < 1 ? 0 : speakerChannels;
     }
 
+    /// <summary>
+    /// 出力デバイスを作り直さず再生ルートだけ差し替える。
+    /// WaveFormat のチャンネル数が変わる（ダウンミックス切替など）ときは false。
+    /// </summary>
+    public bool TryApplyRouteLive(int[]? outputMap, int[]? fileChannelMap, int speakerChannels)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _outputMap = outputMap ?? [];
+        _fileChannelMap = fileChannelMap ?? [];
+        _speakerChannels = speakerChannels < 1 ? 0 : speakerChannels;
+
+        var deviceChannels = _deviceChannels;
+        if (deviceChannels < 1)
+        {
+            if (_settings.Api == AudioOutputApi.Asio)
+            {
+                // Init 前はドライバ ch が未確定。マップだけ保持して成功扱い。
+                return true;
+            }
+
+            deviceChannels = AudioCaptureFactory.QueryOutputChannelCount(_settings);
+            if (deviceChannels < 1)
+            {
+                deviceChannels = 2;
+            }
+        }
+
+        ConfigureProviderOutput(deviceChannels);
+        return _output is null || _provider.WaveFormat.Channels == _deviceChannels;
+    }
+
     public void SetSoloMask(int mask) => _provider.SetSoloMask(mask);
 
     /// <summary>再生中のフレームゲイン（音量カーブ試聴など）。null で解除。</summary>

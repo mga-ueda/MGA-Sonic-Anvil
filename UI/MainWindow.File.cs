@@ -2431,7 +2431,8 @@ public partial class MainWindow
     private void ApplySpeakerPreset(string id, bool persist)
     {
         var settings = AppStorage.Settings;
-        if (settings.FindSpeaker(id) is null)
+        var next = settings.FindSpeaker(id);
+        if (next is null)
         {
             return;
         }
@@ -2443,23 +2444,74 @@ public partial class MainWindow
             return;
         }
 
-        StopRecording();
-        if (IsPlaybackActive())
+        var previous = settings.FindSpeaker(settings.ActiveSpeakerPresetId);
+        var nextOutput = next.ToAudioOutputSettings();
+        var deviceChanged = _outputSettings.Api != nextOutput.Api
+            || !string.Equals(
+                _outputSettings.DeviceId ?? string.Empty,
+                nextOutput.DeviceId ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
+        var recordRouteChanged = previous is null
+            || previous.Channels != next.Channels
+            || !IntMapEquals(previous.RecordInputMap, next.RecordInputMap)
+            || !IntMapEquals(previous.FileChannelMap, next.FileChannelMap);
+
+        // 録音中は入力マップ／デバイスが変わるときだけ止める。
+        if (IsRecording && (deviceChanged || recordRouteChanged))
         {
-            StopPlayback();
+            StopRecording();
         }
 
         settings.ActiveSpeakerPresetId = id;
         settings.EnsureSpeakerPresets();
         var speaker = settings.ResolvedSpeaker();
-        ApplyPlayerRoute();
-        ApplyOutputSettings(speaker.ToAudioOutputSettings());
+
+        // 同じ出力デバイスなら再生を止めずルートだけ差し替える。
+        if (!deviceChanged
+            && _player.TryApplyRouteLive(
+                speaker.PlaybackOutputMap,
+                speaker.FileChannelMap,
+                speaker.Channels))
+        {
+            ApplyChannelSolo();
+        }
+        else
+        {
+            ApplyPlayerRoute();
+            if (IsPlaybackActive())
+            {
+                StopPlayback();
+            }
+
+            ApplyOutputSettings(speaker.ToAudioOutputSettings());
+        }
+
         RefreshSpeakerMenu();
         SyncMonitorLayout();
         if (persist)
         {
             AppStorage.Save();
         }
+    }
+
+    private static bool IntMapEquals(int[]? a, int[]? b)
+    {
+        a ??= [];
+        b ??= [];
+        if (a.Length != b.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < a.Length; i++)
+        {
+            if (a[i] != b[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void TryApplyAutoSpeaker()
@@ -2518,7 +2570,8 @@ public partial class MainWindow
                 _document.ChannelMask,
                 settings.ActiveSpeakerPresetId,
                 settings.SpeakerPresets);
-        SpeakerMenuIcon.Alert = conflict;
+        // 赤はプルダウン塗りだけ。アイコンは通常色のまま。
+        SpeakerMenuIcon.Alert = false;
         SpeakerMenu.SetResourceReference(Control.ForegroundProperty, "PrimaryForeBrush");
         SpeakerMenuFrame.BorderBrush = Brushes.Transparent;
         ApplySpeakerMenuFillAlert(conflict);
