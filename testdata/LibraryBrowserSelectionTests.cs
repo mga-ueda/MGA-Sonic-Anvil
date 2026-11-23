@@ -6780,6 +6780,407 @@ public sealed class LibraryBrowserSelectionTests
         });
     }
 
+    [Fact]
+    public void Playlist_EndPad_AllowsLastRowAboveViewportBottom()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[36];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), "end-pad", $"track{i:D2}.mp3"));
+                document.ApplyTags(new AudioFileTags
+                {
+                    Probed = true,
+                    Title = $"Track {i:D2}",
+                    Album = "End Pad Album",
+                    Artist = "CAPCOM",
+                });
+                sessions[i] = new DocumentSession(document);
+            }
+
+            var view = new LibraryBrowserView();
+            view.SetVisibleColumns(LibraryColumnFilter.All);
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 360,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[^1], [sessions[^1]]);
+            Flush();
+            view.UpdateLayout();
+            window.UpdateLayout();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            Flush();
+
+            view.MoveSelectionToEdge(1);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+
+            var scroll = FindScroll(view.FileGrid);
+            Assert.NotNull(scroll);
+            var grid = Assert.IsType<DataGrid>(view.FileGrid);
+            var row = grid.ItemContainerGenerator.ContainerFromItem(grid.SelectedItem)
+                as FrameworkElement;
+            Assert.NotNull(row);
+            var bounds = row!.TransformToAncestor(grid)
+                .TransformBounds(new Rect(row.RenderSize));
+            Assert.True(
+                bounds.Bottom <= view.RowsViewportBottom() + 1.5,
+                $"last row should sit above viewport bottom: bottom={bounds.Bottom}, limit={view.RowsViewportBottom()}");
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void WheelScroll_AfterAltScroll_DoesNotSnapBackToPinnedOffset()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[40];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), "wheel-after-alt", $"track{i:D2}.mp3"));
+                document.ApplyTags(new AudioFileTags
+                {
+                    Probed = true,
+                    Title = $"Track {i:D2}",
+                    Album = "Wheel Album",
+                    Artist = "CAPCOM",
+                });
+                sessions[i] = new DocumentSession(document);
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 360,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            window.UpdateLayout();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            Flush();
+
+            var scroll = FindScroll(view.FileGrid);
+            Assert.NotNull(scroll);
+            Assert.True(scroll!.ScrollableHeight > 10, "precondition: playlist must be scrollable");
+
+            // Alt スクロールで pin を立て、離し相当の Flush で Idle 後に pin を捨てる。
+            view.PlaylistAltScrollKeyHeldForTest = () => true;
+            view.ScrollPlaylistByRows(4);
+            view.PlaylistAltScrollKeyHeldForTest = () => false;
+            view.FlushPlaylistAltScrollChrome();
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            Flush();
+            var afterAlt = scroll.VerticalOffset;
+            Assert.True(afterAlt > 2.5, $"Alt scroll should move, got {afterAlt}");
+
+            // ホイール相当のネイティブ縦スクロール。pin が残っていると Repin で戻される。
+            scroll.ScrollToVerticalOffset(afterAlt + 6);
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Render);
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            Flush();
+
+            Assert.True(
+                scroll.VerticalOffset > afterAlt + 3,
+                $"wheel after Alt must keep new offset, alt={afterAlt}, now={scroll.VerticalOffset}");
+            view.PlaylistAltScrollKeyHeldForTest = null;
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void MoveSelectionPage_DefersStickyChromeWhileNavKeyHeld()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[48];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), "page-nav-album", $"track{i:D2}.mp3"));
+                document.ApplyTags(new AudioFileTags
+                {
+                    Probed = true,
+                    Title = $"Track {i:D2}",
+                    Album = "Page Nav Album",
+                    Artist = "CAPCOM",
+                });
+                sessions[i] = new DocumentSession(document);
+                document.SetArtwork(OnePixelPng);
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 360,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            window.UpdateLayout();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            Flush();
+
+            var jacket = FindDescendants<LibraryGroupJacketImage>(view.FileGrid).FirstOrDefault();
+            Assert.NotNull(jacket);
+            Assert.Equal(0, jacket!.StickyOffsetY, 1);
+
+            // PgDn 押し続け相当：移動は進めるが sticky はキー離しまで溜める。
+            view.PlaylistNavigationKeyHeldForTest = () => true;
+            view.MoveSelectionPage(1, extend: false, wrap: false);
+            view.MoveSelectionPage(1, extend: false, wrap: false);
+            Flush();
+            view.UpdateLayout();
+            Flush();
+
+            Assert.NotSame(sessions[0], view.SelectedSession);
+            Assert.True(
+                view.IsPlaylistGroupViewportDirty || jacket.StickyOffsetY < 1,
+                "sticky chrome should stay deferred while Page navigation key is held");
+
+            view.PlaylistNavigationKeyHeldForTest = () => false;
+            view.FlushPlaylistMoveDefer();
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Render);
+            Flush();
+
+            Assert.False(view.IsPlaylistGroupViewportDirty);
+            jacket = FindDescendants<LibraryGroupJacketImage>(view.FileGrid).FirstOrDefault();
+            Assert.NotNull(jacket);
+            Assert.True(
+                jacket!.StickyOffsetY > 24,
+                $"jacket should catch up after Page key release, offset was {jacket.StickyOffsetY}");
+
+            view.PlaylistNavigationKeyHeldForTest = null;
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void MoveSelectionPage_MatchesExplorer_VisibleEdgeThenPage()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[64];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), "page-explorer", $"track{i:D2}.mp3"));
+                document.ApplyTags(new AudioFileTags
+                {
+                    Probed = true,
+                    Title = $"Track {i:D2}",
+                    Album = "Page Explorer Album",
+                    Artist = "CAPCOM",
+                });
+                sessions[i] = new DocumentSession(document);
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 360,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            window.UpdateLayout();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            Flush();
+
+            var scroll = FindScroll(view.FileGrid);
+            Assert.NotNull(scroll);
+            Assert.True(scroll!.ScrollableHeight > 12, "precondition: playlist must be scrollable");
+
+            // 表示内の中ほどへ（スクロールは発生しない想定）。
+            view.MoveSelection(4, extend: false, wrap: false);
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+            var mid = view.PlaylistCaretFileIndex();
+            Assert.True(mid > 0, $"precondition: mid caret, got {mid}");
+            var offsetBefore = scroll.VerticalOffset;
+
+            view.ArmPlaylistPageNavLite();
+            view.PlaylistNavigationKeyHeldForTest = () => true;
+            // 1回目: いま見えている最下段へ。スクロールしない。
+            view.MoveSelectionPage(1, extend: false, wrap: false);
+            Flush();
+            for (var i = 0; i < 4; i++)
+            {
+                Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+                Flush();
+            }
+
+            var edge = view.PlaylistCaretFileIndex();
+            Assert.True(edge > mid, $"first PageDown should move to visible bottom (mid={mid}, edge={edge})");
+            Assert.Equal(offsetBefore, scroll.VerticalOffset, 1);
+
+            // 2回目: 既に端なので1ページ送り。
+            view.MoveSelectionPage(1, extend: false, wrap: false);
+            Flush();
+            for (var i = 0; i < 8; i++)
+            {
+                Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+                Flush();
+            }
+
+            var paged = view.PlaylistCaretFileIndex();
+            Assert.True(paged > edge, $"second PageDown should page beyond visible edge (edge={edge}, paged={paged})");
+            Assert.True(
+                scroll.VerticalOffset > offsetBefore + 0.5,
+                $"second PageDown should scroll (before={offsetBefore}, after={scroll.VerticalOffset})");
+
+            view.PlaylistNavigationKeyHeldForTest = () => false;
+            view.FlushPlaylistMoveDefer();
+            Flush();
+            for (var i = 0; i < 8; i++)
+            {
+                Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+                Flush();
+            }
+
+            view.UpdateLayout();
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+            Flush();
+
+            // 2回目以降も、新ページの可視最下段に乗っていること。
+            var grid = Assert.IsType<DataGrid>(view.FileGrid);
+            var row = grid.ItemContainerGenerator.ContainerFromItem(grid.SelectedItem)
+                as FrameworkElement;
+            Assert.NotNull(row);
+            var bounds = row!.TransformToAncestor(grid)
+                .TransformBounds(new Rect(row.RenderSize));
+            var gapFromBottom = view.RowsViewportBottom() - bounds.Bottom;
+            Assert.True(
+                gapFromBottom < 40,
+                $"paged selection should sit on visible bottom (gap={gapFromBottom}, bottom={bounds.Bottom}, viewportBottom={view.RowsViewportBottom()})");
+
+            view.PlaylistNavigationKeyHeldForTest = null;
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void ScrollPlaylistByRows_DefersStickyChromeUntilKeyRelease()
+    {
+        RunSta(() =>
+        {
+            EnsureTheme();
+            var sessions = new DocumentSession[36];
+            for (var i = 0; i < sessions.Length; i++)
+            {
+                var document = AudioDocument.CreateDeferred(
+                    Path.Combine(Path.GetTempPath(), "alt-scroll-album", $"track{i:D2}.mp3"));
+                document.ApplyTags(new AudioFileTags
+                {
+                    Probed = true,
+                    Title = $"Track {i:D2}",
+                    Album = "Alt Scroll Album",
+                    Artist = "CAPCOM",
+                });
+                sessions[i] = new DocumentSession(document);
+                document.SetArtwork(OnePixelPng);
+            }
+
+            var view = new LibraryBrowserView();
+            var window = new Window
+            {
+                Content = view,
+                Width = 900,
+                Height = 360,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+            window.Show();
+            view.SetSessions(sessions, sessions[0], [sessions[0]]);
+            Flush();
+            view.UpdateLayout();
+            window.UpdateLayout();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            Flush();
+
+            var scroll = FindScroll(view.FileGrid);
+            Assert.NotNull(scroll);
+            Assert.True(scroll!.ScrollableHeight > 8, "precondition: playlist must be scrollable");
+
+            var jacket = FindDescendants<LibraryGroupJacketImage>(view.FileGrid).FirstOrDefault();
+            Assert.NotNull(jacket);
+            Assert.Equal(0, jacket!.StickyOffsetY, 1);
+
+            // 押し続け中は sticky を溜め、リピート差分は Input 優先度で合流する。
+            view.PlaylistAltScrollKeyHeldForTest = () => true;
+            view.ScrollPlaylistByRows(2, coalesceRepeat: false);
+            view.ScrollPlaylistByRows(3, coalesceRepeat: true);
+            view.ScrollPlaylistByRows(4, coalesceRepeat: true);
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Input);
+            Flush();
+
+            Assert.True(view.IsPlaylistAltScrollChromeActive);
+            Assert.True(
+                scroll.VerticalOffset > 6.5,
+                $"coalesced Alt scroll should land near y=9, got {scroll.VerticalOffset}");
+            // 押し続け中は TransformToAncestor の sticky 更新を端折る。
+            Assert.True(
+                view.IsPlaylistGroupViewportDirty || jacket.StickyOffsetY < 1,
+                "sticky chrome should stay deferred while Alt scroll key is held");
+
+            view.PlaylistAltScrollKeyHeldForTest = () => false;
+            view.FlushPlaylistAltScrollChrome();
+            Flush();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Render);
+            Flush();
+
+            Assert.False(view.IsPlaylistAltScrollChromeActive);
+            Assert.False(view.IsPlaylistGroupViewportDirty);
+            jacket = FindDescendants<LibraryGroupJacketImage>(view.FileGrid).FirstOrDefault();
+            Assert.NotNull(jacket);
+            Assert.True(
+                jacket!.StickyOffsetY > 20,
+                $"jacket should catch up after Alt scroll key release, offset was {jacket.StickyOffsetY}");
+            Assert.Same(sessions[0], view.SelectedSession);
+
+            view.PlaylistAltScrollKeyHeldForTest = null;
+            window.Close();
+        });
+    }
+
     private static int CountCyanInHeader(Window window, DataGridColumnHeader header)
     {
         window.UpdateLayout();

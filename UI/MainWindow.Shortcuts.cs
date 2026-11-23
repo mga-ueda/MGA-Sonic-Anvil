@@ -774,9 +774,11 @@ public partial class MainWindow
             }
 
             FlushPlaylistExtendPending();
+            FlushPlaylistMovePending();
             FlushDeferredPlaylistSelectionLoudness();
             LibraryBrowser.FlushDeferredHeaderStructureRefresh();
             LibraryBrowser.FlushPlaylistMoveDefer();
+            LibraryBrowser.FlushPlaylistAltScrollChrome();
             HeaderChunkStrip.FlushDeferredChunkApply();
             TryPlayLibraryAfterArrowRelease();
             return;
@@ -792,10 +794,12 @@ public partial class MainWindow
         if (key is Key.Home or Key.End or Key.PageUp or Key.PageDown)
         {
             FlushPlaylistExtendPending();
+            FlushPlaylistMovePending();
             FlushDeferredPlaylistSelectionLoudness();
             LibraryBrowser.FlushDeferredHeaderStructureRefresh();
             LibraryBrowser.FlushPlaylistMoveDefer();
             HeaderChunkStrip.FlushDeferredChunkApply();
+
             if (!LibraryBrowser.PlaylistVisualIsPdf)
             {
                 TryPlayLibraryAfterArrowRelease();
@@ -826,6 +830,8 @@ public partial class MainWindow
                 StopSpectrogramBoostNudge();
             }
 
+            // Alt を先に離しても、溜めた sticky／Repin を確定する。
+            LibraryBrowser.FlushPlaylistAltScrollChrome();
             e.Handled = true;
         }
 
@@ -2633,11 +2639,13 @@ public partial class MainWindow
                 return false;
             }
 
-            // 選択は据え置きで表示だけ1行動かす。ツリーフォーカス時はルート並び替えが先。
+            // 選択は据え置きで表示だけ1行動かす（ホイールと同じ素スクロール）。ツリー時はルート並び替えが先。
             if (LibraryPlayerMode.IsPlaylistScroll(key, modifiers)
                 && !IsLibraryExplorerFocused)
             {
-                LibraryBrowser.ScrollPlaylistByRows(key == Key.Up ? -1 : 1);
+                LibraryBrowser.ScrollPlaylistByRows(
+                    key == Key.Up ? -1 : 1,
+                    coalesceRepeat: isRepeat);
                 return true;
             }
 
@@ -2718,33 +2726,63 @@ public partial class MainWindow
 
                 var extend = modifiers == ModifierKeys.Shift;
                 // 処理遅れでキューに残ったリピートは、もうキーが上がっていれば捨てる。
-                if (isRepeat && extend && !Keyboard.IsKeyDown(key))
+                if (isRepeat && !Keyboard.IsKeyDown(key))
                 {
                     FlushPlaylistExtendPending();
+                    FlushPlaylistMovePending();
                     FlushDeferredPlaylistSelectionLoudness();
                     LibraryBrowser.FlushDeferredHeaderStructureRefresh();
                     LibraryBrowser.FlushPlaylistMoveDefer();
                     return true;
                 }
 
-                // Shift+↑↓／Page のリピートはフレーム単位にまとめ、メーター更新の隙間を空ける。
-                if (extend && isRepeat && key is Key.Up or Key.Down or Key.PageUp or Key.PageDown)
+                // ↑↓／Page のリピートはフレーム単位にまとめ、EnsureRowVisible の連打を避ける。
+                if (isRepeat && key is Key.Up or Key.Down or Key.PageUp or Key.PageDown)
                 {
-                    var step = key switch
+                    if (extend)
                     {
-                        Key.Up => -1,
-                        Key.Down => 1,
-                        Key.PageUp => -LibraryBrowser.PlaylistPageStepRows(),
-                        _ => LibraryBrowser.PlaylistPageStepRows(),
-                    };
-                    QueuePlaylistExtendStep(step, byGroup: false);
-                    _libraryPlayOnArrowRelease = false;
+                        var extendStep = key switch
+                        {
+                            Key.Up => -1,
+                            Key.Down => 1,
+                            Key.PageUp => -LibraryBrowser.PlaylistPageStepRows(),
+                            _ => LibraryBrowser.PlaylistPageStepRows(),
+                        };
+                        QueuePlaylistExtendStep(extendStep, byGroup: false);
+                        _libraryPlayOnArrowRelease = false;
+                    }
+                    else if (key is Key.PageUp or Key.PageDown)
+                    {
+                        // エクスプローラーと同じ MoveSelectionPage を1回分だけ進める。
+                        // 行数デルタで MoveSelection すると見えていない行へ飛び越しうる。
+                        var pageDir = key == Key.PageUp ? -1 : 1;
+                        if (LibraryBrowser.IsPlaylistCaretAtEdge(pageDir))
+                        {
+                            LibraryBrowser.ArmPlaylistPageNavLite();
+                            _libraryPlayOnArrowRelease = true;
+                            return true;
+                        }
+
+                        LibraryBrowser.ArmPlaylistPageNavLite();
+                        QueuePlaylistPageStep(pageDir);
+                        _libraryPlayOnArrowRelease = true;
+                    }
+                    else
+                    {
+                        QueuePlaylistMoveStep(key == Key.Up ? -1 : 1);
+                        _libraryPlayOnArrowRelease = true;
+                    }
+
                     return true;
                 }
 
                 if (extend)
                 {
                     FlushPlaylistExtendPending();
+                }
+                else
+                {
+                    FlushPlaylistMovePending();
                 }
 
                 // 単発は端から反対側へ回る。長押し連続は端で一旦止まる（Ctrl+Tab と同じ）。
@@ -2755,6 +2793,11 @@ public partial class MainWindow
                 }
                 else if (key is Key.PageUp or Key.PageDown)
                 {
+                    if (!extend)
+                    {
+                        LibraryBrowser.ArmPlaylistPageNavLite();
+                    }
+
                     LibraryBrowser.MoveSelectionPage(key == Key.PageUp ? -1 : 1, extend, wrap);
                 }
                 else

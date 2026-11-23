@@ -638,6 +638,11 @@ internal static class DesignMetrics
     /// <summary>プレイリスト横スクロール。Shift+ホイール 1 ノッチぶん。</summary>
     public static double LibraryPlaylistHorizontalWheelStep => From96(80);
 
+    /// <summary>
+    /// プレイリスト末尾の余白。ScrollUnit.Item だと最終行がビュー下端／横バーに見切れるので足す。
+    /// </summary>
+    public static double LibraryPlaylistEndPad => From96(28);
+
     /// <summary>オーディオタブの入力／出力列のすき間。</summary>
     public static double SettingsColumnGap => From96(20);
 

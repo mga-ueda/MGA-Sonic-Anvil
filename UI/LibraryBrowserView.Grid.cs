@@ -106,7 +106,9 @@ internal sealed partial class LibraryBrowserView
         _grid.EnableRowVirtualization = true;
         VirtualizingPanel.SetIsVirtualizing(_grid, true);
         VirtualizingPanel.SetIsVirtualizingWhenGrouping(_grid, true);
-        VirtualizingPanel.SetVirtualizationMode(_grid, VirtualizationMode.Standard);
+        // Standard はスクロールのたびに行コンテナを作り直してカクつく。
+        // ツリーと同じ Recycling で再利用する（ホイール／Alt 共通の軽さ）。
+        VirtualizingPanel.SetVirtualizationMode(_grid, VirtualizationMode.Recycling);
         VirtualizingPanel.SetScrollUnit(_grid, ScrollUnit.Item);
         _grid.RowHeaderWidth = 0;
         _grid.MinRowHeight = 24;

@@ -82,6 +82,9 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// <summary>ジャケット／グロー用デコードの長辺上限。APIC 原寸展開を避ける。</summary>
     private const int ArtworkDecodeMaxEdge = 512;
 
+    /// <summary>グループ枠用。表示サイズに近い長辺に抑え、スクロール中のデコードを軽くする。</summary>
+    private const int GroupJacketDecodeMaxEdge = 128;
+
     private readonly Grid _host = new();
     private readonly Grid _glowHost = new();
     private readonly Border _glowFrom = CreateGlowWashLayer();
@@ -324,6 +327,12 @@ internal sealed partial class LibraryBrowserView : UserControl
     private string? _playlistVisualSourcePath;
     private DataGridColumn _groupSpacer = null!;
     private bool _gridScrollHooked;
+
+    /// <summary>
+    /// ScrollViewer より手前の ScrollContentPresenter に RequestBringIntoView を付けたか。
+    /// DataGrid 側だと ScrollViewer が先に縦オフセットを動かしてしまい、抑止が間に合わない。
+    /// </summary>
+    private bool _playlistBringIntoViewHooked;
     private readonly Dictionary<LibraryFileColumn, DataGridColumn> _columns = [];
     private readonly Dictionary<LibraryFileColumn, LibrarySortHeader> _sortHeaders = [];
     private CancellationTokenSource? _playlistWaveCts;
@@ -367,6 +376,9 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// ScrollIntoView 後の仮想化が SelectedItem を寄せるあいだシアンを守る。
     /// </summary>
     private int _playlistMoveDeferGeneration;
+
+    /// <summary>ナビキー押し続け中、RevealTemporarily を一度だけ出す。</summary>
+    private bool _playlistNavRevealArmed;
     /// <summary>
     /// 非選択の連続 Append で <see cref="_deferActivate"/> をネストしたときの深さ。
     /// 各件が「追加前の値」へ戻すと、内側の Idle が true を残してクリック不能になる。
@@ -401,6 +413,69 @@ internal sealed partial class LibraryBrowserView : UserControl
 
     private int _playlistRepinGeneration;
 
+    /// <summary>Render／Loaded／ContextIdle の Repin が既に並んでいるとき true。</summary>
+    private bool _playlistRepinQueued;
+
+    /// <summary>Idle の最終 Repin 後に pin を外す（Alt 離し後の引き戻し嵐を止める）。</summary>
+    private bool _playlistRepinReleasePinWhenIdle;
+
+    /// <summary>
+    /// Alt+↑／↓ 押し続け中。sticky 更新と Reveal の再入場を抑え、キー離しで Flush する。
+    /// </summary>
+    private bool _playlistAltScrollChromeActive;
+
+    /// <summary>同一 Alt スクロールジェスチャで RevealTemporarily を一度だけ出す。</summary>
+    private bool _playlistAltScrollRevealArmed;
+
+    /// <summary>キーリピート分を1フレームにまとめるための差分。</summary>
+    private int _playlistAltScrollPendingDelta;
+
+    private bool _playlistAltScrollApplyQueued;
+    private int _playlistAltScrollFlushGeneration;
+    private bool _playlistGroupViewportDirty;
+    private int _playlistStickyFlushGeneration;
+    private long _playlistLastScrollTickMs;
+    /// <summary>連続 ScrollChanged 回数。1回だけなら即 sticky、連打時は静止後。</summary>
+    private int _playlistScrollBurstCount;
+    private DispatcherTimer? _playlistStickyFlushTimer;
+    private int _playlistStickyFlushTimerGen;
+    /// <summary>Sticky 一括更新中のヘッダ／横オフセット。ジャケット毎の再計測を避ける。</summary>
+    private double? _stickyViewportTopCache;
+    private double? _stickyHorizontalOffsetCache;
+    /// <summary>連打スクロール中は反射を消し、顔だけにして合成を軽くする。</summary>
+    private bool _playlistJacketLiteChrome;
+    private bool _playlistEndPadApplied;
+    private bool _playlistEndPadRetryQueued;
+    /// <summary>Page 押し中に SelectedItem／ScrollIntoView を端折った。キー離しで確定する。</summary>
+    private bool _playlistMoveLiteScrollPending;
+
+    /// <summary>
+    /// Page ジェスチャ中。キー状態だけだと Flush 時点で離していて lite を取りこぼす。
+    /// </summary>
+    private bool _playlistPageNavLiteArmed;
+
+    /// <summary>
+    /// SelectedItem 同期時の RequestBringIntoView を握る。
+    /// Page lite 確定で遠くへ飛ぶときの ScrollIntoView 嵐を止める。
+    /// </summary>
+    private bool _suppressPlaylistBringIntoView;
+
+    /// <summary>
+    /// Finalize 中の ScrollChanged で sticky Queue を起こさず dirty だけ立てる。
+    /// </summary>
+    private bool _playlistSuppressGroupViewportQueue;
+
+    /// <summary>
+    /// Page lite 中のスクロール先。
+    /// 可視端への移動では据え置き、ページ送り時は新選択が見える位置へ。
+    /// </summary>
+    private int _playlistLiteScrollTargetFileIndex = -1;
+    private double? _playlistLiteScrollTargetOffset;
+    private bool _playlistLiteScrollChaseQueued;
+    private int _playlistLiteScrollChaseGeneration;
+    private bool _playlistLiteScrollCatchUp;
+    private const int PlaylistLiteScrollChaseStep = 12;
+
     /// <summary>自前の ScrollToVerticalOffset 中。ScrollChanged からの再スケジュールを避ける。</summary>
     private int _playlistScrollIntentDepth;
 
@@ -426,7 +501,21 @@ internal sealed partial class LibraryBrowserView : UserControl
     private IReadOnlyList<LibraryFileRow> _rows = [];
     private ObservableCollection<LibraryFileRow> _items = [];
     private readonly Dictionary<string, BitmapSource?> _groupJackets = new(StringComparer.Ordinal);
+    /// <summary>Document.Artwork の参照同一性でデコード結果を再利用する。</summary>
+    private readonly Dictionary<byte[], BitmapSource?> _groupJacketDecodeByBytes =
+        new(ByteArrayRefComparer.Instance);
+
+    private sealed class ByteArrayRefComparer : IEqualityComparer<byte[]>
+    {
+        public static readonly ByteArrayRefComparer Instance = new();
+
+        public bool Equals(byte[]? x, byte[]? y) => ReferenceEquals(x, y);
+
+        public int GetHashCode(byte[] obj) =>
+            System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
+    }
     private bool _groupJacketsInvalidateQueued;
+    private bool _groupArtworkNotifyDeferred;
     private bool _fitColumnsQueued;
     private int _anchorIndex;
     /// <summary>直前の範囲選択キャレット（ファイル行インデックス）。差分更新用。無効は -1。</summary>
@@ -599,6 +688,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         };
         _favoritesList.IsKeyboardFocusWithinChanged += (_, _) => SyncPaneFocusChrome();
         _grid.IsKeyboardFocusWithinChanged += Grid_IsKeyboardFocusWithinChanged;
+        // Window が Page を握らなかったとき DataGrid 既定のページ送りへ落ちるのを防ぎ、経路をログする。
+        _grid.PreviewKeyDown += Grid_PreviewKeyDownPageNav;
         PreviewMouseMove += PlaylistHost_PreviewMouseMove;
         PreviewMouseLeftButtonDown += LibraryBrowser_PreviewMouseLeftButtonDownForDismissGuard;
         PreviewMouseLeftButtonUp += PlaylistHost_PreviewMouseLeftButtonUp;
@@ -943,9 +1034,12 @@ internal sealed partial class LibraryBrowserView : UserControl
     {
         get
         {
+            // Page lite 中は帯フラグを張らないので、キャレットを選択として扱う。
             if (_playlistCaretRow is { Tag: DocumentSession caret }
-                && _playlistCaretRow.IsPlaylistSelected
-                && IsBoundPlaylistRow(_playlistCaretRow))
+                && IsBoundPlaylistRow(_playlistCaretRow)
+                && (_playlistCaretRow.IsPlaylistSelected
+                    || _playlistMoveLiteScrollPending
+                    || _playlistPageNavLiteArmed))
             {
                 return caret;
             }
@@ -3040,6 +3134,10 @@ internal sealed partial class LibraryBrowserView : UserControl
         ApplyMoveSelectionFile(index, extend, files);
     }
 
+    /// <summary>
+    /// エクスプローラーと同じ Page 挙動。
+    /// まず今見えている範囲の端へ。既に端なら1ページ分スクロールして新しい端へ。
+    /// </summary>
     public void MoveSelectionPage(int direction, bool extend = false, bool wrap = true)
     {
         if (direction == 0)
@@ -3047,8 +3145,82 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
-        var step = LibraryPlayerMode.PageStep(VisibleRowCount());
-        MoveSelection(direction < 0 ? -step : step, extend, wrap);
+        var files = SnapshotPlaylistFiles();
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        var current = PlaylistFileIndexOfSelected(files);
+        if (current < 0)
+        {
+            ApplyMoveSelectionFile(direction > 0 ? 0 : files.Count - 1, extend, files);
+            return;
+        }
+
+        if (!TryGetVisiblePlaylistFileRange(files, out var firstVisible, out var lastVisible))
+        {
+            var step = LibraryPlayerMode.PageStep(VisibleRowCount());
+            var fallback = direction > 0
+                ? Math.Min(files.Count - 1, current + step)
+                : Math.Max(0, current - step);
+            if (fallback == current)
+            {
+                if (!wrap || extend)
+                {
+                    return;
+                }
+
+                fallback = direction > 0 ? 0 : files.Count - 1;
+            }
+
+            ApplyMoveSelectionFile(fallback, extend, files);
+            return;
+        }
+
+        int target;
+        if (direction > 0)
+        {
+            // PageDown: 未端なら可視最下段へ（スクロールなし）。
+            // 端なら現在行を新しい先頭にし、そのページの可視最下段へ。
+            if (current < lastVisible)
+            {
+                target = lastVisible;
+            }
+            else
+            {
+                target = ResolvePlaylistPageTargetAfterScroll(files, current, pageDown: true);
+                if (target == current)
+                {
+                    if (!wrap || extend)
+                    {
+                        return;
+                    }
+
+                    target = 0;
+                }
+            }
+        }
+        else if (current > firstVisible)
+        {
+            // PageUp: 未端なら可視最上段へ。
+            target = firstVisible;
+        }
+        else
+        {
+            target = ResolvePlaylistPageTargetAfterScroll(files, current, pageDown: false);
+            if (target == current)
+            {
+                if (!wrap || extend)
+                {
+                    return;
+                }
+
+                target = files.Count - 1;
+            }
+        }
+
+        ApplyMoveSelectionFile(target, extend, files);
     }
 
     /// <summary>Shift+Page キーリピートのまとめ用。表示行数に応じた1ページ分の行数。</summary>
@@ -3260,11 +3432,22 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
+        var fromIndex = PlaylistFileIndexOfSelected(files);
+        // 端へのリピートなど、位置が変わらない移動は捨てる（Page 押し続け末尾で毎フレーム動いていた）。
+        if (!extend && fromIndex == index)
+        {
+            return;
+        }
+
         // ↑↓ で選択移動するときは、Alt 閲覧モードを解除して行を追従させる。
         ClearPlaylistViewportBrowse();
 
-        // 実スクロール前でも、溢れていればナビキーでバーを出す。
-        LibraryScrollReveal.RevealTemporarilyIfScrollable(_grid);
+        // 実スクロール前でも、溢れていればナビキーでバーを出す（押し続け中は一度だけ）。
+        if (!_playlistNavRevealArmed)
+        {
+            _playlistNavRevealArmed = true;
+            LibraryScrollReveal.RevealTemporarilyIfScrollable(_grid);
+        }
 
         var row = files[index];
         // ScrollIntoView／仮想化のあいだも _syncing と _deferActivate を維持する。
@@ -3273,6 +3456,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         // EnsureRowVisible の Loaded 再アサートより後まで _deferActivate を残し、
         // ナビキー押し続け中はキー離し（FlushPlaylistMoveDefer）まで外さない。
         var moveGen = ++_playlistMoveDeferGeneration;
+        // lite は Page 押しっぱなし専用。↑↓ に使うとキー離しの再 Ensure でセンターロック感になる。
+        var liteScroll = !extend && IsPlaylistPageNavigationKeyHeld();
         _deferActivate = true;
         _syncing = true;
         SuspendPlaylistSelectionNotify();
@@ -3283,7 +3468,17 @@ internal sealed partial class LibraryBrowserView : UserControl
                 _anchorIndex = index;
                 _playlistRangeCaretIndex = -1;
                 MovePlaylistSingleSelectionTo(row);
-                SyncPlaylistCaretToGrid(row);
+                if (liteScroll)
+                {
+                    // DataGrid.SelectedItem 代入は仮想化＋グループで十数 ms かかる。
+                    // Page 押し中はシアン帯とキャレットだけ進め、離したときに同期する。
+                    _playlistCaretRow = row;
+                    _playlistMoveLiteScrollPending = true;
+                }
+                else
+                {
+                    SyncPlaylistCaretToGrid(row);
+                }
             }
             else
             {
@@ -3294,20 +3489,411 @@ internal sealed partial class LibraryBrowserView : UserControl
                 ApplyPlaylistFileRangeCore(_anchorIndex, index, files);
             }
 
-            // キー移動は SelectedItem だけ変えがちで、CurrentItem が先頭のまま残る。
-            // 行波形の遅延描画でレイアウトが走ると、古い CurrentItem を手がかりに
-            // シアン帯が1行目へ寄って見えることがある。
-            PinSelectionCurrent();
-            EnsureListFocused(pinCurrent: false);
-            EnsureRowVisible(row);
-            // 仮想化スクロール後に SelectedItem／CurrentItem がずれたら意図した行へ戻す。
-            ReassertPlaylistMoveSelection(row, extend);
+            if (!liteScroll)
+            {
+                // キー移動は SelectedItem だけ変えがちで、CurrentItem が先頭のまま残る。
+                PinSelectionCurrent();
+                EnsureListFocused(pinCurrent: false);
+                EnsureRowVisible(row);
+                ReassertPlaylistMoveSelection(row, extend);
+            }
+            else
+            {
+                // キー処理ではスクロールしない。Idle で追従。
+                // 可視範囲内（端への移動）は offset 据え置き。ページ送り時だけ合わせる。
+                NotePlaylistLiteScrollTarget(files, fromIndex, index);
+                SetPlaylistJacketLiteChrome(true);
+                _playlistGroupViewportDirty = true;
+                QueuePlaylistLiteScrollChase();
+            }
         }
         finally
         {
             _syncing = false;
             ResumePlaylistSelectionNotify();
             ScheduleEndPlaylistMoveDefer(moveGen);
+        }
+    }
+
+    /// <summary>Page ジェスチャを開始する。リピート Flush でも lite を維持する。</summary>
+    internal void ArmPlaylistPageNavLite() => _playlistPageNavLiteArmed = true;
+
+    private void ClearPlaylistLiteScrollSchedule()
+    {
+        _playlistLiteScrollTargetFileIndex = -1;
+        _playlistLiteScrollTargetOffset = null;
+        _playlistLiteScrollCatchUp = false;
+        _playlistLiteScrollChaseGeneration++;
+        _playlistLiteScrollChaseQueued = false;
+    }
+
+    /// <summary>
+    /// Page の目標 VerticalOffset（エクスプローラー相当）。
+    /// いま見えている行への移動はスクロールしない。
+    /// ページ送り時は旧選択を反対端へ（PageDown: 旧下端→新しい先頭）。
+    /// </summary>
+    private void NotePlaylistLiteScrollTarget(
+        IReadOnlyList<LibraryFileRow> files,
+        int fromFileIndex,
+        int toFileIndex)
+    {
+        _playlistLiteScrollTargetFileIndex = toFileIndex;
+        if (FindDataGridScrollViewer() is not { } scroll
+            || (uint)toFileIndex >= (uint)files.Count)
+        {
+            return;
+        }
+
+        // 可視範囲内（最下段／最上段への移動）は飛ばさない。
+        if (IsPlaylistRowFullyInViewport(files[toFileIndex]))
+        {
+            _playlistLiteScrollTargetOffset = scroll.VerticalOffset;
+            return;
+        }
+
+        var viewport = PlaylistViewportItemCount(scroll);
+        var pageDown = fromFileIndex < 0 || toFileIndex >= fromFileIndex;
+        double target;
+        if (pageDown && fromFileIndex >= 0 && (uint)fromFileIndex < (uint)files.Count)
+        {
+            // エクスプローラー: 旧選択（可視下端）が新しい先頭になる。
+            target = GroupedItemOffsetForFileIndex(files, fromFileIndex);
+        }
+        else if (!pageDown && fromFileIndex >= 0 && (uint)fromFileIndex < (uint)files.Count)
+        {
+            // PageUp: 旧選択（可視上端）が新しい末尾になる。
+            target = GroupedItemOffsetForFileIndex(files, fromFileIndex) - (viewport - 1);
+        }
+        else
+        {
+            var itemOffset = GroupedItemOffsetForFileIndex(files, toFileIndex);
+            target = pageDown
+                ? itemOffset - (viewport - 1)
+                : itemOffset;
+        }
+
+        _playlistLiteScrollTargetOffset = Math.Clamp(
+            target,
+            0,
+            Math.Max(0, scroll.ScrollableHeight));
+    }
+
+    private void QueuePlaylistLiteScrollChase()
+    {
+        if (_playlistLiteScrollChaseQueued)
+        {
+            return;
+        }
+
+        _playlistLiteScrollChaseQueued = true;
+        var gen = ++_playlistLiteScrollChaseGeneration;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (gen != _playlistLiteScrollChaseGeneration)
+                {
+                    return;
+                }
+
+                _playlistLiteScrollChaseQueued = false;
+                ChasePlaylistLiteScrollStep();
+            },
+            DispatcherPriority.ContextIdle);
+    }
+
+    /// <summary>
+    /// Page lite の追従。1 Idle あたり最大 <see cref="PlaylistLiteScrollChaseStep"/> Item。
+    /// 目標 offset は <see cref="NotePlaylistLiteScrollTarget"/> が決める（最下段／最上段）。
+    /// </summary>
+    private void FinishPlaylistLiteScrollCatchUp()
+    {
+        if (!_playlistLiteScrollCatchUp)
+        {
+            return;
+        }
+
+        _playlistLiteScrollCatchUp = false;
+        SetPlaylistJacketLiteChrome(false);
+        _playlistGroupViewportDirty = true;
+        FlushDeferredGroupViewportIfNeeded();
+        FlushDeferredGroupJacketDecodes();
+    }
+
+    private void ChasePlaylistLiteScrollStep()
+    {
+        if (_playlistLiteScrollTargetOffset is not double targetOffset
+            || FindDataGridScrollViewer() is not { } scroll)
+        {
+            FinishPlaylistLiteScrollCatchUp();
+            return;
+        }
+
+        var target = Math.Clamp(targetOffset, 0, Math.Max(0, scroll.ScrollableHeight));
+        var current = scroll.VerticalOffset;
+        var remain = target - current;
+        if (Math.Abs(remain) < 0.5)
+        {
+            FinishPlaylistLiteScrollCatchUp();
+            return;
+        }
+
+        var step = Math.Sign(remain) * Math.Min(Math.Abs(remain), PlaylistLiteScrollChaseStep);
+        var next = current + step;
+        SetPlaylistJacketLiteChrome(true);
+        _playlistGroupViewportDirty = true;
+        _playlistScrollIntentDepth++;
+        try
+        {
+            scroll.ScrollToVerticalOffset(next);
+        }
+        finally
+        {
+            _playlistScrollIntentDepth--;
+        }
+
+        if (_playlistMoveLiteScrollPending
+            || _playlistPageNavLiteArmed
+            || _playlistLiteScrollCatchUp)
+        {
+            QueuePlaylistLiteScrollChase();
+        }
+    }
+
+    /// <summary>
+    /// 長押し Page が端に付いたか。true なら Queue せずキーだけ消費する
+    /// （末尾での空 Queue＋ログ flush が硬直に見えていた）。
+    /// </summary>
+    internal bool IsPlaylistCaretAtEdge(int direction)
+    {
+        var files = SnapshotPlaylistFiles();
+        if (files.Count == 0)
+        {
+            return true;
+        }
+
+        var index = PlaylistFileIndexOfSelected(files);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        return direction < 0 ? index <= 0 : index >= files.Count - 1;
+    }
+
+    /// <summary>キャレットの曲インデックス。未選択は -1。</summary>
+    internal int PlaylistCaretFileIndex()
+    {
+        var files = SnapshotPlaylistFiles();
+        return PlaylistFileIndexOfSelected(files);
+    }
+
+    /// <summary>Page ジェスチャ中だけ true。↑↓ の体験は従来の EnsureRowVisible のまま。</summary>
+    private bool IsPlaylistPageNavigationKeyHeld() =>
+        _playlistPageNavLiteArmed
+        || (PlaylistNavigationKeyHeldForTest?.Invoke()
+            ?? (Keyboard.IsKeyDown(Key.PageUp) || Keyboard.IsKeyDown(Key.PageDown)));
+
+    /// <summary>
+    /// ScrollUnit.Item＋グループ化での縦オフセット。各グループ見出しを 1 Item と数える。
+    /// </summary>
+    private static int GroupedItemOffsetForFileIndex(IReadOnlyList<LibraryFileRow> files, int fileIndex)
+    {
+        if (files.Count == 0 || fileIndex < 0)
+        {
+            return 0;
+        }
+
+        fileIndex = Math.Min(fileIndex, files.Count - 1);
+        var groups = 0;
+        string? prev = null;
+        for (var i = 0; i <= fileIndex; i++)
+        {
+            var key = files[i].GroupKey ?? string.Empty;
+            if (prev is null || !string.Equals(key, prev, StringComparison.Ordinal))
+            {
+                groups++;
+                prev = key;
+            }
+        }
+
+        return fileIndex + groups;
+    }
+
+    /// <summary>ScrollUnit.Item の可視スロット数（端数は切り捨て＝完全に見える行）。</summary>
+    private int PlaylistViewportItemCount(ScrollViewer? scroll = null)
+    {
+        scroll ??= FindDataGridScrollViewer();
+        if (scroll is { CanContentScroll: true, ViewportHeight: >= 1 })
+        {
+            return Math.Max(1, (int)Math.Floor(scroll.ViewportHeight + 1e-9));
+        }
+
+        return Math.Max(1, VisibleRowCount());
+    }
+
+    /// <summary>
+    /// 端にいる状態からの Page。現在行を反対端にし、そのページの新しい可視端の曲へ。
+    /// </summary>
+    private int ResolvePlaylistPageTargetAfterScroll(
+        IReadOnlyList<LibraryFileRow> files,
+        int currentFileIndex,
+        bool pageDown)
+    {
+        if (files.Count == 0 || (uint)currentFileIndex >= (uint)files.Count)
+        {
+            return currentFileIndex;
+        }
+
+        var viewport = PlaylistViewportItemCount();
+        var currentItem = GroupedItemOffsetForFileIndex(files, currentFileIndex);
+        if (pageDown)
+        {
+            // 現在行が新しい先頭 → 新しい末尾 Item の曲。
+            var bottomItem = currentItem + viewport - 1;
+            var target = FileIndexAtOrBeforeGroupedItem(files, bottomItem);
+            if (target <= currentFileIndex)
+            {
+                target = Math.Min(files.Count - 1, currentFileIndex + 1);
+            }
+
+            return target;
+        }
+
+        // 現在行が新しい末尾 → 新しい先頭 Item の曲。
+        var topItem = Math.Max(0, currentItem - (viewport - 1));
+        var upTarget = FileIndexAtOrAfterGroupedItem(files, topItem);
+        if (upTarget >= currentFileIndex)
+        {
+            upTarget = Math.Max(0, currentFileIndex - 1);
+        }
+
+        return upTarget;
+    }
+
+    /// <summary>
+    /// いま完全に見えている曲の先頭／末尾インデックス（エクスプローラー Page 用）。
+    /// </summary>
+    private bool TryGetVisiblePlaylistFileRange(
+        IReadOnlyList<LibraryFileRow> files,
+        out int firstFileIndex,
+        out int lastFileIndex)
+    {
+        firstFileIndex = -1;
+        lastFileIndex = -1;
+        if (files.Count == 0 || FindDataGridScrollViewer() is not { } scroll)
+        {
+            return false;
+        }
+
+        var topItem = (int)Math.Floor(scroll.VerticalOffset + 1e-9);
+        var viewport = PlaylistViewportItemCount(scroll);
+        var bottomItem = topItem + viewport - 1;
+        firstFileIndex = FileIndexAtOrAfterGroupedItem(files, topItem);
+        lastFileIndex = FileIndexAtOrBeforeGroupedItem(files, bottomItem);
+        if (firstFileIndex < 0 || lastFileIndex < 0)
+        {
+            return false;
+        }
+
+        if (lastFileIndex < firstFileIndex)
+        {
+            lastFileIndex = firstFileIndex;
+        }
+
+        return true;
+    }
+
+    /// <summary>平坦 Item 位置がヘッダならそのグループ先頭曲、曲ならその曲。</summary>
+    private static int FileIndexAtOrAfterGroupedItem(IReadOnlyList<LibraryFileRow> files, int itemOffset)
+    {
+        if (files.Count == 0)
+        {
+            return -1;
+        }
+
+        var item = 0;
+        string? prev = null;
+        for (var i = 0; i < files.Count; i++)
+        {
+            var key = files[i].GroupKey ?? string.Empty;
+            if (prev is null || !string.Equals(key, prev, StringComparison.Ordinal))
+            {
+                if (itemOffset <= item)
+                {
+                    return i;
+                }
+
+                item++;
+                prev = key;
+            }
+
+            if (itemOffset <= item)
+            {
+                return i;
+            }
+
+            item++;
+        }
+
+        return files.Count - 1;
+    }
+
+    /// <summary>平坦 Item 位置がヘッダなら直前の曲、曲ならその曲。</summary>
+    private static int FileIndexAtOrBeforeGroupedItem(IReadOnlyList<LibraryFileRow> files, int itemOffset)
+    {
+        if (files.Count == 0)
+        {
+            return -1;
+        }
+
+        var item = 0;
+        string? prev = null;
+        var lastFile = -1;
+        for (var i = 0; i < files.Count; i++)
+        {
+            var key = files[i].GroupKey ?? string.Empty;
+            if (prev is null || !string.Equals(key, prev, StringComparison.Ordinal))
+            {
+                if (item >= itemOffset)
+                {
+                    return lastFile >= 0 ? lastFile : i;
+                }
+
+                item++;
+                prev = key;
+            }
+
+            lastFile = i;
+            if (item >= itemOffset)
+            {
+                return i;
+            }
+
+            item++;
+        }
+
+        return lastFile;
+    }
+
+    private bool IsPlaylistRowFullyInViewport(LibraryFileRow row)
+    {
+        if (_grid.ItemContainerGenerator.ContainerFromItem(row) is not FrameworkElement element
+            || _grid.ActualHeight <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var bounds = element.TransformToAncestor(_grid)
+                .TransformBounds(new Rect(element.RenderSize));
+            var top = RowsViewportTop();
+            var bottom = RowsViewportBottom();
+            return bounds.Top >= top && bounds.Bottom <= bottom;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
         }
     }
 
@@ -3341,7 +3927,99 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// </summary>
     internal void FlushPlaylistMoveDefer()
     {
-        CompletePlaylistMoveDefer(_playlistMoveDeferGeneration);
+        // Page lite のときだけ、離したときに SelectedItem／位置を確定する。
+        // ↑↓ では MoveSelection 時点で済みなので、ここでもう一度 Ensure すると二重補正になる。
+        // Activate より先にキャレットへ SelectedItem を合わせ、旧行→新行の二重 SessionActivated を避ける。
+        var finalizeLite = _playlistMoveLiteScrollPending || _playlistPageNavLiteArmed;
+        _playlistMoveLiteScrollPending = false;
+        _playlistPageNavLiteArmed = false;
+        // 大きな一発 Scroll／Ensure はしない。追従スクロールを Idle で続け、KeyUp はすぐ返す。
+        // CatchUp 中は BringIntoView（選択を最上段へ）を握る。
+        if (finalizeLite && _playlistLiteScrollTargetFileIndex >= 0)
+        {
+            if (_playlistLiteScrollTargetOffset is null
+                && FindDataGridScrollViewer() is { } liveScroll)
+            {
+                _playlistLiteScrollTargetOffset = liveScroll.VerticalOffset;
+            }
+
+            _playlistLiteScrollCatchUp = true;
+            QueuePlaylistLiteScrollChase();
+        }
+
+        var resumeSelectionNotify = false;
+        _playlistSuppressGroupViewportQueue = true;
+        try
+        {
+            if (finalizeLite && ResolvePlaylistCaretRow() is { } caret)
+            {
+                // SelectedItem 代入は ScrollViewer 経由で最上段寄せしうる。
+                // SCP 抑止に加え、同期前後で相対 target／現在 offset へ戻す。
+                var restoreOffset = _playlistLiteScrollTargetOffset;
+                if (restoreOffset is null
+                    && FindDataGridScrollViewer() is { } beforeSync)
+                {
+                    restoreOffset = beforeSync.VerticalOffset;
+                }
+
+                _syncing = true;
+                _suppressPlaylistBringIntoView = true;
+                SuspendPlaylistSelectionNotify();
+                resumeSelectionNotify = true;
+                try
+                {
+                    SyncPlaylistCaretToGrid(caret);
+                    PinSelectionCurrent();
+                    ReassertPlaylistMoveSelection(caret, extend: false);
+                    if (restoreOffset is double keepY
+                        && FindDataGridScrollViewer() is { } afterSync
+                        && Math.Abs(afterSync.VerticalOffset - keepY) > 0.5)
+                    {
+                        _playlistScrollIntentDepth++;
+                        try
+                        {
+                            afterSync.ScrollToVerticalOffset(
+                                Math.Clamp(keepY, 0, Math.Max(0, afterSync.ScrollableHeight)));
+                        }
+                        finally
+                        {
+                            _playlistScrollIntentDepth--;
+                        }
+                    }
+                }
+                finally
+                {
+                    // CatchUp 中は RequestBringIntoView 側で抑止を継続する。
+                    _suppressPlaylistBringIntoView = false;
+                    _syncing = false;
+                }
+            }
+
+            CompletePlaylistMoveDefer(_playlistMoveDeferGeneration);
+
+            _playlistNavRevealArmed = false;
+
+            if (resumeSelectionNotify)
+            {
+                // ラウドネス等は KeyUp 同期経路から外す（698ms の主因だった）。
+                Dispatcher.BeginInvoke(
+                    () => ResumePlaylistSelectionNotify(),
+                    DispatcherPriority.Background);
+            }
+        }
+        finally
+        {
+            _playlistSuppressGroupViewportQueue = false;
+        }
+
+        if (!finalizeLite)
+        {
+            _playlistStickyFlushGeneration++;
+            _playlistStickyFlushTimer?.Stop();
+            _playlistScrollBurstCount = 0;
+            FlushDeferredGroupViewportIfNeeded();
+            FlushDeferredGroupJacketDecodes();
+        }
     }
 
     private void CompletePlaylistMoveDefer(int moveGen)
@@ -3378,6 +4056,62 @@ internal sealed partial class LibraryBrowserView : UserControl
             EnsureListFocused(pinCurrent: false);
         }
     }
+
+    private void FlushDeferredGroupViewportIfNeeded()
+    {
+        if (!_playlistGroupViewportDirty)
+        {
+            return;
+        }
+
+        _playlistGroupViewportDirty = false;
+        SetPlaylistJacketLiteChrome(false);
+        BeginStickyBatch();
+        try
+        {
+            GroupViewportChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            EndStickyBatch();
+        }
+
+        FlushDeferredGroupJacketDecodes();
+    }
+
+    private void BeginStickyBatch()
+    {
+        _stickyViewportTopCache = RowsViewportTop();
+        _stickyHorizontalOffsetCache = GroupHorizontalOffset();
+    }
+
+    private void EndStickyBatch()
+    {
+        _stickyViewportTopCache = null;
+        _stickyHorizontalOffsetCache = null;
+    }
+
+    internal double RowsViewportTopForSticky() => _stickyViewportTopCache ?? RowsViewportTop();
+
+    internal double GroupHorizontalOffsetForSticky() =>
+        _stickyHorizontalOffsetCache ?? GroupHorizontalOffset();
+
+    private void SetPlaylistJacketLiteChrome(bool lite)
+    {
+        if (_playlistJacketLiteChrome == lite)
+        {
+            return;
+        }
+
+        _playlistJacketLiteChrome = lite;
+        // 連打中に Collapsed にしたジャケットを、キー離しで必ず Reload する。
+        if (lite)
+        {
+            _groupArtworkNotifyDeferred = true;
+        }
+    }
+
+    internal bool PlaylistJacketLiteChrome => _playlistJacketLiteChrome;
 
     /// <summary>
     /// <see cref="EnsureRowVisible"/> 後に DataGrid が選択を先頭へ寄せていても、
@@ -3610,7 +4344,171 @@ internal sealed partial class LibraryBrowserView : UserControl
     }
 
     /// <summary>選択は変えず、表示だけ1行単位で縦スクロールする。ScrollUnit.Item 前提。</summary>
-    public void ScrollPlaylistByRows(int delta)
+    public void ScrollPlaylistByRows(int delta) => ScrollPlaylistByRows(delta, coalesceRepeat: false);
+
+    /// <summary>
+    /// 選択は変えず縦スクロールする。マウスホイールと同じく素の ScrollToVerticalOffset のみ。
+    /// pin／Repin は使わない（重さの主因だった）。
+    /// <paramref name="coalesceRepeat"/> 時はリピート差分を1フレームにまとめる。
+    /// </summary>
+    public void ScrollPlaylistByRows(int delta, bool coalesceRepeat)
+    {
+        if (delta == 0)
+        {
+            return;
+        }
+
+        if (coalesceRepeat)
+        {
+            BeginPlaylistAltScrollChrome();
+            _playlistAltScrollPendingDelta += delta;
+            SchedulePlaylistAltScrollApply();
+            SchedulePlaylistAltScrollChromeFlush();
+            return;
+        }
+
+        if (_playlistAltScrollPendingDelta != 0)
+        {
+            delta += _playlistAltScrollPendingDelta;
+            _playlistAltScrollPendingDelta = 0;
+        }
+
+        ApplyWheelLikePlaylistScroll(delta);
+
+        if (IsPlaylistAltScrollKeyHeld())
+        {
+            BeginPlaylistAltScrollChrome();
+            SchedulePlaylistAltScrollChromeFlush();
+        }
+    }
+
+    /// <summary>テスト用。null なら実キー状態を見る。</summary>
+    internal Func<bool>? PlaylistAltScrollKeyHeldForTest { get; set; }
+
+    /// <summary>テスト用。Alt スクロール中に sticky 更新を溜めているか。</summary>
+    internal bool IsPlaylistAltScrollChromeActive => _playlistAltScrollChromeActive;
+
+    /// <summary>テスト用。グループ sticky の遅延通知が未 Flush か。</summary>
+    internal bool IsPlaylistGroupViewportDirty => _playlistGroupViewportDirty;
+
+    /// <summary>テスト用。ホイール相当で Alt pin を外す。</summary>
+    internal void NotePlaylistViewportUserChangeForTest(bool releasePin) =>
+        NotePlaylistViewportUserChange(releasePin);
+
+    private bool IsPlaylistAltScrollKeyHeld() =>
+        PlaylistAltScrollKeyHeldForTest?.Invoke()
+        ?? ((Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt))
+            && (Keyboard.IsKeyDown(Key.Up) || Keyboard.IsKeyDown(Key.Down)));
+
+    private void BeginPlaylistAltScrollChrome()
+    {
+        if (!_playlistAltScrollChromeActive)
+        {
+            _playlistAltScrollHoldStartMs = Environment.TickCount64;
+        }
+
+        _playlistAltScrollChromeActive = true;
+        _playlistGroupViewportDirty = true;
+        SetPlaylistJacketLiteChrome(true);
+        if (_playlistAltScrollRevealArmed)
+        {
+            return;
+        }
+
+        _playlistAltScrollRevealArmed = true;
+        LibraryScrollReveal.RevealTemporarily(_grid);
+    }
+
+    private long _playlistAltScrollHoldStartMs;
+
+    private void SchedulePlaylistAltScrollApply()
+    {
+        if (_playlistAltScrollApplyQueued)
+        {
+            return;
+        }
+
+        _playlistAltScrollApplyQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _playlistAltScrollApplyQueued = false;
+                var pending = _playlistAltScrollPendingDelta;
+                if (pending == 0)
+                {
+                    return;
+                }
+
+                _playlistAltScrollPendingDelta = 0;
+                // 押しっぱなしが続くほど1フレームの移動量を増やす（キーリピート以上の巡航速度）。
+                if (_playlistAltScrollHoldStartMs != 0)
+                {
+                    var held = Environment.TickCount64 - _playlistAltScrollHoldStartMs;
+                    var boost = held >= 1200 ? 3 : held >= 500 ? 2 : 1;
+                    if (boost > 1)
+                    {
+                        pending *= boost;
+                    }
+                }
+
+                ApplyWheelLikePlaylistScroll(pending);
+            },
+            DispatcherPriority.Input);
+    }
+
+    private void SchedulePlaylistAltScrollChromeFlush()
+    {
+        var gen = ++_playlistAltScrollFlushGeneration;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (gen != _playlistAltScrollFlushGeneration)
+                {
+                    return;
+                }
+
+                if (IsPlaylistAltScrollKeyHeld())
+                {
+                    return;
+                }
+
+                FlushPlaylistAltScrollChrome();
+            },
+            DispatcherPriority.ContextIdle);
+    }
+
+    /// <summary>
+    /// Alt+↑／↓ を離したとき、溜めていたスクロール差分と sticky を確定する。
+    /// </summary>
+    internal void FlushPlaylistAltScrollChrome()
+    {
+        _playlistAltScrollFlushGeneration++;
+        if (_playlistAltScrollPendingDelta != 0)
+        {
+            var pending = _playlistAltScrollPendingDelta;
+            _playlistAltScrollPendingDelta = 0;
+            ApplyWheelLikePlaylistScroll(pending);
+        }
+
+        var hadChrome = _playlistAltScrollChromeActive || _playlistGroupViewportDirty;
+        _playlistAltScrollChromeActive = false;
+        _playlistAltScrollRevealArmed = false;
+        _playlistAltScrollHoldStartMs = 0;
+        if (!hadChrome)
+        {
+            FlushDeferredGroupJacketDecodes();
+            return;
+        }
+
+        // pin／Repin はしない。sticky／ジャケットはキー離しで合わせる。
+        FlushDeferredGroupViewportIfNeeded();
+        FlushDeferredGroupJacketDecodes();
+    }
+
+    /// <summary>
+    /// マウスホイールと同じ経路。pin を外し、素の ScrollToVerticalOffset だけ行う。
+    /// </summary>
+    private void ApplyWheelLikePlaylistScroll(int delta)
     {
         if (delta == 0 || FindDataGridScrollViewer() is not { } scroll)
         {
@@ -3626,14 +4524,15 @@ internal sealed partial class LibraryBrowserView : UserControl
             return;
         }
 
-        // 進行中の行差し替え／列フィット復元よりユーザー操作を優先する。
-        NotePlaylistViewportUserChange();
-        _playlistPinnedOffset = next;
-        SetPlaylistVerticalOffset(scroll, next);
+        // ホイールと同じ: pin を捨てて世代だけ進め、BringIntoView の引き戻しは browse で止める。
+        NotePlaylistViewportUserChange(releasePin: true);
+        scroll.ScrollToVerticalOffset(next);
 
-        // Item スクロール＋グループ化は、直後のレイアウトで offset を戻すことがある。
-        SchedulePlaylistViewportRepin();
-        LibraryScrollReveal.RevealTemporarily(_grid);
+        if (!_playlistAltScrollRevealArmed)
+        {
+            _playlistAltScrollRevealArmed = true;
+            LibraryScrollReveal.RevealTemporarily(_grid);
+        }
     }
 
     /// <summary>横に溢れているときだけ true（スクロールバー表示可否の判定）。</summary>
@@ -3662,7 +4561,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         var next = Math.Clamp(scroll.HorizontalOffset + delta, 0, scroll.ScrollableWidth);
         if (Math.Abs(scroll.HorizontalOffset - next) >= 0.01)
         {
-            NotePlaylistViewportUserChange();
+            // 横操作でも Alt の縦 pin を残すと、直後の縦 ScrollChanged で引き戻されうる。
+            NotePlaylistViewportUserChange(releasePin: true);
             scroll.ScrollToHorizontalOffset(next);
         }
 
@@ -3688,8 +4588,8 @@ internal sealed partial class LibraryBrowserView : UserControl
         if (Keyboard.Modifiers == ModifierKeys.None)
         {
             // 既定の縦スクロールはそのまま通し、バーだけ一時表示する。
-            // 行差し替えの遅延復元がホイール位置を打ち消さないよう世代を進める。
-            NotePlaylistViewportUserChange();
+            // Alt+↑↓ の pin が残っていると ScrollChanged→Repin でホイール位置を戻すので外す。
+            NotePlaylistViewportUserChange(releasePin: true);
             LibraryScrollReveal.RevealTemporarily(_grid);
         }
     }
@@ -3737,6 +4637,34 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// MainWindow のショートカットが Page を握らなかったときの受け皿。
+    /// DataGrid 既定のページ送りはログも lite も無いので、ここで自前移動へ寄せる。
+    /// </summary>
+    private void Grid_PreviewKeyDownPageNav(object sender, KeyEventArgs e)
+    {
+        if (e.Handled)
+        {
+            return;
+        }
+
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is not (Key.PageUp or Key.PageDown))
+        {
+            return;
+        }
+
+        var modifiers = Keyboard.Modifiers;
+        if (modifiers is not (ModifierKeys.None or ModifierKeys.Shift))
+        {
+            return;
+        }
+
+        ArmPlaylistPageNavLite();
+        MoveSelectionPage(key == Key.PageUp ? -1 : 1, extend: modifiers == ModifierKeys.Shift);
+        e.Handled = true;
     }
 
     private void EnsureListFocused(bool pinCurrent = true)
@@ -3844,7 +4772,8 @@ internal sealed partial class LibraryBrowserView : UserControl
                 var bounds = element.TransformToAncestor(_grid)
                     .TransformBounds(new Rect(element.RenderSize));
                 var top = RowsViewportTop();
-                if (bounds.Top >= top && bounds.Bottom <= _grid.ActualHeight)
+                var bottom = RowsViewportBottom();
+                if (bounds.Top >= top && bounds.Bottom <= bottom)
                 {
                     // 既に見えているときは見出し補正しない。
                     // Alt+↑／↓ 直後にグループ名がわずかに欠けて見えるだけで上方向へ戻されるのを防ぐ。
@@ -3909,7 +4838,12 @@ internal sealed partial class LibraryBrowserView : UserControl
                     PinSelectionCurrent();
                 }
 
-                RevealGroupHeaderIfNearlyClipped(item);
+                // 押し続け中の見出し補正は端折る（毎打 Transform が重い）。
+                // 下端の +1 補正（RevealRowBottom）は EndPad で足りる。毎行やるとセンターロック感と重さの元。
+                if (!IsPlaylistNavigationKeyHeld())
+                {
+                    RevealGroupHeaderIfNearlyClipped(item);
+                }
             },
             DispatcherPriority.Loaded);
     }
@@ -3935,56 +4869,120 @@ internal sealed partial class LibraryBrowserView : UserControl
         public bool Valid { get; init; }
     }
 
-    private void NotePlaylistViewportUserChange()
+    private void NotePlaylistViewportUserChange(bool releasePin = false)
     {
         _playlistViewportGeneration++;
         _playlistViewportBrowse = true;
+        if (!releasePin)
+        {
+            return;
+        }
+
+        // ホイール等のユーザー縦スクロール。Alt pin を残すと Repin が位置を奪い返す。
+        if (_playlistPinnedOffset is null)
+        {
+            _playlistRepinQueued = false;
+            return;
+        }
+
+        _playlistPinnedOffset = null;
+        _playlistRepinGeneration++;
+        _playlistRepinQueued = false;
     }
 
     private void ClearPlaylistViewportBrowse()
     {
+        // 既に閲覧モードでなければ触らない。
+        // Page 連打のたびに lite／sticky／Reveal を壊して再構築していたのが重さの一因。
+        if (!_playlistViewportBrowse)
+        {
+            return;
+        }
+
         _playlistViewportBrowse = false;
         _playlistPinnedOffset = null;
         _playlistRepinGeneration++;
+        _playlistRepinQueued = false;
+        _playlistRepinReleasePinWhenIdle = false;
+        _playlistAltScrollPendingDelta = 0;
+        _playlistAltScrollApplyQueued = false;
+        _playlistAltScrollChromeActive = false;
+        _playlistAltScrollRevealArmed = false;
+        _playlistNavRevealArmed = false;
+        _playlistGroupViewportDirty = false;
+        _playlistStickyFlushGeneration++;
+        _playlistScrollBurstCount = 0;
+        _playlistStickyFlushTimer?.Stop();
+        _playlistJacketLiteChrome = false;
+        _playlistAltScrollFlushGeneration++;
     }
 
-    private void SchedulePlaylistViewportRepin()
+    private void SchedulePlaylistViewportRepin(bool releasePinWhenIdle = false)
     {
         if (!_playlistViewportBrowse || _playlistPinnedOffset is null)
         {
             return;
         }
 
-        var gen = ++_playlistRepinGeneration;
-        var pinned = _playlistPinnedOffset.Value;
-        void Repin()
+        if (releasePinWhenIdle)
         {
-            if (gen != _playlistRepinGeneration
-                || !_playlistViewportBrowse
-                || _playlistPinnedOffset is not { } current
-                || Math.Abs(current - pinned) > 0.01)
+            _playlistRepinReleasePinWhenIdle = true;
+        }
+
+        // 連打中は pinned だけ更新し、並び済みの Render／Loaded／Idle に任せる。
+        if (_playlistRepinQueued)
+        {
+            return;
+        }
+
+        _playlistRepinQueued = true;
+        var gen = ++_playlistRepinGeneration;
+
+        void Repin(bool last)
+        {
+            if (gen != _playlistRepinGeneration)
             {
                 return;
             }
 
-            RepinPlaylistViewportIfNeeded(current);
+            if (last)
+            {
+                _playlistRepinQueued = false;
+                if (_playlistRepinReleasePinWhenIdle)
+                {
+                    _playlistRepinReleasePinWhenIdle = false;
+                    if (_playlistPinnedOffset is not null)
+                    {
+                        _playlistPinnedOffset = null;
+                    }
+                }
+            }
+
+            if (!_playlistViewportBrowse || _playlistPinnedOffset is not { } current)
+            {
+                return;
+            }
+
+            // スケジュール時点の値ではなく、その時点の pinned を使う（合流後の最新位置）。
+            RepinPlaylistViewportIfNeeded(current, last);
         }
 
         // 仮想化の InitializeViewport が Render／Loaded のあいだに戻すので複数段で張り直す。
-        Dispatcher.BeginInvoke(Repin, DispatcherPriority.Render);
-        Dispatcher.BeginInvoke(Repin, DispatcherPriority.Loaded);
-        Dispatcher.BeginInvoke(Repin, DispatcherPriority.ContextIdle);
+        Dispatcher.BeginInvoke(() => Repin(false), DispatcherPriority.Render);
+        Dispatcher.BeginInvoke(() => Repin(false), DispatcherPriority.Loaded);
+        Dispatcher.BeginInvoke(() => Repin(true), DispatcherPriority.ContextIdle);
     }
 
-    private void RepinPlaylistViewportIfNeeded(double pinned)
+    private void RepinPlaylistViewportIfNeeded(double pinned, bool last = false)
     {
         if (FindDataGridScrollViewer() is not { } scroll)
         {
             return;
         }
 
+        var before = scroll.VerticalOffset;
         var next = Math.Clamp(pinned, 0, Math.Max(0, scroll.ScrollableHeight));
-        if (Math.Abs(scroll.VerticalOffset - next) < 0.01)
+        if (Math.Abs(before - next) < 0.01)
         {
             return;
         }
@@ -4438,6 +5436,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     public void RefreshAppearance()
     {
         _fallbackWashTurns = null;
+        LibraryJacketReflectionView.InvalidateOpacityMaskCache();
         ApplyGlowVeil();
         ApplyGridStyles();
         ApplyExplorerStyle();
@@ -4571,7 +5570,8 @@ internal sealed partial class LibraryBrowserView : UserControl
             next.GroupKey = LibraryFileList.GroupLabel(next, _group);
             if (LibraryFileList.SameContent(_items[i], next))
             {
-                InvalidateGroupJackets();
+                // 内容同じならビットマップキャッシュは捨てない（再デコード嵐の防止）。
+                QueueGroupArtworkChanged();
                 return;
             }
 
@@ -5302,6 +6302,7 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         RefreshSortChrome();
+        EnsurePlaylistEndPad();
     }
 
     /// <summary>
@@ -5310,6 +6311,7 @@ internal sealed partial class LibraryBrowserView : UserControl
     /// </summary>
     private void DetachBoundRows()
     {
+        _playlistEndPadApplied = false;
         if (_grid.ItemsSource is ListCollectionView view)
         {
             _grid.ItemsSource = null;
@@ -5772,9 +6774,82 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         scroll.ScrollChanged += GridScroll_Changed;
-        _grid.SizeChanged += (_, _) => GroupViewportChanged?.Invoke(this, EventArgs.Empty);
+        EnsurePlaylistBringIntoViewHook(scroll);
+        _grid.SizeChanged += (_, _) => QueueGroupViewportChanged();
+        EnsurePlaylistEndPad();
         _gridScrollHooked = true;
         GroupViewportChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// ScrollContentPresenter で RequestBringIntoView を握る。
+    /// DataGrid への AddHandler では ScrollViewer が先に縦スクロールしてしまう。
+    /// </summary>
+    private void EnsurePlaylistBringIntoViewHook(ScrollViewer scroll)
+    {
+        if (_playlistBringIntoViewHooked)
+        {
+            return;
+        }
+
+        if (FindDescendant<ScrollContentPresenter>(scroll) is not { } presenter)
+        {
+            // テンプレート展開前は見つからない。次のレイアウトで再試行。
+            Dispatcher.BeginInvoke(
+                () =>
+                {
+                    if (_playlistBringIntoViewHooked
+                        || FindDataGridScrollViewer() is not { } later)
+                    {
+                        return;
+                    }
+
+                    EnsurePlaylistBringIntoViewHook(later);
+                },
+                DispatcherPriority.Loaded);
+            return;
+        }
+
+        presenter.RequestBringIntoView += Grid_RequestBringIntoView;
+        _playlistBringIntoViewHooked = true;
+    }
+
+    /// <summary>
+    /// ScrollUnit.Item だと末尾行がビュー下端に見切れるので、ItemsPresenter に下余白を足す。
+    /// </summary>
+    private void EnsurePlaylistEndPad()
+    {
+        if (_playlistEndPadApplied)
+        {
+            return;
+        }
+
+        if (FindDescendant<ItemsPresenter>(_grid) is not { } presenter)
+        {
+            // 仮想化前は見つからないことがある。次のレイアウトで再試行。
+            if (!_playlistEndPadRetryQueued)
+            {
+                _playlistEndPadRetryQueued = true;
+                Dispatcher.BeginInvoke(
+                    () =>
+                    {
+                        _playlistEndPadRetryQueued = false;
+                        EnsurePlaylistEndPad();
+                    },
+                    DispatcherPriority.Loaded);
+            }
+
+            return;
+        }
+
+        var pad = DesignMetrics.LibraryPlaylistEndPad;
+        var margin = presenter.Margin;
+        if (margin.Bottom + 0.5 < pad)
+        {
+            presenter.Margin = new Thickness(margin.Left, margin.Top, margin.Right, pad);
+        }
+
+        _playlistEndPadApplied = true;
     }
 
     private void GridScroll_Changed(object sender, ScrollChangedEventArgs e)
@@ -5790,28 +6865,124 @@ internal sealed partial class LibraryBrowserView : UserControl
         }
 
         // グループ化 Item スクロールが Alt 位置を戻したら、次のディスパッチで張り直す。
+        // Alt 押し中は Apply 側の Repin に任せ、ここでの再スケジュールはしない（重い）。
         if (_playlistViewportBrowse
             && _playlistPinnedOffset is not null
             && e.VerticalChange != 0
-            && _playlistScrollIntentDepth == 0)
+            && _playlistScrollIntentDepth == 0
+            && !_playlistAltScrollChromeActive)
         {
-            SchedulePlaylistViewportRepin();
+            if (Math.Abs(e.VerticalChange) >= 0.5)
+            {
+                _playlistPinnedOffset = null;
+                _playlistRepinGeneration++;
+                _playlistRepinQueued = false;
+                _playlistRepinReleasePinWhenIdle = false;
+            }
+            else
+            {
+                SchedulePlaylistViewportRepin();
+            }
         }
 
-        GroupViewportChanged?.Invoke(this, EventArgs.Empty);
+        // 連打中は sticky／反射を後回し。止まったあとの Idle で一度だけ合わせる。
+        _playlistLastScrollTickMs = Environment.TickCount64;
+        _playlistScrollBurstCount++;
+        if (e.VerticalChange != 0 || e.HorizontalChange != 0)
+        {
+            SetPlaylistJacketLiteChrome(true);
+        }
+
+        if (IsPlaylistNavigationKeyHeld()
+            || (_playlistAltScrollChromeActive && IsPlaylistAltScrollKeyHeld())
+            || _playlistSuppressGroupViewportQueue)
+        {
+            _playlistGroupViewportDirty = true;
+        }
+        else
+        {
+            QueueGroupViewportChanged();
+        }
     }
 
     /// <summary>
-    /// Alt+↑／↓ 後、選択行コンテナの BringIntoView がレイアウトで縦位置を戻すのを握る。
+    /// sticky はスクロール静止後に一度。連打中の 5ms×毎フレームをやめる。
+    /// ContextIdle の再キューは Flush が止まらなくなるので、連打時は Timer で待つ。
     /// </summary>
-    private void Grid_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+    private void QueueGroupViewportChanged()
     {
-        if (!_playlistViewportBrowse)
+        _playlistGroupViewportDirty = true;
+        var gen = ++_playlistStickyFlushGeneration;
+        if (_playlistScrollBurstCount > 1)
+        {
+            ScheduleStickyFlushTimer(gen);
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() => TryFlushSticky(gen), DispatcherPriority.ContextIdle);
+    }
+
+    private void ScheduleStickyFlushTimer(int gen)
+    {
+        _playlistStickyFlushTimerGen = gen;
+        _playlistStickyFlushTimer ??= CreateStickyFlushTimer();
+        _playlistStickyFlushTimer.Stop();
+        _playlistStickyFlushTimer.Interval = TimeSpan.FromMilliseconds(40);
+        _playlistStickyFlushTimer.Start();
+    }
+
+    private DispatcherTimer CreateStickyFlushTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            TryFlushSticky(_playlistStickyFlushTimerGen);
+        };
+        return timer;
+    }
+
+    private void TryFlushSticky(int gen)
+    {
+        if (gen != _playlistStickyFlushGeneration)
         {
             return;
         }
 
-        e.Handled = true;
+        if (IsPlaylistNavigationKeyHeld()
+            || (_playlistAltScrollChromeActive && IsPlaylistAltScrollKeyHeld()))
+        {
+            _playlistGroupViewportDirty = true;
+            return;
+        }
+
+        // 連打がまだ続いていればタイマーを振り直す（Idle 再キューはしない）。
+        if (_playlistScrollBurstCount > 1
+            && Environment.TickCount64 - _playlistLastScrollTickMs < 40)
+        {
+            ScheduleStickyFlushTimer(gen);
+            return;
+        }
+
+        _playlistScrollBurstCount = 0;
+        FlushDeferredGroupViewportIfNeeded();
+    }
+
+    /// <summary>
+    /// Alt 閲覧中の引き戻し、および Page 移動中の SelectedItem 同期による
+    /// 「選択行をビュー最上段へ」を握る。スクロールは相対 offset 追従だけにする。
+    /// ScrollContentPresenter にも同じハンドラを付け、ScrollViewer より前で止める。
+    /// </summary>
+    private void Grid_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+    {
+        if (_suppressPlaylistBringIntoView
+            || _playlistViewportBrowse
+            || _playlistPageNavLiteArmed
+            || _playlistMoveLiteScrollPending
+            || _playlistLiteScrollCatchUp)
+        {
+            e.Handled = true;
+        }
     }
 
     internal double RowsViewportTop()
@@ -5832,6 +7003,45 @@ internal sealed partial class LibraryBrowserView : UserControl
         return _grid.ColumnHeaderHeight > 0 && !double.IsNaN(_grid.ColumnHeaderHeight)
             ? _grid.ColumnHeaderHeight
             : 28;
+    }
+
+    /// <summary>行が見える下端。横スクロールバー分は除く。</summary>
+    internal double RowsViewportBottom()
+    {
+        var bottom = _grid.ActualHeight;
+        if (FindDataGridScrollViewer() is not { } scroll
+            || scroll.ComputedHorizontalScrollBarVisibility != Visibility.Visible)
+        {
+            return bottom;
+        }
+
+        foreach (var bar in EnumerateScrollBars(scroll))
+        {
+            if (bar.Orientation == Orientation.Horizontal && bar.ActualHeight > 1)
+            {
+                return Math.Max(RowsViewportTop() + 1, bottom - bar.ActualHeight);
+            }
+        }
+
+        return Math.Max(RowsViewportTop() + 1, bottom - DesignMetrics.SettingsScrollBarWidth);
+    }
+
+    private static IEnumerable<ScrollBar> EnumerateScrollBars(DependencyObject root)
+    {
+        if (root is ScrollBar bar)
+        {
+            yield return bar;
+            yield break;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            foreach (var child in EnumerateScrollBars(VisualTreeHelper.GetChild(root, i)))
+            {
+                yield return child;
+            }
+        }
     }
 
     internal double GroupHorizontalOffset() =>
@@ -6780,7 +7990,7 @@ internal sealed class LibraryJacketReflectionView : Border
         Margin = new Thickness(0, LibraryJacketReflection.GapDip, 0, 0);
         Padding = new Thickness(0);
         BorderThickness = new Thickness(0);
-        OpacityMask = CreateOpacityMask();
+        OpacityMask = GetOpacityMask();
 
         _image.Stretch = Stretch.Uniform;
         _image.SnapsToDevicePixels = true;
@@ -6824,7 +8034,13 @@ internal sealed class LibraryJacketReflectionView : Border
         height = pixelHeight * scale;
     }
 
-    internal void RefreshMask() => OpacityMask = CreateOpacityMask();
+    private static Brush? _cachedOpacityMask;
+
+    internal void RefreshMask() => OpacityMask = GetOpacityMask();
+
+    internal static void InvalidateOpacityMaskCache() => _cachedOpacityMask = null;
+
+    internal static Brush GetOpacityMask() => _cachedOpacityMask ??= CreateOpacityMask();
 
     internal static Brush CreateOpacityMask()
     {
@@ -6908,6 +8124,7 @@ internal sealed class LibraryGroupJacketImage : StackPanel
     private readonly LibraryGroupHorizontalPin _pin;
     private LibraryBrowserView? _owner;
     private double _contentHeight;
+    private string? _boundGroupKey;
 
     public LibraryGroupJacketImage()
     {
@@ -6950,6 +8167,13 @@ internal sealed class LibraryGroupJacketImage : StackPanel
     /// </summary>
     protected override Size MeasureOverride(Size constraint)
     {
+        // Page 連打中はジャケットをレイアウトから外し、仮想化コストを下げる。
+        if (_owner?.PlaylistJacketLiteChrome == true)
+        {
+            _contentHeight = 0;
+            return new Size(0, 0);
+        }
+
         var measured = base.MeasureOverride(constraint);
         _contentHeight = measured.Height;
         var faceHeight = _face.DesiredSize.Height;
@@ -6998,7 +8222,11 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         }
 
         Reload();
-        UpdateSticky();
+        // Page／連打中は sticky Transform を飛ばす（仮想化嵐の硬直要因）。
+        if (_owner?.PlaylistJacketLiteChrome != true)
+        {
+            UpdateSticky();
+        }
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -7014,7 +8242,15 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         _pin.Reset();
     }
 
-    private void OnViewportChanged(object? sender, EventArgs e) => UpdateSticky();
+    private void OnViewportChanged(object? sender, EventArgs e)
+    {
+        if (_owner?.PlaylistJacketLiteChrome == true)
+        {
+            return;
+        }
+
+        UpdateSticky();
+    }
 
     private void UpdateSticky()
     {
@@ -7025,10 +8261,11 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         }
 
         _owner.EnsureGroupScrollHook();
+        ApplyReflectionChrome();
 
         try
         {
-            var headerBottom = _owner.RowsViewportTop();
+            var headerBottom = _owner.RowsViewportTopForSticky();
             var natural = TransformToAncestor(_owner.FileGrid).Transform(new Point(0, 0)).Y - _stick.Y;
             var max = Math.Max(0, stage.ActualHeight - jacketH);
             var offset = Math.Clamp(headerBottom - natural, 0, max);
@@ -7044,25 +8281,58 @@ internal sealed class LibraryGroupJacketImage : StackPanel
         }
     }
 
+    private void ApplyReflectionChrome()
+    {
+        if (_face.Source is null)
+        {
+            _reflection.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // 連打中は反射を消して合成を軽くする。止めれば sticky flush で戻る。
+        _reflection.Visibility = _owner?.PlaylistJacketLiteChrome == true
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
     private void Reload()
     {
         var owner = _owner ?? FindOwner();
-        var art = owner?.ArtworkForGroup(DataContext as CollectionViewGroup);
+        var group = DataContext as CollectionViewGroup;
+        var groupKey = group?.Name?.ToString();
+        // キャッシュ参照のみ（スクロール中はデコードしない）。出ない不具合の主因だった
+        //「Alt 中に Reload 自体をスキップ」はしない。
+        var art = owner?.ArtworkForGroup(group);
         if (art is null)
         {
             _face.Source = null;
             _reflection.Source = null;
             Visibility = Visibility.Collapsed;
+            _boundGroupKey = null;
+            return;
+        }
+
+        // Recycling で同じグループが再 Loaded されても、同じ Bitmap なら反射マスクまで作り直さない。
+        if (ReferenceEquals(_face.Source, art)
+            && string.Equals(_boundGroupKey, groupKey, StringComparison.Ordinal))
+        {
+            Visibility = Visibility.Visible;
+            Opacity = 1;
+            ApplyReflectionChrome();
             return;
         }
 
         _face.Source = art;
         _reflection.Source = art;
-        _reflection.RefreshMask();
         Visibility = Visibility.Visible;
         Opacity = 1;
-        _reflection.Visibility = Visibility.Visible;
-        SyncReflectionSize();
+        _boundGroupKey = groupKey;
+        ApplyReflectionChrome();
+        // 連打中は反射サイズ計算も後回し（キー離しの sticky flush で揃う）。
+        if (owner?.PlaylistJacketLiteChrome != true)
+        {
+            SyncReflectionSize();
+        }
     }
 
     private LibraryBrowserView? FindOwner()
@@ -7111,7 +8381,7 @@ internal sealed class LibraryGroupHorizontalPin
             return;
         }
 
-        var scroll = owner.GroupHorizontalOffset();
+        var scroll = owner.GroupHorizontalOffsetForSticky();
         if (scroll < 1)
         {
             _restX = natural;

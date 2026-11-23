@@ -71,6 +71,15 @@ public partial class MainWindow
     private int _playlistExtendPendingDelta;
     private int _playlistExtendPendingGroupSteps;
     private bool _playlistExtendFlushQueued;
+
+    /// <summary>
+    /// 無修飾の ↑↓ キーリピートを Input へ溜める。
+    /// 毎打 EnsureRowVisible／ScrollIntoView すると仮想化と sticky でカクつく。
+    /// </summary>
+    private int _playlistMovePendingDelta;
+    /// <summary>Page リピート回数（符号＝方向）。1 フレーム 1 回の MoveSelectionPage に分ける。</summary>
+    private int _playlistPagePendingSteps;
+    private bool _playlistMoveFlushQueued;
     /// <summary>Space 再生。true のあいだは曲末で次へ進まず停止する。</summary>
     private bool _libraryStopAfterTrack;
     /// <summary>F9（および F8 動画ミニ）。サイド／トランスポート／ステータスを隠す。F8 はアナライザを残す。再生は止めない。</summary>
@@ -1641,14 +1650,10 @@ public partial class MainWindow
             RefreshStatus();
         }
 
-        // Shift+矢印の範囲伸ばし中は毎キーの平均計算を避ける（キーリピート滞留の一因）。
-        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0
-            && (Keyboard.IsKeyDown(Key.Up)
-                || Keyboard.IsKeyDown(Key.Down)
-                || Keyboard.IsKeyDown(Key.PageUp)
-                || Keyboard.IsKeyDown(Key.PageDown)
-                || Keyboard.IsKeyDown(Key.Home)
-                || Keyboard.IsKeyDown(Key.End)))
+        // ナビ押し続け／キー離し直後は平均ラウドネスを後回し（Page 離しで 200ms超の一因）。
+        if (_libraryPlayOnArrowRelease
+            || _libraryPlayOnTrackKeyRelease
+            || IsPlaylistNavKeyDown())
         {
             ScheduleDeferredPlaylistSelectionLoudness();
             return;
@@ -1658,6 +1663,14 @@ public partial class MainWindow
         _playlistSelectionLoudnessDeferTicket++;
         SyncPlaylistSelectionLoudness();
     }
+
+    private static bool IsPlaylistNavKeyDown() =>
+        Keyboard.IsKeyDown(Key.Up)
+        || Keyboard.IsKeyDown(Key.Down)
+        || Keyboard.IsKeyDown(Key.PageUp)
+        || Keyboard.IsKeyDown(Key.PageDown)
+        || Keyboard.IsKeyDown(Key.Home)
+        || Keyboard.IsKeyDown(Key.End);
 
     private void ScheduleDeferredPlaylistSelectionLoudness()
     {
@@ -1672,13 +1685,9 @@ public partial class MainWindow
                     return;
                 }
 
-                if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0
-                    && (Keyboard.IsKeyDown(Key.Up)
-                        || Keyboard.IsKeyDown(Key.Down)
-                        || Keyboard.IsKeyDown(Key.PageUp)
-                        || Keyboard.IsKeyDown(Key.PageDown)
-                        || Keyboard.IsKeyDown(Key.Home)
-                        || Keyboard.IsKeyDown(Key.End)))
+                if (_libraryPlayOnArrowRelease
+                    || _libraryPlayOnTrackKeyRelease
+                    || IsPlaylistNavKeyDown())
                 {
                     return;
                 }
@@ -1774,6 +1783,107 @@ public partial class MainWindow
         {
             _playlistExtendFlushQueued = true;
             _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, FlushPlaylistExtendPending);
+        }
+    }
+
+    /// <summary>
+    /// 無修飾 ↑↓ のリピート差分を1フレームにまとめる。
+    /// 単一の <see cref="LibraryBrowserView.MoveSelection"/> で一気に進める（ScrollIntoView 1回）。
+    /// </summary>
+    private void QueuePlaylistMoveStep(int delta)
+    {
+        if (delta == 0)
+        {
+            return;
+        }
+
+        _playlistMovePendingDelta += delta;
+        SchedulePlaylistMoveFlush();
+    }
+
+    /// <summary>
+    /// Page リピートを溜める。行数デルタではなく <see cref="LibraryBrowserView.MoveSelectionPage"/> 1回分。
+    /// </summary>
+    private void QueuePlaylistPageStep(int direction)
+    {
+        if (direction == 0)
+        {
+            return;
+        }
+
+        _playlistPagePendingSteps += direction > 0 ? 1 : -1;
+        SchedulePlaylistMoveFlush();
+    }
+
+    private void SchedulePlaylistMoveFlush()
+    {
+        if (_playlistMoveFlushQueued)
+        {
+            return;
+        }
+
+        _playlistMoveFlushQueued = true;
+        // Input の方がキーリピートに追いつきやすい。
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Input, FlushPlaylistMovePending);
+    }
+
+    private void FlushPlaylistMovePending()
+    {
+        _playlistMoveFlushQueued = false;
+
+        // Page はエクスプローラー相当の1ステップずつ（見えていない行へ飛ばさない）。
+        if (_playlistPagePendingSteps != 0)
+        {
+            var pageSteps = _playlistPagePendingSteps;
+            _playlistPagePendingSteps = 0;
+            var dir = Math.Sign(pageSteps);
+            var beforePage = LibraryBrowser.PlaylistCaretFileIndex();
+            LibraryBrowser.MoveSelectionPage(dir, extend: false, wrap: false);
+            var pageRemain = pageSteps - dir;
+            if (pageRemain != 0)
+            {
+                if (beforePage == LibraryBrowser.PlaylistCaretFileIndex())
+                {
+                    _playlistPagePendingSteps = 0;
+                }
+                else
+                {
+                    _playlistPagePendingSteps = pageRemain;
+                    SchedulePlaylistMoveFlush();
+                    return;
+                }
+            }
+        }
+
+        var delta = _playlistMovePendingDelta;
+        _playlistMovePendingDelta = 0;
+        if (delta == 0)
+        {
+            return;
+        }
+
+        // 溜まりすぎた ↑↓ を一度に飛ばしすぎない。
+        var maxRows = Math.Max(1, LibraryBrowser.PlaylistPageStepRows());
+        var apply = delta;
+        if (Math.Abs(delta) > maxRows)
+        {
+            apply = Math.Sign(delta) * maxRows;
+            _playlistMovePendingDelta = delta - apply;
+        }
+
+        var beforeIndex = LibraryBrowser.PlaylistCaretFileIndex();
+        LibraryBrowser.MoveSelection(apply, extend: false, wrap: false);
+        if (_playlistMovePendingDelta != 0)
+        {
+            // 端で進まなければ残りを捨てて空回しを止める。
+            if (beforeIndex == LibraryBrowser.PlaylistCaretFileIndex())
+            {
+                _playlistMovePendingDelta = 0;
+            }
+            else
+            {
+                SchedulePlaylistMoveFlush();
+            }
         }
     }
 
@@ -2550,7 +2660,21 @@ public partial class MainWindow
         {
             if (session is not null)
             {
-                PreviewLibrarySession(session);
+                // 波形ロードを KeyUp 同期経路から外す（Page 離しの Finalize 直後に重ねない）。
+                var ticket = session;
+                _ = Dispatcher.BeginInvoke(
+                    () =>
+                    {
+                        if (!IsLibraryMaximized
+                            || IsPlaybackActive()
+                            || !ReferenceEquals(LibraryBrowser.SelectedSession ?? _activeSession, ticket))
+                        {
+                            return;
+                        }
+
+                        PreviewLibrarySession(ticket);
+                    },
+                    DispatcherPriority.Background);
             }
 
             return;
