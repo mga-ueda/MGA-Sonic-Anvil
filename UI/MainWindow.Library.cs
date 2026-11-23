@@ -2101,6 +2101,13 @@ public partial class MainWindow
             return;
         }
 
+        // 行差し替え（ラウドネス計測完了など）で同じ曲が再 Activate されても、
+        // 再生中／一時停止中の音を頭からやり直さない。
+        if (ReferenceEquals(session, _activeSession))
+        {
+            return;
+        }
+
         _ = PlayLibrarySessionAsync(session);
     }
 
