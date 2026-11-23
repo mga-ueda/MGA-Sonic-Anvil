@@ -268,8 +268,9 @@ internal sealed class SpeakerPreset
 
     /// <summary>
     /// 有効な定義の本数に合わせる。1〜2ch は Stereo。候補が無いか曖昧なら null。
-    /// チャンネルマスクが有効な配置（カスタム含む）に一致すれば、同本数の維持より先にそちらへ寄せる。
-    /// 今の配置がすでに同じ本数なら、1〜2ch→Stereo とマスク一致以外は切り替えない。
+    /// チャンネルマスクが有効な配置にだけ一致すればそれ（カスタム可）。複数候補で迷うとき、
+    /// またはマスクが無い／一致しないときは規定配置（PreferredForChannels）を優先。
+    /// 規定が無効で同本数が複数あるときだけ現状維持（切り替えない）。
     /// </summary>
     public static string? ResolveAutoSpeakerId(
         int fileChannels,
@@ -302,12 +303,6 @@ internal sealed class SpeakerPreset
             return SameId(currentId, DefaultId) ? null : DefaultId;
         }
 
-        var current = FindById(catalog, currentId);
-        if (current is not null && current.Channels == fileChannels)
-        {
-            return null;
-        }
-
         var matches = new List<SpeakerPreset>();
         foreach (var preset in catalog)
         {
@@ -326,11 +321,6 @@ internal sealed class SpeakerPreset
             return null;
         }
 
-        if (matches.Count == 1)
-        {
-            return SameId(currentId, matches[0].Id) ? null : matches[0].Id;
-        }
-
         var preferredId = ChannelLayout.PreferredForChannels(fileChannels).Id;
         foreach (var match in matches)
         {
@@ -340,9 +330,25 @@ internal sealed class SpeakerPreset
             }
         }
 
+        // 規定が無効。今が同本数なら維持。唯一の候補ならそれへ。複数なら曖昧で切り替えない。
+        if (FindById(matches, currentId) is not null)
+        {
+            return null;
+        }
+
+        if (matches.Count == 1)
+        {
+            return SameId(currentId, matches[0].Id) ? null : matches[0].Id;
+        }
+
         return null;
     }
 
+    /// <summary>
+    /// 同マスクの候補から勝者を一意に決める。現状が勝者なら null（切り替え不要）。
+    /// 候補が 1 つ（カスタム含む）ならそれが完全マッチ。複数で迷うときだけ規定を優先。
+    /// 「今の配置が候補なら維持」はしない（非勝者のカスタムに張り付いてタブ間がぶれるため）。
+    /// </summary>
     private static bool TryResolveFromChannelMask(
         int channelMask,
         int fileChannels,
@@ -372,25 +378,22 @@ internal sealed class SpeakerPreset
             return false;
         }
 
-        foreach (var match in matches)
+        var winnerId = PickChannelMaskWinnerId(channelMask, matches);
+        id = SameId(currentId, winnerId) ? null : winnerId;
+        return true;
+    }
+
+    /// <summary>
+    /// マスク一致の勝者。唯一ならそれ（カスタム可）。複数なら KnownPresets → 組み込み → カタログ先頭。
+    /// </summary>
+    private static string PickChannelMaskWinnerId(int channelMask, List<SpeakerPreset> matches)
+    {
+        if (matches.Count == 1)
         {
-            if (SameId(currentId, match.Id))
-            {
-                id = null;
-                return true;
-            }
+            return matches[0].Id;
         }
 
-        // 同マスクならカスタムを優先（ユーザー定義の並びに寄せる）。
-        foreach (var match in matches)
-        {
-            if (match.IsCustom)
-            {
-                id = match.Id;
-                return true;
-            }
-        }
-
+        // 規定とカスタムが同じマスク（スピーカー集合が同じ）→ 迷うので規定へ。
         var knownId = ChannelLayoutMasks.MatchPresetId(channelMask);
         if (knownId is not null)
         {
@@ -398,20 +401,27 @@ internal sealed class SpeakerPreset
             {
                 if (match.Id.Equals(knownId, StringComparison.OrdinalIgnoreCase))
                 {
-                    id = match.Id;
-                    return true;
+                    return match.Id;
                 }
             }
         }
 
-        id = matches[0].Id;
-        return true;
+        foreach (var match in matches)
+        {
+            if (!match.IsCustom)
+            {
+                return match.Id;
+            }
+        }
+
+        return matches[0].Id;
     }
 
     /// <summary>
     /// ファイルの本数／チャンネルマスクと、いまのスピーカー設定が食い違い、
     /// プレビューや再生の割り当てが危ういとき true。
     /// マスクが示す配置がメニューに無い（切り替え不可）場合も含む。
+    /// モノラル（1ch）は Stereo 等へのミラー再生が前提なので警告しない。
     /// </summary>
     public static bool HasPreviewLayoutConflict(
         int fileChannels,
@@ -420,6 +430,12 @@ internal sealed class SpeakerPreset
         IEnumerable<SpeakerPreset>? presets)
     {
         if (fileChannels < 1)
+        {
+            return false;
+        }
+
+        // 1ch は自動選択でも Stereo を優先し、左右へ同じ音を出す。本数／マスク差は警告しない。
+        if (fileChannels == 1)
         {
             return false;
         }

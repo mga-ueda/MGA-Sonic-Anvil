@@ -191,8 +191,22 @@ public sealed class SpeakerPresetTests
         Assert.Equal("5.1", AutoId(settings, 6));
         settings.ActiveSpeakerPresetId = "5.1";
         Assert.Null(AutoId(settings, 6));
+        // マスク無しでも規定 5.1 を優先（同本数の現状維持より先）。
         settings.ActiveSpeakerPresetId = "5.1-Side";
-        Assert.Null(AutoId(settings, 6));
+        Assert.Equal("5.1", AutoId(settings, 6));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_PrefersBuiltInOverCustomWithoutMask()
+    {
+        var custom = SpeakerPreset.CreateCustom("My 5.1", ["L", "R", "C", "LFE", "Ls", "Rs"]);
+        var settings = Visible("Stereo", "5.1");
+        settings.SpeakerPresets = SpeakerPreset.MergeCatalog([.. settings.SpeakerPresets, custom]);
+        settings.ApplyVisibleSpeakerIds(["Stereo", "5.1", custom.Id]);
+        settings.ActiveSpeakerPresetId = custom.Id;
+        Assert.Equal("5.1", AutoId(settings, 6));
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.Equal("5.1", AutoId(settings, 6));
     }
 
     [Fact]
@@ -257,16 +271,53 @@ public sealed class SpeakerPresetTests
     }
 
     [Fact]
-    public void ResolveAutoSpeakerId_PrefersVisibleCustomMatchingMask()
+    public void ResolveAutoSpeakerId_AmbiguousMaskPrefersBuiltInOverCustom()
     {
         var custom = SpeakerPreset.CreateCustom("LRC Side", ["FL", "FC", "FR", "SL", "SR", "LFE"]);
         var settings = Visible("Stereo", "5.1", "5.1-Side");
         settings.SpeakerPresets = SpeakerPreset.MergeCatalog([.. settings.SpeakerPresets, custom]);
         settings.ApplyVisibleSpeakerIds(["Stereo", "5.1", "5.1-Side", custom.Id]);
         settings.ActiveSpeakerPresetId = "5.1";
+        // 規定とカスタムが同マスク → 迷うので規定 5.1-Side。
+        Assert.Equal("5.1-Side", AutoId(settings, 6, channelMask: 0x60F));
+        settings.ActiveSpeakerPresetId = custom.Id;
+        Assert.Equal("5.1-Side", AutoId(settings, 6, channelMask: 0x60F));
+        settings.ActiveSpeakerPresetId = "5.1-Side";
+        Assert.Null(AutoId(settings, 6, channelMask: 0x60F));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_UniqueCustomMaskMatchSelectsCustom()
+    {
+        var custom = SpeakerPreset.CreateCustom("LRC Side", ["FL", "FC", "FR", "SL", "SR", "LFE"]);
+        var settings = Visible("Stereo", "5.1");
+        settings.SpeakerPresets = SpeakerPreset.MergeCatalog([.. settings.SpeakerPresets, custom]);
+        settings.ApplyVisibleSpeakerIds(["Stereo", "5.1", custom.Id]);
+        // 5.1-Side が無効ならマスク 0x60F はカスタムだけが完全マッチ。
+        settings.ActiveSpeakerPresetId = "5.1";
+        Assert.Equal(custom.Id, AutoId(settings, 6, channelMask: 0x60F));
+        settings.ActiveSpeakerPresetId = "Stereo";
         Assert.Equal(custom.Id, AutoId(settings, 6, channelMask: 0x60F));
         settings.ActiveSpeakerPresetId = custom.Id;
         Assert.Null(AutoId(settings, 6, channelMask: 0x60F));
+    }
+
+    [Fact]
+    public void ResolveAutoSpeakerId_MaskMatchAmongCustomsIsStable()
+    {
+        // 規定に無い並び（同じスピーカー集合＝同マスク）が複数 → 迷うのでカタログ先頭で一意。
+        var first = SpeakerPreset.CreateCustom("Side A", ["FL", "FR", "FC", "LFE", "SL", "SR"]);
+        var second = SpeakerPreset.CreateCustom("Side B", ["FL", "FR", "FC", "LFE", "SL", "SR"]);
+        Assert.Equal(first.ChannelMaskOrNull(), second.ChannelMaskOrNull());
+        var mask = first.ChannelMaskOrNull()!.Value;
+
+        var settings = Visible("Stereo");
+        settings.SpeakerPresets = SpeakerPreset.MergeCatalog([.. settings.SpeakerPresets, first, second]);
+        settings.ApplyVisibleSpeakerIds(["Stereo", first.Id, second.Id]);
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.Equal(first.Id, AutoId(settings, 6, channelMask: mask));
+        settings.ActiveSpeakerPresetId = second.Id;
+        Assert.Equal(first.Id, AutoId(settings, 6, channelMask: mask));
     }
 
     [Fact]
@@ -277,6 +328,19 @@ public sealed class SpeakerPresetTests
         Assert.True(Conflict(settings, 6, 0));
         settings.ActiveSpeakerPresetId = "5.1";
         Assert.False(Conflict(settings, 6, 0));
+    }
+
+    [Fact]
+    public void HasPreviewLayoutConflict_MonoFileNeverConflicts()
+    {
+        var settings = Visible("Stereo", "Mono", "5.1");
+        settings.ActiveSpeakerPresetId = "Stereo";
+        Assert.False(Conflict(settings, 1, 0));
+        Assert.False(Conflict(settings, 1, 0x1));
+        settings.ActiveSpeakerPresetId = "5.1";
+        Assert.False(Conflict(settings, 1, 0));
+        settings.ActiveSpeakerPresetId = "Mono";
+        Assert.False(Conflict(settings, 1, 0x1));
     }
 
     [Fact]
