@@ -194,11 +194,63 @@ internal static class LibraryColumnFilter
     }
 
     /// <summary>
+    /// その曲の形式向け列プリセットで波形がオンか。
+    /// 混在リストでも Wave / MP3 / Video それぞれの設定を見る（列があってもオフなら描かない）。
+    /// </summary>
+    public static bool PresetAllowsWaveform(
+        LibraryFileRow row,
+        IReadOnlyList<LibraryFileColumn> waveColumns,
+        IReadOnlyList<LibraryFileColumn> mp3Columns,
+        IReadOnlyList<LibraryFileColumn>? videoColumns = null) =>
+        PresetAllowsWaveform(EffectiveKind(row), waveColumns, mp3Columns, videoColumns);
+
+    /// <summary>形式キー向け。PDF は常にオフ。</summary>
+    public static bool PresetAllowsWaveform(
+        string kind,
+        IReadOnlyList<LibraryFileColumn> waveColumns,
+        IReadOnlyList<LibraryFileColumn> mp3Columns,
+        IReadOnlyList<LibraryFileColumn>? videoColumns = null)
+    {
+        if (IsPdfFamilyKind(kind))
+        {
+            return false;
+        }
+
+        IReadOnlyList<LibraryFileColumn> columns;
+        if (IsPcmFamilyKind(kind))
+        {
+            columns = waveColumns;
+        }
+        else if (IsTagFamilyKind(kind))
+        {
+            columns = mp3Columns;
+        }
+        else if (IsVideoFamilyKind(kind))
+        {
+            columns = videoColumns ?? VideoDefaults;
+        }
+        else
+        {
+            return false;
+        }
+
+        for (var i = 0; i < columns.Count; i++)
+        {
+            if (columns[i] == LibraryFileColumn.Waveform)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// プレイリストに値が1件でもある列。空リストは空集合（列をすべて隠す）。
     /// null は使用フィルタ無し（設定どおり全部出す）。
     /// ジャケットは実際に画像がある行が1件でもあれば出す。
     /// 無いときは列も枠も出さない。
-    /// 波形は曲が1件でもあれば出す（中身は後から埋める）。
+    /// 波形は曲が1件でもあれば列として出す（中身は形式プリセットに従い、後から埋める）。
     /// ラウドネスは WAVE / AIFF が1件でもあれば出す（計測は後から埋める）。
     /// 親フォルダ／波形を出すかは Wave / MP3 の列プリセット側。
     /// </summary>

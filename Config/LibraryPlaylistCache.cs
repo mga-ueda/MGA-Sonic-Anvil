@@ -65,12 +65,12 @@ internal static class LibraryPlaylistCache
     /// <summary>形式に応じた列プリセットで波形がオンか。</summary>
     public static bool RequiresWaveform(string kindKey)
     {
-        if (LibraryColumnFilter.IsPdfFamilyKind(kindKey))
-        {
-            return false;
-        }
-
-        return ContainsColumn(ColumnsForKind(kindKey), LibraryFileColumn.Waveform);
+        var settings = AppStorage.Settings;
+        return LibraryColumnFilter.PresetAllowsWaveform(
+            kindKey,
+            settings.ResolvedLibraryListColumnsWave(),
+            settings.ResolvedLibraryListColumnsMp3(),
+            settings.ResolvedLibraryListColumnsVideo());
     }
 
     /// <summary>形式に応じた列プリセットでジャケットがオンか。</summary>

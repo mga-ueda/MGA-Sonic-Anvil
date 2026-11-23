@@ -380,6 +380,34 @@ public sealed class LibraryColumnFilterTests
     }
 
     [Fact]
+    public void PresetAllowsWaveform_HonorsFamilyColumnSettings()
+    {
+        var wave = LibraryColumnFilter.WaveDefaults;
+        var mp3 = LibraryColumnFilter.Mp3Defaults;
+        var video = LibraryColumnFilter.VideoDefaults;
+        Assert.True(LibraryColumnFilter.PresetAllowsWaveform(
+            new LibraryFileRow { Name = "a.wav", Kind = "WAVE" }, wave, mp3, video));
+        Assert.True(LibraryColumnFilter.PresetAllowsWaveform(
+            new LibraryFileRow { Name = "a.aiff", Kind = "AIFF" }, wave, mp3, video));
+        Assert.False(LibraryColumnFilter.PresetAllowsWaveform(
+            new LibraryFileRow { Name = "a.mp3", Kind = "MP3" }, wave, mp3, video));
+        Assert.True(LibraryColumnFilter.PresetAllowsWaveform(
+            new LibraryFileRow { Name = "a.mp4", Kind = "MP4" }, wave, mp3, video));
+        Assert.False(LibraryColumnFilter.PresetAllowsWaveform(
+            new LibraryFileRow { Name = "a.pdf", Kind = "PDF" }, wave, mp3, video));
+
+        var mp3WithWave = LibraryColumnFilter.Mp3Defaults
+            .Append(LibraryFileColumn.Waveform)
+            .ToArray();
+        Assert.True(LibraryColumnFilter.PresetAllowsWaveform(
+            new LibraryFileRow { Name = "a.mp3", Kind = "MP3" }, wave, mp3WithWave, video));
+
+        var waveWithout = wave.Where(c => c != LibraryFileColumn.Waveform).ToArray();
+        Assert.False(LibraryColumnFilter.PresetAllowsWaveform(
+            new LibraryFileRow { Name = "a.wav", Kind = "WAVE" }, waveWithout, mp3, video));
+    }
+
+    [Fact]
     public void ClassifyPlaylistColumns_SeparatesWaveMp3AndMixed()
     {
         Assert.Equal(
